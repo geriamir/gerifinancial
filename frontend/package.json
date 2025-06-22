@@ -29,8 +29,8 @@
   "scripts": {
     "start": "react-app-rewired start",
     "build": "react-app-rewired build",
-    "test": "jest --config=jest.config.js",
-    "test:ci": "jest --config=jest.config.js --watchAll=false",
+    "test": "jest --config=jest.config.js --runInBand",
+    "test:ci": "node --expose-gc ./node_modules/.bin/jest --config=jest.config.js --runInBand --no-cache --watchAll=false",
     "eject": "react-scripts eject",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run",
