@@ -1,14 +1,13 @@
-const { MongoMemoryServer } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
+const testDb = require('./testDb');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 
 let mongoServer;
 
-// Set up MongoDB Memory Server before all tests
+// Set up database connection before all tests
 beforeAll(async () => {
-  // Use the URI from globalSetup
-  await mongoose.connect(process.env.MONGO_URI);
+  await testDb.connect();
 });
 
 // Clear all collections between tests
@@ -19,11 +18,9 @@ beforeEach(async () => {
   }
 });
 
-// Close connection and stop server after all tests
+// Close connection after all tests
 afterAll(async () => {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect();
-  }
+  await testDb.disconnect();
 });
 
 // Helper function to generate test JWT tokens

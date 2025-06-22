@@ -1,4 +1,3 @@
-const { MongoMemoryServer } = require('mongodb-memory-server');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -6,10 +5,8 @@ module.exports = async () => {
   // If we're in CI, use the MongoDB service container
   if (process.env.CI) {
     process.env.MONGO_URI = process.env.MONGODB_URI;
-    return;
   }
 
-  // For local development, use MongoDB Memory Server
   // Create test data directory if it doesn't exist
   const testDataPath = path.join(__dirname, '../../test-data');
   try {
@@ -20,21 +17,6 @@ module.exports = async () => {
     }
   }
 
-  // Configure mongodb-memory-server to use a specific version that works on Windows
-  const mongod = await MongoMemoryServer.create({
-    instance: {
-      dbPath: testDataPath,
-      storageEngine: 'wiredTiger'
-    },
-    binary: {
-      version: '5.0.0',
-      downloadDir: path.join(testDataPath, 'mongodb-binaries'),
-    },
-  });
-
-  // Store the URI for later use
-  global.__MONGOD__ = mongod;
-  const uri = mongod.getUri();
-  process.env.MONGO_URI = uri;
-  console.log('MongoDB Memory Server started at:', uri);
+  // The actual connection will be handled by testDb.js
+  console.log('Test environment setup complete');
 };
