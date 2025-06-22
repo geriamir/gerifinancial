@@ -174,6 +174,7 @@ export const BankAccountsList: React.FC = () => {
                     <IconButton
                       onClick={() => handleTestConnection(account._id, getBankName(account.bankId))}
                       title="Test Connection"
+                      aria-label={`Test connection for ${account.name}`}
                       size="small"
                     >
                       <RefreshIcon />
@@ -181,6 +182,7 @@ export const BankAccountsList: React.FC = () => {
                     <IconButton
                       onClick={() => handleDelete(account._id, getBankName(account.bankId))}
                       title="Delete Account"
+                      aria-label={`Delete ${account.name}`}
                       size="small"
                       color="error"
                     >
