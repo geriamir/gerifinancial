@@ -32,8 +32,15 @@ jobs:
 
     - name: Install Dependencies
       run: |
+        rm -rf frontend/node_modules backend/node_modules node_modules
         npm run install-all
         cd frontend && npm install cypress --save-dev
+        cd ..
+
+    - name: Verify Frontend Dependencies
+      run: |
+        cd frontend
+        npm ls react-router-dom
         cd ..
 
     - name: Verify Cypress
