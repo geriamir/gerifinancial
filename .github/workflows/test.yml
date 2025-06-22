@@ -1,0 +1,50 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install Dependencies
+      run: |
+        npm run install-all
+        cd frontend && npm install -g cypress
+        cd ..
+
+    - name: Run Backend Tests
+      run: cd backend && npm test
+      env:
+        NODE_ENV: test
+        JWT_SECRET: test-secret
+        MONGODB_URI: mongodb://localhost:27777/gerifinancial-test
+
+    - name: Run Frontend Unit Tests
+      run: cd frontend && npm test -- --watchAll=false
+      env:
+        CI: true
+
+    - name: Run E2E Tests
+      run: npm run test:e2e:ci
+      env:
+        NODE_ENV: test
+        JWT_SECRET: test-secret
+        MONGODB_URI: mongodb://localhost:27777/gerifinancial-test
+        CI: true
