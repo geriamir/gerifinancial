@@ -54,7 +54,7 @@ jobs:
         MONGODB_URI: mongodb://localhost:27777/gerifinancial-test
 
     - name: Run Frontend Unit Tests
-      run: cd frontend && npm test -- --watchAll=false
+      run: cd frontend && npm run test:ci
       env:
         CI: true
 
