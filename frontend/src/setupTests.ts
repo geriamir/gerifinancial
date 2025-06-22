@@ -1,17 +1,27 @@
-// jest-dom adds custom jest matchers for asserting on DOM nodes.
 import '@testing-library/jest-dom';
+import { configure } from '@testing-library/react';
 
-// Mock matchMedia for Material-UI components
+// Set up testing library configuration
+configure({
+  testIdAttribute: 'data-testid',
+});
+
+// Mock window.matchMedia for Material-UI
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: jest.fn().mockImplementation(query => ({
     matches: false,
     media: query,
     onchange: null,
-    addListener: jest.fn(),
-    removeListener: jest.fn(),
     addEventListener: jest.fn(),
     removeEventListener: jest.fn(),
     dispatchEvent: jest.fn(),
   })),
 });
+
+// Mock window.ResizeObserver for Material-UI
+window.ResizeObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}));
