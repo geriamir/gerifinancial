@@ -9,15 +9,32 @@ import {
   IconButton,
   Menu,
   MenuItem,
-  Avatar
+  Avatar,
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ListItemButton
 } from '@mui/material';
-import { AccountCircle as AccountCircleIcon } from '@mui/icons-material';
+import {
+  AccountCircle as AccountCircleIcon,
+  Menu as MenuIcon,
+  Dashboard as DashboardIcon,
+  AccountBalance as AccountBalanceIcon
+} from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 
 const AuthLayout: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+
+  const menuItems = [
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+    { text: 'Bank Accounts', icon: <AccountBalanceIcon />, path: '/banks' }
+  ];
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -37,6 +54,15 @@ const AuthLayout: React.FC = () => {
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <AppBar position="static">
         <Toolbar>
+          <IconButton
+            edge="start"
+            color="inherit"
+            aria-label="menu"
+            onClick={() => setDrawerOpen(true)}
+            sx={{ mr: 2 }}
+          >
+            <MenuIcon />
+          </IconButton>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             GeriFinancial
           </Typography>
@@ -81,6 +107,30 @@ const AuthLayout: React.FC = () => {
           </Box>
         </Toolbar>
       </AppBar>
+
+      <Drawer
+        anchor="left"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+      >
+        <Box
+          sx={{ width: 250 }}
+          role="presentation"
+          onClick={() => setDrawerOpen(false)}
+        >
+          <List>
+            {menuItems.map((item) => (
+              <ListItemButton
+                key={item.text}
+                onClick={() => navigate(item.path)}
+              >
+                <ListItemIcon>{item.icon}</ListItemIcon>
+                <ListItemText primary={item.text} />
+              </ListItemButton>
+            ))}
+          </List>
+        </Box>
+      </Drawer>
 
       <Container component="main" sx={{ flex: 1, py: 4 }}>
         <Outlet />
