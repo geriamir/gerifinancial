@@ -1,6 +1,11 @@
 import '@testing-library/jest-dom';
 import { configure } from '@testing-library/react';
 
+// Add missing TextEncoder/TextDecoder implementations
+const { TextEncoder, TextDecoder } = require('util');
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
+
 // Set up testing library configuration
 configure({
   testIdAttribute: 'data-testid',
