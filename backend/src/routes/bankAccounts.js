@@ -86,7 +86,6 @@ router.patch('/:id', auth, async (req, res) => {
 
 // Account Management Routes
 
-
 // Get scraping configuration
 router.get('/:id/scraping-config', auth, async (req, res) => {
   try {
@@ -166,8 +165,10 @@ router.patch('/:id/scraping-config', auth, async (req, res) => {
 
 // Bank Connection Routes
 router.post('/:id/test', auth, async (req, res) => {
+  let bankAccount = null;
+
   try {
-    const bankAccount = await BankAccount.findOne({
+    bankAccount = await BankAccount.findOne({
       _id: req.params.id,
       userId: req.user._id
     });
@@ -226,6 +227,5 @@ router.delete('/:id', auth, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 
 module.exports = router;
