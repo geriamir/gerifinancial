@@ -3,6 +3,13 @@ const fs = require('fs').promises;
 const path = require('path');
 
 module.exports = async () => {
+  // If we're in CI, use the MongoDB service container
+  if (process.env.CI) {
+    process.env.MONGO_URI = process.env.MONGODB_URI;
+    return;
+  }
+
+  // For local development, use MongoDB Memory Server
   // Create test data directory if it doesn't exist
   const testDataPath = path.join(__dirname, '../../test-data');
   try {
