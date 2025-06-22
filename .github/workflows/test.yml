@@ -33,8 +33,11 @@ jobs:
     - name: Install Dependencies
       run: |
         npm run install-all
-        cd frontend && npm install -g cypress
+        cd frontend && npm install cypress --save-dev
         cd ..
+
+    - name: Verify Cypress
+      run: cd frontend && npx cypress verify
 
     - name: Run Backend Tests
       run: cd backend && npm test
@@ -55,3 +58,5 @@ jobs:
         JWT_SECRET: test-secret
         MONGODB_URI: mongodb://localhost:27777/gerifinancial-test
         CI: true
+        CYPRESS_BASE_URL: http://localhost:3000
+        CYPRESS_API_URL: http://localhost:3001
