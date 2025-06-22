@@ -1,5 +1,10 @@
 const express = require('express');
-const { createScraper } = require('israeli-bank-scrapers');
+const bcrypt = require('bcryptjs');
+const scraperModule = process.env.NODE_ENV === 'test'
+  ? require('../test/mocks/bankScraper')
+  : require('israeli-bank-scrapers');
+
+const { createScraper } = scraperModule;
 const BankAccount = require('../models/BankAccount');
 const auth = require('../middleware/auth');
 
@@ -20,6 +25,10 @@ router.post('/', auth, async (req, res) => {
   try {
     const { bankId, name, credentials } = req.body;
 
+    if (!bankId || !name || !credentials || !credentials.username || !credentials.password) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
     // Validate bank credentials by trying to scrape
     const scraper = createScraper({
       companyId: bankId,
@@ -29,7 +38,6 @@ router.post('/', auth, async (req, res) => {
     try {
       await scraper.initialize();
       await scraper.login(credentials);
-      // If login successful, save the account
     } catch (error) {
       return res.status(400).json({
         error: 'Invalid credentials or bank service unavailable',
@@ -37,17 +45,24 @@ router.post('/', auth, async (req, res) => {
       });
     }
 
+    // Hash the password before saving
+    const hashedPassword = await bcrypt.hash(credentials.password, 10);
     const bankAccount = new BankAccount({
       userId: req.user._id,
       bankId,
       name,
-      credentials,
+      credentials: {
+        ...credentials,
+        password: hashedPassword
+      },
       status: 'active'
     });
 
     await bankAccount.save();
 
-    res.status(201).json(bankAccount);
+    // Return without sensitive data
+    const response = bankAccount.toJSON();
+    res.status(201).json(response);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -64,13 +79,20 @@ router.patch('/:id', auth, async (req, res) => {
   }
 
   try {
-    const bankAccount = await BankAccount.findOne({
-      _id: req.params.id,
-      userId: req.user._id
-    });
+    const bankAccount = await BankAccount.findById(req.params.id);
 
     if (!bankAccount) {
       return res.status(404).json({ error: 'Bank account not found' });
+    }
+
+    // Check if user owns the account
+    if (bankAccount.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Not authorized to update this account' });
+    }
+
+    // Hash new password if it's being updated
+    if (req.body.credentials?.password) {
+      req.body.credentials.password = await bcrypt.hash(req.body.credentials.password, 10);
     }
 
     updates.forEach(update => {
@@ -78,92 +100,13 @@ router.patch('/:id', auth, async (req, res) => {
     });
 
     await bankAccount.save();
-    res.json(bankAccount);
+    res.json(bankAccount.toJSON());
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
-// Account Management Routes
-
-// Get scraping configuration
-router.get('/:id/scraping-config', auth, async (req, res) => {
-  try {
-    const bankAccount = await BankAccount.findOne({
-      _id: req.params.id,
-      userId: req.user._id
-    });
-
-    if (!bankAccount) {
-      return res.status(404).json({ error: 'Bank account not found' });
-    }
-
-    res.json({
-      scrapingConfig: bankAccount.scrapingConfig,
-      nextScrapingTime: bankAccount.getNextScrapingTime()
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Update scraping configuration
-router.patch('/:id/scraping-config', auth, async (req, res) => {
-  try {
-    const bankAccount = await BankAccount.findOne({
-      _id: req.params.id,
-      userId: req.user._id
-    });
-
-    if (!bankAccount) {
-      return res.status(404).json({ error: 'Bank account not found' });
-    }
-
-    // Validate and update scraping configuration
-    if (req.body.schedule) {
-      const { frequency, dayOfWeek, dayOfMonth, timeOfDay } = req.body.schedule;
-      
-      if (frequency) {
-        bankAccount.scrapingConfig.schedule.frequency = frequency;
-      }
-      
-      if (dayOfWeek !== undefined && frequency === 'weekly') {
-        bankAccount.scrapingConfig.schedule.dayOfWeek = dayOfWeek;
-      }
-      
-      if (dayOfMonth !== undefined && frequency === 'monthly') {
-        bankAccount.scrapingConfig.schedule.dayOfMonth = dayOfMonth;
-      }
-      
-      if (timeOfDay) {
-        bankAccount.scrapingConfig.schedule.timeOfDay = timeOfDay;
-      }
-    }
-
-    if (req.body.options) {
-      const { startDate, monthsBack } = req.body.options;
-      
-      if (startDate) {
-        bankAccount.scrapingConfig.options.startDate = new Date(startDate);
-      }
-      
-      if (monthsBack) {
-        bankAccount.scrapingConfig.options.monthsBack = monthsBack;
-      }
-    }
-
-    await bankAccount.save();
-    
-    res.json({
-      scrapingConfig: bankAccount.scrapingConfig,
-      nextScrapingTime: bankAccount.getNextScrapingTime()
-    });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-// Bank Connection Routes
+// Test bank connection
 router.post('/:id/test', auth, async (req, res) => {
   let bankAccount = null;
 
@@ -189,11 +132,10 @@ router.post('/:id/test', auth, async (req, res) => {
     await bankAccount.save();
 
     res.json({ 
-      message: 'Connection successful',
+      message: 'Connection test successful',
       nextScrapingTime: bankAccount.getNextScrapingTime()
     });
   } catch (error) {
-    // Handle bank account not found
     if (!bankAccount) {
       return res.status(404).json({ error: 'Bank account not found' });
     }
@@ -207,7 +149,7 @@ router.post('/:id/test', auth, async (req, res) => {
     await bankAccount.save();
 
     res.status(400).json({
-      error: 'Connection failed',
+      error: 'Connection test failed',
       details: error.message
     });
   }
@@ -216,16 +158,19 @@ router.post('/:id/test', auth, async (req, res) => {
 // Delete bank account
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const bankAccount = await BankAccount.findOneAndDelete({
-      _id: req.params.id,
-      userId: req.user._id
-    });
-
+    const bankAccount = await BankAccount.findById(req.params.id);
+    
     if (!bankAccount) {
       return res.status(404).json({ error: 'Bank account not found' });
     }
 
-    res.json(bankAccount);
+    // Check if user owns the account
+    if (bankAccount.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Not authorized to delete this account' });
+    }
+
+    await BankAccount.deleteOne({ _id: bankAccount._id });
+    res.json({ message: 'Account deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -3,11 +3,19 @@
   "version": "1.0.0",
   "description": "Financial management application with bank scraping capabilities",
   "scripts": {
+    "preinstall": "echo 'Setting NODE_OPTIONS...' && set NODE_OPTIONS=--no-deprecation",
     "install-all": "cd backend && npm install && cd ../frontend && npm install",
+    "kill-ports": "npx kill-port 3000 3001",
     "backend": "cd backend && npm run dev",
     "frontend": "cd frontend && npm start",
     "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "concurrently \"cd backend && npm test\" \"cd frontend && npm test\"",
+    "test:e2e": "concurrently \"npm run dev\" \"cd frontend && wait-on http://localhost:3000 http://localhost:3001 && npm run cypress:open\"",
+    "test:e2e:headless": "concurrently \"npm run dev\" \"cd frontend && wait-on http://localhost:3000 http://localhost:3001 && npm run cypress:run\"",
+    "test:e2e:auth": "concurrently \"npm run dev\" \"cd frontend && wait-on http://localhost:3000 http://localhost:3001 && npm run cypress:run --spec 'cypress/e2e/auth/**/*.cy.ts'\"",
+    "test:e2e:bank": "concurrently \"npm run dev\" \"cd frontend && wait-on http://localhost:3000 http://localhost:3001 && npm run cypress:run --spec 'cypress/e2e/bank/**/*.cy.ts'\"",
+    "test:e2e:new": "node scripts/test-e2e.js",
+    "test:all": "npm run test && npm run test:e2e:headless"
   },
   "repository": {
     "type": "git",
@@ -21,6 +29,10 @@
   },
   "homepage": "https://github.com/geriamir/gerifinancial#readme",
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "axios": "^1.10.0",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "kill-port": "^2.0.1",
+    "wait-on": "^8.0.3"
   }
 }
