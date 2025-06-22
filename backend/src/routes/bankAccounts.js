@@ -193,15 +193,18 @@ router.post('/:id/test', auth, async (req, res) => {
       nextScrapingTime: bankAccount.getNextScrapingTime()
     });
   } catch (error) {
-    // Update error status
-    if (bankAccount) {
-      bankAccount.status = 'error';
-      bankAccount.lastError = {
-        message: error.message,
-        date: new Date()
-      };
-      await bankAccount.save();
+    // Handle bank account not found
+    if (!bankAccount) {
+      return res.status(404).json({ error: 'Bank account not found' });
     }
+
+    // Update error status
+    bankAccount.status = 'error';
+    bankAccount.lastError = {
+      message: error.message,
+      date: new Date()
+    };
+    await bankAccount.save();
 
     res.status(400).json({
       error: 'Connection failed',
