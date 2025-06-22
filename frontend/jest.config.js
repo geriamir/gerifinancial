@@ -1,14 +1,10 @@
 module.exports = {
-  // Use react-scripts' default configuration
-  ...require('react-scripts/config/jest/babelTransform'),
-  
+  preset: 'react-scripts',
+  transform: {
+    '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { configFile: './babel.config.js' }],
+  },
   // Make sure Jest can find node_modules
   moduleDirectories: ['node_modules', '<rootDir>/src'],
-  
-  // Add root directory to module name mapper
-  moduleNameMapper: {
-    '^react-router-dom$': '<rootDir>/node_modules/react-router-dom',
-  },
 
   // Add test setup file
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.ts'],
