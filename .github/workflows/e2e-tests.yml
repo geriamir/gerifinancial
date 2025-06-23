@@ -2,9 +2,10 @@ name: E2E Tests
 
 on:
   push:
-    branches: [ main, develop, feature/** ]
+    branches: [ main ]
   pull_request:
     branches: [ main, develop ]
+    types: [opened, synchronize, reopened]
 
 jobs:
   e2e-tests:
