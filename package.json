@@ -4,6 +4,7 @@
   "description": "Financial management application with bank scraping capabilities",
   "scripts": {
     "preinstall": "echo 'Setting NODE_OPTIONS...' && set NODE_OPTIONS=--no-deprecation",
+    "test:e2e:ci": "node scripts/test-e2e-ci.js",
     "install-all": "cd backend && npm install && cd ../frontend && npm install",
     "kill-ports": "npx kill-port 3000 3001",
     "backend": "cd backend && npm run dev",

@@ -11,16 +11,8 @@ const testRoutes = require('./routes/test');
 // Create Express app
 const app = express();
 
-// Connect to MongoDB
-const testDb = require('./test/testDb');
-
-if (config.env === 'test') {
-  // Test environment: use in-memory database
-  testDb.connect()
-    .then(() => console.log('Connected to test MongoDB'))
-    .catch(err => console.error('Test MongoDB connection error:', err));
-} else {
-  // Production/development: use real database
+// Connect to MongoDB (skip in test environment as it's handled by test setup)
+if (config.env !== 'test') {
   mongoose.connect(config.mongodbUri, {
     useNewUrlParser: true,
     useUnifiedTopology: true

@@ -1,45 +1,39 @@
-const { MongoMemoryServer } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
-const jwt = require('jsonwebtoken');
-const config = require('../config');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 
-let mongoServer;
+let mongod = null;
 
-// Set up MongoDB Memory Server before all tests
 beforeAll(async () => {
-  // Use the URI from globalSetup
-  await mongoose.connect(process.env.MONGO_URI);
+  // Create MongoDB Memory Server
+  mongod = await MongoMemoryServer.create();
+  const mongoUri = mongod.getUri();
+
+  // Connect to MongoDB
+  await mongoose.connect(mongoUri);
 });
 
-// Clear all collections between tests
 beforeEach(async () => {
-  const collections = await mongoose.connection.db.collections();
-  for (let collection of collections) {
-    await collection.deleteMany({});
+  // Clear all collections
+  const collections = mongoose.connection.collections;
+  for (const key in collections) {
+    const collection = collections[key];
+    await collection.deleteMany();
   }
 });
 
-// Close connection and stop server after all tests
-afterAll(async () => {
-  if (mongoose.connection.readyState !== 0) {
-    await mongoose.disconnect();
-  }
-});
-
-// Helper function to generate test JWT tokens
-global.generateTestToken = (userId) => {
-  return jwt.sign({ userId: userId }, config.jwtSecret, {
-    expiresIn: config.jwtExpiration,
+afterEach(async () => {
+  // Clear mongoose models to prevent OverwriteModelError
+  Object.keys(mongoose.models).forEach(key => {
+    delete mongoose.models[key];
   });
-};
+});
 
-// Helper function to create test users
-global.createTestUser = async (User, userData = {}) => {
-  const defaultUser = {
-    email: 'test@example.com',
-    password: 'password123',
-    name: 'Test User',
-    ...userData
-  };
-  return await User.create(defaultUser);
-};
+afterAll(async () => {
+  // Close mongoose connection
+  await mongoose.connection.close();
+  
+  // Stop MongoDB Memory Server
+  if (mongod) {
+    await mongod.stop();
+  }
+});

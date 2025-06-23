@@ -2,8 +2,12 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders learn react link', () => {
-  render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+// Mock the AuthContext module
+jest.mock('./contexts/AuthContext');
+
+describe('App', () => {
+  test('renders login form when not authenticated', () => {
+    render(<App />);
+    expect(screen.getByRole('heading', { name: /login/i })).toBeInTheDocument();
+  });
 });

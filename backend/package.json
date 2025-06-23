@@ -21,7 +21,8 @@
       "**/?(*.)+(spec|test).js"
     ],
     "testPathIgnorePatterns": [
-      "/node_modules/"
+      "/node_modules/",
+      "src/routes/test.js"
     ],
     "clearMocks": true,
     "verbose": true,

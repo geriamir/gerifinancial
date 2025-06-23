@@ -1,6 +1,9 @@
 const request = require('supertest');
+const jwt = require('jsonwebtoken');
+const { createTestUser } = require('../../test/testUtils');
 const app = require('../../app');
 const User = require('../../models/User');
+const config = require('../../config');
 
 describe('Auth Routes', () => {
   describe('POST /api/auth/register', () => {
@@ -9,7 +12,7 @@ describe('Auth Routes', () => {
         .post('/api/auth/register')
         .send({
           email: 'test@example.com',
-          password: 'password123',
+          password: 'testpassword',
           name: 'Test User'
         });
 
@@ -27,12 +30,8 @@ describe('Auth Routes', () => {
     });
 
     it('should not register user with existing email', async () => {
-      // Create initial user
-      await User.create({
-        email: 'test@example.com',
-        password: 'password123',
-        name: 'Test User'
-      });
+      // Create initial user using our test utility
+      await createTestUser(User);
 
       // Try to register with same email
       const response = await request(app)
@@ -58,7 +57,7 @@ describe('Auth Routes', () => {
         .post('/api/auth/login')
         .send({
           email: 'test@example.com',
-          password: 'password123'
+          password: 'testpassword'
         });
 
       expect(response.status).toBe(200);
@@ -85,7 +84,7 @@ describe('Auth Routes', () => {
         .post('/api/auth/login')
         .send({
           email: 'nonexistent@example.com',
-          password: 'password123'
+          password: 'testpassword'
         });
 
       expect(response.status).toBe(401);
@@ -94,12 +93,13 @@ describe('Auth Routes', () => {
   });
 
   describe('GET /api/auth/profile', () => {
-    let token;
     let user;
+    let token;
 
     beforeEach(async () => {
-      user = await createTestUser(User);
-      token = generateTestToken(user._id);
+      const testData = await createTestUser(User);
+      user = testData.user;
+      token = testData.token;
     });
 
     it('should get user profile with valid token', async () => {

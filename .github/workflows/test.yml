@@ -1,0 +1,43 @@
+name: Unit Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install frontend dependencies
+      run: cd frontend && npm ci
+
+    - name: Install backend dependencies
+      run: cd backend && npm ci
+
+    - name: Run frontend unit tests
+      run: cd frontend && npm test -- --watchAll=false
+      env:
+        CI: true
+
+    - name: Run backend unit tests
+      run: cd backend && npm test
+      env:
+        JWT_SECRET: test-jwt-secret
+        NODE_ENV: test
+        MONGODB_URI: mongodb://127.0.0.1/test-db
+        MONGODB_MEMORY_SERVER: true
