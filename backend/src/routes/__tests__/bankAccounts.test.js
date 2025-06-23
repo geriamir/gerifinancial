@@ -10,11 +10,9 @@ describe('Bank Account Routes', () => {
   let token;
 
   beforeEach(async () => {
-    user = await createTestUser(User);
-    const loginResponse = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'test@example.com', password: 'testpassword' });
-    token = loginResponse.body.token;
+    const testData = await createTestUser(User);
+    user = testData.user;
+    token = testData.token;
   });
 
   describe('POST /api/bank-accounts', () => {
@@ -36,7 +34,7 @@ describe('Bank Account Routes', () => {
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('bankId', bankAccountData.bankId);
       expect(response.body).toHaveProperty('name', bankAccountData.name);
-      expect(response.body).toHaveProperty('userId', user.id);
+      expect(response.body.userId.toString()).toBe(user._id.toString());
     });
 
     it('should not create bank account without authentication', async () => {
@@ -61,7 +59,7 @@ describe('Bank Account Routes', () => {
   describe('GET /api/bank-accounts', () => {
     it('should list user\'s bank accounts', async () => {
       const bankAccount = new BankAccount({
-        userId: user.id,
+        userId: user._id,
         bankId: 'hapoalim',
         name: 'Test Account',
         credentials: {
@@ -78,7 +76,7 @@ describe('Bank Account Routes', () => {
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBe(1);
-      expect(response.body[0].userId).toBe(user.id);
+      expect(response.body[0].userId.toString()).toBe(user._id.toString());
     });
 
     it('should not list accounts without authentication', async () => {
@@ -89,9 +87,14 @@ describe('Bank Account Routes', () => {
     });
 
     it('should only list accounts for authenticated user', async () => {
-      const otherUser = await createTestUser(User);
+      const otherTestData = await createTestUser(User, {
+        email: 'other@example.com',
+        name: 'Other User'
+      });
+      const otherUser = otherTestData.user;
+
       const bankAccount = new BankAccount({
-        userId: otherUser.id,
+        userId: otherUser._id,
         bankId: 'hapoalim',
         name: 'Other Account',
         credentials: {
@@ -114,7 +117,7 @@ describe('Bank Account Routes', () => {
   describe('DELETE /api/bank-accounts/:id', () => {
     it('should delete bank account', async () => {
       const bankAccount = new BankAccount({
-        userId: user.id,
+        userId: user._id,
         bankId: 'hapoalim',
         name: 'Test Account',
         credentials: {
@@ -135,7 +138,7 @@ describe('Bank Account Routes', () => {
 
     it('should not delete account without authentication', async () => {
       const bankAccount = new BankAccount({
-        userId: user.id,
+        userId: user._id,
         bankId: 'hapoalim',
         name: 'Test Account',
         credentials: {
@@ -152,14 +155,14 @@ describe('Bank Account Routes', () => {
     });
 
     it('should not delete another user\'s account', async () => {
-      const otherUser = await User.create({
-        name: 'Other User',
+      const otherTestData = await createTestUser(User, {
         email: 'other@example.com',
-        password: 'testpass123'
+        name: 'Other User'
       });
+      const otherUser = otherTestData.user;
 
       const bankAccount = new BankAccount({
-        userId: otherUser.id,
+        userId: otherUser._id,
         bankId: 'hapoalim',
         name: 'Other Account',
         credentials: {

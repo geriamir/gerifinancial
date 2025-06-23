@@ -1,14 +1,25 @@
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const config = require('../config');
 
-const createTestUser = async (User) => {
+const createTestUser = async (User, userData = {}) => {
   const hashedPassword = await bcrypt.hash('testpassword', 10);
   const user = new User({
     name: 'Test User',
     email: 'test@example.com',
-    password: hashedPassword
+    password: hashedPassword,
+    ...userData
   });
   await user.save();
-  return user;
+
+  // Generate token
+  const token = jwt.sign(
+    { userId: user._id },
+    config.jwtSecret,
+    { expiresIn: config.jwtExpiration }
+  );
+
+  return { user, token };
 };
 
 const clearDatabase = async (mongoose) => {
