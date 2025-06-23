@@ -1,42 +1,39 @@
 const mongoose = require('mongoose');
-const testDb = require('./testDb');
-const jwt = require('jsonwebtoken');
-const config = require('../config');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 
-let mongoServer;
+let mongod = null;
 
-// Set up database connection before all tests
 beforeAll(async () => {
-  await testDb.connect();
+  // Create MongoDB Memory Server
+  mongod = await MongoMemoryServer.create();
+  const mongoUri = mongod.getUri();
+
+  // Connect to MongoDB
+  await mongoose.connect(mongoUri);
 });
 
-// Clear all collections between tests
 beforeEach(async () => {
-  const collections = await mongoose.connection.db.collections();
-  for (let collection of collections) {
-    await collection.deleteMany({});
+  // Clear all collections
+  const collections = mongoose.connection.collections;
+  for (const key in collections) {
+    const collection = collections[key];
+    await collection.deleteMany();
   }
 });
 
-// Close connection after all tests
-afterAll(async () => {
-  await testDb.disconnect();
+afterEach(async () => {
+  // Clear mongoose models to prevent OverwriteModelError
+  Object.keys(mongoose.models).forEach(key => {
+    delete mongoose.models[key];
+  });
 });
 
-// Helper function to generate test JWT tokens
-global.generateTestToken = (userId) => {
-  return jwt.sign({ userId: userId }, config.jwtSecret, {
-    expiresIn: config.jwtExpiration,
-  });
-};
-
-// Helper function to create test users
-global.createTestUser = async (User, userData = {}) => {
-  const defaultUser = {
-    email: 'test@example.com',
-    password: 'password123',
-    name: 'Test User',
-    ...userData
-  };
-  return await User.create(defaultUser);
-};
+afterAll(async () => {
+  // Close mongoose connection
+  await mongoose.connection.close();
+  
+  // Stop MongoDB Memory Server
+  if (mongod) {
+    await mongod.stop();
+  }
+});

@@ -37,5 +37,7 @@ jobs:
     - name: Run backend unit tests
       run: cd backend && npm test
       env:
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        JWT_SECRET: test-jwt-secret
         NODE_ENV: test
+        MONGODB_URI: mongodb://127.0.0.1/test-db
+        MONGODB_MEMORY_SERVER: true
