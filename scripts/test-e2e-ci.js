@@ -17,8 +17,16 @@ const frontend = spawn('npm', ['run', 'frontend'], {
 
 // Function to kill processes and their children
 const cleanup = () => {
-  process.kill(-backend.pid);
-  process.kill(-frontend.pid);
+  try {
+    process.kill(-backend.pid);
+  } catch (error) {
+    console.warn(`Failed to kill backend process: ${error.message}`);
+  }
+  try {
+    process.kill(-frontend.pid);
+  } catch (error) {
+    console.warn(`Failed to kill frontend process: ${error.message}`);
+  }
   execSync('npm run kill-ports', { stdio: 'inherit' });
 };
 
