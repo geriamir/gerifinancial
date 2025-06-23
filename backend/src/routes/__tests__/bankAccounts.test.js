@@ -20,11 +20,12 @@ describe('Bank Account Routes', () => {
   describe('POST /api/bank-accounts', () => {
     it('should create a new bank account', async () => {
       const bankAccountData = {
-        bankId: 'bank1',
-        accountNumber: '123456789',
-        username: 'testuser',
-        password: 'bankpass123',
-        nickname: 'Test Account'
+        bankId: 'hapoalim',
+        name: 'My Bank Account',
+        credentials: {
+          username: 'testuser',
+          password: 'bankpass123'
+        }
       };
 
       const response = await request(app)
@@ -34,9 +35,8 @@ describe('Bank Account Routes', () => {
 
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('bankId', bankAccountData.bankId);
-      expect(response.body).toHaveProperty('accountNumber', bankAccountData.accountNumber);
-      expect(response.body).toHaveProperty('nickname', bankAccountData.nickname);
-      expect(response.body).toHaveProperty('user', user.id);
+      expect(response.body).toHaveProperty('name', bankAccountData.name);
+      expect(response.body).toHaveProperty('userId', user.id);
     });
 
     it('should not create bank account without authentication', async () => {
@@ -61,12 +61,13 @@ describe('Bank Account Routes', () => {
   describe('GET /api/bank-accounts', () => {
     it('should list user\'s bank accounts', async () => {
       const bankAccount = new BankAccount({
-        bankId: 'bank1',
-        accountNumber: '123456789',
-        username: 'testuser',
-        password: 'bankpass123',
-        nickname: 'Test Account',
-        user: user.id
+        userId: user.id,
+        bankId: 'hapoalim',
+        name: 'Test Account',
+        credentials: {
+          username: 'testuser',
+          password: 'bankpass123'
+        }
       });
       await bankAccount.save();
 
@@ -77,7 +78,7 @@ describe('Bank Account Routes', () => {
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBe(1);
-      expect(response.body[0].user).toBe(user.id);
+      expect(response.body[0].userId).toBe(user.id);
     });
 
     it('should not list accounts without authentication', async () => {
@@ -90,12 +91,13 @@ describe('Bank Account Routes', () => {
     it('should only list accounts for authenticated user', async () => {
       const otherUser = await createTestUser(User);
       const bankAccount = new BankAccount({
-        bankId: 'bank1',
-        accountNumber: '123456789',
-        username: 'testuser',
-        password: 'bankpass123',
-        nickname: 'Test Account',
-        user: otherUser.id
+        userId: otherUser.id,
+        bankId: 'hapoalim',
+        name: 'Other Account',
+        credentials: {
+          username: 'testuser',
+          password: 'bankpass123'
+        }
       });
       await bankAccount.save();
 
@@ -112,12 +114,13 @@ describe('Bank Account Routes', () => {
   describe('DELETE /api/bank-accounts/:id', () => {
     it('should delete bank account', async () => {
       const bankAccount = new BankAccount({
-        bankId: 'bank1',
-        accountNumber: '123456789',
-        username: 'testuser',
-        password: 'bankpass123',
-        nickname: 'Test Account',
-        user: user.id
+        userId: user.id,
+        bankId: 'hapoalim',
+        name: 'Test Account',
+        credentials: {
+          username: 'testuser',
+          password: 'bankpass123'
+        }
       });
       await bankAccount.save();
 
@@ -132,12 +135,13 @@ describe('Bank Account Routes', () => {
 
     it('should not delete account without authentication', async () => {
       const bankAccount = new BankAccount({
-        bankId: 'bank1',
-        accountNumber: '123456789',
-        username: 'testuser',
-        password: 'bankpass123',
-        nickname: 'Test Account',
-        user: user.id
+        userId: user.id,
+        bankId: 'hapoalim',
+        name: 'Test Account',
+        credentials: {
+          username: 'testuser',
+          password: 'bankpass123'
+        }
       });
       await bankAccount.save();
 
@@ -155,12 +159,13 @@ describe('Bank Account Routes', () => {
       });
 
       const bankAccount = new BankAccount({
-        bankId: 'bank1',
-        accountNumber: '123456789',
-        username: 'testuser',
-        password: 'bankpass123',
-        nickname: 'Test Account',
-        user: otherUser.id
+        userId: otherUser.id,
+        bankId: 'hapoalim',
+        name: 'Other Account',
+        credentials: {
+          username: 'testuser',
+          password: 'bankpass123'
+        }
       });
       await bankAccount.save();
 
