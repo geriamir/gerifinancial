@@ -1,13 +1,11 @@
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 
 const createTestUser = async (User, userData = {}) => {
-  const hashedPassword = await bcrypt.hash('testpassword', 10);
   const user = new User({
     name: 'Test User',
     email: 'test@example.com',
-    password: hashedPassword,
+    password: 'testpassword',
     ...userData
   });
   await user.save();
