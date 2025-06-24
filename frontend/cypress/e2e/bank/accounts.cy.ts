@@ -10,7 +10,7 @@ describe('Bank Accounts Management', () => {
     }).then(token => {
       authToken = token;
       localStorage.setItem('token', token);
-      cy.visit('/dashboard');
+      cy.visit('/banks');
     });
   });
 
@@ -19,67 +19,90 @@ describe('Bank Accounts Management', () => {
     cy.contains('Add Bank Account').click();
 
     // Fill in the bank account form
-    cy.get('select[name="bankId"]').select('hapoalim');
-    cy.get('input[name="accountNumber"]').type('123456');
+    // Open MUI Select dropdown
+    cy.get('[role="combobox"]').click();
+    // Select the 'Bank Hapoalim' option from the menu
+    cy.get('[role="listbox"]').contains('Bank Hapoalim').click();
     cy.get('input[name="username"]').type('testuser');
     cy.get('input[name="password"]').type('bankpass123');
-    cy.get('input[name="nickname"]').type('My Test Account');
+    cy.get('input[name="name"]').type('My Test Account');
+
+    // Intercept API calls
+    cy.intercept('POST', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('addAccount');
+    cy.intercept('GET', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('getAccounts');
 
     // Submit the form
-    cy.get('button[type="submit"]').click();
+    cy.contains('button', 'Add Account').click();
 
-    // Assert account was added
-    cy.contains('My Test Account').should('be.visible');
-    cy.contains('Bank Hapoalim').should('be.visible');
-    cy.contains('Account added successfully').should('be.visible');
+    // Wait for the add request and subsequent fetch
+    cy.wait('@addAccount');
+    cy.get('dialog').should('not.exist');
+    cy.wait('@getAccounts');
+
+    // Assert account appears in the list
+    cy.contains('My Test Account')
+      .parents('.MuiCard-root')
+      .within(() => {
+        cy.contains('Bank Hapoalim').should('be.visible');
+      });
   });
 
   it('should display validation errors for invalid form submission', () => {
     cy.contains('Add Bank Account').click();
 
     // Submit empty form
-    cy.get('button[type="submit"]').click();
+    cy.contains('button', 'Add Account').click();
 
-    // Assert validation errors
-    cy.contains('Bank is required').should('be.visible');
-    cy.contains('Account number is required').should('be.visible');
-    cy.contains('Username is required').should('be.visible');
-    cy.contains('Password is required').should('be.visible');
-    cy.contains('Nickname is required').should('be.visible');
+    // Check if form is still open (wasn't submitted due to validation)
+    cy.get('form').should('exist');
+    cy.contains('Add Bank Account').should('be.visible');
+
+    // Check all inputs are marked as required
+    cy.get('[name="bankId"]').should('have.attr', 'required');
+    cy.get('input[name="username"]').should('have.attr', 'required');
+    cy.get('input[name="password"]').should('have.attr', 'required');
+    cy.get('input[name="name"]').should('have.attr', 'required');
   });
 
   it('should handle invalid bank credentials', () => {
     cy.contains('Add Bank Account').click();
 
     // Fill in form with invalid credentials
-    cy.get('select[name="bankId"]').select('hapoalim');
-    cy.get('input[name="accountNumber"]').type('999999');
+    // Open MUI Select dropdown
+    cy.get('[role="combobox"]').click();
+    // Select the 'Bank Hapoalim' option from the menu
+    cy.get('[role="listbox"]').contains('Bank Hapoalim').click();
     cy.get('input[name="username"]').type('invalid');
     cy.get('input[name="password"]').type('invalid123');
-    cy.get('input[name="nickname"]').type('Invalid Account');
+    cy.get('input[name="name"]').type('Invalid Account');
 
-    cy.get('button[type="submit"]').click();
+    // Intercept the API call
+    cy.intercept('POST', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('addAccount');
 
-    // Assert error message
-    cy.contains('Invalid bank credentials').should('be.visible');
+    // Submit form
+    cy.contains('button', 'Add Account').click();
+
+    // Wait for error response
+    cy.wait('@addAccount');
+
+    // Assert error message from backend
+    cy.contains('Invalid credentials or bank service unavailable').should('be.visible');
   });
 
   it('should list bank accounts', () => {
     // Add test accounts
     cy.createBankAccount(authToken, {
       bankId: 'hapoalim',
-      accountNumber: '123456',
-      username: 'testuser1',
-      password: 'pass123',
-      nickname: 'Personal Account'
+      name: 'Personal Account',
+      username: 'testuser',
+      password: 'bankpass123'
     });
 
     cy.createBankAccount(authToken, {
       bankId: 'leumi',
-      accountNumber: '789012',
-      username: 'testuser2',
-      password: 'pass123',
-      nickname: 'Business Account'
+      name: 'Business Account',
+      username: 'testuser',
+      password: 'bankpass123'
     });
 
     // Refresh page to see new accounts
@@ -96,25 +119,30 @@ describe('Bank Accounts Management', () => {
     // Add test account
     cy.createBankAccount(authToken, {
       bankId: 'hapoalim',
-      accountNumber: '123456',
+      name: 'Account to Delete',
       username: 'testuser',
-      password: 'pass123',
-      nickname: 'Account to Delete'
+      password: 'bankpass123'
     });
 
     cy.reload();
 
+    // Set up confirmation dialog handler
+    cy.on('window:confirm', () => true);
+
+    // Intercept delete request
+    cy.intercept('DELETE', `${Cypress.env('apiUrl')}/api/bank-accounts/*`).as('deleteAccount');
+
     // Find and click delete button for the account
     cy.contains('Account to Delete')
-      .parent()
-      .find('[aria-label="Delete account"]')
-      .click();
+      .parents('.MuiCard-root')
+      .within(() => {
+        cy.get('[title="Delete Account"]').click();
+      });
 
-    // Confirm deletion in dialog
-    cy.contains('Yes, delete').click();
+    // Wait for server response
+    cy.wait('@deleteAccount');
 
-    // Assert account was deleted
-    cy.contains('Account deleted successfully').should('be.visible');
+    // Assert account was removed from the list
     cy.contains('Account to Delete').should('not.exist');
   });
 
@@ -122,22 +150,35 @@ describe('Bank Accounts Management', () => {
     // Add test account
     cy.createBankAccount(authToken, {
       bankId: 'hapoalim',
-      accountNumber: '123456',
+      name: 'Test Connection Account',
       username: 'testuser',
-      password: 'pass123',
-      nickname: 'Test Connection Account'
+      password: 'bankpass123'
     });
 
     cy.reload();
 
+    // Intercept API calls
+    cy.intercept('POST', `${Cypress.env('apiUrl')}/api/bank-accounts/*/test`).as('testConnection');
+    cy.intercept('GET', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('getAccounts');
+
     // Find and click test connection button
     cy.contains('Test Connection Account')
-      .parent()
-      .find('[aria-label="Test connection"]')
-      .click();
+      .parents('.MuiCard-root')
+      .within(() => {
+        cy.get('[title="Test Connection"]')
+          .click();
+      });
 
-    // Assert connection test result
-    cy.contains('Connection test successful').should('be.visible');
+    // Wait for test and refresh to complete
+    cy.wait('@testConnection');
+    cy.wait('@getAccounts');
+
+    // Assert connection test updates account status
+    cy.contains('Test Connection Account')
+      .parents('.MuiCard-root')
+      .within(() => {
+        cy.contains('active').should('be.visible');
+      });
   });
 
   it('should handle network errors gracefully', () => {
@@ -149,6 +190,6 @@ describe('Bank Accounts Management', () => {
     cy.reload();
 
     // Assert error message
-    cy.contains('Error loading bank accounts').should('be.visible');
+    cy.contains('Failed to load bank accounts').should('be.visible');
   });
 });

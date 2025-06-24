@@ -7,9 +7,12 @@ beforeAll(async () => {
   // Create MongoDB Memory Server
   mongod = await MongoMemoryServer.create();
   const mongoUri = mongod.getUri();
+  
+  console.log('Connecting to MongoDB at:', mongoUri);
 
   // Connect to MongoDB
   await mongoose.connect(mongoUri);
+  console.log('Successfully connected to MongoDB');
 });
 
 beforeEach(async () => {

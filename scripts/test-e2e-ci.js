@@ -6,7 +6,11 @@ console.log('Starting servers...');
 const backend = spawn('npm', ['run', 'backend'], { 
   stdio: 'inherit',
   shell: true,
-  detached: true 
+  detached: true,
+  env: {
+    ...process.env,
+    NODE_ENV: 'e2e'
+  }
 });
 
 const frontend = spawn('npm', ['run', 'frontend'], { 
@@ -39,7 +43,7 @@ process.on('exit', cleanup);
 waitOn({
   resources: [
     'http://localhost:3000',
-    'http://localhost:3001'
+    'http://localhost:3001/health'
   ],
   timeout: 60000
 }).then(() => {

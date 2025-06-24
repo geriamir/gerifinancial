@@ -9,7 +9,7 @@
     "kill-ports": "npx kill-port 3000 3001",
     "backend": "cd backend && npm run dev",
     "frontend": "cd frontend && npm start",
-    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "dev": "concurrently -n backend,frontend -c blue,green \"npm run backend\" \"npm run frontend\"",
     "test": "concurrently \"cd backend && npm test\" \"cd frontend && npm test\"",
     "test:e2e": "concurrently \"npm run dev\" \"cd frontend && wait-on http://localhost:3000 http://localhost:3001 && npm run cypress:open\"",
     "test:e2e:headless": "concurrently \"npm run dev\" \"cd frontend && wait-on http://localhost:3000 http://localhost:3001 && npm run cypress:run\"",

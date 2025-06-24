@@ -1,6 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const scraperModule = process.env.NODE_ENV === 'test'
+const scraperModule = ['test', 'e2e'].includes(process.env.NODE_ENV)
   ? require('../test/mocks/bankScraper')
   : require('israeli-bank-scrapers');
 
@@ -23,16 +23,19 @@ router.get('/', auth, async (req, res) => {
 // Add a new bank account
 router.post('/', auth, async (req, res) => {
   try {
+    console.log('Adding bank account with environment:', process.env.NODE_ENV);
     const { bankId, name, credentials } = req.body;
+    console.log('Request body:', { bankId, name, hasCredentials: !!credentials });
 
     if (!bankId || !name || !credentials || !credentials.username || !credentials.password) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     // Validate bank credentials by trying to scrape
+    console.log('Using scraper module:', ['test', 'e2e'].includes(process.env.NODE_ENV) ? 'mock' : 'real');
     const scraper = createScraper({
       companyId: bankId,
-      verbose: false
+      verbose: true
     });
 
     try {
