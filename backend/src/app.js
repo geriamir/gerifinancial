@@ -2,10 +2,17 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const config = require('./config');
+const logger = require('./utils/logger');
+const ensureLogsDir = require('./middleware/ensureLogsDir');
+
+// Ensure logs directory exists in production
+ensureLogsDir();
+const scrapingSchedulerService = require('./services/scrapingSchedulerService');
 
 // Import routes
 const authRoutes = require('./routes/auth');
 const bankAccountRoutes = require('./routes/bankAccounts');
+const transactionRoutes = require('./routes/transactions');
 const testRoutes = require('./routes/test');
 
 // Create Express app
@@ -20,7 +27,18 @@ if (config.env === 'test') {
     useNewUrlParser: true,
     useUnifiedTopology: true
   })
-    .then(() => console.log('Connected to MongoDB'))
+    .then(async () => {
+      console.log('Connected to MongoDB');
+      // Only initialize scheduler in production and E2E environments
+      if (process.env.NODE_ENV !== 'test' || process.env.NODE_ENV === 'e2e') {
+        try {
+          await scrapingSchedulerService.initialize();
+          logger.info('Transaction scraping scheduler initialized');
+        } catch (error) {
+          logger.error('Failed to initialize transaction scraping scheduler:', error);
+        }
+      }
+    })
     .catch(err => console.error('MongoDB connection error:', err));
 }
 
@@ -49,6 +67,7 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/bank-accounts', bankAccountRoutes);
+app.use('/api/transactions', transactionRoutes);
 
 // Test routes (enabled in test and e2e environments)
 if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'e2e') {
@@ -57,7 +76,7 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'e2e') {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  logger.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
 

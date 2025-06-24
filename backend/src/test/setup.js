@@ -3,6 +3,9 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 
 let mongod = null;
 
+// Import all models to ensure they're registered
+require('../models');
+
 beforeAll(async () => {
   // Create MongoDB Memory Server
   mongod = await MongoMemoryServer.create();
@@ -25,10 +28,12 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  // Clear mongoose models to prevent OverwriteModelError
-  Object.keys(mongoose.models).forEach(key => {
-    delete mongoose.models[key];
-  });
+  // Instead of clearing models, just clear the collections' data
+  const collections = mongoose.connection.collections;
+  for (const key in collections) {
+    const collection = collections[key];
+    await collection.deleteMany();
+  }
 });
 
 afterAll(async () => {

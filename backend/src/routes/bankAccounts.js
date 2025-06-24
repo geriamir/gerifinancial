@@ -7,6 +7,7 @@ const scraperModule = ['test', 'e2e'].includes(process.env.NODE_ENV)
 const { createScraper } = scraperModule;
 const BankAccount = require('../models/BankAccount');
 const auth = require('../middleware/auth');
+const transactionService = require('../services/transactionService');
 
 const router = express.Router();
 
@@ -174,6 +175,72 @@ router.delete('/:id', auth, async (req, res) => {
 
     await BankAccount.deleteOne({ _id: bankAccount._id });
     res.json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Scrape all accounts
+router.post('/scrape-all', auth, async (req, res) => {
+  try {
+    const accounts = await BankAccount.find({ 
+      userId: req.user._id,
+      status: 'active'
+    });
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7); // Default to last 7 days
+
+    const results = {
+      totalAccounts: accounts.length,
+      successfulScrapes: 0,
+      failedScrapes: 0,
+      errors: []
+    };
+
+    // Process accounts sequentially to avoid overwhelming bank APIs
+    for (const account of accounts) {
+      try {
+        const scrapeResult = await transactionService.scrapeTransactions(account, {
+          showBrowser: false,
+          startDate
+        });
+        results.successfulScrapes++;
+      } catch (error) {
+        results.failedScrapes++;
+        results.errors.push({
+          accountId: account._id,
+          accountName: account.name,
+          error: error.message
+        });
+      }
+    }
+
+    res.json(results);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Trigger transaction scraping for an account
+router.post('/:id/scrape', auth, async (req, res) => {
+  try {
+    const { showBrowser, startDate } = req.body;
+    const account = await BankAccount.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+    
+    if (!account) {
+      return res.status(404).json({ error: 'Bank account not found' });
+    }
+
+    const results = await transactionService.scrapeTransactions(account, {
+      showBrowser,
+      startDate: startDate ? new Date(startDate) : undefined
+    });
+
+    res.json(results);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const scrapingSchedulerService = require('../services/scrapingSchedulerService');
+const logger = require('../utils/logger');
 
 const bankAccountSchema = new mongoose.Schema({
   userId: {
@@ -153,6 +155,40 @@ bankAccountSchema.methods.getNextScrapingTime = function() {
   
   return nextRun;
 };
+
+// Schedule scraping when account becomes active
+bankAccountSchema.post('save', async function(doc) {
+  if (doc.status === 'active' && process.env.NODE_ENV !== 'test') {
+    try {
+      await scrapingSchedulerService.scheduleAccount(doc);
+      logger.info(`Scheduled scraping for bank account: ${doc._id}`);
+    } catch (error) {
+      logger.error(`Failed to schedule scraping for bank account ${doc._id}:`, error);
+    }
+  }
+});
+
+// Handle status changes
+bankAccountSchema.pre('findOneAndUpdate', async function(next) {
+  const update = this.getUpdate();
+  if (update.$set && update.$set.status === 'disabled') {
+    const doc = await this.model.findOne(this.getQuery());
+    if (doc && doc.status === 'active') {
+      await scrapingSchedulerService.stopAccount(doc._id);
+      logger.info(`Stopped scraping for bank account: ${doc._id}`);
+    }
+  }
+  next();
+});
+
+// Clean up scheduler when account is deleted
+bankAccountSchema.pre('remove', async function(next) {
+  if (this.status === 'active') {
+    await scrapingSchedulerService.stopAccount(this._id);
+    logger.info(`Stopped scraping for deleted bank account: ${this._id}`);
+  }
+  next();
+});
 
 const BankAccount = mongoose.model('BankAccount', bankAccountSchema);
 

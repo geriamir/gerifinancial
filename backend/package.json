@@ -39,7 +39,9 @@
     "express": "^5.1.0",
     "israeli-bank-scrapers": "^6.1.4",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.16.0"
+    "mongoose": "^8.16.0",
+    "node-cron": "^3.0.3",
+    "winston": "^3.11.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
