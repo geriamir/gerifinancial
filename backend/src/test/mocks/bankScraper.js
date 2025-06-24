@@ -12,7 +12,7 @@ module.exports = {
         return true;
       },
       login: async (credentials) => {
-        console.log('Mock scraper login called with:', credentials);
+        console.log('Mock scraper login called with:', { username: credentials.username, password: '[REDACTED]' });
         if (credentials.username !== validCredentials.username || 
             credentials.password !== validCredentials.password) {
           throw new Error('Invalid credentials');
