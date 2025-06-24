@@ -23,15 +23,35 @@ Cypress.Commands.add('createTestUser', (options = {}) => {
     });
 });
 
+export interface TestUserOptions {
+  email: string;
+  password: string;
+  name: string;
+}
+
+export interface BankAccountOptions {
+  bankId?: string;
+  name?: string;
+  username?: string;
+  password?: string;
+}
+
 // Create bank account command
-Cypress.Commands.add('createBankAccount', (token: string, options = {}) => {
-  const defaultOptions = {
+Cypress.Commands.add('createBankAccount', (token: string, options: Partial<BankAccountOptions> = {}) => {
+  const { username, password, ...rest } = {
     bankId: 'hapoalim',
-    accountNumber: '123456',
+    name: 'Test Account',
     username: 'testuser',
     password: 'bankpass123',
-    nickname: 'Test Account',
     ...options
+  };
+
+  const defaultOptions = {
+    ...rest,
+    credentials: {
+      username,
+      password
+    }
   };
 
   return cy.request({
@@ -44,28 +64,17 @@ Cypress.Commands.add('createBankAccount', (token: string, options = {}) => {
 
 // Clear test data command
 Cypress.Commands.add('clearTestData', () => {
-  // Get the current token if it exists
-  const token = localStorage.getItem('token');
-  
-  if (token) {
-    // Delete all bank accounts for the current user
-    cy.request({
-      method: 'GET',
-      url: `${Cypress.env('apiUrl')}/api/bank-accounts`,
-      headers: { Authorization: `Bearer ${token}` }
-    }).then((response) => {
-      response.body.forEach((account: { _id: string }) => {
-        cy.request({
-          method: 'DELETE',
-          url: `${Cypress.env('apiUrl')}/api/bank-accounts/${account._id}`,
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      });
-    });
-  }
-
-  // Clear localStorage
-  localStorage.clear();
+  cy.request({
+    method: 'POST',
+    url: `${Cypress.env('apiUrl')}/api/test/clear-data`,
+    failOnStatusCode: false
+  }).then((response) => {
+    if (response.status !== 200) {
+      cy.log('Warning: Failed to clear test database');
+    }
+    // Clear localStorage regardless of DB clear result
+    localStorage.clear();
+  });
 });
 
 // Add support for more specific bank account actions

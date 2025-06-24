@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AxiosError } from 'axios';
 import {
   Button,
   Dialog,
@@ -82,7 +83,10 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
       onSuccess();
       onClose();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add bank account';
+      // Extract error message from axios error response
+      const errorMessage = isAxiosError(err)
+        ? err.response?.data?.error || 'Failed to add bank account'
+        : 'Failed to add bank account';
       setError(errorMessage);
       track(BANK_ACCOUNT_EVENTS.ADD_ERROR, {
         bankId: formData.bankId,

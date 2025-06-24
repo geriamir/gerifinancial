@@ -6,7 +6,11 @@ console.log('Starting servers...');
 const backend = spawn('npm', ['run', 'backend'], { 
   stdio: 'inherit',
   shell: true,
-  detached: true 
+  detached: true,
+  env: {
+    ...process.env,
+    NODE_ENV: 'e2e'
+  }
 });
 
 const frontend = spawn('npm', ['run', 'frontend'], { 
@@ -38,10 +42,10 @@ process.on('exit', cleanup);
 // Wait for both servers to be ready
 waitOn({
   resources: [
-    'http://localhost:3000',
-    'http://localhost:3001'
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001/health'
   ],
-  timeout: 60000
+  timeout: 90000
 }).then(() => {
   console.log('Servers are ready, running E2E tests...');
   try {

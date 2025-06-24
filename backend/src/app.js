@@ -11,8 +11,11 @@ const testRoutes = require('./routes/test');
 // Create Express app
 const app = express();
 
-// Connect to MongoDB (skip in test environment as it's handled by test setup)
-if (config.env !== 'test') {
+// Connect to MongoDB (skip only in test environment for unit tests)
+if (config.env === 'test') {
+  console.log('Skipping MongoDB connection in test environment (for unit tests)');
+} else {
+  console.log('Connecting to MongoDB at:', config.mongodbUri);
   mongoose.connect(config.mongodbUri, {
     useNewUrlParser: true,
     useUnifiedTopology: true
@@ -25,12 +28,30 @@ if (config.env !== 'test') {
 app.use(cors());
 app.use(express.json());
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  // Check MongoDB connection state
+  const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+  
+  if (mongoStatus === 'connected') {
+    res.status(200).json({ 
+      status: 'ok',
+      mongo: mongoStatus
+    });
+  } else {
+    res.status(503).json({ 
+      status: 'error',
+      mongo: mongoStatus
+    });
+  }
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/bank-accounts', bankAccountRoutes);
 
-// Test routes (only in test environment)
-if (process.env.NODE_ENV === 'test') {
+// Test routes (enabled in test and e2e environments)
+if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'e2e') {
   app.use('/api/test', testRoutes);
 }
 
