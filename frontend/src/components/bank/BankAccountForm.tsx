@@ -84,7 +84,7 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
       onClose();
     } catch (err) {
       // Extract error message from axios error response
-      const errorMessage = isAxiosError(err)
+      const errorMessage = err instanceof AxiosError
         ? err.response?.data?.error || 'Failed to add bank account'
         : 'Failed to add bank account';
       setError(errorMessage);
