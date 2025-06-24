@@ -42,8 +42,8 @@ process.on('exit', cleanup);
 // Wait for both servers to be ready
 waitOn({
   resources: [
-    'http://localhost:3000',
-    'http://localhost:3001/health'
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001/health'
   ],
   timeout: 90000
 }).then(() => {
