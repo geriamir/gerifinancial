@@ -45,7 +45,7 @@ waitOn({
     'http://localhost:3000',
     'http://localhost:3001/health'
   ],
-  timeout: 60000
+  timeout: 90000
 }).then(() => {
   console.log('Servers are ready, running E2E tests...');
   try {
