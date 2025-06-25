@@ -142,14 +142,14 @@ transactionSchema.statics.getSpendingSummary = async function(accountId, startDa
 };
 
 // Method to create transaction from scraper data
-transactionSchema.statics.createFromScraperData = async function(scraperTransaction, accountId) {
+transactionSchema.statics.createFromScraperData = async function(scraperTransaction, accountId, defaultCurrency) {
   const type = determineTransactionType(scraperTransaction);
   
   return this.create({
     identifier: scraperTransaction.identifier,
     accountId,
     amount: Math.abs(scraperTransaction.chargedAmount),
-    currency: scraperTransaction.currency,
+    currency: scraperTransaction.currency || defaultCurrency,
     date: new Date(scraperTransaction.date),
     type,
     description: scraperTransaction.description,
