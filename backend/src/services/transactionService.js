@@ -1,55 +1,13 @@
-const { createScraper } = require('israeli-bank-scrapers');
 const { Transaction, SubCategory } = require('../models');
+const bankScraperService = require('./bankScraperService');
 
 class TransactionService {
-  constructor() {
-    this.MAX_RETRIES = 3;
-    this.RETRY_DELAY = 5000; // 5 seconds
-  }
-
   async scrapeTransactions(bankAccount, options = {}) {
-    const {
-      startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days by default
-      showBrowser = false
-    } = options;
-
-    let attempts = 0;
-    let error = null;
-
-    while (attempts < this.MAX_RETRIES) {
-      try {
-        const scraper = createScraper({
-          companyId: bankAccount.bankId,
-          verbose: process.env.NODE_ENV === 'development',
-          showBrowser
-        });
-
-        const scraperResult = await scraper.scrape({
-          credentials: {
-            username: bankAccount.credentials.username,
-            password: bankAccount.credentials.password
-          },
-          startDate
-        });
-
-        if (!scraperResult.success) {
-          throw new Error(scraperResult.errorType || 'Unknown error during scraping');
-        }
-
-        return await this.processScrapedTransactions(scraperResult.accounts, bankAccount._id);
-      } catch (err) {
-        error = err;
-        attempts++;
-        if (attempts < this.MAX_RETRIES) {
-          await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY));
-        }
-      }
-    }
-
-    throw new Error(`Failed to scrape after ${this.MAX_RETRIES} attempts: ${error.message}`);
+    const accounts = await bankScraperService.scrapeTransactions(bankAccount, options);
+    return await this.processScrapedTransactions(accounts, bankAccount);
   }
 
-  async processScrapedTransactions(scrapedAccounts, bankAccountId) {
+  async processScrapedTransactions(scrapedAccounts, bankAccount) {
     const results = {
       newTransactions: 0,
       duplicates: 0,
@@ -59,11 +17,11 @@ class TransactionService {
     for (const account of scrapedAccounts) {
       for (const transaction of account.txns) {
         try {
-          await Transaction.createFromScraperData(transaction, bankAccountId);
+          await Transaction.createFromScraperData(transaction, bankAccount._id, bankAccount.defaultCurrency);
           results.newTransactions++;
           
           // Attempt auto-categorization
-          await this.attemptAutoCategorization(transaction, bankAccountId);
+          await this.attemptAutoCategorization(transaction, bankAccount._id);
         } catch (error) {
           if (error.code === 11000) { // Duplicate key error
             results.duplicates++;
@@ -76,6 +34,8 @@ class TransactionService {
         }
       }
     }
+
+    console.log(`Scraping completed for account ${bankAccount._id}:`, results);
 
     return results;
   }

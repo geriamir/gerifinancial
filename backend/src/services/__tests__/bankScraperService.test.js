@@ -1,0 +1,131 @@
+const bankScraperService = require('../bankScraperService');
+const { mockTransactions } = require('../../test/mocks/bankScraper');
+
+// Mock israeli-bank-scrapers
+jest.mock('israeli-bank-scrapers', () => require('../../test/mocks/bankScraper'));
+
+describe('BankScraperService', () => {
+  const mockBankAccount = {
+    _id: 'test-account-1',
+    bankId: 'hapoalim',
+    credentials: {
+      username: 'testuser',
+      password: 'testpass'
+    },
+    getScraperOptions: () => ({
+      credentials: {
+        username: 'testuser',
+        password: 'testpass'
+      }
+    })
+  };
+
+  describe('login', () => {
+    it('should successfully login with valid credentials', async () => {
+      const scraper = await bankScraperService.login(mockBankAccount);
+      expect(scraper).toBeDefined();
+    });
+
+    it('should retry on login failure', async () => {
+      const badAccount = {
+        ...mockBankAccount,
+        credentials: {
+          username: 'retry-test',
+          password: 'pass'
+        },
+        getScraperOptions: () => ({
+          credentials: {
+            username: 'retry-test',
+            password: 'pass'
+          }
+        })
+      };
+
+      await expect(bankScraperService.login(badAccount))
+        .rejects
+        .toThrow('Login failed');
+    });
+
+    it('should fail after max retries', async () => {
+      const invalidAccount = {
+        ...mockBankAccount,
+        credentials: {
+          username: 'invalid',
+          password: 'invalid'
+        },
+        getScraperOptions: () => ({
+          credentials: {
+            username: 'invalid',
+            password: 'invalid'
+          }
+        })
+      };
+
+      await expect(bankScraperService.login(invalidAccount))
+        .rejects
+        .toThrow('Invalid credentials');
+    });
+  });
+
+  describe('scrapeTransactions', () => {
+    it('should successfully scrape transactions', async () => {
+      const accounts = await bankScraperService.scrapeTransactions(mockBankAccount);
+      expect(accounts[0].txns).toEqual(mockTransactions);
+    });
+
+    it('should retry on scraping failure', async () => {
+      const errorAccount = {
+        ...mockBankAccount,
+        bankId: 'error_bank'
+      };
+
+      await expect(bankScraperService.scrapeTransactions(errorAccount))
+        .rejects
+        .toThrow('Bank API is temporarily unavailable');
+    });
+  });
+
+  describe('validateCredentials', () => {
+    it('should validate correct credentials', async () => {
+      const result = await bankScraperService.validateCredentials('hapoalim', {
+        username: 'testuser',
+        password: 'bankpass123'
+      });
+      expect(result).toBe(true);
+    });
+
+    it('should reject invalid credentials', async () => {
+      await expect(bankScraperService.validateCredentials('hapoalim', {
+        username: 'invalid',
+        password: 'invalid'
+      })).rejects.toThrow('Invalid credentials');
+    });
+  });
+
+  describe('testConnection', () => {
+    it('should successfully test valid connection', async () => {
+      const result = await bankScraperService.testConnection(mockBankAccount);
+      expect(result).toBe(true);
+    });
+
+    it('should fail test for invalid connection', async () => {
+      const invalidAccount = {
+        ...mockBankAccount,
+        credentials: {
+          username: 'invalid',
+          password: 'invalid'
+        },
+        getScraperOptions: () => ({
+          credentials: {
+            username: 'invalid',
+            password: 'invalid'
+          }
+        })
+      };
+
+      await expect(bankScraperService.testConnection(invalidAccount))
+        .rejects
+        .toThrow('Invalid credentials');
+    });
+  });
+});

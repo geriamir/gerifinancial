@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const scrapingSchedulerService = require('../services/scrapingSchedulerService');
 const logger = require('../utils/logger');
+const { encrypt, decrypt } = require('../utils/encryption');
 
 const bankAccountSchema = new mongoose.Schema({
   userId: {
@@ -12,6 +13,11 @@ const bankAccountSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard'] // Supported banks
+  },
+  defaultCurrency: {
+    type: String,
+    required: true,
+    default: 'ILS'
   },
   name: {
     type: String,
@@ -107,11 +113,11 @@ bankAccountSchema.methods.getScraperOptions = function() {
     companyId: this.bankId,
     credentials: {
       username: this.credentials.username,
-      password: this.credentials.password
+      password: decrypt(this.credentials.password)
     },
     startDate: this.scrapingConfig.options.startDate,
-    showBrowser: false,
-    verbose: false
+    showBrowser: true,
+    verbose: true
   };
 
   return options;

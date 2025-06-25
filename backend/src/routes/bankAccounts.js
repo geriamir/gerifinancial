@@ -1,13 +1,9 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const scraperModule = ['test', 'e2e'].includes(process.env.NODE_ENV)
-  ? require('../test/mocks/bankScraper')
-  : require('israeli-bank-scrapers');
-
-const { createScraper } = scraperModule;
 const BankAccount = require('../models/BankAccount');
 const auth = require('../middleware/auth');
 const transactionService = require('../services/transactionService');
+const bankScraperService = require('../services/bankScraperService');
+const { encrypt } = require('../utils/encryption');
 
 const router = express.Router();
 
@@ -32,16 +28,9 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Validate bank credentials by trying to scrape
-    console.log('Using scraper module:', ['test', 'e2e'].includes(process.env.NODE_ENV) ? 'mock' : 'real');
-    const scraper = createScraper({
-      companyId: bankId,
-      verbose: true
-    });
-
+    // Validate bank credentials
     try {
-      await scraper.initialize();
-      await scraper.login(credentials);
+      await bankScraperService.validateCredentials(bankId, credentials);
     } catch (error) {
       return res.status(400).json({
         error: 'Invalid credentials or bank service unavailable',
@@ -49,15 +38,15 @@ router.post('/', auth, async (req, res) => {
       });
     }
 
-    // Hash the password before saving
-    const hashedPassword = await bcrypt.hash(credentials.password, 10);
+    // Encrypt the password before saving
+    const encryptedPassword = encrypt(credentials.password);
     const bankAccount = new BankAccount({
       userId: req.user._id,
       bankId,
       name,
       credentials: {
-        ...credentials,
-        password: hashedPassword
+        username: credentials.username,
+        password: encryptedPassword
       },
       status: 'active'
     });
@@ -94,9 +83,9 @@ router.patch('/:id', auth, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to update this account' });
     }
 
-    // Hash new password if it's being updated
+    // Encrypt new password if it's being updated
     if (req.body.credentials?.password) {
-      req.body.credentials.password = await bcrypt.hash(req.body.credentials.password, 10);
+      req.body.credentials.password = encrypt(req.body.credentials.password);
     }
 
     updates.forEach(update => {
@@ -124,10 +113,7 @@ router.post('/:id/test', auth, async (req, res) => {
       return res.status(404).json({ error: 'Bank account not found' });
     }
 
-    const scraper = createScraper(bankAccount.getScraperOptions());
-
-    await scraper.initialize();
-    await scraper.login(bankAccount.credentials);
+    await bankScraperService.testConnection(bankAccount);
 
     // Update last successful connection
     bankAccount.lastScraped = new Date();

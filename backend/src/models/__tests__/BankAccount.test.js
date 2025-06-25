@@ -134,6 +134,19 @@ describe('BankAccount Model', () => {
     });
   });
 
+  describe('Default Currency', () => {
+    it('should set ILS as default currency when not specified', async () => {
+      const account = await BankAccount.create(mockAccount);
+      expect(account.defaultCurrency).toBe('ILS');
+    });
+
+    it('should allow custom default currency', async () => {
+      mockAccount.defaultCurrency = 'USD';
+      const account = await BankAccount.create(mockAccount);
+      expect(account.defaultCurrency).toBe('USD');
+    });
+  });
+
   describe('JSON Transformation', () => {
     it('should remove sensitive data when converting to JSON', async () => {
       const account = await BankAccount.create(mockAccount);
