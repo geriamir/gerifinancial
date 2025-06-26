@@ -10,12 +10,12 @@ describe('BankScraperService', () => {
     bankId: 'hapoalim',
     credentials: {
       username: 'testuser',
-      password: 'testpass'
+      password: 'bankpass123'
     },
     getScraperOptions: () => ({
       credentials: {
         username: 'testuser',
-        password: 'testpass'
+        password: 'bankpass123'
       }
     })
   };
@@ -63,7 +63,7 @@ describe('BankScraperService', () => {
 
       await expect(bankScraperService.login(invalidAccount))
         .rejects
-        .toThrow('Invalid credentials');
+        .toThrow('Login failed: Invalid bank credentials');
     });
   });
 
@@ -98,7 +98,7 @@ describe('BankScraperService', () => {
       await expect(bankScraperService.validateCredentials('hapoalim', {
         username: 'invalid',
         password: 'invalid'
-      })).rejects.toThrow('Invalid credentials');
+      })).rejects.toThrow('Login failed: Invalid bank credentials');
     });
   });
 
@@ -125,7 +125,7 @@ describe('BankScraperService', () => {
 
       await expect(bankScraperService.testConnection(invalidAccount))
         .rejects
-        .toThrow('Invalid credentials');
+        .toThrow('Login failed: Invalid bank credentials');
     });
   });
 });

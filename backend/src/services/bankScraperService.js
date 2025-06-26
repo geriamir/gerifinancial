@@ -74,7 +74,7 @@ class BankScraperService {
 
     while (attempts < this.MAX_RETRIES) {
       try {
-        const scraperResult = await scraper.scrape(bankAccount.getScraperOptions().credentials);
+        const scraperResult = await scraper.scrape(bankAccount.getScraperOptions());
 
         if (!scraperResult.success) {
           const errorType = scraperResult.errorType || 'Unknown';

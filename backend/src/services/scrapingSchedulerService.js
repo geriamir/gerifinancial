@@ -22,7 +22,7 @@ class ScrapingSchedulerService {
       this.stopAll();
 
       // Get all active bank accounts
-      const accounts = await BankAccount.find({ isActive: true });
+      const accounts = await BankAccount.find({ status: 'active' });
       
       // Schedule jobs for each account
       accounts.forEach(account => {

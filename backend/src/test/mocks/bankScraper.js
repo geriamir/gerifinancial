@@ -77,10 +77,11 @@ module.exports = {
           balance: 1000
         }];
       },
-      scrape: async (credentials) => {
-        console.log('Mock scraper scrape called with:', { username: credentials.credentials.username, password: '[REDACTED]' });
-        if (credentials.credentials.username !== validCredentials.username || 
-            credentials.credentials.password !== validCredentials.password) {
+      scrape: async (options) => {
+        console.log('Mock scraper scrape called');
+        const credentials = options.credentials;
+        if (credentials.username !== validCredentials.username || 
+            credentials.password !== validCredentials.password) {
           return {
             success: false,
             errorType: 'InvalidCredentials',
