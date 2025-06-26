@@ -1,10 +1,9 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
+// Create MongoDB Memory Server and expose it for tests
 let mongod = null;
-
-// Import all models to ensure they're registered
-require('../models');
+global.__MONGOD__ = mongod;
 
 beforeAll(async () => {
   // Create MongoDB Memory Server
@@ -16,6 +15,14 @@ beforeAll(async () => {
   // Connect to MongoDB
   await mongoose.connect(mongoUri);
   console.log('Successfully connected to MongoDB');
+
+  // Only require models after mongoose is connected
+  const { BankAccount } = require('../models');
+  const scrapingSchedulerService = require('../services/scrapingSchedulerService');
+
+  // Register hooks after models are loaded
+  require('../models/hooks/bankAccountHooks')
+    .registerSchedulerHooks(BankAccount.schema, scrapingSchedulerService);
 });
 
 beforeEach(async () => {
