@@ -47,6 +47,7 @@ jobs:
     - name: Run E2E Tests
       run: npm run test:e2e:ci
       env:
-        JWT_SECRET: test-secret-key-for-e2e
+        ENCRYPTION_KEY: ukkOKWiDPAYU72avz4QxwEMPregK2U0b
+        JWT_SECRET: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
         NODE_ENV: e2e
         CI: true
