@@ -11,17 +11,31 @@ gerifinancial/
 │   │   ├── config/       # Configuration setup
 │   │   ├── middleware/   # Express middleware
 │   │   ├── models/       # MongoDB models
-│   │   └── routes/       # API routes
+│   │   │   └── __tests__/  # Model tests
+│   │   ├── routes/       # API routes
+│   │   │   └── __tests__/  # Route tests
+│   │   ├── services/     # Business logic services
+│   │   │   └── __tests__/  # Service tests
+│   │   ├── test/         # Test utilities and setup
+│   │   │   ├── mocks/      # Test mocks
+│   │   │   └── setup.js    # Test configuration
+│   │   └── utils/        # Utility functions
 │   ├── .env             # Local environment variables (git-ignored)
 │   └── .env.example     # Environment template
 ├── frontend/            # React frontend
+│   ├── cypress/         # E2E test suite
+│   │   ├── e2e/          # E2E test files
+│   │   └── support/      # Test helpers and commands
 │   └── src/
 │       ├── components/  # React components
-│       │   ├── auth/    # Authentication components
-│       │   ├── bank/    # Bank management components
-│       │   └── layout/  # Layout components
+│       │   ├── auth/      # Authentication components
+│       │   ├── bank/      # Bank management & scraping components
+│       │   └── layout/    # Layout components
 │       ├── contexts/    # React contexts
 │       ├── services/    # API services
+│       │   └── types/     # TypeScript type definitions
+│       ├── test/        # Frontend test utilities
+│       │   └── __mocks__/ # Component mocks
 │       ├── utils/       # Utility functions
 │       └── constants/   # Shared constants
 ├── package.json        # Root package with scripts
@@ -58,7 +72,7 @@ gerifinancial/
 3. Set up proper .gitignore files
 4. Added development scripts in root package.json
 
-### Phase 2: Bank Integration (Completed)
+### Phase 2: Bank Integration (In Progress)
 
 #### Bank Account Management
 1. Implemented bank account connection UI:
@@ -95,6 +109,28 @@ gerifinancial/
    - Clean component structure
    - Reusable utilities
    - Analytics abstraction
+
+#### Transaction Scraping
+1. Unified Bank Account Management:
+   - Centralized scraping in bank accounts context
+   - Individual account scraping controls
+   - Batch scraping for all accounts
+   - Last scrape status tracking
+   - Improved error handling and feedback
+
+2. API Improvements:
+   - Moved scraping endpoints to bank accounts router
+   - Added batch scraping endpoint
+   - Consistent response formats
+   - Better error reporting
+   - Real-time progress tracking
+
+3. Frontend Architecture:
+   - Moved bank components to core structure
+   - Added comprehensive TypeScript types
+   - Enhanced loading states
+   - Clear error messaging
+   - Analytics event tracking
 
 ## Environment Setup
 
@@ -251,6 +287,8 @@ Recent enhancements to the testing setup include:
 - MongoDB with Mongoose
 - JWT for authentication
 - Israeli-bank-scrapers for bank data
+- Service-based architecture for business logic
+- Comprehensive test coverage with Jest
 
 ### Frontend Stack
 - React with TypeScript
@@ -262,7 +300,8 @@ Recent enhancements to the testing setup include:
 
 ### Security Features
 - JWT-based authentication
-- Secure credential handling
+- Secure credential handling through service layer
+- Encrypted bank credentials
 - No sensitive data exposure
 - Automatic response sanitization
 - Protected routes and endpoints

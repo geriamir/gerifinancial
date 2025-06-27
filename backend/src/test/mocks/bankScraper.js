@@ -3,29 +3,119 @@ const validCredentials = {
   password: 'bankpass123'
 };
 
+// Static date for consistent testing
+const STATIC_DATE = '2025-06-27T00:00:00.000Z';
+
+// Mock data for scraped transactions
+const mockTransactions = [
+  {
+    identifier: 'mock-txn-1',
+    date: STATIC_DATE,
+    processedDate: STATIC_DATE,
+    description: 'Super Market Purchase',
+    memo: 'Shopping',
+    type: 'normal',
+    chargedAmount: -150.50,
+    currency: 'ILS',
+    status: 'completed'
+  },
+  {
+    identifier: 'mock-txn-2',
+    date: STATIC_DATE,
+    processedDate: STATIC_DATE,
+    description: 'Salary Payment',
+    memo: 'Monthly Salary',
+    type: 'normal',
+    chargedAmount: 5000.00,
+    currency: 'ILS',
+    status: 'completed'
+  },
+  {
+    identifier: 'mock-txn-3',
+    date: STATIC_DATE,
+    processedDate: STATIC_DATE,
+    description: 'Credit Card Payment',
+    memo: 'Monthly Payment',
+    type: 'CREDIT_CARD_PAYMENT',
+    chargedAmount: -2000.00,
+    currency: 'ILS',
+    status: 'completed'
+  }
+];
+
 module.exports = {
+  validCredentials,
   createScraper: (options) => {
-    console.log('Creating mock scraper with options:', options);
+
+    // Add special case for error testing
+    if (options.companyId === 'error_bank') {
+      return {
+        initialize: async () => true,
+        login: async () => true,
+        getAccountsData: async () => {
+          throw new Error('Bank API is temporarily unavailable');
+        },
+        scrape: async () => {
+          throw new Error('Bank API is temporarily unavailable');
+        }
+      };
+    }
     return {
       initialize: async () => {
-        console.log('Mock scraper initialize called');
         return true;
       },
       login: async (credentials) => {
-        console.log('Mock scraper login called with:', { username: credentials.username, password: '[REDACTED]' });
-        if (credentials.username !== validCredentials.username || 
-            credentials.password !== validCredentials.password) {
-          throw new Error('Invalid credentials');
+        
+        // For validation and login attempts
+        if (!credentials.username || !credentials.password) {
+          throw new Error('Missing credentials');
         }
-        return true;
+
+        // Always verify credentials
+        if (credentials.username === validCredentials.username && 
+            credentials.password === validCredentials.password) {
+          return true;
+        }
+
+        // Test credentials failed
+        throw new Error('Invalid bank credentials');
       },
       getAccountsData: async () => {
-        console.log('Mock scraper getAccountsData called');
         return [{
           accountNumber: '123456',
           balance: 1000
         }];
+      },
+      scrape: async (options) => {
+        const { credentials } = options;
+        
+        if (!credentials || !credentials.username || !credentials.password) {
+          return {
+            success: false,
+            errorType: 'InvalidCredentials',
+            errorMessage: 'Missing credentials'
+          };
+        }
+
+        if (credentials.username === validCredentials.username && 
+            credentials.password === validCredentials.password) {
+          return {
+            success: true,
+            accounts: [{
+              accountNumber: '123456',
+              balance: 10000,
+              txns: mockTransactions
+            }]
+          };
+        }
+        
+        return {
+          success: false,
+          errorType: 'InvalidCredentials',
+          errorMessage: 'Invalid credentials provided'
+        };
       }
     };
-  }
+  },
+  mockTransactions
 };

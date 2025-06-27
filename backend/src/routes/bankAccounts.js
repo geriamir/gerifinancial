@@ -1,12 +1,9 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const scraperModule = ['test', 'e2e'].includes(process.env.NODE_ENV)
-  ? require('../test/mocks/bankScraper')
-  : require('israeli-bank-scrapers');
-
-const { createScraper } = scraperModule;
 const BankAccount = require('../models/BankAccount');
 const auth = require('../middleware/auth');
+const transactionService = require('../services/transactionService');
+const bankAccountService = require('../services/bankAccountService.js');
+const { encrypt } = require('../utils/encryption');
 
 const router = express.Router();
 
@@ -23,45 +20,18 @@ router.get('/', auth, async (req, res) => {
 // Add a new bank account
 router.post('/', auth, async (req, res) => {
   try {
-    console.log('Adding bank account with environment:', process.env.NODE_ENV);
     const { bankId, name, credentials } = req.body;
-    console.log('Request body:', { bankId, name, hasCredentials: !!credentials });
 
-    if (!bankId || !name || !credentials || !credentials.username || !credentials.password) {
+    if (!bankId || !name || !credentials?.username || !credentials?.password) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Validate bank credentials by trying to scrape
-    console.log('Using scraper module:', ['test', 'e2e'].includes(process.env.NODE_ENV) ? 'mock' : 'real');
-    const scraper = createScraper({
-      companyId: bankId,
-      verbose: true
-    });
-
-    try {
-      await scraper.initialize();
-      await scraper.login(credentials);
-    } catch (error) {
-      return res.status(400).json({
-        error: 'Invalid credentials or bank service unavailable',
-        details: error.message
-      });
-    }
-
-    // Hash the password before saving
-    const hashedPassword = await bcrypt.hash(credentials.password, 10);
-    const bankAccount = new BankAccount({
-      userId: req.user._id,
+    const bankAccount = await bankAccountService.create(req.user._id, {
       bankId,
       name,
-      credentials: {
-        ...credentials,
-        password: hashedPassword
-      },
-      status: 'active'
+      username: credentials.username,
+      password: credentials.password
     });
-
-    await bankAccount.save();
 
     // Return without sensitive data
     const response = bankAccount.toJSON();
@@ -93,9 +63,9 @@ router.patch('/:id', auth, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to update this account' });
     }
 
-    // Hash new password if it's being updated
+    // Encrypt new password if it's being updated
     if (req.body.credentials?.password) {
-      req.body.credentials.password = await bcrypt.hash(req.body.credentials.password, 10);
+      req.body.credentials.password = encrypt(req.body.credentials.password);
     }
 
     updates.forEach(update => {
@@ -111,46 +81,17 @@ router.patch('/:id', auth, async (req, res) => {
 
 // Test bank connection
 router.post('/:id/test', auth, async (req, res) => {
-  let bankAccount = null;
-
   try {
-    bankAccount = await BankAccount.findOne({
-      _id: req.params.id,
-      userId: req.user._id
-    });
-
+    const bankAccount = await bankAccountService.updateStatus(req.params.id, req.user._id, 'active');
     if (!bankAccount) {
       return res.status(404).json({ error: 'Bank account not found' });
     }
-
-    const scraper = createScraper(bankAccount.getScraperOptions());
-
-    await scraper.initialize();
-    await scraper.login(bankAccount.credentials);
-
-    // Update last successful connection
-    bankAccount.lastScraped = new Date();
-    bankAccount.status = 'active';
-    bankAccount.lastError = null;
-    await bankAccount.save();
-
+    
     res.json({ 
       message: 'Connection test successful',
       nextScrapingTime: bankAccount.getNextScrapingTime()
     });
   } catch (error) {
-    if (!bankAccount) {
-      return res.status(404).json({ error: 'Bank account not found' });
-    }
-
-    // Update error status
-    bankAccount.status = 'error';
-    bankAccount.lastError = {
-      message: error.message,
-      date: new Date()
-    };
-    await bankAccount.save();
-
     res.status(400).json({
       error: 'Connection test failed',
       details: error.message
@@ -161,20 +102,92 @@ router.post('/:id/test', auth, async (req, res) => {
 // Delete bank account
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const bankAccount = await BankAccount.findById(req.params.id);
+    const result = await bankAccountService.delete(req.params.id, req.user._id);
     
-    if (!bankAccount) {
+    if (!result) {
       return res.status(404).json({ error: 'Bank account not found' });
     }
 
-    // Check if user owns the account
-    if (bankAccount.userId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ error: 'Not authorized to delete this account' });
-    }
-
-    await BankAccount.deleteOne({ _id: bankAccount._id });
     res.json({ message: 'Account deleted successfully' });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Scrape all accounts
+router.post('/scrape-all', auth, async (req, res) => {
+  try {
+    const accounts = await BankAccount.find({ 
+      userId: req.user._id,
+      status: 'active'
+    });
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 7); // Default to last 7 days
+
+    const results = {
+      totalAccounts: accounts.length,
+      successfulScrapes: 0,
+      failedScrapes: 0,
+      errors: []
+    };
+
+    // Process accounts sequentially to avoid overwhelming bank APIs
+    for (const account of accounts) {
+      try {
+        const scrapeResult = await transactionService.scrapeTransactions(account, {
+          showBrowser: false,
+          startDate
+        });
+        
+        // Only count as successful if there were no errors
+        if (scrapeResult.errors.length === 0) {
+          results.successfulScrapes++;
+        } else {
+          results.failedScrapes++;
+          results.errors.push(...scrapeResult.errors.map(err => ({
+            accountId: account._id,
+            accountName: account.name,
+            error: err.error
+          })));
+        }
+      } catch (error) {
+        results.failedScrapes++;
+        results.errors.push({
+          accountId: account._id,
+          accountName: account.name,
+          error: error.message
+        });
+      }
+    }
+
+    res.json(results);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Trigger transaction scraping for an account
+router.post('/:id/scrape', auth, async (req, res) => {
+  try {
+    const { showBrowser, startDate } = req.body;
+    const account = await BankAccount.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+    
+    if (!account) {
+      return res.status(404).json({ error: 'Bank account not found' });
+    }
+
+    const results = await transactionService.scrapeTransactions(account, {
+      showBrowser,
+      startDate: startDate ? new Date(startDate) : undefined
+    });
+
+    res.json(results);
+  } catch (error) {
+    console.error('Error scraping transactions:', error);
     res.status(500).json({ error: error.message });
   }
 });

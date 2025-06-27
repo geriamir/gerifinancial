@@ -2,8 +2,13 @@ const request = require('supertest');
 const mongoose = require('mongoose');
 const { createTestUser } = require('../../test/testUtils');
 const app = require('../../app');
-const User = require('../../models/User');
-const BankAccount = require('../../models/BankAccount');
+const { User, BankAccount } = require('../../models');
+
+// Setup mock for israeli-bank-scrapers
+jest.mock('israeli-bank-scrapers', () => require('../../test/mocks/bankScraper'));
+
+// Import valid credentials from mock
+const { validCredentials } = require('../../test/mocks/bankScraper');
 
 describe('Bank Account Routes', () => {
   let user;
@@ -21,8 +26,8 @@ describe('Bank Account Routes', () => {
         bankId: 'hapoalim',
         name: 'My Bank Account',
         credentials: {
-          username: 'testuser',
-          password: 'bankpass123'
+          username: validCredentials.username,
+          password: validCredentials.password
         }
       };
 
@@ -56,6 +61,178 @@ describe('Bank Account Routes', () => {
     });
   });
 
+  describe('POST /api/bank-accounts/scrape-all', () => {
+    it('should scrape all active accounts', async () => {
+      // Create two active accounts
+      const accounts = await Promise.all([
+        BankAccount.create({
+          userId: user._id,
+          bankId: 'hapoalim',
+          name: 'Test Account 1',
+          credentials: {
+            username: validCredentials.username,
+            password: validCredentials.password
+          },
+          status: 'active'
+        }),
+        BankAccount.create({
+          userId: user._id,
+          bankId: 'leumi',
+          name: 'Test Account 2',
+          credentials: {
+            username: validCredentials.username,
+            password: validCredentials.password
+          },
+          status: 'active'
+        })
+      ]);
+
+      const res = await request(app)
+        .post('/api/bank-accounts/scrape-all')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.totalAccounts).toBe(2);
+      expect(res.body.successfulScrapes).toBe(2);
+      expect(res.body.failedScrapes).toBe(0);
+      expect(res.body.errors).toHaveLength(0);
+    });
+
+    it('should handle accounts with errors', async () => {
+      // Create one successful and one failing account
+      const accounts = await Promise.all([
+        BankAccount.create({
+          userId: user._id,
+          bankId: 'hapoalim',
+          name: 'Success Account',
+          credentials: {
+            username: validCredentials.username,
+            password: validCredentials.password
+          },
+          status: 'active'
+        }),
+        BankAccount.create({
+          userId: user._id,
+          bankId: 'hapoalim',
+          name: 'Error Account',
+          credentials: {
+            username: 'invalid',
+            password: 'invalid'
+          },
+          status: 'active'
+        })
+      ]);
+
+      const res = await request(app)
+        .post('/api/bank-accounts/scrape-all')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.totalAccounts).toBe(2);
+      expect(res.body.successfulScrapes).toBe(1);
+      expect(res.body.failedScrapes).toBe(1);
+      expect(res.body.errors).toHaveLength(1);
+      expect(res.body.errors[0]).toMatchObject({
+        accountName: 'Error Account',
+        error: expect.any(String)
+      });
+    });
+
+    it('should only scrape active accounts and skip disabled ones', async () => {
+      // Create one active and one disabled account
+      const accounts = await Promise.all([
+        BankAccount.create({
+          userId: user._id,
+          bankId: 'hapoalim',
+          name: 'Active Account',
+          credentials: {
+            username: validCredentials.username,
+            password: validCredentials.password
+          },
+          status: 'active'
+        }),
+        BankAccount.create({
+          userId: user._id,
+          bankId: 'leumi',
+          name: 'Disabled Account',
+          credentials: {
+            username: validCredentials.username,
+            password: validCredentials.password
+          },
+          status: 'disabled'
+        })
+      ]);
+
+      const res = await request(app)
+        .post('/api/bank-accounts/scrape-all')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.totalAccounts).toBe(1); // Only counts active accounts
+      expect(res.body.successfulScrapes).toBe(1);
+      expect(res.body.failedScrapes).toBe(0);
+    });
+
+    it('should handle case when user has no active accounts', async () => {
+      const res = await request(app)
+        .post('/api/bank-accounts/scrape-all')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.totalAccounts).toBe(0);
+      expect(res.body.successfulScrapes).toBe(0);
+      expect(res.body.failedScrapes).toBe(0);
+    });
+
+    it('should require authentication', async () => {
+      const res = await request(app)
+        .post('/api/bank-accounts/scrape-all');
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('POST /api/bank-accounts/:id/scrape', () => {
+    it('should scrape and save new transactions', async () => {
+      const bankAccount = new BankAccount({
+        userId: user._id,
+        bankId: 'hapoalim',
+        name: 'Test Account',
+        credentials: {
+          username: validCredentials.username,
+          password: validCredentials.password
+        }
+      });
+      await bankAccount.save();
+
+      const res = await request(app)
+        .post(`/api/bank-accounts/${bankAccount._id}/scrape`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          showBrowser: false,
+          startDate: new Date().toISOString()
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.newTransactions).toBeGreaterThan(0);
+      expect(res.body.errors).toHaveLength(0);
+    });
+
+    it('should handle non-existent account', async () => {
+      const fakeId = new mongoose.Types.ObjectId();
+      const res = await request(app)
+        .post(`/api/bank-accounts/${fakeId}/scrape`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          showBrowser: false,
+          startDate: new Date().toISOString()
+        });
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Bank account not found');
+    });
+  });
+
   describe('GET /api/bank-accounts', () => {
     it('should list user\'s bank accounts', async () => {
       const bankAccount = new BankAccount({
@@ -63,8 +240,8 @@ describe('Bank Account Routes', () => {
         bankId: 'hapoalim',
         name: 'Test Account',
         credentials: {
-          username: 'testuser',
-          password: 'bankpass123'
+          username: validCredentials.username,
+          password: validCredentials.password
         }
       });
       await bankAccount.save();
@@ -98,8 +275,8 @@ describe('Bank Account Routes', () => {
         bankId: 'hapoalim',
         name: 'Other Account',
         credentials: {
-          username: 'testuser',
-          password: 'bankpass123'
+          username: validCredentials.username,
+          password: validCredentials.password
         }
       });
       await bankAccount.save();
@@ -121,8 +298,8 @@ describe('Bank Account Routes', () => {
         bankId: 'hapoalim',
         name: 'Test Account',
         credentials: {
-          username: 'testuser',
-          password: 'bankpass123'
+          username: validCredentials.username,
+          password: validCredentials.password
         }
       });
       await bankAccount.save();
@@ -142,8 +319,8 @@ describe('Bank Account Routes', () => {
         bankId: 'hapoalim',
         name: 'Test Account',
         credentials: {
-          username: 'testuser',
-          password: 'bankpass123'
+          username: validCredentials.username,
+          password: validCredentials.password
         }
       });
       await bankAccount.save();
@@ -166,8 +343,8 @@ describe('Bank Account Routes', () => {
         bankId: 'hapoalim',
         name: 'Other Account',
         credentials: {
-          username: 'testuser',
-          password: 'bankpass123'
+          username: validCredentials.username,
+          password: validCredentials.password
         }
       });
       await bankAccount.save();
@@ -176,7 +353,7 @@ describe('Bank Account Routes', () => {
         .delete(`/api/bank-accounts/${bankAccount.id}`)
         .set('Authorization', `Bearer ${token}`);
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(404);
       const accountStillExists = await BankAccount.findById(bankAccount.id);
       expect(accountStillExists).toBeTruthy();
     });

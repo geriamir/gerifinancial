@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const { encrypt, decrypt } = require('../utils/encryption');
+const logger = require('../utils/logger');
 
 const bankAccountSchema = new mongoose.Schema({
   userId: {
@@ -10,6 +12,11 @@ const bankAccountSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard'] // Supported banks
+  },
+  defaultCurrency: {
+    type: String,
+    required: true,
+    default: 'ILS'
   },
   name: {
     type: String,
@@ -99,17 +106,32 @@ bankAccountSchema.set('toJSON', {
 // Index for efficient queries
 bankAccountSchema.index({ userId: 1, bankId: 1 });
 
+// Pre-save middleware to encrypt password
+bankAccountSchema.pre('save', function(next) {
+  try {
+    if (this.isModified('credentials.password')) {
+      // Only encrypt if not already encrypted (encrypted strings contain ':')
+      if (!this.credentials.password.includes(':')) {
+        this.credentials.password = encrypt(this.credentials.password);
+      }
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Method to get scraper options
 bankAccountSchema.methods.getScraperOptions = function() {
   const options = {
     companyId: this.bankId,
     credentials: {
       username: this.credentials.username,
-      password: this.credentials.password
+      password: decrypt(this.credentials.password)
     },
     startDate: this.scrapingConfig.options.startDate,
-    showBrowser: false,
-    verbose: false
+    showBrowser: true,
+    verbose: true
   };
 
   return options;
@@ -154,6 +176,5 @@ bankAccountSchema.methods.getNextScrapingTime = function() {
   return nextRun;
 };
 
-const BankAccount = mongoose.model('BankAccount', bankAccountSchema);
 
-module.exports = BankAccount;
+module.exports = mongoose.model('BankAccount', bankAccountSchema);

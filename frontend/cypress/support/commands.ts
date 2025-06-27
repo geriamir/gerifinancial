@@ -38,15 +38,19 @@ export interface BankAccountOptions {
 
 // Create bank account command
 Cypress.Commands.add('createBankAccount', (token: string, options: Partial<BankAccountOptions> = {}) => {
-  const { username, password, ...rest } = {
+  const defaults = {
     bankId: 'hapoalim',
     name: 'Test Account',
     username: 'testuser',
-    password: 'bankpass123',
+    password: 'bankpass123'
+  };
+
+  const { username, password, ...rest } = {
+    ...defaults,
     ...options
   };
 
-  const defaultOptions = {
+  const requestBody = {
     ...rest,
     credentials: {
       username,
@@ -58,7 +62,7 @@ Cypress.Commands.add('createBankAccount', (token: string, options: Partial<BankA
     method: 'POST',
     url: `${Cypress.env('apiUrl')}/api/bank-accounts`,
     headers: { Authorization: `Bearer ${token}` },
-    body: defaultOptions
+    body: requestBody
   });
 });
 

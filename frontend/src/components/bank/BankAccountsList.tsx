@@ -23,6 +23,8 @@ import { bankAccountsApi, BankAccount } from '../../services/api';
 import { SUPPORTED_BANKS } from '../../constants/banks';
 import { BankAccountForm } from './BankAccountForm';
 import { track, BANK_ACCOUNT_EVENTS } from '../../utils/analytics';
+import { ScrapeAllAccounts } from './ScrapeAllAccounts';
+import { AccountScraping } from './AccountScraping';
 
 const getStatusColor = (status: BankAccount['status']) => {
   switch (status) {
@@ -115,16 +117,22 @@ export const BankAccountsList: React.FC = () => {
     <Box>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h5">Bank Accounts</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => {
-            track(BANK_ACCOUNT_EVENTS.OPEN_ADD_FORM);
-            setShowAddForm(true);
-          }}
-        >
-          Add Bank Account
-        </Button>
+        <Stack direction="row" spacing={2}>
+          <ScrapeAllAccounts
+            disabled={accounts.length === 0}
+            onScrapingComplete={fetchAccounts}
+          />
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              track(BANK_ACCOUNT_EVENTS.OPEN_ADD_FORM);
+              setShowAddForm(true);
+            }}
+          >
+            Add Bank Account
+          </Button>
+        </Stack>
       </Stack>
 
       {error && (
@@ -154,16 +162,17 @@ export const BankAccountsList: React.FC = () => {
                     <Typography color="textSecondary" variant="body2">
                       {getBankName(account.bankId)}
                     </Typography>
-                    {account.lastScraped && (
-                      <Typography variant="caption" display="block">
-                        Last Updated: {new Date(account.lastScraped).toLocaleString()}
-                      </Typography>
-                    )}
                     {account.lastError && (
-                      <Typography color="error" variant="caption" display="block">
+                      <Typography color="error" variant="caption" display="block" sx={{ mb: 1 }}>
                         Error: {account.lastError.message}
                       </Typography>
                     )}
+                    <AccountScraping
+                      accountId={account._id}
+                      lastScraped={account.lastScraped}
+                      isDisabled={account.status !== 'active'}
+                      onScrapingComplete={fetchAccounts}
+                    />
                   </Box>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Chip
