@@ -50,6 +50,10 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  // Clean up any running scheduler jobs
+  const scrapingSchedulerService = require('../services/scrapingSchedulerService');
+  scrapingSchedulerService.stopAll();
+
   // Close mongoose connection
   await mongoose.connection.close();
   
