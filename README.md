@@ -232,53 +232,17 @@ npm run test:e2e:headless
 npm run test:e2e:new    # Uses in-memory DB and improved stability
 ```
 
-### Test Improvements
+For detailed information about test improvements and roadmap, see TESTING_ROADMAP.md
 
-Recent enhancements to the testing setup include:
+## Future Roadmap
 
-1. **Reliable Database Management**
-   - In-memory MongoDB for E2E tests
-   - Automatic test data cleanup
-   - Isolated test environment
+See FEATURES_ROADMAP.md for detailed feature implementation plans.
 
-2. **Improved Test Stability**
-   - Better UI component interaction
-   - Proper wait conditions
-   - Reduced test flakiness
-   - Clean server startup/shutdown
-
-3. **Enhanced Developer Experience**
-   - Reduced console noise
-   - Clear test output
-   - Faster test execution
-   - Improved error messages
-
-## Next Steps
-
-### Phase 3: Financial Analysis (Future)
-1. Implement transaction categorization
-   - Automatic categorization rules
-   - Custom categories
-   - Bulk categorization
-   - Category statistics
-
-2. Add data visualization
-   - Monthly spending charts
-   - Category-based analysis
-   - Income vs. expenses
-   - Trend analysis
-
-3. Implement budgeting features
-   - Monthly budget setting
-   - Category-based budgets
-   - Budget alerts
-   - Remaining budget calculations
-
-4. Add financial reports and insights
-   - Monthly financial summaries
-   - Spending pattern analysis
-   - Savings recommendations
-   - Financial health indicators
+### Phase 3: Financial Analysis
+- Transaction management and categorization
+- Data visualization and reporting
+- Budgeting and financial insights
+- Performance optimizations
 
 ## Technical Details
 
