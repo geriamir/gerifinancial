@@ -10,11 +10,18 @@ describe('Bank Accounts Management', () => {
     }).then(token => {
       authToken = token;
       localStorage.setItem('token', token);
-      cy.visit('/banks');
     });
   });
 
   it('should add a new bank account', () => {
+    // Intercept API calls before visiting the page
+    cy.intercept('GET', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('getAccounts');
+    cy.intercept('POST', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('addAccount');
+    
+    // Visit the page and wait for initial load
+    cy.visit('/banks');
+    cy.wait('@getAccounts');
+
     // Click add bank account button
     cy.contains('Add Bank Account').click();
 
@@ -26,10 +33,6 @@ describe('Bank Accounts Management', () => {
     cy.get('input[name="username"]').type('testuser');
     cy.get('input[name="password"]').type('bankpass123');
     cy.get('input[name="name"]').type('My Test Account');
-
-    // Intercept API calls
-    cy.intercept('POST', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('addAccount');
-    cy.intercept('GET', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('getAccounts');
 
     // Submit the form
     cy.contains('button', 'Add Account').click();
@@ -48,6 +51,13 @@ describe('Bank Accounts Management', () => {
   });
 
   it('should display validation errors for invalid form submission', () => {
+    // Intercept API calls before visiting the page
+    cy.intercept('GET', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('getAccounts');
+    
+    // Visit the page and wait for initial load
+    cy.visit('/banks');
+    cy.wait('@getAccounts');
+
     cy.contains('Add Bank Account').click();
 
     // Submit empty form
@@ -65,6 +75,14 @@ describe('Bank Accounts Management', () => {
   });
 
   it('should handle invalid bank credentials', () => {
+    // Intercept API calls before visiting the page
+    cy.intercept('GET', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('getAccounts');
+    cy.intercept('POST', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('addAccount');
+    
+    // Visit the page and wait for initial load
+    cy.visit('/banks');
+    cy.wait('@getAccounts');
+
     cy.contains('Add Bank Account').click();
 
     // Fill in form with invalid credentials
@@ -86,10 +104,13 @@ describe('Bank Accounts Management', () => {
     cy.wait('@addAccount');
 
     // Assert error message from backend
-    cy.contains('Invalid credentials or bank service unavailable').should('be.visible');
+    cy.contains('Invalid bank credentials').should('be.visible');
   });
 
   it('should list bank accounts', () => {
+    // Intercept API call before visiting the page
+    cy.intercept('GET', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('getAccounts');
+
     // Add test accounts
     cy.createBankAccount(authToken, {
       bankId: 'hapoalim',
@@ -105,8 +126,9 @@ describe('Bank Accounts Management', () => {
       password: 'bankpass123'
     });
 
-    // Refresh page to see new accounts
-    cy.reload();
+    // Visit page and wait for accounts to load
+    cy.visit('/banks');
+    cy.wait('@getAccounts');
 
     // Assert accounts are listed
     cy.contains('Personal Account').should('be.visible');
@@ -116,6 +138,10 @@ describe('Bank Accounts Management', () => {
   });
 
   it('should delete a bank account', () => {
+    // Intercept API calls
+    cy.intercept('GET', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('getAccounts');
+    cy.intercept('DELETE', `${Cypress.env('apiUrl')}/api/bank-accounts/*`).as('deleteAccount');
+
     // Add test account
     cy.createBankAccount(authToken, {
       bankId: 'hapoalim',
@@ -124,7 +150,8 @@ describe('Bank Accounts Management', () => {
       password: 'bankpass123'
     });
 
-    cy.reload();
+    cy.visit('/banks');
+    cy.wait('@getAccounts');
 
     // Set up confirmation dialog handler
     cy.on('window:confirm', () => true);
@@ -147,6 +174,10 @@ describe('Bank Accounts Management', () => {
   });
 
   it('should handle connection test', () => {
+    // Intercept API calls
+    cy.intercept('GET', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('getAccounts');
+    cy.intercept('POST', `${Cypress.env('apiUrl')}/api/bank-accounts/*/test`).as('testConnection');
+
     // Add test account
     cy.createBankAccount(authToken, {
       bankId: 'hapoalim',
@@ -155,11 +186,8 @@ describe('Bank Accounts Management', () => {
       password: 'bankpass123'
     });
 
-    cy.reload();
-
-    // Intercept API calls
-    cy.intercept('POST', `${Cypress.env('apiUrl')}/api/bank-accounts/*/test`).as('testConnection');
-    cy.intercept('GET', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('getAccounts');
+    cy.visit('/banks');
+    cy.wait('@getAccounts');
 
     // Find and click test connection button
     cy.contains('Test Connection Account')
@@ -185,9 +213,10 @@ describe('Bank Accounts Management', () => {
     // Simulate offline state
     cy.intercept('GET', `${Cypress.env('apiUrl')}/api/bank-accounts`, {
       forceNetworkError: true
-    });
+    }).as('failedRequest');
 
-    cy.reload();
+    cy.visit('/banks');
+    cy.wait('@failedRequest');
 
     // Assert error message
     cy.contains('Failed to load bank accounts').should('be.visible');

@@ -20,17 +20,17 @@ router.get('/', auth, async (req, res) => {
 // Add a new bank account
 router.post('/', auth, async (req, res) => {
   try {
-    const { bankId, name, username, password } = req.body;
+    const { bankId, name, credentials } = req.body;
 
-    if (!bankId || !name || !username || !password) {
+    if (!bankId || !name || !credentials?.username || !credentials?.password) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     const bankAccount = await bankAccountService.create(req.user._id, {
       bankId,
       name,
-      username,
-      password
+      username: credentials.username,
+      password: credentials.password
     });
 
     // Return without sensitive data
