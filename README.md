@@ -287,6 +287,8 @@ Recent enhancements to the testing setup include:
 - MongoDB with Mongoose
 - JWT for authentication
 - Israeli-bank-scrapers for bank data
+- Service-based architecture for business logic
+- Comprehensive test coverage with Jest
 
 ### Frontend Stack
 - React with TypeScript
@@ -298,7 +300,8 @@ Recent enhancements to the testing setup include:
 
 ### Security Features
 - JWT-based authentication
-- Secure credential handling
+- Secure credential handling through service layer
+- Encrypted bank credentials
 - No sensitive data exposure
 - Automatic response sanitization
 - Protected routes and endpoints

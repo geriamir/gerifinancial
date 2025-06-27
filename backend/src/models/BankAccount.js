@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { decrypt } = require('../utils/encryption');
+const { encrypt, decrypt } = require('../utils/encryption');
 const logger = require('../utils/logger');
 
 const bankAccountSchema = new mongoose.Schema({
@@ -106,6 +106,21 @@ bankAccountSchema.set('toJSON', {
 // Index for efficient queries
 bankAccountSchema.index({ userId: 1, bankId: 1 });
 
+// Pre-save middleware to encrypt password
+bankAccountSchema.pre('save', function(next) {
+  try {
+    if (this.isModified('credentials.password')) {
+      // Only encrypt if not already encrypted (encrypted strings contain ':')
+      if (!this.credentials.password.includes(':')) {
+        this.credentials.password = encrypt(this.credentials.password);
+      }
+    }
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Method to get scraper options
 bankAccountSchema.methods.getScraperOptions = function() {
   const options = {
@@ -162,6 +177,4 @@ bankAccountSchema.methods.getNextScrapingTime = function() {
 };
 
 
-const BankAccount = mongoose.model('BankAccount', bankAccountSchema);
-
-module.exports = BankAccount;
+module.exports = mongoose.model('BankAccount', bankAccountSchema);

@@ -29,6 +29,7 @@ if (config.env === 'test') {
   })
     .then(async () => {
       console.log('Connected to MongoDB');
+
       // Only initialize scheduler in production and E2E environments
       if (process.env.NODE_ENV !== 'test' || process.env.NODE_ENV === 'e2e') {
         try {

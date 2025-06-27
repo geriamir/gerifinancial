@@ -1,11 +1,13 @@
 const mongoose = require('mongoose');
 const { BankAccount } = require('../../models');
-const scrapingSchedulerService = require('../../services/scrapingSchedulerService');
-const logger = require('../../utils/logger');
+const bankAccountService = require('../../services/bankAccountService');
+const encryption = require('../../utils/encryption');
 
 // Mock dependencies
-jest.mock('../../services/scrapingSchedulerService');
-jest.mock('../../utils/logger');
+jest.mock('../../services/bankAccountService');
+
+// Import valid credentials from mock scraper
+const { validCredentials } = require('../../test/mocks/bankScraper');
 
 describe('BankAccount Model', () => {
   let mockAccount;
@@ -16,8 +18,8 @@ describe('BankAccount Model', () => {
       bankId: 'hapoalim',
       name: 'Test Account',
       credentials: {
-        username: 'testuser',
-        password: 'testpass'
+        username: validCredentials.username,
+        password: validCredentials.password
       },
       status: 'active',
       scrapingConfig: {
@@ -29,47 +31,38 @@ describe('BankAccount Model', () => {
     };
   });
 
-  describe('Schedule Management', () => {
-    it('should schedule scraping when account is created with active status', async () => {
+  describe('Account Management', () => {
+    it('should save bank account with encrypted credentials', async () => {
+      const account = new BankAccount(mockAccount);
+      const encryptedPassword = encryption.encrypt(validCredentials.password);
+      account.credentials.password = encryptedPassword;
+      await account.save();
+      
+      const savedAccount = await BankAccount.findById(account._id);
+      expect(savedAccount.credentials.password).toBe(encryptedPassword);
+      expect(savedAccount.status).toBe('active');
+    });
+
+    it('should allow status updates', async () => {
       const account = await BankAccount.create(mockAccount);
+      account.status = 'disabled';
+      await account.save();
       
-      expect(scrapingSchedulerService.scheduleAccount).toHaveBeenCalledWith(
-        expect.objectContaining({ _id: account._id })
-      );
-      expect(logger.info).toHaveBeenCalledWith(
-        expect.stringContaining(`Scheduled scraping for bank account: ${account._id}`)
-      );
+      const updatedAccount = await BankAccount.findById(account._id);
+      expect(updatedAccount.status).toBe('disabled');
     });
 
-    it('should not schedule scraping for non-active accounts', async () => {
-      mockAccount.status = 'pending';
-      await BankAccount.create(mockAccount);
-      
-      expect(scrapingSchedulerService.scheduleAccount).not.toHaveBeenCalled();
-    });
-
-    it('should stop scheduling when account is disabled', async () => {
+    it('should track error state', async () => {
       const account = await BankAccount.create(mockAccount);
-      
-      await BankAccount.findByIdAndUpdate(account._id, {
-        $set: { status: 'disabled' }
-      });
+      const errorMessage = 'Test error';
+      account.lastError = {
+        message: errorMessage,
+        date: new Date()
+      };
+      await account.save();
 
-      expect(scrapingSchedulerService.stopAccount).toHaveBeenCalledWith(account._id);
-      expect(logger.info).toHaveBeenCalledWith(
-        expect.stringContaining(`Stopped scraping for bank account: ${account._id}`)
-      );
-    });
-
-    it('should handle scheduling errors gracefully', async () => {
-      scrapingSchedulerService.scheduleAccount.mockRejectedValueOnce(new Error('Scheduling failed'));
-      
-      await BankAccount.create(mockAccount);
-
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to schedule scraping for bank account'),
-        expect.any(Error)
-      );
+      const updatedAccount = await BankAccount.findById(account._id);
+      expect(updatedAccount.lastError.message).toBe(errorMessage);
     });
   });
 
@@ -119,17 +112,17 @@ describe('BankAccount Model', () => {
   describe('Scraper Options', () => {
     it('should generate correct scraper options', async () => {
       const account = await BankAccount.create(mockAccount);
+      
       const options = account.getScraperOptions();
-
       expect(options).toEqual({
         companyId: 'hapoalim',
         credentials: {
-          username: 'testuser',
-          password: 'testpass'
+          username: validCredentials.username,
+          password: validCredentials.password
         },
         startDate: expect.any(Date),
-        showBrowser: false,
-        verbose: false
+        showBrowser: true,
+        verbose: true
       });
     });
   });

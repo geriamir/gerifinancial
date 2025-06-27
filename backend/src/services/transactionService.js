@@ -3,8 +3,25 @@ const bankScraperService = require('./bankScraperService');
 
 class TransactionService {
   async scrapeTransactions(bankAccount, options = {}) {
-    const accounts = await bankScraperService.scrapeTransactions(bankAccount, options);
-    return await this.processScrapedTransactions(accounts, bankAccount);
+    try {
+      const accounts = await bankScraperService.scrapeTransactions(bankAccount, options);
+      return await this.processScrapedTransactions(accounts, bankAccount);
+    } catch (error) {
+      bankAccount.status = 'error';
+      bankAccount.lastError = {
+        message: error.message,
+        date: new Date()
+      };
+      await bankAccount.save();
+      
+      return {
+        newTransactions: 0,
+        duplicates: 0,
+        errors: [{
+          error: error.message
+        }]
+      };
+    }
   }
 
   async processScrapedTransactions(scrapedAccounts, bankAccount) {

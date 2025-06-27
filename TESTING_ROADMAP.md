@@ -1,13 +1,20 @@
 # Testing Roadmap
 
-## 1. Test Architecture Reorganization
-### High Priority
-- Move backend "e2e" tests to integration tests directory
-  - Rename backend/src/test/e2e to backend/src/test/integration
-  - Update test descriptions to reflect integration test nature
-  - Keep focused on testing API endpoints and service interactions
+## 1. Test Architecture Organization
+### Completed
+- [x] Moved from model hooks to service layer
+  - Moved scheduling logic to bankAccountService
+  - Created comprehensive service tests
+  - Updated model tests to focus on core functionality
+  - Removed legacy hook references
 
-- Enhance true E2E test coverage in Cypress
+- [x] Established clear testing boundaries
+  - Model tests: Schema, validation, and data integrity
+  - Service tests: Business logic and external integrations
+  - Integration tests: Full API workflow testing
+
+### High Priority
+- Enhance E2E test coverage in Cypress
   - Focus on complete user workflows
   - Test full system integration from UI to database
   - Include bank scraping scenarios
@@ -15,9 +22,10 @@
 
 ### Medium Priority
 - Standardize test naming conventions
-- Document test architecture in README
+- Document service layer architecture in README
 - Create test coverage reports
 - Set up automated test environment management
+- Add service layer API documentation
 
 ## 2. Frontend Component Testing
 ### High Priority

@@ -34,13 +34,13 @@ router.get('/uncategorized/:accountId', auth, async (req, res) => {
 router.get('/summary/:accountId', auth, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    const summary = await transactionService.getSpendingSummary(
+    const rawSummary = await transactionService.getSpendingSummary(
       req.params.accountId,
       startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
       endDate ? new Date(endDate) : new Date()
     );
 
-    res.json(summary);
+    res.json(rawSummary);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

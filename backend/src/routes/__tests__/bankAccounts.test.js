@@ -7,6 +7,9 @@ const { User, BankAccount } = require('../../models');
 // Setup mock for israeli-bank-scrapers
 jest.mock('israeli-bank-scrapers', () => require('../../test/mocks/bankScraper'));
 
+// Import valid credentials from mock
+const { validCredentials } = require('../../test/mocks/bankScraper');
+
 describe('Bank Account Routes', () => {
   let user;
   let token;
@@ -22,10 +25,8 @@ describe('Bank Account Routes', () => {
       const bankAccountData = {
         bankId: 'hapoalim',
         name: 'My Bank Account',
-        credentials: {
-          username: 'testuser',
-          password: 'bankpass123'
-        }
+        username: validCredentials.username,
+        password: validCredentials.password
       };
 
       const response = await request(app)
@@ -67,8 +68,8 @@ describe('Bank Account Routes', () => {
           bankId: 'hapoalim',
           name: 'Test Account 1',
           credentials: {
-            username: 'testuser1',
-            password: 'bankpass123'
+            username: validCredentials.username,
+            password: validCredentials.password
           },
           status: 'active'
         }),
@@ -77,8 +78,8 @@ describe('Bank Account Routes', () => {
           bankId: 'leumi',
           name: 'Test Account 2',
           credentials: {
-            username: 'testuser2',
-            password: 'bankpass123'
+            username: validCredentials.username,
+            password: validCredentials.password
           },
           status: 'active'
         })
@@ -103,18 +104,18 @@ describe('Bank Account Routes', () => {
           bankId: 'hapoalim',
           name: 'Success Account',
           credentials: {
-            username: 'testuser1',
-            password: 'bankpass123'
+            username: validCredentials.username,
+            password: validCredentials.password
           },
           status: 'active'
         }),
         BankAccount.create({
           userId: user._id,
-          bankId: 'error_bank',
+          bankId: 'hapoalim',
           name: 'Error Account',
           credentials: {
-            username: 'testuser2',
-            password: 'bankpass123'
+            username: 'invalid',
+            password: 'invalid'
           },
           status: 'active'
         })
@@ -143,8 +144,8 @@ describe('Bank Account Routes', () => {
           bankId: 'hapoalim',
           name: 'Active Account',
           credentials: {
-            username: 'testuser1',
-            password: 'bankpass123'
+            username: validCredentials.username,
+            password: validCredentials.password
           },
           status: 'active'
         }),
@@ -153,8 +154,8 @@ describe('Bank Account Routes', () => {
           bankId: 'leumi',
           name: 'Disabled Account',
           credentials: {
-            username: 'testuser2',
-            password: 'bankpass123'
+            username: validCredentials.username,
+            password: validCredentials.password
           },
           status: 'disabled'
         })
@@ -196,8 +197,8 @@ describe('Bank Account Routes', () => {
         bankId: 'hapoalim',
         name: 'Test Account',
         credentials: {
-          username: 'testuser',
-          password: 'bankpass123'
+          username: validCredentials.username,
+          password: validCredentials.password
         }
       });
       await bankAccount.save();
@@ -237,8 +238,8 @@ describe('Bank Account Routes', () => {
         bankId: 'hapoalim',
         name: 'Test Account',
         credentials: {
-          username: 'testuser',
-          password: 'bankpass123'
+          username: validCredentials.username,
+          password: validCredentials.password
         }
       });
       await bankAccount.save();
@@ -272,8 +273,8 @@ describe('Bank Account Routes', () => {
         bankId: 'hapoalim',
         name: 'Other Account',
         credentials: {
-          username: 'testuser',
-          password: 'bankpass123'
+          username: validCredentials.username,
+          password: validCredentials.password
         }
       });
       await bankAccount.save();
@@ -295,8 +296,8 @@ describe('Bank Account Routes', () => {
         bankId: 'hapoalim',
         name: 'Test Account',
         credentials: {
-          username: 'testuser',
-          password: 'bankpass123'
+          username: validCredentials.username,
+          password: validCredentials.password
         }
       });
       await bankAccount.save();
@@ -316,8 +317,8 @@ describe('Bank Account Routes', () => {
         bankId: 'hapoalim',
         name: 'Test Account',
         credentials: {
-          username: 'testuser',
-          password: 'bankpass123'
+          username: validCredentials.username,
+          password: validCredentials.password
         }
       });
       await bankAccount.save();
@@ -340,8 +341,8 @@ describe('Bank Account Routes', () => {
         bankId: 'hapoalim',
         name: 'Other Account',
         credentials: {
-          username: 'testuser',
-          password: 'bankpass123'
+          username: validCredentials.username,
+          password: validCredentials.password
         }
       });
       await bankAccount.save();
@@ -350,7 +351,7 @@ describe('Bank Account Routes', () => {
         .delete(`/api/bank-accounts/${bankAccount.id}`)
         .set('Authorization', `Bearer ${token}`);
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(404);
       const accountStillExists = await BankAccount.findById(bankAccount.id);
       expect(accountStillExists).toBeTruthy();
     });

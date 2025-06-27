@@ -12,17 +12,23 @@ beforeAll(async () => {
   
   console.log('Connecting to MongoDB at:', mongoUri);
 
+  // Set encryption key for tests (must be exactly 32 bytes for AES-256-CBC)
+  const crypto = require('crypto');
+  // Generate a fixed test key using a repeatable pattern
+  process.env.ENCRYPTION_KEY = "ws4Y832ySLsuPeUaoHIQ0a4ZNuSpBECb";
+
   // Connect to MongoDB
   await mongoose.connect(mongoUri);
   console.log('Successfully connected to MongoDB');
 
-  // Only require models after mongoose is connected
-  const { BankAccount } = require('../models');
+  // Initialize required services
   const scrapingSchedulerService = require('../services/scrapingSchedulerService');
-
-  // Register hooks after models are loaded
-  require('../models/hooks/bankAccountHooks')
-    .registerSchedulerHooks(BankAccount.schema, scrapingSchedulerService);
+  
+  // Load models
+  const models = require('../models');
+  
+  // Initialize scheduler for tests
+  await scrapingSchedulerService.initialize();
 });
 
 beforeEach(async () => {

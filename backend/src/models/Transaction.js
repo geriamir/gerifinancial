@@ -112,33 +112,69 @@ transactionSchema.statics.findUncategorized = async function(accountId) {
 
 // Static method to get spending summary by category
 transactionSchema.statics.getSpendingSummary = async function(accountId, startDate, endDate) {
-  return this.aggregate([
-    {
-      $match: {
-        accountId: new mongoose.Types.ObjectId(accountId),
-        date: { $gte: startDate, $lte: endDate },
-        type: 'Expense'
+  const [expenses, income] = await Promise.all([
+    this.aggregate([
+      {
+        $match: {
+          accountId: new mongoose.Types.ObjectId(accountId),
+          date: { $gte: startDate, $lte: endDate },
+          type: 'Expense'
+        }
+      },
+      {
+        $group: {
+          _id: {
+            category: '$category',
+            currency: '$currency'
+          },
+          total: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'categories',
+          localField: '_id.category',
+          foreignField: '_id',
+          as: 'categoryDetails'
+        }
       }
-    },
-    {
-      $group: {
-        _id: {
-          category: '$category',
-          currency: '$currency'
-        },
-        total: { $sum: '$amount' },
-        count: { $sum: 1 }
+    ]),
+    this.aggregate([
+      {
+        $match: {
+          accountId: new mongoose.Types.ObjectId(accountId),
+          date: { $gte: startDate, $lte: endDate },
+          type: 'Income'
+        }
+      },
+      {
+        $group: {
+          _id: {
+            category: '$category',
+            currency: '$currency'
+          },
+          total: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'categories',
+          localField: '_id.category',
+          foreignField: '_id',
+          as: 'categoryDetails'
+        }
       }
-    },
-    {
-      $lookup: {
-        from: 'categories',
-        localField: '_id.category',
-        foreignField: '_id',
-        as: 'categoryDetails'
-      }
-    }
+    ])
   ]);
+
+  return {
+    expenses,
+    income,
+    totalExpenses: expenses.reduce((sum, group) => sum + group.total, 0),
+    totalIncome: income.reduce((sum, group) => sum + group.total, 0)
+  };
 };
 
 // Method to create transaction from scraper data

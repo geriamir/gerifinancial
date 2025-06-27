@@ -102,7 +102,7 @@ class BankScraperService {
     const tempAccount = { 
       bankId, 
       _id: 'validation',
-      getScraperOptions: () => ({ credentials }) 
+      getScraperOptions: () => ({ credentials: { username: credentials.username, password: credentials.password } })
     };
     
     try {
