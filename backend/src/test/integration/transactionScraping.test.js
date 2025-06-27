@@ -113,13 +113,14 @@ describe('Transaction Scraping Integration Tests', () => {
         .send({
           bankId: 'hapoalim',
           name: 'New Test Account',
-          username: validCredentials.username,
-          password: validCredentials.password
+          credentials: {
+            username: validCredentials.username,
+            password: validCredentials.password
+          }
         });
 
       expect(response.status).toBe(201);
       const newAccountId = response.body._id;
-      console.log('New account created:', newAccountId);
       expect(scrapingSchedulerService.jobs.has(newAccountId.toString())).toBeTruthy();
     });
 

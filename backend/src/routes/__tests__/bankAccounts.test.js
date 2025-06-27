@@ -25,8 +25,10 @@ describe('Bank Account Routes', () => {
       const bankAccountData = {
         bankId: 'hapoalim',
         name: 'My Bank Account',
-        username: validCredentials.username,
-        password: validCredentials.password
+        credentials: {
+          username: validCredentials.username,
+          password: validCredentials.password
+        }
       };
 
       const response = await request(app)
