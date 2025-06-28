@@ -12,7 +12,6 @@ import {
   Avatar,
   Drawer,
   List,
-  ListItem,
   ListItemIcon,
   ListItemText,
   ListItemButton

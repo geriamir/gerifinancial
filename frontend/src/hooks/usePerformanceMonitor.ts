@@ -100,16 +100,18 @@ export const usePerformanceMonitor = (componentName: string) => {
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       const interval = setInterval(() => {
-        if (metricsRef.current.length > 0) {
-          logPerformanceReport(metricsRef.current, componentName);
+        const currentMetrics = metricsRef.current;
+        if (currentMetrics.length > 0) {
+          logPerformanceReport(currentMetrics, componentName);
         }
       }, 5000); // Log every 5 seconds if there are metrics
 
       return () => {
         clearInterval(interval);
         // Log final report on unmount
-        if (metricsRef.current.length > 0) {
-          logPerformanceReport(metricsRef.current, `${componentName} (Final)`);
+        const finalMetrics = metricsRef.current;
+        if (finalMetrics.length > 0) {
+          logPerformanceReport(finalMetrics, `${componentName} (Final)`);
         }
       };
     }

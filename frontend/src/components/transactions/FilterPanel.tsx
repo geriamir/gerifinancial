@@ -50,7 +50,7 @@ interface CategorySelectProps {
 }
 
 const CategorySelectBase: React.FC<CategorySelectProps> = ({ onFilterChange }) => {
-  const { categories, loading, error } = useCategories();
+  const { categories } = useCategories();
   const { announce } = useAnnouncer();
   const performance = usePerformanceMonitor('CategorySelect');
   const pendingOperationsRef = useRef<AbortController[]>([]);
