@@ -20,18 +20,6 @@ import { usePerformanceMonitor } from '../../hooks/usePerformanceMonitor';
 import LiveAnnouncer from '../common/LiveAnnouncer';
 import PerformanceMonitor from '../dev/PerformanceMonitor';
 
-/**
- * Operation handling in FilterPanel:
- * - All async operations (filters, searches, etc.) are tracked and can be cancelled
- * - Uses AbortController to handle operation cancellation on unmount or during rapid changes
- * - Operations are automatically cleaned up to prevent memory leaks
- * - Each operation tracks its own performance metrics
- * 
- * Performance considerations:
- * - Operations are debounced where appropriate
- * - Pending operations are cancelled when component unmounts
- * - Performance metrics are logged in development mode
- */
 interface FilterPanelProps {
   startDate?: Date;
   endDate?: Date;
@@ -61,27 +49,11 @@ interface CategorySelectProps {
   onFilterChange: FilterPanelProps['onFilterChange'];
 }
 
-interface PendingOperation {
-  controller: AbortController;
-  operationName: string;
-  startTime: number;
-}
-
 const CategorySelectBase: React.FC<CategorySelectProps> = ({ onFilterChange }) => {
   const { categories, loading, error } = useCategories();
   const { announce } = useAnnouncer();
   const performance = usePerformanceMonitor('CategorySelect');
   const pendingOperationsRef = useRef<AbortController[]>([]);
-
-  // Clean up any pending operations on unmount
-  useEffect(() => {
-    return () => {
-      pendingOperationsRef.current.forEach(controller => {
-        controller.abort();
-      });
-      pendingOperationsRef.current = [];
-    };
-  }, []);
 
   const sortedCategories = useMemo(() => {
     performance.startOperation('sortCategories');
@@ -116,11 +88,14 @@ const CategorySelectBase: React.FC<CategorySelectProps> = ({ onFilterChange }) =
     handleCategorySelect
   );
 
-  // Clean up performance metrics and event listeners on unmount
   useEffect(() => {
     document.addEventListener('keypress', handleKeyPress);
     return () => {
       document.removeEventListener('keypress', handleKeyPress);
+      pendingOperationsRef.current.forEach(controller => {
+        controller.abort();
+      });
+      pendingOperationsRef.current = [];
       performance.clearMetrics();
     };
   }, [handleKeyPress, performance]);
@@ -128,12 +103,9 @@ const CategorySelectBase: React.FC<CategorySelectProps> = ({ onFilterChange }) =
   useEffect(() => {
     if (searchString) {
       announce(`Quick search: ${searchString}`);
-      performance.measureOperation('quickSearch', async () => {});
+      void performance.measureOperation('quickSearch', async () => {});
     }
   }, [searchString, announce, performance]);
-
-  // ... rest of CategorySelect code remains the same ...
-  // (keeping the rendering part unchanged)
 
   return (
     <Box sx={{ position: 'relative' }}>
@@ -171,16 +143,6 @@ const CategorySelectBase: React.FC<CategorySelectProps> = ({ onFilterChange }) =
   );
 };
 
-/**
- * Memoized version of CategorySelect component.
- * Uses default memo equality check since the component only receives onFilterChange prop,
- * and React's default prop comparison is sufficient for this case.
- * 
- * Performance considerations:
- * 1. Prevents re-renders when parent FilterPanel updates unrelated state
- * 2. Maintains sorted categories list via useMemo
- * 3. Optimizes quick search functionality with useCallback
- */
 const CategorySelect = React.memo(CategorySelectBase);
 CategorySelect.displayName = 'CategorySelect';
 
@@ -196,8 +158,70 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const performance = usePerformanceMonitor('FilterPanel');
   const pendingOperationsRef = useRef<AbortController[]>([]);
+  const { announcement, isAssertive, announce } = useAnnouncer();
 
-  // Clean up any pending operations on unmount
+  useLayoutEffect(() => {
+    performance.startOperation('initialRender');
+    return () => {
+      performance.endOperation('initialRender');
+      performance.clearMetrics();
+    };
+  }, [performance]);
+
+  const handleClearSearch = useCallback(async () => {
+    const controller = new AbortController();
+    pendingOperationsRef.current.push(controller);
+
+    try {
+      await performance.measureOperation('clearSearch', async () => {
+        if (controller.signal.aborted) return;
+        setSearchInput('');
+        announce('Search cleared');
+      });
+    } finally {
+      const index = pendingOperationsRef.current.indexOf(controller);
+      if (index > -1) {
+        pendingOperationsRef.current.splice(index, 1);
+      }
+    }
+  }, [performance, announce]);
+
+  const handleTypeChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newType = event.target.value as TransactionType | '';
+    const controller = new AbortController();
+    pendingOperationsRef.current.push(controller);
+
+    try {
+      await performance.measureOperation('typeFilter', async () => {
+        if (controller.signal.aborted) return;
+        onFilterChange({ type: newType || undefined });
+        announce(formatFilterAnnouncement('Transaction type', newType || 'All types'));
+      });
+    } finally {
+      const index = pendingOperationsRef.current.indexOf(controller);
+      if (index > -1) {
+        pendingOperationsRef.current.splice(index, 1);
+      }
+    }
+  }, [onFilterChange, announce, performance]);
+
+  const handleFocusSearch = useCallback((e: KeyboardEvent) => {
+    e.preventDefault();
+    searchInputRef.current?.focus();
+  }, []);
+
+  const handleAltT = useCallback(() => {
+    const currentIndex = transactionTypes.findIndex(t => t.value === type);
+    const nextIndex = (currentIndex + 1) % transactionTypes.length;
+    void handleTypeChange({
+      target: { value: transactionTypes[nextIndex].value }
+    } as React.ChangeEvent<HTMLInputElement>);
+  }, [type, handleTypeChange]);
+
+  useKeyboardShortcut({ key: 'f', ctrlKey: true }, handleFocusSearch);
+  useKeyboardShortcut({ key: 'r', ctrlKey: true }, handleClearSearch);
+  useKeyboardShortcut({ key: 't', altKey: true }, handleAltT);
+
   useEffect(() => {
     return () => {
       pendingOperationsRef.current.forEach(controller => {
@@ -207,55 +231,24 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     };
   }, []);
 
-  // Track initial render time and clean up performance metrics on unmount
-  useLayoutEffect(() => {
-    performance.startOperation('initialRender');
-    return () => {
-      performance.endOperation('initialRender');
-      // Clear performance metrics to prevent memory leaks
-      performance.clearMetrics();
-    };
-  }, [performance]);
-
-  // Keyboard shortcuts
-  useKeyboardShortcut({ key: 'f', ctrlKey: true }, (e) => {
-    e.preventDefault();
-    searchInputRef.current?.focus();
-  });
-
-  useKeyboardShortcut({ key: 'r', ctrlKey: true }, (e) => {
-    e.preventDefault();
-    handleClearSearch();
-  });
-
-  useKeyboardShortcut({ key: 't', altKey: true }, () => {
-    const currentIndex = transactionTypes.findIndex(t => t.value === type);
-    const nextIndex = (currentIndex + 1) % transactionTypes.length;
-    handleTypeChange({
-      target: { value: transactionTypes[nextIndex].value }
-    } as React.ChangeEvent<HTMLInputElement>);
-  });
-
   useEffect(() => {
     const controller = new AbortController();
     pendingOperationsRef.current.push(controller);
 
-    try {
-      performance.measureOperation('searchFilter', async () => {
-        if (controller.signal.aborted) return;
-        onFilterChange({ search: debouncedSearch || undefined });
-      });
-    } finally {
+    void performance.measureOperation('searchFilter', async () => {
+      if (controller.signal.aborted) return;
+      onFilterChange({ search: debouncedSearch || undefined });
+    });
+
+    return () => {
       const index = pendingOperationsRef.current.indexOf(controller);
       if (index > -1) {
         pendingOperationsRef.current.splice(index, 1);
       }
-    }
+    };
   }, [debouncedSearch, onFilterChange, performance]);
 
-  const { announcement, isAssertive, announce } = useAnnouncer();
-
-  const handleDateChange = (field: 'startDate' | 'endDate') => async (date: Date | null) => {
+  const handleDateChange = useCallback((field: 'startDate' | 'endDate') => async (date: Date | null) => {
     if (date) {
       const controller = new AbortController();
       pendingOperationsRef.current.push(controller);
@@ -273,28 +266,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         }
       }
     }
-  };
+  }, [onFilterChange, announce, performance]);
 
-  const handleTypeChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newType = event.target.value as TransactionType | '';
-    const controller = new AbortController();
-    pendingOperationsRef.current.push(controller);
-
-    try {
-      await performance.measureOperation('typeFilter', async () => {
-        if (controller.signal.aborted) return;
-        onFilterChange({ type: newType || undefined });
-        announce(formatFilterAnnouncement('Transaction type', newType || 'All types'));
-      });
-    } finally {
-      const index = pendingOperationsRef.current.indexOf(controller);
-      if (index > -1) {
-        pendingOperationsRef.current.splice(index, 1);
-      }
-    }
-  };
-
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     performance.startOperation('searchInput');
     const value = event.target.value;
     setSearchInput(value);
@@ -302,27 +276,8 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
       announce('Search cleared');
     }
     performance.endOperation('searchInput');
-  };
+  }, [performance, announce]);
 
-  const handleClearSearch = async () => {
-    const controller = new AbortController();
-    pendingOperationsRef.current.push(controller);
-
-    try {
-      await performance.measureOperation('clearSearch', async () => {
-        if (controller.signal.aborted) return;
-        setSearchInput('');
-        announce('Search cleared');
-      });
-    } finally {
-      const index = pendingOperationsRef.current.indexOf(controller);
-      if (index > -1) {
-        pendingOperationsRef.current.splice(index, 1);
-      }
-    }
-  };
-
-  // Rest of the rendering code remains the same
   const { metrics } = performance.getMetrics();
 
   return (
@@ -423,20 +378,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   );
 };
 
-/**
- * Memoized version of FilterPanel with custom equality check.
- * The comparison function ensures we only re-render when the actual filter values change.
- * Special handling is included for Date objects since they need to be compared by value.
- * Performance improvement targets:
- * 1. Prevent re-renders when parent components update but filters haven't changed
- * 2. Optimize date comparison to avoid unnecessary re-renders
- * 3. Maintain referential equality for callback functions
- * 
- * Note: The CategorySelect component is also memoized separately to optimize
- * the category list rendering and quick search functionality.
- */
 const MemoizedFilterPanel = React.memo(FilterPanel, (prevProps, nextProps) => {
-  // Custom comparison to prevent unnecessary re-renders when filters haven't changed
   return (
     prevProps.startDate?.getTime() === nextProps.startDate?.getTime() &&
     prevProps.endDate?.getTime() === nextProps.endDate?.getTime() &&

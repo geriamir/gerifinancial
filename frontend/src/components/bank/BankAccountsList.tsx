@@ -7,16 +7,13 @@ import {
   Chip,
   IconButton,
   List,
-  ListItem,
   Paper,
   Stack,
-  Typography,
-  useTheme
+  Typography
 } from '@mui/material';
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
-  Settings as SettingsIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { bankAccountsApi } from '../../services/api/bank';
@@ -47,8 +44,6 @@ export const BankAccountsList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
-  const theme = useTheme();
-
   const fetchAccounts = async () => {
     try {
       const data = await bankAccountsApi.getAll();

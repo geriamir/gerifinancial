@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Category } from '../services/api/types';
 
 const QUICK_SEARCH_TIMEOUT = 1000; // Reset search after 1 second of inactivity
@@ -8,20 +8,19 @@ export const useCategoryQuickSearch = (
   onCategorySelect: (categoryId: string) => void
 ) => {
   const [searchString, setSearchString] = useState('');
-  const [timeoutId, setTimeoutId] = useState<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Reset search string after timeout
   useEffect(() => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
     }
     if (searchString) {
-      const id = setTimeout(() => setSearchString(''), QUICK_SEARCH_TIMEOUT);
-      setTimeoutId(id);
+      timeoutRef.current = setTimeout(() => setSearchString(''), QUICK_SEARCH_TIMEOUT);
     }
     return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
   }, [searchString]);
