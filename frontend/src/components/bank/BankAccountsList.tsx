@@ -19,7 +19,8 @@ import {
   Settings as SettingsIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
-import { bankAccountsApi, BankAccount } from '../../services/api';
+import { bankAccountsApi } from '../../services/api/bank';
+import { BankAccount } from '../../services/api/types';
 import { SUPPORTED_BANKS } from '../../constants/banks';
 import { BankAccountForm } from './BankAccountForm';
 import { track, BANK_ACCOUNT_EVENTS } from '../../utils/analytics';

@@ -1,6 +1,5 @@
 export interface BankAccount {
   _id: string;
-  userId: string;
   bankId: string;
   name: string;
   status: 'active' | 'error' | 'pending' | 'disabled';
@@ -16,7 +15,25 @@ export interface BankAccount {
       dayOfMonth?: number;
       timeOfDay: string;
     };
+    options: {
+      startDate: string;
+      monthsBack: number;
+    };
   };
+}
+
+export interface AddBankAccountDto {
+  bankId: string;
+  name: string;
+  credentials: {
+    username: string;
+    password: string;
+  };
+}
+
+export interface ScrapeOptionsDto {
+  showBrowser?: boolean;
+  startDate?: string;
 }
 
 export interface ScrapeResult {
@@ -30,8 +47,15 @@ export interface ScrapeResult {
   }>;
 }
 
-export interface SingleAccountScrapeResult {
-  newTransactions: number;
-  duplicates: number;
-  errors: string[];
+export interface UpdateScrapingConfigDto {
+  schedule?: {
+    frequency?: 'daily' | 'weekly' | 'monthly';
+    dayOfWeek?: number;
+    dayOfMonth?: number;
+    timeOfDay?: string;
+  };
+  options?: {
+    startDate?: string;
+    monthsBack?: number;
+  };
 }

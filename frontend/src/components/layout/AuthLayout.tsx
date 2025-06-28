@@ -21,7 +21,8 @@ import {
   AccountCircle as AccountCircleIcon,
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
-  AccountBalance as AccountBalanceIcon
+  AccountBalance as AccountBalanceIcon,
+  Receipt as ReceiptIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -33,7 +34,8 @@ const AuthLayout: React.FC = () => {
 
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Bank Accounts', icon: <AccountBalanceIcon />, path: '/banks' }
+    { text: 'Bank Accounts', icon: <AccountBalanceIcon />, path: '/banks' },
+    { text: 'Transactions', icon: <ReceiptIcon />, path: '/transactions' }
   ];
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
