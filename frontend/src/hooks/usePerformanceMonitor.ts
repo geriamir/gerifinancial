@@ -99,20 +99,33 @@ export const usePerformanceMonitor = (componentName: string) => {
   // Log periodic performance reports in development
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
+      const cleanup = () => {
+        const currentMetrics = [...metricsRef.current];
+        const currentOperations = new Map(activeOperations.current);
+
+        // Log final metrics if any
+        if (currentMetrics.length > 0) {
+          logPerformanceReport(currentMetrics, `${componentName} (Final)`);
+        }
+
+        // Handle any active operations
+        if (currentOperations.size > 0) {
+          console.warn(
+            `[Performance] Found ${currentOperations.size} active operations during cleanup`
+          );
+        }
+      };
+
       const interval = setInterval(() => {
-        const currentMetrics = metricsRef.current;
+        const currentMetrics = [...metricsRef.current];
         if (currentMetrics.length > 0) {
           logPerformanceReport(currentMetrics, componentName);
         }
-      }, 5000); // Log every 5 seconds if there are metrics
+      }, 5000);
 
       return () => {
         clearInterval(interval);
-        // Log final report on unmount
-        const finalMetrics = metricsRef.current;
-        if (finalMetrics.length > 0) {
-          logPerformanceReport(finalMetrics, `${componentName} (Final)`);
-        }
+        cleanup();
       };
     }
   }, [componentName]);
