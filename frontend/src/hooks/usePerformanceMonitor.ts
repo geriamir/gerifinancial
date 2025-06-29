@@ -26,10 +26,14 @@ export const usePerformanceMonitor = (componentName: string) => {
 
   // Ensure metrics are cleared on unmount if not done manually
   useLayoutEffect(() => {
+    // Capture ref values at setup time
+    const metricsRefValue = metricsRef.current;
+    const operationsRefValue = activeOperations.current;
+
     return () => {
-      // Copy ref values to local variables
-      const currentOperations = new Map(activeOperations.current);
-      const currentMetrics = [...metricsRef.current];
+      // Use captured ref values
+      const currentOperations = new Map(operationsRefValue);
+      const currentMetrics = [...metricsRefValue];
 
       // End any active operations with a warning
       if (currentOperations.size > 0) {
@@ -38,7 +42,8 @@ export const usePerformanceMonitor = (componentName: string) => {
         );
         currentOperations.forEach((startTime, opName) => {
           const endTime = performance.now();
-          metricsRef.current.push({
+          // Still need to update the ref here as we want to capture the final state
+          metricsRefValue.push({
             operationName: `${opName} (interrupted)`,
             startTime,
             endTime,
@@ -51,10 +56,10 @@ export const usePerformanceMonitor = (componentName: string) => {
       if (currentMetrics.length > 0) {
         logPerformanceReport(currentMetrics, `${componentName} (Final)`);
         console.info(`[Performance] Auto-cleaning metrics for ${componentName}`);
-        metricsRef.current = [];
+        metricsRefValue.length = 0; // Clear the array in place
       }
 
-      activeOperations.current.clear();
+      operationsRefValue.clear();
     };
   }, [componentName]);
 
