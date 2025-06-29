@@ -181,8 +181,20 @@ transactionSchema.statics.getSpendingSummary = async function(accountId, startDa
 transactionSchema.statics.createFromScraperData = async function(scraperTransaction, accountId, defaultCurrency) {
   const type = determineTransactionType(scraperTransaction);
   
+  // Generate a unique identifier if one is not provided by the scraper
+  let identifier = scraperTransaction.identifier;
+  if (!identifier) {
+    // Create a unique identifier from transaction details
+    identifier = [
+      accountId,
+      scraperTransaction.date,
+      scraperTransaction.chargedAmount,
+      scraperTransaction.description
+    ].join('_');
+  }
+  
   return this.create({
-    identifier: scraperTransaction.identifier,
+    identifier,
     accountId,
     amount: Math.abs(scraperTransaction.chargedAmount),
     currency: scraperTransaction.currency || defaultCurrency,

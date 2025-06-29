@@ -1,11 +1,11 @@
-const webpackConfig = require('./webpack.config');
+const path = require('path');
 
 module.exports = function override(config, env) {
-  return {
-    ...config,
-    devServer: {
-      ...config.devServer,
-      ...webpackConfig.devServer
-    }
+  // Add fallback for node modules
+  config.resolve.fallback = {
+    ...config.resolve.fallback,
+    path: require.resolve('path-browserify'),
   };
+
+  return config;
 };

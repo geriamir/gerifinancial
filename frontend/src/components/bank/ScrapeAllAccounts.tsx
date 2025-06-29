@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Button, CircularProgress } from '@mui/material';
-import api from '../../services/api';
+import { bankAccountsApi } from '../../services/api/bank';
 import { track } from '../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
-import { ScrapeResult } from '../../services/types/bankAccount';
 
 interface ScrapeAllAccountsProps {
   disabled?: boolean;
@@ -20,11 +19,11 @@ export const ScrapeAllAccounts: React.FC<ScrapeAllAccountsProps> = ({
     setIsLoading(true);
     track(BANK_ACCOUNT_EVENTS.SCRAPE_ALL);
     try {
-      const result = await api.post<ScrapeResult>('/bank-accounts/scrape-all');
+      const result = await bankAccountsApi.scrapeAll();
     
-      if (result.data.failedScrapes > 0) {
-        console.warn(`Failed to scrape ${result.data.failedScrapes} out of ${result.data.totalAccounts} accounts`);
-        result.data.errors.forEach((error) => {
+      if (result.failedScrapes > 0) {
+        console.warn(`Failed to scrape ${result.failedScrapes} out of ${result.totalAccounts} accounts`);
+        result.errors.forEach((error) => {
           console.error(`Failed to scrape ${error.accountName}:`, error.error);
         });
       }

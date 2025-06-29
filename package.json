@@ -2,6 +2,9 @@
   "name": "gerifinancial",
   "version": "1.0.0",
   "description": "Financial management application with bank scraping capabilities",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "preinstall": "echo 'Setting NODE_OPTIONS...' && set NODE_OPTIONS=--no-deprecation",
     "test:e2e:ci": "node scripts/test-e2e-ci.js",

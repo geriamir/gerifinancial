@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button, CircularProgress, Typography } from '@mui/material';
-import api from '../../services/api';
+import { bankAccountsApi } from '../../services/api/bank';
 import { format } from 'date-fns';
 import { track } from '../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
@@ -24,10 +24,7 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
     setIsLoading(true);
     track(BANK_ACCOUNT_EVENTS.SCRAPE, { accountId });
     try {
-      await api.post(`/bank-accounts/${accountId}/scrape`, {
-        showBrowser: false,
-        startDate: format(new Date(), 'yyyy-MM-dd')
-      });
+      await bankAccountsApi.scrape(accountId, {});
       track(BANK_ACCOUNT_EVENTS.SCRAPE_SUCCESS, { accountId });
       onScrapingComplete?.();
     } catch (err) {

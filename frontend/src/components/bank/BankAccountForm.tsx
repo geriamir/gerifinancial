@@ -14,7 +14,7 @@ import {
   SelectChangeEvent,
   TextField
 } from '@mui/material';
-import { bankAccountsApi } from '../../services/api';
+import { bankAccountsApi } from '../../services/api/bank';
 import { SUPPORTED_BANKS } from '../../constants/banks';
 import { track, BANK_ACCOUNT_EVENTS } from '../../utils/analytics';
 
