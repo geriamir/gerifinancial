@@ -99,9 +99,23 @@ export const usePerformanceMonitor = (componentName: string) => {
   // Log periodic performance reports in development
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      const cleanup = () => {
-        const currentMetrics = [...metricsRef.current];
-        const currentOperations = new Map(activeOperations.current);
+      // Capture ref objects at setup time to avoid stale values in cleanup
+      const metricsRefValue = metricsRef.current;
+      const operationsRefValue = activeOperations.current;
+
+      const interval = setInterval(() => {
+        const currentMetrics = [...metricsRefValue];
+        if (currentMetrics.length > 0) {
+          logPerformanceReport(currentMetrics, componentName);
+        }
+      }, 5000);
+
+      return () => {
+        clearInterval(interval);
+
+        // Use captured ref values in cleanup
+        const currentMetrics = [...metricsRefValue];
+        const currentOperations = new Map(operationsRefValue);
 
         // Log final metrics if any
         if (currentMetrics.length > 0) {
@@ -114,18 +128,6 @@ export const usePerformanceMonitor = (componentName: string) => {
             `[Performance] Found ${currentOperations.size} active operations during cleanup`
           );
         }
-      };
-
-      const interval = setInterval(() => {
-        const currentMetrics = [...metricsRef.current];
-        if (currentMetrics.length > 0) {
-          logPerformanceReport(currentMetrics, componentName);
-        }
-      }, 5000);
-
-      return () => {
-        clearInterval(interval);
-        cleanup();
       };
     }
   }, [componentName]);
