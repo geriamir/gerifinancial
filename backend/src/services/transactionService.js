@@ -33,6 +33,7 @@ class TransactionService {
 
     for (const account of scrapedAccounts) {
       for (const transaction of account.txns) {
+        // Log raw transaction data for debugging
         try {
           await Transaction.createFromScraperData(transaction, bankAccount._id, bankAccount.defaultCurrency);
           results.newTransactions++;
@@ -109,6 +110,48 @@ class TransactionService {
 
   async getSpendingSummary(accountId, startDate, endDate) {
     return Transaction.getSpendingSummary(accountId, startDate, endDate);
+  }
+
+  async getTransactions({
+    startDate,
+    endDate,
+    type,
+    category,
+    search,
+    limit = 20,
+    skip = 0,
+    accountId
+  }) {
+    // Build query object
+    const query = {};
+
+    if (startDate) query.date = { $gte: startDate };
+    if (endDate) query.date = { ...query.date, $lte: endDate };
+    if (type) query.type = type;
+    if (category) query.category = category;
+    if (accountId) query.accountId = accountId;
+    if (search) {
+      query.description = { $regex: search, $options: 'i' };
+    }
+
+    // Get total count for pagination
+    const total = await Transaction.countDocuments(query);
+
+    // Get paginated transactions
+    const transactions = await Transaction.find(query)
+      .sort({ date: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('category subCategory');
+
+    // Calculate if there are more transactions
+    const hasMore = total > skip + transactions.length;
+
+    return {
+      transactions,
+      total,
+      hasMore
+    };
   }
 }
 

@@ -4,6 +4,37 @@ const auth = require('../middleware/auth');
 const { Category, SubCategory } = require('../models');
 const transactionService = require('../services/transactionService');
 
+// Get transactions with pagination and filtering
+router.get('/', auth, async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      type,
+      category,
+      search,
+      limit = '20',
+      skip = '0',
+      accountId
+    } = req.query;
+
+    const result = await transactionService.getTransactions({
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+      type,
+      category,
+      search,
+      limit: parseInt(limit),
+      skip: parseInt(skip),
+      accountId
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get transactions for a specific bank account
 router.get('/account/:accountId', auth, async (req, res) => {
   try {

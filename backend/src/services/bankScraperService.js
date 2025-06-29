@@ -9,18 +9,18 @@ class BankScraperService {
   constructor() {
     this.MAX_RETRIES = 3;
     this.RETRY_DELAY = 5000; // 5 seconds
-    this.DEFAULT_TIMEOUT = 180000; // 3 minutes
+    this.DEFAULT_TIMEOUT = 210000; // 3 minutes
   }
 
   createScraper(bankAccount, options = {}) {
     const {
       startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days by default
-      showBrowser = false,
-      verbose = false,
+      showBrowser = true,
+      verbose = true,
       timeout = this.DEFAULT_TIMEOUT
     } = options;
 
-    return createScraper({
+    const scraper = createScraper({
       companyId: bankAccount.bankId,
       verbose,
       showBrowser,
@@ -30,18 +30,14 @@ class BankScraperService {
       combineInstallments: false,
       excludePendingTransactions: true
     });
+    
+    return scraper;
   }
 
   async login(bankAccount, options = {}) {
     const scraper = this.createScraper(bankAccount, options);
     let attempts = 0;
     let error = null;
-
-    try {
-      await scraper.initialize();
-    } catch (err) {
-      this.handleScraperError(err, 'Scraper initialization', bankAccount._id);
-    }
 
     while (attempts < this.MAX_RETRIES) {
       try {
@@ -68,13 +64,13 @@ class BankScraperService {
   }
 
   async scrapeTransactions(bankAccount, options = {}) {
-    const scraper = await this.login(bankAccount, options);
+    const scraper = this.createScraper(bankAccount, options);
     let attempts = 0;
     let error = null;
 
     while (attempts < this.MAX_RETRIES) {
       try {
-        const scraperResult = await scraper.scrape(bankAccount.getScraperOptions());
+        const scraperResult = await scraper.scrape(bankAccount.getScraperOptions().credentials);
 
         if (!scraperResult.success) {
           const errorType = scraperResult.errorType || 'Unknown';
@@ -88,7 +84,7 @@ class BankScraperService {
         attempts++;
 
         if (attempts < this.MAX_RETRIES) {
-          logger.info(`Scraping attempt ${attempts} failed for bank account ${bankAccount._id}, retrying in ${this.RETRY_DELAY}ms...`);
+          logger.info(`Scraping attempt ${attempts} failed for bank account ${bankAccount._id} with error ${error}, retrying in ${this.RETRY_DELAY}ms...`);
           await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY));
         }
       }

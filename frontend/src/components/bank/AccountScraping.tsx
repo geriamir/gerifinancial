@@ -24,10 +24,7 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
     setIsLoading(true);
     track(BANK_ACCOUNT_EVENTS.SCRAPE, { accountId });
     try {
-      await bankAccountsApi.scrape(accountId, {
-        showBrowser: false,
-        startDate: format(new Date(), 'yyyy-MM-dd')
-      });
+      await bankAccountsApi.scrape(accountId, {});
       track(BANK_ACCOUNT_EVENTS.SCRAPE_SUCCESS, { accountId });
       onScrapingComplete?.();
     } catch (err) {
