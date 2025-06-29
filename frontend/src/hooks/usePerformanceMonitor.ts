@@ -21,7 +21,9 @@ export const usePerformanceMonitor = (componentName: string) => {
 
   const startOperation = useCallback((operationName: string) => {
     const startTime = performance.now();
-    activeOperations.current.set(operationName, startTime);
+    // Get reference to current Map instance to ensure consistency
+    const operations = activeOperations.current;
+    operations.set(operationName, startTime);
   }, []);
 
   // Ensure metrics are cleared on unmount if not done manually
@@ -64,7 +66,11 @@ export const usePerformanceMonitor = (componentName: string) => {
   }, [componentName]);
 
   const endOperation = useCallback((operationName: string) => {
-    const startTime = activeOperations.current.get(operationName);
+    // Get reference to current collections to ensure consistency
+    const metrics = metricsRef.current;
+    const operations = activeOperations.current;
+    
+    const startTime = operations.get(operationName);
     if (!startTime) {
       console.warn(`No start time found for operation: ${operationName}`);
       return;
@@ -80,8 +86,8 @@ export const usePerformanceMonitor = (componentName: string) => {
       duration,
     };
 
-    metricsRef.current.push(metric);
-    activeOperations.current.delete(operationName);
+    metrics.push(metric);
+    operations.delete(operationName);
 
     // Log performance metric
     console.info(
@@ -138,16 +144,19 @@ export const usePerformanceMonitor = (componentName: string) => {
   }, [componentName]);
 
   const getMetrics = useCallback(() => {
+    // Get reference to current metrics array to ensure consistency
+    const metrics = metricsRef.current;
     return {
-      metrics: metricsRef.current,
-      averageDuration: metricsRef.current.reduce((acc, curr) => acc + curr.duration, 0) / metricsRef.current.length,
-      operationCount: metricsRef.current.length,
-      slowOperations: metricsRef.current.filter(m => m.duration > 100),
+      metrics,
+      averageDuration: metrics.reduce((acc, curr) => acc + curr.duration, 0) / metrics.length,
+      operationCount: metrics.length,
+      slowOperations: metrics.filter(m => m.duration > 100),
     };
   }, []);
 
   const clearMetrics = useCallback(() => {
-    metricsRef.current = [];
+    const metrics = metricsRef.current;
+    metrics.length = 0; // Clear array in place rather than reassigning
   }, []);
 
   const measureOperation = useCallback(async <T>(
