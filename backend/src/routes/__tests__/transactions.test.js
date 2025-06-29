@@ -11,6 +11,7 @@ describe('Transaction Routes', () => {
   let category;
   let subCategory;
   let transaction;
+  let transactions = [];
 
   beforeEach(async () => {
     // Create test user
@@ -57,6 +58,89 @@ describe('Transaction Routes', () => {
       type: 'Expense',
       description: 'Test Restaurant',
       rawData: { originalData: 'test' }
+    });
+
+    // Create additional transactions for pagination tests
+    const dates = [
+      new Date('2025-06-01'),
+      new Date('2025-06-15'),
+      new Date('2025-06-30')
+    ];
+
+    for (let i = 0; i < 25; i++) {
+      const tx = await Transaction.create({
+        identifier: `test-transaction-${i + 2}`,
+        accountId: bankAccount._id,
+        amount: 50 + i,
+        currency: 'ILS',
+        date: dates[i % 3], // Distribute across different dates
+        type: i % 2 === 0 ? 'Expense' : 'Income',
+        description: `Test Transaction ${i + 2}`,
+        rawData: { originalData: `test-${i + 2}` }
+      });
+      transactions.push(tx);
+    }
+  });
+
+  describe('GET /api/transactions', () => {
+    it('should return paginated transactions', async () => {
+      const res = await request(app)
+        .get('/api/transactions')
+        .query({ limit: 10, skip: 0 })
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('transactions');
+      expect(res.body).toHaveProperty('total');
+      expect(res.body).toHaveProperty('hasMore');
+      expect(res.body.transactions.length).toBe(10);
+      expect(res.body.total).toBe(26); // 25 + 1 from initial setup
+      expect(res.body.hasMore).toBe(true);
+    });
+
+    it('should filter transactions by date range', async () => {
+      const res = await request(app)
+        .get('/api/transactions')
+        .query({
+          startDate: '2025-06-01T00:00:00.000Z',
+          endDate: '2025-06-15T23:59:59.999Z'
+        })
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.transactions.every(t => 
+        new Date(t.date) >= new Date('2025-06-01') &&
+        new Date(t.date) <= new Date('2025-06-15')
+      )).toBe(true);
+    });
+
+    it('should filter transactions by type', async () => {
+      const res = await request(app)
+        .get('/api/transactions')
+        .query({ type: 'Expense' })
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.transactions.every(t => t.type === 'Expense')).toBe(true);
+    });
+
+    it('should filter transactions by search term', async () => {
+      const res = await request(app)
+        .get('/api/transactions')
+        .query({ search: 'Transaction 2' })
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.transactions.every(t => 
+        t.description.includes('Transaction 2')
+      )).toBe(true);
+    });
+
+    it('should require authentication', async () => {
+      const res = await request(app)
+        .get('/api/transactions');
+
+      expect(res.status).toBe(401);
     });
   });
 
@@ -310,6 +394,63 @@ describe('Transaction Routes', () => {
 
       expect(res.status).toBe(404);
       expect(res.body.error).toBe('Category not found');
+    });
+  });
+
+  describe('Transaction Identifier Generation', () => {
+    it('should generate a unique identifier when none is provided', async () => {
+      // Create transaction data without identifier
+      const transactionData = {
+        accountId: bankAccount._id,
+        amount: 75,
+        currency: 'ILS',
+        date: new Date(),
+        type: 'Expense',
+        description: 'Auto ID Test',
+        rawData: { originalData: 'test-auto-id' }
+      };
+
+      const transaction = await Transaction.createFromScraperData({
+        chargedAmount: -75,
+        date: new Date(),
+        description: 'Auto ID Test'
+      }, bankAccount._id, 'ILS');
+
+      expect(transaction.identifier).toBeTruthy();
+      expect(typeof transaction.identifier).toBe('string');
+      expect(transaction.identifier.includes(bankAccount._id.toString())).toBe(true);
+    });
+
+    it('should use provided identifier when available', async () => {
+      const providedId = 'test-provided-id';
+      const transaction = await Transaction.createFromScraperData({
+        identifier: providedId,
+        chargedAmount: -75,
+        date: new Date(),
+        description: 'Provided ID Test'
+      }, bankAccount._id, 'ILS');
+
+      expect(transaction.identifier).toBe(providedId);
+    });
+
+    it('should generate unique identifiers for similar transactions', async () => {
+      const date = new Date();
+      const description = 'Similar Transaction';
+      const amount = -100;
+
+      const transaction1 = await Transaction.createFromScraperData({
+        chargedAmount: amount,
+        date,
+        description
+      }, bankAccount._id, 'ILS');
+
+      const transaction2 = await Transaction.createFromScraperData({
+        chargedAmount: amount,
+        date,
+        description
+      }, bankAccount._id, 'ILS');
+
+      expect(transaction1.identifier).not.toBe(transaction2.identifier);
     });
   });
 });
