@@ -33,13 +33,16 @@ describe('TransactionService', () => {
     ];
 
     for (let i = 0; i < 25; i++) {
+      const type = i % 2 === 0 ? 'Expense' : 'Income';
+      const amount = type === 'Expense' ? -(50 + i) : (50 + i);
       const tx = await Transaction.create({
         identifier: `test-transaction-${i + 1}`,
         accountId: bankAccount._id,
-        amount: 50 + i,
+        userId: user._id,  // Add required userId
+        amount: amount,    // Make amount match type
         currency: 'ILS',
         date: dates[i % 3],
-        type: i % 2 === 0 ? 'Expense' : 'Income',
+        type: type,
         description: `Test Transaction ${i + 1}`,
         rawData: { originalData: `test-${i + 1}` }
       });
@@ -51,7 +54,8 @@ describe('TransactionService', () => {
     it('should return paginated transactions', async () => {
       const result = await transactionService.getTransactions({
         limit: 10,
-        skip: 0
+        skip: 0,
+        userId: user._id  // Add required userId
       });
 
       expect(result.transactions).toHaveLength(10);
@@ -62,7 +66,8 @@ describe('TransactionService', () => {
     it('should filter by date range', async () => {
       const result = await transactionService.getTransactions({
         startDate: new Date('2025-06-01'),
-        endDate: new Date('2025-06-15')
+        endDate: new Date('2025-06-15'),
+        userId: user._id  // Add required userId
       });
 
       expect(result.transactions.every(t => 
@@ -73,7 +78,8 @@ describe('TransactionService', () => {
 
     it('should filter by type', async () => {
       const result = await transactionService.getTransactions({
-        type: 'Expense'
+        type: 'Expense',
+        userId: user._id  // Add required userId
       });
 
       expect(result.transactions.every(t => t.type === 'Expense')).toBe(true);
@@ -81,7 +87,8 @@ describe('TransactionService', () => {
 
     it('should filter by account', async () => {
       const result = await transactionService.getTransactions({
-        accountId: bankAccount._id
+        accountId: bankAccount._id,
+        userId: user._id  // Add required userId
       });
 
       expect(result.transactions.every(t => 
@@ -91,7 +98,8 @@ describe('TransactionService', () => {
 
     it('should search by description', async () => {
       const result = await transactionService.getTransactions({
-        search: 'Transaction 1'
+        search: 'Transaction 1',
+        userId: user._id  // Add required userId
       });
 
       expect(result.transactions.every(t => 
@@ -104,7 +112,8 @@ describe('TransactionService', () => {
         type: 'Expense',
         startDate: new Date('2025-06-01'),
         endDate: new Date('2025-06-15'),
-        limit: 5
+        limit: 5,
+        userId: user._id  // Add required userId
       });
 
       expect(result.transactions).toHaveLength(5);
@@ -119,7 +128,7 @@ describe('TransactionService', () => {
   describe('createFromScraperData', () => {
     it('should generate unique identifier when none provided', async () => {
       const scraperData = {
-        chargedAmount: -75,
+        chargedAmount: -75,  // Negative amount will make it an Expense
         date: new Date(),
         description: 'Auto ID Test'
       };
@@ -127,7 +136,8 @@ describe('TransactionService', () => {
       const transaction = await Transaction.createFromScraperData(
         scraperData,
         bankAccount._id,
-        'ILS'
+        'ILS',
+        user._id  // Add required userId
       );
 
       expect(transaction.identifier).toBeTruthy();
@@ -140,12 +150,13 @@ describe('TransactionService', () => {
       const transaction = await Transaction.createFromScraperData(
         {
           identifier: providedId,
-          chargedAmount: -75,
+          chargedAmount: -75,  // Negative amount will make it an Expense
           date: new Date(),
           description: 'Provided ID Test'
         },
         bankAccount._id,
-        'ILS'
+        'ILS',
+        user._id  // Add required userId
       );
 
       expect(transaction.identifier).toBe(providedId);
@@ -158,12 +169,13 @@ describe('TransactionService', () => {
 
       const transaction1 = await Transaction.createFromScraperData(
         {
-          chargedAmount: amount,
+          chargedAmount: amount,  // Already negative from the test setup
           date,
           description
         },
         bankAccount._id,
-        'ILS'
+        'ILS',
+        user._id  // Add required userId
       );
 
       const transaction2 = await Transaction.createFromScraperData(
@@ -173,7 +185,8 @@ describe('TransactionService', () => {
           description
         },
         bankAccount._id,
-        'ILS'
+        'ILS',
+        user._id  // Add required userId
       );
 
       expect(transaction1.identifier).not.toBe(transaction2.identifier);
