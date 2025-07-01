@@ -86,9 +86,7 @@ module.exports = {
           balance: 1000
         }];
       },
-      scrape: async (options) => {
-        const { credentials } = options;
-        
+      scrape: async (credentials) => {
         if (!credentials || !credentials.username || !credentials.password) {
           return {
             success: false,
