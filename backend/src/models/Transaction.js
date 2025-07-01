@@ -223,19 +223,21 @@ transactionSchema.statics.createFromScraperData = async function(scraperTransact
   let identifier = scraperTransaction.identifier;
   if (!identifier) {
     // Create a unique identifier from transaction details
-    identifier = [
-      accountId,
-      scraperTransaction.date,
-      scraperTransaction.chargedAmount,
-      scraperTransaction.description
-    ].join('_');
+      identifier = [
+        accountId,
+        scraperTransaction.date,
+        scraperTransaction.chargedAmount,
+        scraperTransaction.description,
+        Date.now(),  // Add timestamp to ensure uniqueness
+        Math.random().toString(36).slice(2, 8)  // Add random string
+      ].join('_');
   }
   
   return this.create({
     identifier,
     accountId,
     userId,
-    amount: Math.abs(scraperTransaction.chargedAmount),
+    amount: scraperTransaction.chargedAmount,
     currency: scraperTransaction.currency || defaultCurrency,
     date: new Date(scraperTransaction.date),
     type,
