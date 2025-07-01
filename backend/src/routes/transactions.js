@@ -74,7 +74,8 @@ router.get('/account/:accountId', auth, async (req, res) => {
     const transactions = await transactionService.getTransactionsByDateRange(
       req.params.accountId,
       startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-      endDate ? new Date(endDate) : new Date()
+      endDate ? new Date(endDate) : new Date(),
+      req.user._id
     );
 
     res.json(transactions);
@@ -86,7 +87,10 @@ router.get('/account/:accountId', auth, async (req, res) => {
 // Get uncategorized transactions
 router.get('/uncategorized/:accountId', auth, async (req, res) => {
   try {
-    const transactions = await transactionService.getUncategorizedTransactions(req.params.accountId);
+    const transactions = await transactionService.getUncategorizedTransactions(
+      req.params.accountId,
+      req.user._id
+    );
     res.json(transactions);
   } catch (error) {
     res.status(500).json({ error: error.message });

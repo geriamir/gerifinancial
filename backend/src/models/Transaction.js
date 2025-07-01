@@ -122,9 +122,11 @@ transactionSchema.methods.categorize = async function(categoryId, subCategoryId,
 };
 
 // Static method to find transactions within a date range
-transactionSchema.statics.findByDateRange = async function(accountId, startDate, endDate) {
+transactionSchema.statics.findByDateRange = async function(accountId, startDate, endDate, userId) {
+  if (!userId) throw new Error('userId is required');
   return this.find({
     accountId,
+    userId,
     date: {
       $gte: startDate,
       $lte: endDate
@@ -136,9 +138,11 @@ transactionSchema.statics.findByDateRange = async function(accountId, startDate,
 };
 
 // Static method to find uncategorized transactions
-transactionSchema.statics.findUncategorized = async function(accountId) {
+transactionSchema.statics.findUncategorized = async function(accountId, userId) {
+  if (!userId) throw new Error('userId is required');
   return this.find({
     accountId,
+    userId,
     category: null
   })
   .sort({ date: -1 });

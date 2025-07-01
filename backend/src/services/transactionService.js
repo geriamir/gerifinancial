@@ -105,12 +105,14 @@ class TransactionService {
     }
   }
 
-  async getTransactionsByDateRange(accountId, startDate, endDate) {
-    return Transaction.findByDateRange(accountId, startDate, endDate);
+  async getTransactionsByDateRange(accountId, startDate, endDate, userId) {
+    if (!userId) throw new Error('userId is required');
+    return Transaction.findByDateRange(accountId, startDate, endDate, userId);
   }
 
-  async getUncategorizedTransactions(accountId) {
-    return Transaction.findUncategorized(accountId);
+  async getUncategorizedTransactions(accountId, userId) {
+    if (!userId) throw new Error('userId is required');
+    return Transaction.findUncategorized(accountId, userId);
   }
 
   async categorizeTransaction(transactionId, categoryId, subCategoryId) {

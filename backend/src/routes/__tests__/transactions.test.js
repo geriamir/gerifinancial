@@ -48,11 +48,12 @@ describe('Transaction Routes', () => {
       $push: { subCategories: subCategory._id }
     });
 
-    // Create test transaction
+    // Create a test transaction for account-specific tests
     transaction = await Transaction.create({
       identifier: 'test-transaction-1',
       accountId: bankAccount._id,
-      amount: 100,
+      userId: user._id,
+      amount: -100,  // Negative for Expense
       currency: 'ILS',
       date: new Date(),
       type: 'Expense',
@@ -60,7 +61,18 @@ describe('Transaction Routes', () => {
       rawData: { originalData: 'test' }
     });
 
-    // Create additional transactions for pagination tests
+    // Create another account for pagination test data
+    const otherAccount = await BankAccount.create({
+      userId: user._id,
+      bankId: 'hapoalim',
+      name: 'Other Test Account',
+      credentials: {
+        username: 'testuser2',
+        password: 'bankpass123'
+      }
+    });
+
+    // Create additional transactions for pagination tests (in different account)
     const dates = [
       new Date('2025-06-01'),
       new Date('2025-06-15'),
@@ -68,13 +80,16 @@ describe('Transaction Routes', () => {
     ];
 
     for (let i = 0; i < 25; i++) {
+      const type = i % 2 === 0 ? 'Expense' : 'Income';
+      const amount = type === 'Expense' ? -(50 + i) : (50 + i);
       const tx = await Transaction.create({
         identifier: `test-transaction-${i + 2}`,
-        accountId: bankAccount._id,
-        amount: 50 + i,
+        accountId: otherAccount._id,  // Use different account
+        userId: user._id,
+        amount: amount,
         currency: 'ILS',
-        date: dates[i % 3], // Distribute across different dates
-        type: i % 2 === 0 ? 'Expense' : 'Income',
+        date: dates[i % 3],
+        type: type,
         description: `Test Transaction ${i + 2}`,
         rawData: { originalData: `test-${i + 2}` }
       });
@@ -414,7 +429,7 @@ describe('Transaction Routes', () => {
         chargedAmount: -75,
         date: new Date(),
         description: 'Auto ID Test'
-      }, bankAccount._id, 'ILS');
+      }, bankAccount._id, 'ILS', user._id);
 
       expect(transaction.identifier).toBeTruthy();
       expect(typeof transaction.identifier).toBe('string');
@@ -428,7 +443,7 @@ describe('Transaction Routes', () => {
         chargedAmount: -75,
         date: new Date(),
         description: 'Provided ID Test'
-      }, bankAccount._id, 'ILS');
+      }, bankAccount._id, 'ILS', user._id);
 
       expect(transaction.identifier).toBe(providedId);
     });
@@ -442,13 +457,13 @@ describe('Transaction Routes', () => {
         chargedAmount: amount,
         date,
         description
-      }, bankAccount._id, 'ILS');
+      }, bankAccount._id, 'ILS', user._id);
 
       const transaction2 = await Transaction.createFromScraperData({
         chargedAmount: amount,
         date,
         description
-      }, bankAccount._id, 'ILS');
+      }, bankAccount._id, 'ILS', user._id);
 
       expect(transaction1.identifier).not.toBe(transaction2.identifier);
     });
