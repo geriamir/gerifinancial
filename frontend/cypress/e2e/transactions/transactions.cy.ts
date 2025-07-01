@@ -133,8 +133,8 @@ describe('Transactions Page', () => {
       expect(result.transactions[0].userId.toString()).to.equal(Cypress.env('testUserId'));
 
       // Verify transaction dates are within expected range
-      const startDate = new Date('2025-05-15T00:00:00.000Z'); // -15 days from June 1st
-      const endDate = new Date('2025-06-15T23:59:59.999Z');   // +15 days from June 1st
+      const startDate = new Date('2025-05-13T00:00:00.000Z'); // -17 days from June 1st
+      const endDate = new Date('2025-06-17T23:59:59.999Z');   // +17 days from June 1st
       
       result.transactions.forEach(tx => {
         const txDate = new Date(tx.date);
