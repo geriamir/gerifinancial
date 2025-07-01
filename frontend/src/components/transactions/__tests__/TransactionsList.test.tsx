@@ -84,18 +84,26 @@ describe('TransactionsList', () => {
     const initialTransactions = mockTransactions(1, 10);
     const nextPageTransactions = mockTransactions(11, 10);
 
-    // Mock first page
-    (transactionsApi.getTransactions as jest.Mock).mockResolvedValueOnce({
-      transactions: initialTransactions,
-      total: 30,
-      hasMore: true
-    });
-
-    // Mock second page
-    (transactionsApi.getTransactions as jest.Mock).mockResolvedValueOnce({
-      transactions: nextPageTransactions,
-      total: 30,
-      hasMore: true
+    // Set up mock responses with debug logging
+    (transactionsApi.getTransactions as jest.Mock).mockImplementation(async (params) => {
+      console.log('Mock API called with params:', params);
+      
+      // Return different responses based on skip parameter
+      if (params.skip === 0) {
+        console.log('Returning initial page');
+        return Promise.resolve({
+          transactions: initialTransactions,
+          total: 30,
+          hasMore: true
+        });
+      } else {
+        console.log('Returning next page');
+        return Promise.resolve({
+          transactions: nextPageTransactions,
+          total: 30,
+          hasMore: true
+        });
+      }
     });
 
     render(<TransactionsList filters={{}} />);
@@ -106,14 +114,49 @@ describe('TransactionsList', () => {
     });
 
     // Simulate intersection observer callback
+    // Wait for initial page to load
+    await waitFor(() => {
+      const items = screen.getAllByTestId(/^transaction-item-/);
+      expect(items).toHaveLength(10);
+    });
+
+    // Create a promise to track loading state
+    let resolveNextPage: (value: any) => void;
+    const nextPagePromise = new Promise(resolve => {
+      resolveNextPage = resolve;
+    });
+
+    // Mock API call with controlled delay
+    (transactionsApi.getTransactions as jest.Mock).mockImplementationOnce(
+      () => nextPagePromise
+    );
+
+    // Trigger infinite scroll
     act(() => {
       const [observerCallback] = (window.IntersectionObserver as jest.Mock).mock.calls[0];
       observerCallback([{ isIntersecting: true }]);
     });
 
-    // Wait for next page
+    // Verify loading state appears
     await waitFor(() => {
+      expect(screen.queryByTestId('loading-indicator')).toBeInTheDocument();
+    });
+
+    // Resolve the API call
+    await act(async () => {
+      resolveNextPage!({
+        transactions: nextPageTransactions,
+        total: 30,
+        hasMore: true
+      });
+    });
+
+    // Wait for next page content and loading to disappear
+    await waitFor(() => {
+      expect(screen.queryByTestId('loading-indicator')).not.toBeInTheDocument();
       expect(screen.getByText('Test Transaction 11')).toBeInTheDocument();
+      const items = screen.getAllByTestId(/^transaction-item-/);
+      expect(items).toHaveLength(20);
     });
 
     // Verify API was called with correct pagination

@@ -47,14 +47,20 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ filters }) => {
         skip,
       });
 
+      if (!response || !Array.isArray(response?.transactions)) {
+        setError('Failed to load transactions. Invalid response format.');
+        return;
+      }
+
+      const newTransactions = response.transactions || [];
       setTransactions(prevTransactions => {
         if (skip === 0) {
-          return response.transactions;
+          return newTransactions;
         }
-        return [...prevTransactions, ...response.transactions];
+        return [...prevTransactions, ...newTransactions];
       });
-      
-      setHasMore(response.hasMore);
+
+      setHasMore(Boolean(response?.hasMore));
     } catch (err) {
       setError('Failed to load transactions. Please try again.');
       console.error('Error fetching transactions:', err);
