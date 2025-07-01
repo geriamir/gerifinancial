@@ -1,5 +1,15 @@
 const { Transaction, SubCategory } = require('../models');
+const { ObjectId } = require('mongodb');
 const bankScraperService = require('./bankScraperService');
+
+const convertToObjectId = (id) => {
+  try {
+    return typeof id === 'string' ? new ObjectId(id) : id;
+  } catch (error) {
+    console.error('Invalid ObjectId:', id, error);
+    throw new Error('Invalid ID format');
+  }
+};
 
 class TransactionService {
   async scrapeTransactions(bankAccount, options = {}) {
@@ -35,7 +45,12 @@ class TransactionService {
       for (const transaction of account.txns) {
         // Log raw transaction data for debugging
         try {
-          await Transaction.createFromScraperData(transaction, bankAccount._id, bankAccount.defaultCurrency);
+          await Transaction.createFromScraperData(
+            transaction, 
+            bankAccount._id, 
+            bankAccount.defaultCurrency,
+            bankAccount.userId // Add userId from the bank account
+          );
           results.newTransactions++;
           
           // Attempt auto-categorization
@@ -120,18 +135,74 @@ class TransactionService {
     search,
     limit = 20,
     skip = 0,
-    accountId
+    accountId,
+    userId
   }) {
-    // Build query object
-    const query = {};
+    // Build base query - userId is required for security
+    if (!userId) {
+      throw new Error('userId is required');
+    }
 
-    if (startDate) query.date = { $gte: startDate };
-    if (endDate) query.date = { ...query.date, $lte: endDate };
-    if (type) query.type = type;
-    if (category) query.category = category;
-    if (accountId) query.accountId = accountId;
+    const query = {
+      userId: convertToObjectId(userId)
+    };
+    
+    // Only add accountId filter if specifically requested
+    if (accountId) {
+      query.accountId = convertToObjectId(accountId);
+    }
+
+    // Add other filters - ensure proper date handling with start/end of day
+    if (startDate || endDate) {
+      query.date = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setUTCHours(0, 0, 0, 0);
+        query.date.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setUTCHours(23, 59, 59, 999);
+        query.date.$lte = end;
+      }
+    }
+    if (type) {
+      console.log('Processing type filter:', { 
+        rawType: type,
+        typeType: typeof type,
+        validTypes: ['Expense', 'Income', 'Transfer'],
+        isValidType: ['Expense', 'Income', 'Transfer'].includes(type)
+      });
+      if (['Expense', 'Income', 'Transfer'].includes(type)) {
+        query.type = type;
+      } else {
+        console.warn('Invalid transaction type received:', type);
+      }
+    }
+    if (category) query.category = convertToObjectId(category);
     if (search) {
       query.description = { $regex: search, $options: 'i' };
+    }
+
+    // Log the query for debugging
+    console.log('MongoDB query:', {
+      userId: query.userId.toString(),
+      dateRange: query.date,
+      type: query.type,
+      description: query.description
+    });
+
+    // Debug: Check collection for matching documents
+    const count = await Transaction.countDocuments(query);
+    console.log('Query results:', {
+      matchingDocuments: count,
+      totalUserDocs: await Transaction.countDocuments({ userId: query.userId })
+    });
+    if (count === 0) {
+      const userCount = await Transaction.countDocuments({
+        userId: convertToObjectId(userId)
+      });
+      console.log('Total transactions for user:', userCount);
     }
 
     // Get total count for pagination
@@ -146,6 +217,8 @@ class TransactionService {
 
     // Calculate if there are more transactions
     const hasMore = total > skip + transactions.length;
+
+    console.log(`Fetched ${transactions.length} transactions, total: ${total}, hasMore: ${hasMore}`);
 
     return {
       transactions,

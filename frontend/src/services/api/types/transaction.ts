@@ -5,6 +5,7 @@ export type TransactionStatus = 'pending' | 'processed' | 'error';
 
 export interface Transaction {
   _id: string;
+  userId: string;
   accountId: string;
   amount: number;
   currency: string;
@@ -35,4 +36,5 @@ export interface TransactionFilters {
   limit?: number;
   skip?: number;
   accountId?: string;
+  userId?: string;
 }

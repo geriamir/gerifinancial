@@ -18,7 +18,7 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ filters }) => {
   const [skip, setSkip] = useState(0);
   
   const observer = useRef<IntersectionObserver | null>(null);
-  const lastTransactionElementRef = useCallback((node: HTMLDivElement | null) => {
+  const lastTransactionElementRef = useCallback((node: HTMLLIElement | null) => {
     if (loading) return;
     
     if (observer.current) {
@@ -66,11 +66,8 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ filters }) => {
   useEffect(() => {
     setSkip(0);
     setTransactions([]);
-  }, [filters]);
-
-  useEffect(() => {
     fetchTransactions();
-  }, [fetchTransactions]);
+  }, [filters, fetchTransactions]);
 
   if (error) {
     return (
@@ -82,28 +79,55 @@ const TransactionsList: React.FC<TransactionsListProps> = ({ filters }) => {
 
   if (transactions.length === 0 && !loading) {
     return (
-      <Alert severity="info" sx={{ mt: 2 }}>
+      <Alert severity="info" sx={{ mt: 2 }} data-testid="no-transactions-message">
         No transactions found.
       </Alert>
     );
   }
 
   return (
-    <Box sx={{ mt: 2 }}>
+    <Box
+      component="ul"
+      sx={{
+        mt: 2,
+        listStyle: 'none',
+        padding: 0,
+        maxHeight: '600px',
+        overflow: 'auto'
+      }}
+      data-testid="transactions-list"
+    >
       {transactions.map((transaction, index) => {
         if (index === transactions.length - 1) {
           return (
-            <div ref={lastTransactionElementRef} key={transaction._id}>
-              <TransactionRow transaction={transaction} />
-            </div>
+            <li
+              ref={lastTransactionElementRef}
+              key={transaction._id}
+              data-testid={`transaction-item-${transaction._id}`}
+            >
+              <TransactionRow 
+                transaction={transaction} 
+                data-testid={`transaction-${transaction._id}-content`}
+              />
+            </li>
           );
         }
-        return <TransactionRow key={transaction._id} transaction={transaction} />;
+        return (
+          <li
+            key={transaction._id}
+            data-testid={`transaction-item-${transaction._id}`}
+          >
+            <TransactionRow 
+              transaction={transaction}
+              data-testid={`transaction-${transaction._id}-content`}
+            />
+          </li>
+        );
       })}
       
       {loading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
-          <CircularProgress />
+          <CircularProgress data-testid="loading-indicator" />
         </Box>
       )}
     </Box>

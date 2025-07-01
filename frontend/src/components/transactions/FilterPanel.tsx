@@ -38,8 +38,8 @@ interface FilterPanelProps {
 const defaultStartDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Last 30 days
 const defaultEndDate = new Date();
 
-const transactionTypes: { value: TransactionType | ''; label: string }[] = [
-  { value: '', label: 'All Types' },
+const transactionTypes: { value: TransactionType | undefined; label: string }[] = [
+  { value: undefined, label: 'All Types' },
   { value: 'Expense', label: 'Expense' },
   { value: 'Income', label: 'Income' },
   { value: 'Transfer', label: 'Transfer' },
@@ -149,7 +149,7 @@ CategorySelect.displayName = 'CategorySelect';
 const FilterPanel: React.FC<FilterPanelProps> = ({
   startDate = defaultStartDate,
   endDate = defaultEndDate,
-  type = '',
+  type = undefined,
   search = '',
   onFilterChange,
 }) => {
@@ -188,13 +188,31 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
   const handleTypeChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const newType = event.target.value as TransactionType | '';
+    console.log('Type filter selection:', { 
+      rawValue: event.target.value,
+      newType,
+      isValidType: ['Expense', 'Income', 'Transfer'].includes(newType)
+    });
     const controller = new AbortController();
     pendingOperationsRef.current.push(controller);
 
     try {
       await performance.measureOperation('typeFilter', async () => {
         if (controller.signal.aborted) return;
-        onFilterChange({ type: newType || undefined });
+
+        // Validate the type before applying filter
+        const validTypes = ['Expense', 'Income', 'Transfer'] as const;
+        const typeFilter = newType === '' ? undefined : 
+                         validTypes.includes(newType as typeof validTypes[number]) ? newType as TransactionType : 
+                         undefined;
+        
+        console.log('Type filter validation:', {
+          rawValue: newType,
+          validatedType: typeFilter,
+          isValid: typeFilter === undefined || validTypes.includes(typeFilter as typeof validTypes[number])
+        });
+
+        onFilterChange({ type: typeFilter });
         announce(formatFilterAnnouncement('Transaction type', newType || 'All types'));
       });
     } finally {
@@ -304,21 +322,31 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
           label="Start Date"
           value={startDate}
           onChange={handleDateChange('startDate')}
+          format="dd/MM/yyyy"
+          data-testid="date-range-filter"
           slotProps={{ 
             textField: { 
               size: 'small',
-              'aria-label': 'Filter from date' 
-            } 
+              'aria-label': 'Filter from date',
+              inputProps: {
+                'data-testid': 'date-range-filter'
+              }
+            }
           }}
         />
         <DatePicker
           label="End Date"
           value={endDate}
           onChange={handleDateChange('endDate')}
+          format="dd/MM/yyyy"
+          data-testid= 'date-range-end-filter'
           slotProps={{ 
             textField: { 
               size: 'small',
-              'aria-label': 'Filter to date'
+              'aria-label': 'Filter to date',
+              inputProps: {
+                'data-testid': 'date-range-end-filter'
+              }
             } 
           }}
         />
@@ -327,10 +355,20 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             select
             size="small"
             label="Type"
-            value={type}
+            value={type || undefined}
             onChange={handleTypeChange}
             sx={{ minWidth: 120 }}
             aria-label="Filter by transaction type"
+            data-testid="type-filter"
+            SelectProps={{
+              displayEmpty: true,
+              MenuProps: {
+                anchorOrigin: {
+                  vertical: 'bottom',
+                  horizontal: 'left'
+                }
+              }
+            }}
           >
             {transactionTypes.map(option => (
               <MenuItem key={option.value} value={option.value}>
@@ -351,6 +389,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         inputRef={searchInputRef}
         placeholder="Search by description..."
         aria-label="Search transactions by description"
+        data-testid="search-input"
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">

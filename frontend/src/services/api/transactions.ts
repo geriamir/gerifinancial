@@ -25,15 +25,17 @@ export const transactionsApi = {
       limit = 20,
       skip = 0,
       accountId,
+      userId,
     } = filters;
 
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate.toISOString());
     if (endDate) params.append('endDate', endDate.toISOString());
-    if (type) params.append('type', type);
+    if (type) params.append('type', type); // Only add if type is a valid TransactionType
     if (category) params.append('category', category);
     if (search) params.append('search', search);
     if (accountId) params.append('accountId', accountId);
+    if (userId) params.append('userId', userId);
     params.append('limit', limit.toString());
     params.append('skip', skip.toString());
 
@@ -48,8 +50,8 @@ export const transactionsApi = {
 
   getSummary: async (
     accountId: string,
-    startDate?: Date,
-    endDate?: Date
+  startDate: Date | undefined,
+  endDate: Date | undefined
   ) => {
     const params = new URLSearchParams();
     if (startDate) params.append('startDate', startDate.toISOString());

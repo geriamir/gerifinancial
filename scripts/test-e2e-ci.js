@@ -9,14 +9,19 @@ const backend = spawn('npm', ['run', 'backend'], {
   detached: true,
   env: {
     ...process.env,
-    NODE_ENV: 'e2e'
+    NODE_ENV: 'e2e',
+    MONGODB_URI: 'mongodb://localhost:27777/gerifinancial-e2e'
   }
 });
 
 const frontend = spawn('npm', ['run', 'frontend'], { 
   stdio: 'inherit',
   shell: true,
-  detached: true 
+  detached: true,
+  env: {
+    ...process.env,
+    MONGODB_URI: 'mongodb://localhost:27777/gerifinancial-e2e'
+  }
 });
 
 // Function to kill processes and their children
@@ -51,7 +56,11 @@ waitOn({
   try {
     // Run Cypress tests
     execSync('cd frontend && npm run cypress:run', {
-      stdio: 'inherit'
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        MONGODB_URI: 'mongodb://localhost:27777/gerifinancial-e2e'
+      }
     });
     console.log('Tests completed successfully');
     cleanup();

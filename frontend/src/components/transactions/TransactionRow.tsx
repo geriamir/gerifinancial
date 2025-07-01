@@ -12,6 +12,7 @@ import { Transaction } from '../../services/api/types';
 
 interface TransactionRowProps {
   transaction: Transaction;
+  'data-testid'?: string;
 }
 
 const formatDate = (dateString: string) => {
@@ -44,9 +45,12 @@ const getTypeColor = (type: Transaction['type']) => {
   }
 };
 
-const TransactionRow: React.FC<TransactionRowProps> = ({ transaction }) => {
+const TransactionRow: React.FC<TransactionRowProps> = ({ transaction, 'data-testid': testId }) => {
+  const baseTestId = testId || `transaction-${transaction._id}`;
+  
   return (
     <Paper
+      data-testid={baseTestId}
       sx={{
         p: 2,
         mb: 1,
@@ -60,10 +64,17 @@ const TransactionRow: React.FC<TransactionRowProps> = ({ transaction }) => {
       elevation={1}
     >
       <Box sx={{ flex: 1 }}>
-        <Typography variant="subtitle1">
+        <Typography 
+          variant="subtitle1"
+          data-testid={`${baseTestId}-description`}
+        >
           {transaction.description}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography 
+          variant="body2" 
+          color="text.secondary"
+          data-testid={`${baseTestId}-date`}
+        >
           {formatDate(transaction.date)}
         </Typography>
       </Box>
@@ -74,6 +85,7 @@ const TransactionRow: React.FC<TransactionRowProps> = ({ transaction }) => {
             label={transaction.category.name}
             size="small"
             variant="outlined"
+            data-testid={`${baseTestId}-category`}
           />
         )}
         
@@ -81,6 +93,7 @@ const TransactionRow: React.FC<TransactionRowProps> = ({ transaction }) => {
           <Typography
             variant="subtitle1"
             color={transaction.type === 'Expense' ? 'error' : 'success'}
+            data-testid={`${baseTestId}-amount`}
           >
             {formatAmount(transaction.amount, transaction.currency)}
           </Typography>
@@ -88,11 +101,15 @@ const TransactionRow: React.FC<TransactionRowProps> = ({ transaction }) => {
             label={transaction.type}
             size="small"
             color={getTypeColor(transaction.type)}
+            data-testid={`${baseTestId}-type`}
           />
         </Box>
 
         <Tooltip title="Edit transaction">
-          <IconButton size="small">
+          <IconButton 
+            size="small"
+            data-testid={`${baseTestId}-edit`}
+          >
             <EditIcon fontSize="small" />
           </IconButton>
         </Tooltip>
