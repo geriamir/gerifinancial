@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { CategorizationMethod, TransactionType, TransactionStatus } = require('../constants/enums');
 
 const transactionSchema = new mongoose.Schema({
   identifier: {
@@ -23,8 +24,8 @@ const transactionSchema = new mongoose.Schema({
       validator: function(v) {
         // Amount can be negative for expenses, positive for income/transfers
         return typeof v === 'number' && !isNaN(v) &&
-               ((this.type === 'Expense' && v < 0) || 
-                (['Income', 'Transfer'].includes(this.type) && v > 0));
+               ((this.type === TransactionType.EXPENSE && v < 0) || 
+                ([TransactionType.INCOME, TransactionType.TRANSFER].includes(this.type) && v > 0));
       },
       message: props => {
         const sign = props.value < 0 ? 'negative' : 'positive';
@@ -45,7 +46,7 @@ const transactionSchema = new mongoose.Schema({
       },
       message: props => `${props.value} is not a valid date!`
     },
-    index: true // Add index for better date query performance
+    index: true
   },
   processedDate: {
     type: Date,
@@ -54,15 +55,15 @@ const transactionSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: {
-      values: ['Expense', 'Income', 'Transfer'],
+      values: Object.values(TransactionType),
       message: '{VALUE} is not a valid transaction type'
     },
     required: [true, 'Transaction type is required'],
     validate: {
       validator: function(v) {
-        return ['Expense', 'Income', 'Transfer'].includes(v);
+        return Object.values(TransactionType).includes(v);
       },
-      message: props => `${props.value} is not a valid transaction type. Must be one of: Expense, Income, Transfer`
+      message: props => `${props.value} is not a valid transaction type. Must be one of: ${Object.values(TransactionType).join(', ')}`
     }
   },
   description: {
@@ -82,14 +83,15 @@ const transactionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'SubCategory',
   },
-  isAutoCategorized: {
-    type: Boolean,
-    default: false,
+  categorizationMethod: {
+    type: String,
+    enum: Object.values(CategorizationMethod),
+    default: CategorizationMethod.MANUAL
   },
   status: {
     type: String,
-    enum: ['pending', 'processed', 'error'],
-    default: 'pending',
+    enum: Object.values(TransactionStatus),
+    default: TransactionStatus.PENDING,
   },
   rawData: {
     type: mongoose.Schema.Types.Mixed,
@@ -108,12 +110,12 @@ transactionSchema.index({ category: 1, date: -1 });
 transactionSchema.index({ status: 1 });
 
 // Helper method to categorize a transaction
-transactionSchema.methods.categorize = async function(categoryId, subCategoryId, isAuto = false) {
+transactionSchema.methods.categorize = async function(categoryId, subCategoryId, method = CategorizationMethod.MANUAL) {
   this.category = categoryId;
   this.subCategory = subCategoryId;
-  this.isAutoCategorized = isAuto;
+  this.categorizationMethod = method;
   this.processedDate = new Date();
-  this.status = 'processed';
+  this.status = TransactionStatus.PROCESSED;
   await this.save();
 };
 
@@ -152,7 +154,7 @@ transactionSchema.statics.getSpendingSummary = async function(accountId, startDa
         $match: {
           accountId: new mongoose.Types.ObjectId(accountId),
           date: { $gte: startDate, $lte: endDate },
-          type: 'Expense'
+          type: TransactionType.EXPENSE
         }
       },
       {
@@ -179,7 +181,7 @@ transactionSchema.statics.getSpendingSummary = async function(accountId, startDa
         $match: {
           accountId: new mongoose.Types.ObjectId(accountId),
           date: { $gte: startDate, $lte: endDate },
-          type: 'Income'
+          type: TransactionType.INCOME
         }
       },
       {
@@ -222,15 +224,14 @@ transactionSchema.statics.createFromScraperData = async function(scraperTransact
   // Generate a unique identifier if one is not provided by the scraper
   let identifier = scraperTransaction.identifier;
   if (!identifier) {
-    // Create a unique identifier from transaction details
-      identifier = [
-        accountId,
-        scraperTransaction.date,
-        scraperTransaction.chargedAmount,
-        scraperTransaction.description,
-        Date.now(),  // Add timestamp to ensure uniqueness
-        Math.random().toString(36).slice(2, 8)  // Add random string
-      ].join('_');
+    identifier = [
+      accountId,
+      scraperTransaction.date,
+      scraperTransaction.chargedAmount,
+      scraperTransaction.description,
+      Date.now(),
+      Math.random().toString(36).slice(2, 8)
+    ].join('_');
   }
   
   return this.create({
@@ -244,7 +245,7 @@ transactionSchema.statics.createFromScraperData = async function(scraperTransact
     description: scraperTransaction.description,
     memo: scraperTransaction.memo || '',
     rawData: scraperTransaction,
-    status: 'pending'
+    status: TransactionStatus.PENDING
   });
 };
 
@@ -253,10 +254,10 @@ function determineTransactionType(scraperTransaction) {
   const amount = scraperTransaction.chargedAmount;
   
   if (scraperTransaction.type === 'CREDIT_CARD_PAYMENT') {
-    return 'Transfer';
+    return TransactionType.TRANSFER;
   }
   
-  return amount < 0 ? 'Expense' : 'Income';
+  return amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME;
 }
 
 const Transaction = mongoose.model('Transaction', transactionSchema);
