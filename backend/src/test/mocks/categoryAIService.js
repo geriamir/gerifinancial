@@ -13,7 +13,7 @@ class MockCategoryAIService {
       // Simplified Porter stemming
       let stemmed = cleaned;
       // Step 1
-      stemmed = stemmed.replace(/(?:ational|tional|ational|iveness|fulness|ousness|aliti|iviti|biliti)$/, 'ate');
+      stemmed = stemmed.replace(/(?:ational|tional|iveness|fulness|ousness|aliti|iviti|biliti)$/, 'ate');
       stemmed = stemmed.replace(/(?:icate|ative|alize|iciti|ical)$/, 'ic');
       // Step 2
       stemmed = stemmed.replace(/(?:ency|ancy)$/, 'ent');
