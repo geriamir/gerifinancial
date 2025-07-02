@@ -1,6 +1,11 @@
-jest.mock('../categoryAIService', () => require('../../test/mocks/categoryAIService'));
+const mongoose = require('mongoose');
+jest.mock('@vitalets/google-translate-api', () => ({
+  __esModule: true,
+  default: jest.fn(text => Promise.resolve({ text: text === 'בית קפה' ? 'coffee shop' : text }))
+}));
 
 describe('CategoryAIService', () => {
+  const mockUserId = new mongoose.Types.ObjectId();
   let service;
   let mockCategories;
 
@@ -16,7 +21,7 @@ describe('CategoryAIService', () => {
           {
             id: '1a',
             name: 'Restaurants',
-            keywords: ['restaurant', 'cafe', 'burger']
+            keywords: ['restaurant', 'cafe', 'burger', 'coffee shop']
           },
           {
             id: '1b',
@@ -49,6 +54,33 @@ describe('CategoryAIService', () => {
     jest.resetModules();
   });
 
+  describe('translateText', () => {
+    it('should translate Hebrew text to English', async () => {
+      const result = await service.translateText('בית קפה');
+      expect(result).toBe('coffee shop');
+    });
+
+    it('should handle untranslatable text', async () => {
+      const text = 'already english text';
+      const result = await service.translateText(text);
+      expect(result).toBe(text);
+    });
+
+    it('should use cache for repeated translations', async () => {
+      const text = 'בית קפה';
+      
+      // First call should translate
+      const result1 = await service.translateText(text);
+      // Second call should use cache
+      const result2 = await service.translateText(text);
+
+      expect(result1).toBe('coffee shop');
+      expect(result2).toBe('coffee shop');
+      // Translation should only be called once
+      expect(require('@vitalets/google-translate-api').default).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('processText', () => {
     it('should tokenize and stem text correctly', () => {
       const text = 'Restaurant Food Delivery';
@@ -65,6 +97,15 @@ describe('CategoryAIService', () => {
       const tokens = service.processText('');
       expect(tokens).toEqual([]);
     });
+
+    it('should handle Hebrew text with translation', async () => {
+      const text = 'בית קפה';
+      const translatedText = await service.translateText(text);
+      const tokens = service.processText(translatedText);
+      
+      expect(tokens.length).toBeGreaterThan(0);
+      expect(tokens.some(t => t.includes('coffee') || t.includes('shop'))).toBe(true);
+    });
   });
 
   describe('suggestCategory', () => {
@@ -75,13 +116,30 @@ describe('CategoryAIService', () => {
       const suggestion = await service.suggestCategory(
         description,
         amount,
-        mockCategories
+        mockCategories,
+        mockUserId
       );
 
       expect(suggestion.categoryId).toBe('1');
       expect(suggestion.subCategoryId).toBe('1a');
       expect(suggestion.confidence).toBeGreaterThan(0.5);
       expect(suggestion.reasoning).toContain('Restaurants');
+    });
+
+    it('should match Hebrew text after translation', async () => {
+      const description = 'בית קפה';
+      const amount = -75;
+
+      const suggestion = await service.suggestCategory(
+        description,
+        amount,
+        mockCategories,
+        mockUserId
+      );
+
+      expect(suggestion.categoryId).toBe('1');
+      expect(suggestion.subCategoryId).toBe('1a');
+      expect(suggestion.confidence).toBeGreaterThan(0.5);
     });
 
     it('should match similar words', async () => {
@@ -91,7 +149,8 @@ describe('CategoryAIService', () => {
       const suggestion = await service.suggestCategory(
         description,
         amount,
-        mockCategories
+        mockCategories,
+        mockUserId
       );
 
       expect(suggestion.categoryId).toBe('1');
@@ -105,14 +164,15 @@ describe('CategoryAIService', () => {
       const suggestion = await service.suggestCategory(
         description,
         amount,
-        mockCategories
+        mockCategories,
+        mockUserId
       );
 
       expect(suggestion.confidence).toBeLessThan(0.5);
     });
 
     it('should handle missing parameters', async () => {
-      const suggestion = await service.suggestCategory('', 0, []);
+      const suggestion = await service.suggestCategory('', 0, [], null);
       
       expect(suggestion.categoryId).toBeNull();
       expect(suggestion.subCategoryId).toBeNull();
@@ -129,6 +189,15 @@ describe('CategoryAIService', () => {
 
       expect(keywords).toContain('subway');
       expect(keywords).toContain('monthly');
+      expect(keywords.length).toBeLessThanOrEqual(3);
+    });
+
+    it('should extract keywords from translated Hebrew text', async () => {
+      const description = 'בית קפה';
+      
+      const keywords = await service.suggestNewKeywords(description);
+
+      expect(keywords.some(k => k.includes('coffee') || k.includes('shop'))).toBe(true);
       expect(keywords.length).toBeLessThanOrEqual(3);
     });
 
