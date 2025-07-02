@@ -33,14 +33,16 @@ describe('Transaction Routes', () => {
     // Create test category and subcategory
     category = await Category.create({
       name: 'Food',
-      type: 'Expense'
+      type: 'Expense',
+      userId: user._id
     });
 
     subCategory = await SubCategory.create({
       name: 'Restaurants',
       keywords: ['restaurant', 'cafe'],
       parentCategory: category._id,
-      isDefault: false
+      isDefault: false,
+      userId: user._id
     });
 
     // Update category with subcategory
@@ -296,7 +298,8 @@ describe('Transaction Routes', () => {
     it('should create a new category', async () => {
       const newCategory = {
         name: 'Transportation',
-        type: 'Expense'
+        type: 'Expense',
+        userId: user._id
       };
 
       const res = await request(app)
