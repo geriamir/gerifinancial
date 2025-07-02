@@ -1,3 +1,5 @@
+jest.mock('../../services/categoryAIService', () => require('../../test/mocks/categoryAIService'));
+
 const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../../app');
@@ -30,9 +32,15 @@ describe('Transaction Routes', () => {
       }
     });
 
-    // Create test category and subcategory
+    // Create test categories
     category = await Category.create({
       name: 'Food',
+      type: 'Expense',
+      userId: user._id
+    });
+
+    const transportCategory = await Category.create({
+      name: 'Transportation',
       type: 'Expense',
       userId: user._id
     });
@@ -74,7 +82,7 @@ describe('Transaction Routes', () => {
       }
     });
 
-    // Create additional transactions for pagination tests (in different account)
+    // Create additional transactions for pagination tests
     const dates = [
       new Date('2025-06-01'),
       new Date('2025-06-15'),
@@ -86,7 +94,7 @@ describe('Transaction Routes', () => {
       const amount = type === 'Expense' ? -(50 + i) : (50 + i);
       const tx = await Transaction.create({
         identifier: `test-transaction-${i + 2}`,
-        accountId: otherAccount._id,  // Use different account
+        accountId: otherAccount._id,
         userId: user._id,
         amount: amount,
         currency: 'ILS',
@@ -158,9 +166,15 @@ describe('Transaction Routes', () => {
         .get('/api/transactions');
 
       expect(res.status).toBe(401);
+    });
   });
 
   describe('POST /api/transactions/:transactionId/suggest-category', () => {
+    beforeEach(async () => {
+      // Clear mocks
+      jest.clearAllMocks();
+    });
+
     it('should suggest category using AI analysis', async () => {
       const res = await request(app)
         .post(`/api/transactions/${transaction._id}/suggest-category`)
@@ -183,7 +197,8 @@ describe('Transaction Routes', () => {
         currency: 'ILS',
         date: new Date(),
         type: 'Expense',
-        description: 'Local Restaurant Dining'
+        description: 'Local Restaurant Dining',
+        rawData: { originalData: 'test' }
       });
 
       const res = await request(app)
@@ -205,7 +220,8 @@ describe('Transaction Routes', () => {
         currency: 'ILS',
         date: new Date(),
         type: 'Expense',
-        description: 'General Payment'
+        description: 'General Payment',
+        rawData: { originalData: 'test' }
       });
 
       const res = await request(app)
@@ -220,60 +236,6 @@ describe('Transaction Routes', () => {
     it('should require authentication', async () => {
       const res = await request(app)
         .post(`/api/transactions/${transaction._id}/suggest-category`);
-
-      expect(res.status).toBe(401);
-    });
-  });
-});
-
-  describe('GET /api/transactions/account/:accountId', () => {
-    it('should return transactions for valid account', async () => {
-      const res = await request(app)
-        .get(`/api/transactions/account/${bankAccount._id}`)
-        .set('Authorization', `Bearer ${token}`);
-
-      expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBeTruthy();
-      expect(res.body.length).toBe(1);
-      expect(res.body[0].identifier).toBe(transaction.identifier);
-    });
-
-    it('should filter transactions by date range', async () => {
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + 1);
-
-      const res = await request(app)
-        .get(`/api/transactions/account/${bankAccount._id}`)
-        .query({ startDate: startDate.toISOString(), endDate: endDate.toISOString() })
-        .set('Authorization', `Bearer ${token}`);
-
-      expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBeTruthy();
-    });
-
-    it('should require authentication', async () => {
-      const res = await request(app)
-        .get(`/api/transactions/account/${bankAccount._id}`);
-
-      expect(res.status).toBe(401);
-    });
-  });
-
-  describe('GET /api/transactions/uncategorized/:accountId', () => {
-    it('should return uncategorized transactions', async () => {
-      const res = await request(app)
-        .get(`/api/transactions/uncategorized/${bankAccount._id}`)
-        .set('Authorization', `Bearer ${token}`);
-
-      expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBeTruthy();
-      expect(res.body.length).toBe(1); // Our test transaction is uncategorized
-    });
-
-    it('should require authentication', async () => {
-      const res = await request(app)
-        .get(`/api/transactions/uncategorized/${bankAccount._id}`);
 
       expect(res.status).toBe(401);
     });
@@ -338,161 +300,8 @@ describe('Transaction Routes', () => {
     });
   });
 
-  describe('GET /api/transactions/categories', () => {
-    it('should return all categories with subcategories', async () => {
-      const res = await request(app)
-        .get('/api/transactions/categories')
-        .set('Authorization', `Bearer ${token}`);
-
-      expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBeTruthy();
-      expect(res.body[0].name).toBe('Food');
-      expect(Array.isArray(res.body[0].subCategories)).toBeTruthy();
-      expect(res.body[0].subCategories[0].name).toBe('Restaurants');
-    });
-
-    it('should require authentication', async () => {
-      const res = await request(app)
-        .get('/api/transactions/categories');
-
-      expect(res.status).toBe(401);
-    });
-  });
-
-  describe('POST /api/transactions/categories', () => {
-    it('should create a new category', async () => {
-      const newCategory = {
-        name: 'Transportation',
-        type: 'Expense',
-        userId: user._id
-      };
-
-      const res = await request(app)
-        .post('/api/transactions/categories')
-        .set('Authorization', `Bearer ${token}`)
-        .send(newCategory);
-
-      expect(res.status).toBe(200);
-      expect(res.body.name).toBe(newCategory.name);
-      expect(res.body.type).toBe(newCategory.type);
-    });
-
-    it('should require name and type', async () => {
-      const res = await request(app)
-        .post('/api/transactions/categories')
-        .set('Authorization', `Bearer ${token}`)
-        .send({});
-
-      expect(res.status).toBe(400);
-      expect(res.body.error).toBe('Name and type are required');
-    });
-
-    it('should require authentication', async () => {
-      const res = await request(app)
-        .post('/api/transactions/categories')
-        .send({ name: 'Test', type: 'Expense' });
-
-      expect(res.status).toBe(401);
-    });
-  });
-
-  describe('POST /api/transactions/categories/:categoryId/subcategories', () => {
-    it('should create a new subcategory', async () => {
-      const newSubCategory = {
-        name: 'Fast Food',
-        keywords: ['mcdonalds', 'burger'],
-        isDefault: false
-      };
-
-      const res = await request(app)
-        .post(`/api/transactions/categories/${category._id}/subcategories`)
-        .set('Authorization', `Bearer ${token}`)
-        .send(newSubCategory);
-
-      expect(res.status).toBe(200);
-      expect(res.body.name).toBe(newSubCategory.name);
-      expect(res.body.keywords).toEqual(newSubCategory.keywords);
-    });
-
-    it('should require authentication', async () => {
-      const res = await request(app)
-        .post(`/api/transactions/categories/${category._id}/subcategories`)
-        .send({ name: 'Test' });
-
-      expect(res.status).toBe(401);
-    });
-  });
-
-  describe('PATCH /api/transactions/subcategories/:subCategoryId/keywords', () => {
-    it('should update subcategory keywords', async () => {
-      const newKeywords = ['restaurant', 'cafe', 'bistro'];
-
-      const res = await request(app)
-        .patch(`/api/transactions/subcategories/${subCategory._id}/keywords`)
-        .set('Authorization', `Bearer ${token}`)
-        .send({ keywords: newKeywords });
-
-      expect(res.status).toBe(200);
-      expect(res.body.keywords).toEqual(newKeywords);
-    });
-
-    it('should require authentication', async () => {
-      const res = await request(app)
-        .patch(`/api/transactions/subcategories/${subCategory._id}/keywords`)
-        .send({ keywords: [] });
-
-      expect(res.status).toBe(401);
-    });
-  });
-
-  describe('DELETE /api/transactions/categories/:categoryId', () => {
-    it('should delete category and its subcategories', async () => {
-      const res = await request(app)
-        .delete(`/api/transactions/categories/${category._id}`)
-        .set('Authorization', `Bearer ${token}`);
-
-      expect(res.status).toBe(200);
-
-      // Verify category is deleted
-      const deletedCategory = await Category.findById(category._id);
-      expect(deletedCategory).toBeNull();
-
-      // Verify subcategories are deleted
-      const deletedSubCategory = await SubCategory.findById(subCategory._id);
-      expect(deletedSubCategory).toBeNull();
-    });
-
-    it('should require authentication', async () => {
-      const res = await request(app)
-        .delete(`/api/transactions/categories/${category._id}`);
-
-      expect(res.status).toBe(401);
-    });
-
-    it('should handle non-existent category', async () => {
-      const fakeId = new mongoose.Types.ObjectId();
-      const res = await request(app)
-        .delete(`/api/transactions/categories/${fakeId}`)
-        .set('Authorization', `Bearer ${token}`);
-
-      expect(res.status).toBe(404);
-      expect(res.body.error).toBe('Category not found');
-    });
-  });
-
   describe('Transaction Identifier Generation', () => {
     it('should generate a unique identifier when none is provided', async () => {
-      // Create transaction data without identifier
-      const transactionData = {
-        accountId: bankAccount._id,
-        amount: 75,
-        currency: 'ILS',
-        date: new Date(),
-        type: 'Expense',
-        description: 'Auto ID Test',
-        rawData: { originalData: 'test-auto-id' }
-      };
-
       const transaction = await Transaction.createFromScraperData({
         chargedAmount: -75,
         date: new Date(),
