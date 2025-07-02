@@ -127,28 +127,12 @@ class CategoryAIService {
           });
         });
 
-        console.log('TF-IDF Scores:', {
-          category: category.name,
-          scores: scores.map(s => ({
-            subCategory: s.subCategory.name,
-            score: s.score,
-            keywords: s.subCategory.keywords
-          }))
-        });
-
         // Find best matching subcategory
         const bestSubMatch = scores.reduce((best, current) => {
           // Also consider exact keyword matches
           const keywordMatch = current.subCategory.keywords?.some(keyword =>
             description.toLowerCase().includes(keyword.toLowerCase())
           ) ? 0.5 : 0;
-
-          console.log('Subcategory match calculation:', {
-            subCategory: current.subCategory.name,
-            tfidfScore: current.score,
-            keywordMatch,
-            totalScore: current.score + keywordMatch
-          });
 
           const totalScore = current.score + keywordMatch;
           return totalScore > best.score ? 

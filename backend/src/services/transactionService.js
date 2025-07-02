@@ -244,7 +244,7 @@ class TransactionService {
       throw new Error('Transaction not found');
     }
 
-    await transaction.categorize(categoryId, subCategoryId, false);
+    await transaction.categorize(categoryId, subCategoryId, CategorizationMethod.MANUAL);
     return transaction;
   }
 

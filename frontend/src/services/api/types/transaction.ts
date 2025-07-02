@@ -3,6 +3,12 @@ import { Category, SubCategory } from './category';
 export type TransactionType = 'Expense' | 'Income' | 'Transfer';
 export type TransactionStatus = 'pending' | 'processed' | 'error';
 
+export enum CategorizationMethod {
+  Manual = 'manual',
+  PreviousData = 'previous_data',
+  AI = 'ai'
+}
+
 export interface Transaction {
   _id: string;
   userId: string;
@@ -17,7 +23,7 @@ export interface Transaction {
   status: TransactionStatus;
   memo?: string;
   processedDate?: string;
-  isAutoCategorized?: boolean;
+  categorizationMethod?: CategorizationMethod;
 }
 
 export interface TransactionListResponse {
