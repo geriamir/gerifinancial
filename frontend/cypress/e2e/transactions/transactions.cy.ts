@@ -265,9 +265,11 @@ describe('Transactions Page', () => {
           .should('be.visible')
           .and('contain.text', '₪');
         
-        cy.get('span[class*="MuiChip-label"]')
-          .invoke('text')
-          .should('match', /(Expense|Income|Transfer)/);
+        // Check transaction type by amount color
+        cy.get('[data-testid$="-amount"]')
+          .should('be.visible')
+          .and('have.css', 'color')
+          .and('match', /(rgb\(211, 47, 47\)|rgb\(46, 125, 50\))/); // Error (red) for Expense, Success (green) for Income
       });
   });
 
@@ -297,27 +299,25 @@ describe('Transactions Page', () => {
   // });
 
   it('should filter transactions by type', () => {
-    // Wait for transactions to load and verify expense transactions exist
-    cy.get('[data-testid="transactions-list"]')
-      .should('be.visible')
-      .find('li[data-testid^="transaction-item-"]')
-      .should('have.length.at.least', 1)
-      .then($items => {
-        // At least one item should be an expense
-        const hasExpense = $items.toArray().some(item => 
-          item.textContent?.includes('Expense')
-        );
-        expect(hasExpense, 'Should have at least one Expense transaction').to.be.true;
-      });
+    // Wait for transactions to load
+    cy.intercept('GET', '**/api/transactions*').as('getTransactions');
 
-    // Proceed with filtering
+    cy.wait('@getTransactions').then((interception) => {
+      const response = interception.response.body;
+      const hasExpense = response.transactions.some(tx => tx.type === 'Expense');
+      expect(hasExpense, 'Should have at least one Expense transaction').to.be.true;
+    });
+
+    // Verify expense transactions appear with red color
     cy.get('[data-testid="transactions-list"]')
-      .find('li[data-testid^="transaction-item-"]')
-      .contains('Expense', { timeout: 10000 })
-      .should('exist')
-      .then(() => {
-        // Only proceed with filter test once we confirm Expense transactions exist
-        cy.log('Found Expense transactions, proceeding with filter test');
+      .find('[data-testid$="-amount"]')
+      .should('have.length.at.least', 1)
+      .then($amounts => {
+        // Check if at least one amount has the error color
+        const hasExpense = Array.from($amounts).some(el => 
+          window.getComputedStyle(el).color === 'rgb(211, 47, 47)'
+        );
+        expect(hasExpense, 'Should have at least one red (expense) amount').to.be.true;
       });
 
     // Click the type filter to open the dropdown
@@ -351,8 +351,8 @@ describe('Transactions Page', () => {
       .should('have.length.at.least', 1)
       .each($item => {
         cy.wrap($item)
-          .find('span[class*="MuiChip-label"]')
-          .should('have.text', 'Expense');
+          .find('[data-testid$="-amount"]')
+          .should('have.css', 'color', 'rgb(211, 47, 47)'); // Error color for Expense
       });
 
     // Verify URL params
