@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const config = require('../config');
 const auth = require('../middleware/auth');
+const { initializeUserCategories } = require('../services/userCategoryService');
 
 const router = express.Router();
 
@@ -25,6 +26,16 @@ router.post('/register', async (req, res) => {
     });
 
     await user.save();
+
+    // Initialize default categories for the user
+    try {
+      await initializeUserCategories(user._id);
+    } catch (error) {
+      console.error('Error initializing user categories:', error);
+      // Delete the user if category initialization fails
+      await User.findByIdAndDelete(user._id);
+      throw new Error('Failed to initialize user categories');
+    }
 
     // Generate token
     const token = jwt.sign(

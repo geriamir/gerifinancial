@@ -122,8 +122,14 @@ router.post('/:transactionId/categorize', auth, async (req, res) => {
       return res.status(400).json({ error: 'Category and subcategory are required' });
     }
 
-    const category = await Category.findById(categoryId);
-    const subCategory = await SubCategory.findById(subCategoryId);
+    const category = await Category.findOne({
+      _id: categoryId,
+      userId: req.user._id
+    });
+    const subCategory = await SubCategory.findOne({
+      _id: subCategoryId,
+      userId: req.user._id
+    });
 
     if (!category || !subCategory) {
       return res.status(404).json({ error: 'Category or subcategory not found' });
@@ -144,7 +150,7 @@ router.post('/:transactionId/categorize', auth, async (req, res) => {
 // Get all categories with subcategories
 router.get('/categories', auth, async (req, res) => {
   try {
-    const categories = await Category.getAllWithSubCategories();
+    const categories = await Category.getAllWithSubCategories(req.user._id);
     if (!categories) {
       return res.status(500).json({ error: 'Failed to fetch categories' });
     }
@@ -163,7 +169,11 @@ router.post('/categories', auth, async (req, res) => {
       return res.status(400).json({ error: 'Name and type are required' });
     }
 
-    const category = await Category.findOrCreate({ name, type });
+    const category = await Category.findOrCreate({ 
+      name, 
+      type,
+      userId: req.user._id 
+    });
     res.json(category);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -179,8 +189,11 @@ router.post('/categories/:categoryId/subcategories', auth, async (req, res) => {
       return res.status(400).json({ error: 'Name is required' });
     }
 
-    // Verify that parent category exists
-    const parentCategory = await Category.findById(req.params.categoryId);
+    // Verify that parent category exists and belongs to the user
+    const parentCategory = await Category.findOne({
+      _id: req.params.categoryId,
+      userId: req.user._id
+    });
     if (!parentCategory) {
       return res.status(404).json({ error: 'Parent category not found' });
     }
@@ -189,7 +202,8 @@ router.post('/categories/:categoryId/subcategories', auth, async (req, res) => {
       name,
       keywords,
       isDefault,
-      parentCategory: req.params.categoryId
+      parentCategory: req.params.categoryId,
+      userId: req.user._id
     });
 
     // Return populated subcategory
@@ -212,8 +226,11 @@ router.patch('/subcategories/:subCategoryId/keywords', auth, async (req, res) =>
       return res.status(400).json({ error: 'Keywords must be an array' });
     }
 
-    const subCategory = await SubCategory.findByIdAndUpdate(
-      req.params.subCategoryId,
+    const subCategory = await SubCategory.findOneAndUpdate(
+      {
+        _id: req.params.subCategoryId,
+        userId: req.user._id
+      },
       { $set: { keywords } },
       { new: true }
     );
@@ -231,16 +248,25 @@ router.patch('/subcategories/:subCategoryId/keywords', auth, async (req, res) =>
 // Delete a category (and its subcategories)
 router.delete('/categories/:categoryId', auth, async (req, res) => {
   try {
-    const category = await Category.findById(req.params.categoryId);
+    const category = await Category.findOne({
+      _id: req.params.categoryId,
+      userId: req.user._id
+    });
     if (!category) {
       return res.status(404).json({ error: 'Category not found' });
     }
 
     // Remove all subcategories
-    await SubCategory.deleteMany({ parentCategory: category._id });
+    await SubCategory.deleteMany({ 
+      parentCategory: category._id,
+      userId: req.user._id 
+    });
     
     // Remove the category
-    await Category.deleteOne({ _id: category._id });
+    await Category.deleteOne({ 
+      _id: category._id,
+      userId: req.user._id 
+    });
 
     res.json({ message: 'Category and subcategories deleted successfully' });
   } catch (error) {

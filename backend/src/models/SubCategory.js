@@ -21,13 +21,18 @@ const subCategorySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
     required: true,
+  },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   }
 }, {
   timestamps: true,
 });
 
-// Ensure subcategory names are unique within their parent category
-subCategorySchema.index({ name: 1, parentCategory: 1 }, { unique: true });
+// Ensure subcategory names are unique within their parent category and user
+subCategorySchema.index({ name: 1, parentCategory: 1, userId: 1 }, { unique: true });
 
 // Add method to find matching subcategories based on description
 subCategorySchema.statics.findMatchingSubCategories = async function(description) {
@@ -44,7 +49,8 @@ subCategorySchema.statics.findMatchingSubCategories = async function(description
 subCategorySchema.statics.findOrCreate = async function(subCategoryData) {
   let subCategory = await this.findOne({
     name: subCategoryData.name,
-    parentCategory: subCategoryData.parentCategory
+    parentCategory: subCategoryData.parentCategory,
+    userId: subCategoryData.userId
   });
 
   if (!subCategory) {

@@ -18,16 +18,21 @@ const categorySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'SubCategory'
   }],
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }
 }, {
   timestamps: true,
 });
 
-// Ensure category names are unique per type
-categorySchema.index({ name: 1, type: 1 }, { unique: true });
+// Ensure category names are unique per type and user
+categorySchema.index({ name: 1, type: 1, userId: 1 }, { unique: true });
 
 // Add method to get all categories with populated subcategories
-categorySchema.statics.getAllWithSubCategories = async function() {
-  return this.find({})
+categorySchema.statics.getAllWithSubCategories = async function(userId) {
+  return this.find({ userId })
     .populate({
       path: 'subCategories',
       select: 'name keywords isDefault'
@@ -40,7 +45,8 @@ categorySchema.statics.getAllWithSubCategories = async function() {
 categorySchema.statics.findOrCreate = async function(categoryData) {
   let category = await this.findOne({
     name: categoryData.name,
-    type: categoryData.type
+    type: categoryData.type,
+    userId: categoryData.userId
   });
 
   if (!category) {
