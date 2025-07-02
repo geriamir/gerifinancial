@@ -49,7 +49,7 @@ export const analyzePerformance = (
     averageDurations,
     slowOperations,
     totalTime,
-    operationsOverThreshold: slowOperations,
+// Removed the redundant assignment of `operationsOverThreshold`.
   };
 };
 
