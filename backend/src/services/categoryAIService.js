@@ -28,11 +28,6 @@ class CategoryAIService {
       const result = await translate(text, { from: 'he', to: 'en' });
       this.translationCache.set(text, result.text);
       
-      console.log('Translation result:', {
-        original: text,
-        translated: result.text
-      });
-
       return result.text;
     } catch (error) {
       console.error('Translation failed:', error);
@@ -98,7 +93,7 @@ class CategoryAIService {
    * @param {string} userId - User ID for vendor mapping lookup
    * @returns {Promise<{categoryId: string, subCategoryId: string, confidence: number, reasoning: string}>}
    */
-  async suggestCategory(description = '', amount = 0, availableCategories = [], userId = null) {
+  async suggestCategory(description = '', amount = 0, availableCategories = [], userId = null, rawCategory = '') {
     try {
 
       if (!description || !availableCategories?.length || !userId) {
@@ -145,13 +140,20 @@ class CategoryAIService {
       }
 
       // No vendor match, try translation and keyword matching
-      const translatedDesc = await this.translateText(description);
-      console.log('Using translated description:', {
-        original: description,
-        translated: translatedDesc
+      const [translatedDesc, translatedCategory] = await Promise.all([
+        this.translateText(description),
+        rawCategory ? this.translateText(rawCategory) : Promise.resolve('')
+      ]);
+
+      // Combine translated texts for matching
+      const combinedText = [translatedDesc, translatedCategory].filter(Boolean).join(' ');
+      console.log('Processing text:', {
+        description: translatedDesc,
+        rawCategory: translatedCategory,
+        combined: combinedText
       });
 
-      const processedDesc = this.processText(translatedDesc.toLowerCase());
+      const processedDesc = this.processText(combinedText.toLowerCase());
       let bestMatch = {
         categoryId: null,
         subCategoryId: null,

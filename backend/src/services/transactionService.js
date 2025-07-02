@@ -166,7 +166,8 @@ class TransactionService {
             keywords: sub.keywords || []
           }))
         })),
-        transaction.userId
+        transaction.userId,
+        transaction.rawData?.category || ''
       );
 
       if (suggestion.confidence >= 0.8) {
