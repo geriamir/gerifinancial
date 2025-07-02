@@ -1,6 +1,8 @@
 const natural = require('natural');
+const translate = require('@vitalets/google-translate-api');
 const WordTokenizer = natural.WordTokenizer;
 const PorterStemmer = natural.PorterStemmer;
+const VendorMapping = require('../models/VendorMapping');
 
 class CategoryAIService {
   constructor() {
@@ -8,6 +10,34 @@ class CategoryAIService {
     this.tfidf = new natural.TfIdf();
     this.classifier = new natural.LogisticRegressionClassifier();
     this.initialized = false;
+    this.translationCache = new Map();
+  }
+
+  /**
+   * Translate text from Hebrew to English
+   * @param {string} text - Text to translate
+   * @returns {Promise<string>} - Translated text
+   */
+  async translateText(text) {
+    try {
+      // Check cache first
+      if (this.translationCache.has(text)) {
+        return this.translationCache.get(text);
+      }
+
+      const result = await translate(text, { from: 'he', to: 'en' });
+      this.translationCache.set(text, result.text);
+      
+      console.log('Translation result:', {
+        original: text,
+        translated: result.text
+      });
+
+      return result.text;
+    } catch (error) {
+      console.error('Translation failed:', error);
+      return text; // Return original text on failure
+    }
   }
 
   /**
@@ -59,16 +89,8 @@ class CategoryAIService {
    */
   buildCorpus(subCategories) {
     this.tfidf = new natural.TfIdf();
-    
-    console.log('Building corpus from subcategories:', {
-      subCategoryCount: subCategories.length,
-      subCategories: subCategories.map(sub => ({
-        name: sub.name,
-        keywords: sub.keywords
-      }))
-    });
 
-    subCategories.forEach((sub, index) => {
+    subCategories.forEach(sub => {
       const text = `${sub.name} ${(sub.keywords || []).join(' ')}`;
       this.tfidf.addDocument(this.processText(text).join(' '));
     });
@@ -79,29 +101,13 @@ class CategoryAIService {
    * @param {string} description - Transaction description
    * @param {number} amount - Transaction amount
    * @param {Array<{id: string, name: string, type: string, subCategories: Array<{id: string, name: string, keywords: string[]}>}>} availableCategories - List of available categories
+   * @param {string} userId - User ID for vendor mapping lookup
    * @returns {Promise<{categoryId: string, subCategoryId: string, confidence: number, reasoning: string}>}
    */
-  async suggestCategory(description = '', amount = 0, availableCategories = []) {
+  async suggestCategory(description = '', amount = 0, availableCategories = [], userId = null) {
     try {
-      console.log('Starting category suggestion for:', {
-        description,
-        amount,
-        availableCategories: availableCategories.map(cat => ({
-          name: cat.name,
-          type: cat.type,
-          subCategoriesCount: cat.subCategories.length
-        }))
-      });
 
-      let bestMatch = {
-        categoryId: null,
-        subCategoryId: null,
-        confidence: 0,
-        reasoning: ''
-      };
-
-      // Process the transaction description
-      if (!description || !availableCategories?.length) {
+      if (!description || !availableCategories?.length || !userId) {
         return {
           categoryId: null,
           subCategoryId: null,
@@ -110,15 +116,58 @@ class CategoryAIService {
         };
       }
 
-      const processedDesc = this.processText(description.toLowerCase());
+      // First try to find an exact vendor match
+      const vendorMatches = await VendorMapping.findMatches(description, userId);
+      if (vendorMatches.length > 0) {
+        const match = vendorMatches[0];
+        console.log('Found exact vendor match:', {
+          vendor: match.vendorName,
+          category: match.category,
+          subCategory: match.subCategory
+        });
+        return {
+          categoryId: match.category.toString(),
+          subCategoryId: match.subCategory.toString(),
+          confidence: match.confidence,
+          reasoning: `Matched based on known vendor: ${match.vendorName}`
+        };
+      }
+
+      // Try similar vendor match
+      const similarVendor = await VendorMapping.suggestMapping(description, userId);
+      if (similarVendor) {
+        console.log('Found similar vendor:', {
+          original: description,
+          matchedVendor: similarVendor.vendorName,
+          category: similarVendor.category,
+          subCategory: similarVendor.subCategory
+        });
+        return {
+          categoryId: similarVendor.category.toString(),
+          subCategoryId: similarVendor.subCategory.toString(),
+          confidence: 0.7,
+          reasoning: `Matched based on similar vendor: ${similarVendor.vendorName}`
+        };
+      }
+
+      // No vendor match, try translation and keyword matching
+      const translatedDesc = await this.translateText(description);
+      console.log('Using translated description:', {
+        original: description,
+        translated: translatedDesc
+      });
+
+      const processedDesc = this.processText(translatedDesc.toLowerCase());
+      let bestMatch = {
+        categoryId: null,
+        subCategoryId: null,
+        confidence: 0,
+        reasoning: ''
+      };
       
       for (const category of availableCategories) {
-        console.log(`Processing category: ${category.name}`);
-        
-        // Build corpus for this category's subcategories
         this.buildCorpus(category.subCategories);
         
-        // Get TF-IDF scores for the description
         const scores = [];
         this.tfidf.tfidfs(processedDesc.join(' '), (index, score) => {
           scores.push({
@@ -127,11 +176,9 @@ class CategoryAIService {
           });
         });
 
-        // Find best matching subcategory
         const bestSubMatch = scores.reduce((best, current) => {
-          // Also consider exact keyword matches
           const keywordMatch = current.subCategory.keywords?.some(keyword =>
-            description.toLowerCase().includes(keyword.toLowerCase())
+            translatedDesc.toLowerCase().includes(keyword.toLowerCase())
           ) ? 0.5 : 0;
 
           const totalScore = current.score + keywordMatch;
@@ -142,6 +189,7 @@ class CategoryAIService {
 
         if (bestSubMatch.score > bestMatch.confidence) {
           console.log('New best match found:', {
+            description: translatedDesc,
             category: category.name,
             subCategory: bestSubMatch.subCategory.name,
             score: bestSubMatch.score
@@ -150,15 +198,13 @@ class CategoryAIService {
           bestMatch = {
             categoryId: category.id,
             subCategoryId: bestSubMatch.subCategory.id,
-            confidence: Math.min(bestSubMatch.score / 2, 1), // Normalize to 0-1
+            confidence: Math.min(bestSubMatch.score / 2, 1),
             reasoning: `Matched based on ${bestSubMatch.score > 0.5 ? 'strong' : 'partial'} similarity to subcategory "${bestSubMatch.subCategory.name}"`
           };
         }
       }
 
-      console.log('Final suggestion:', bestMatch);
       if (!bestMatch.categoryId && availableCategories.length > 0) {
-        // For no matches but available categories, return first with low confidence
         const firstCategory = availableCategories[0];
         const firstSubCategory = firstCategory.subCategories?.[0];
         bestMatch = {
@@ -168,6 +214,7 @@ class CategoryAIService {
           reasoning: 'No strong matches found, using default category'
         };
       }
+
       return bestMatch;
     } catch (error) {
       console.error('Error in category suggestion:', error);
@@ -184,7 +231,14 @@ class CategoryAIService {
     try {
       console.log('Starting keyword suggestion for:', description);
       
-      const tokens = this.processText(description);
+      // First try with original text
+      let tokens = this.processText(description);
+      
+      // If not enough tokens found, try with translated text
+      if (tokens.length < 3) {
+        const translatedDesc = await this.translateText(description);
+        tokens = this.processText(translatedDesc);
+      }
       
       // Filter out common words and short tokens
       const significantTokens = tokens.filter(token => 
@@ -202,8 +256,6 @@ class CategoryAIService {
       significantTokens.forEach(token => {
         wordFreq[token] = (wordFreq[token] || 0) + 1;
       });
-
-      console.log('Word frequencies:', wordFreq);
 
       const keywords = Object.entries(wordFreq)
         .sort(([, a], [, b]) => b - a)

@@ -2,6 +2,7 @@ const { Transaction, SubCategory, Category } = require('../models');
 const { ObjectId } = require('mongodb');
 const bankScraperService = require('./bankScraperService');
 const categoryAIService = require('./categoryAIService');
+const VendorMapping = require('../models/VendorMapping');
 const { CategorizationMethod, TransactionType, TransactionStatus } = require('../constants/enums');
 
 const convertToObjectId = (id) => {
@@ -77,11 +78,6 @@ class TransactionService {
 
   async attemptAutoCategorization(transaction, bankAccountId) {
     try {
-      console.log('Attempting auto-categorization for transaction:', {
-        identifier: transaction.identifier,
-        description: transaction.description,
-        amount: transaction.amount
-      });
 
       // Find the transaction in our database
       const dbTransaction = await Transaction.findOne({
@@ -243,6 +239,16 @@ class TransactionService {
     if (!transaction) {
       throw new Error('Transaction not found');
     }
+
+    // Create vendor mapping for future auto-categorization
+    const vendorName = transaction.description.toLowerCase().trim();
+    await VendorMapping.findOrCreate({
+      vendorName,
+      userId: transaction.userId,
+      category: categoryId,
+      subCategory: subCategoryId,
+      language: 'he' // Assuming Hebrew as default
+    });
 
     await transaction.categorize(categoryId, subCategoryId, CategorizationMethod.MANUAL);
     return transaction;
