@@ -91,10 +91,6 @@ const transactionSchema = new mongoose.Schema({
     enum: ['pending', 'processed', 'error'],
     default: 'pending',
   },
-  transferDetails: {
-    type: mongoose.Schema.Types.Mixed,
-    default: null,
-  },
   rawData: {
     type: mongoose.Schema.Types.Mixed,
     required: true,
