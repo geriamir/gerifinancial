@@ -16,7 +16,7 @@ export interface Transaction {
   subCategory?: SubCategory;
   status: TransactionStatus;
   memo?: string;
-  transferDetails?: TransferDetails;
+  transferDetails?: any;
   processedDate?: string;
   isAutoCategorized?: boolean;
 }
