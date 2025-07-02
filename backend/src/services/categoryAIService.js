@@ -71,7 +71,6 @@ class CategoryAIService {
     subCategories.forEach((sub, index) => {
       const text = `${sub.name} ${(sub.keywords || []).join(' ')}`;
       this.tfidf.addDocument(this.processText(text).join(' '));
-      this.subCategoryIndex = index;
     });
   }
 
