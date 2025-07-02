@@ -5,6 +5,12 @@ const transactionSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true,
+  },
   accountId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'BankAccount',
@@ -12,7 +18,19 @@ const transactionSchema = new mongoose.Schema({
   },
   amount: {
     type: Number,
-    required: true,
+    required: [true, 'Amount is required'],
+    validate: {
+      validator: function(v) {
+        // Amount can be negative for expenses, positive for income/transfers
+        return typeof v === 'number' && !isNaN(v) &&
+               ((this.type === 'Expense' && v < 0) || 
+                (['Income', 'Transfer'].includes(this.type) && v > 0));
+      },
+      message: props => {
+        const sign = props.value < 0 ? 'negative' : 'positive';
+        return `Amount must be ${props.value < 0 ? 'negative for expenses' : 'positive for income/transfers'} (got ${sign} value for type ${props.type})`;
+      }
+    }
   },
   currency: {
     type: String,
@@ -21,6 +39,13 @@ const transactionSchema = new mongoose.Schema({
   date: {
     type: Date,
     required: true,
+    validate: {
+      validator: function(v) {
+        return v instanceof Date && !isNaN(v);
+      },
+      message: props => `${props.value} is not a valid date!`
+    },
+    index: true // Add index for better date query performance
   },
   processedDate: {
     type: Date,
@@ -28,8 +53,17 @@ const transactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['Expense', 'Income', 'Transfer'],
-    required: true,
+    enum: {
+      values: ['Expense', 'Income', 'Transfer'],
+      message: '{VALUE} is not a valid transaction type'
+    },
+    required: [true, 'Transaction type is required'],
+    validate: {
+      validator: function(v) {
+        return ['Expense', 'Income', 'Transfer'].includes(v);
+      },
+      message: props => `${props.value} is not a valid transaction type. Must be one of: Expense, Income, Transfer`
+    }
   },
   description: {
     type: String,
@@ -88,9 +122,11 @@ transactionSchema.methods.categorize = async function(categoryId, subCategoryId,
 };
 
 // Static method to find transactions within a date range
-transactionSchema.statics.findByDateRange = async function(accountId, startDate, endDate) {
+transactionSchema.statics.findByDateRange = async function(accountId, startDate, endDate, userId) {
+  if (!userId) throw new Error('userId is required');
   return this.find({
     accountId,
+    userId,
     date: {
       $gte: startDate,
       $lte: endDate
@@ -102,9 +138,11 @@ transactionSchema.statics.findByDateRange = async function(accountId, startDate,
 };
 
 // Static method to find uncategorized transactions
-transactionSchema.statics.findUncategorized = async function(accountId) {
+transactionSchema.statics.findUncategorized = async function(accountId, userId) {
+  if (!userId) throw new Error('userId is required');
   return this.find({
     accountId,
+    userId,
     category: null
   })
   .sort({ date: -1 });
@@ -178,13 +216,32 @@ transactionSchema.statics.getSpendingSummary = async function(accountId, startDa
 };
 
 // Method to create transaction from scraper data
-transactionSchema.statics.createFromScraperData = async function(scraperTransaction, accountId, defaultCurrency) {
+transactionSchema.statics.createFromScraperData = async function(scraperTransaction, accountId, defaultCurrency, userId) {
+  if (!userId) {
+    throw new Error('userId is required when creating a transaction');
+  }
+
   const type = determineTransactionType(scraperTransaction);
   
+  // Generate a unique identifier if one is not provided by the scraper
+  let identifier = scraperTransaction.identifier;
+  if (!identifier) {
+    // Create a unique identifier from transaction details
+      identifier = [
+        accountId,
+        scraperTransaction.date,
+        scraperTransaction.chargedAmount,
+        scraperTransaction.description,
+        Date.now(),  // Add timestamp to ensure uniqueness
+        Math.random().toString(36).slice(2, 8)  // Add random string
+      ].join('_');
+  }
+  
   return this.create({
-    identifier: scraperTransaction.identifier,
+    identifier,
     accountId,
-    amount: Math.abs(scraperTransaction.chargedAmount),
+    userId,
+    amount: scraperTransaction.chargedAmount,
     currency: scraperTransaction.currency || defaultCurrency,
     date: new Date(scraperTransaction.date),
     type,

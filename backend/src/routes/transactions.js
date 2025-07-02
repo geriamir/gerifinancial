@@ -4,6 +4,69 @@ const auth = require('../middleware/auth');
 const { Category, SubCategory } = require('../models');
 const transactionService = require('../services/transactionService');
 
+// Get transactions with pagination and filtering
+router.get('/', auth, async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      type,
+      category,
+      search,
+      limit = '20',
+      skip = '0',
+      accountId
+    } = req.query;
+
+    const validTypes = ['Expense', 'Income', 'Transfer'];
+    const query = {
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+      type: validTypes.includes(type) ? type : undefined,
+      category,
+      search,
+      limit: parseInt(limit),
+      skip: parseInt(skip),
+      accountId,
+      userId: req.user._id, // User ID from auth middleware
+    };
+
+    console.log('Transaction request:', {
+      rawParams: req.query,
+      parsedQuery: {
+        type: query.type,
+        startDate: query.startDate?.toISOString(),
+        endDate: query.endDate?.toISOString(),
+        userId: query.userId.toString()
+      }
+    });
+    
+    const result = await transactionService.getTransactions(query);
+
+    console.log('Found transactions:', {
+      userId: req.user._id,
+      total: result.total,
+      transactionCount: result.transactions.length
+    });
+
+    // Log response sample
+    if (result.transactions.length > 0) {
+      console.log('First transaction:', {
+        _id: result.transactions[0]._id,
+        userId: result.transactions[0].userId,
+        description: result.transactions[0].description
+      });
+    } else {
+      console.log('No transactions found for query');
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get transactions for a specific bank account
 router.get('/account/:accountId', auth, async (req, res) => {
   try {
@@ -11,7 +74,8 @@ router.get('/account/:accountId', auth, async (req, res) => {
     const transactions = await transactionService.getTransactionsByDateRange(
       req.params.accountId,
       startDate ? new Date(startDate) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-      endDate ? new Date(endDate) : new Date()
+      endDate ? new Date(endDate) : new Date(),
+      req.user._id
     );
 
     res.json(transactions);
@@ -23,7 +87,10 @@ router.get('/account/:accountId', auth, async (req, res) => {
 // Get uncategorized transactions
 router.get('/uncategorized/:accountId', auth, async (req, res) => {
   try {
-    const transactions = await transactionService.getUncategorizedTransactions(req.params.accountId);
+    const transactions = await transactionService.getUncategorizedTransactions(
+      req.params.accountId,
+      req.user._id
+    );
     res.json(transactions);
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Container, Typography } from '@mui/material';
+import { Container } from '@mui/material';
 import { BankAccountsList } from '../components/bank/BankAccountsList';
 
 export const Banks: React.FC = () => {

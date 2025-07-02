@@ -32,8 +32,10 @@ gerifinancial/
 │       │   ├── bank/      # Bank management & scraping components
 │       │   └── layout/    # Layout components
 │       ├── contexts/    # React contexts
-│       ├── services/    # API services
-│       │   └── types/     # TypeScript type definitions
+│       ├── services/    # Services layer
+│       │   └── api/       # API services and types
+│       │       ├── types/   # TypeScript type definitions
+│       │       └── base.ts  # Base API configuration
 │       ├── test/        # Frontend test utilities
 │       │   └── __mocks__/ # Component mocks
 │       ├── utils/       # Utility functions
@@ -131,6 +133,21 @@ gerifinancial/
    - Enhanced loading states
    - Clear error messaging
    - Analytics event tracking
+   - Reorganized services directory:
+     * Centralized API services under api/
+     * Moved shared types to api/types/
+     * Added clean interface exports
+     * Improved code maintainability
+   - Transaction System Improvements:
+     * Flexible transaction querying
+     * Optional account filtering
+     * Infinite scroll pagination
+     * Comprehensive filtering capabilities
+   - Date Picker Integration:
+     * Integrated MUI Date Pickers
+     * Added Hebrew locale support
+     * Configured ESM/CJS compatibility
+     * Optimized webpack configuration
 
 ## Environment Setup
 

@@ -14,8 +14,8 @@ const mockTransactions = [
     processedDate: STATIC_DATE,
     description: 'Super Market Purchase',
     memo: 'Shopping',
-    type: 'normal',
-    chargedAmount: -150.50,
+    type: 'EXPENSE',  // Change to match our transaction types
+    chargedAmount: -150.50,  // Correct - negative for expense
     currency: 'ILS',
     status: 'completed'
   },
@@ -25,8 +25,8 @@ const mockTransactions = [
     processedDate: STATIC_DATE,
     description: 'Salary Payment',
     memo: 'Monthly Salary',
-    type: 'normal',
-    chargedAmount: 5000.00,
+    type: 'INCOME',  // Change to match our transaction types
+    chargedAmount: 5000.00,  // Correct - positive for income
     currency: 'ILS',
     status: 'completed'
   },
@@ -37,7 +37,7 @@ const mockTransactions = [
     description: 'Credit Card Payment',
     memo: 'Monthly Payment',
     type: 'CREDIT_CARD_PAYMENT',
-    chargedAmount: -2000.00,
+    chargedAmount: 2000.00,  // Fix - transfers should have positive amounts
     currency: 'ILS',
     status: 'completed'
   }
@@ -86,9 +86,7 @@ module.exports = {
           balance: 1000
         }];
       },
-      scrape: async (options) => {
-        const { credentials } = options;
-        
+      scrape: async (credentials) => {
         if (!credentials || !credentials.username || !credentials.password) {
           return {
             success: false,

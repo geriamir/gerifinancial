@@ -19,6 +19,7 @@ Cypress.Commands.add('createTestUser', (options = {}) => {
 
   return cy.request('POST', `${Cypress.env('apiUrl')}/api/auth/register`, defaultOptions)
     .then((response) => {
+      Cypress.env('testUserId', response.body.userId);
       return response.body.token;
     });
 });
@@ -66,17 +67,9 @@ Cypress.Commands.add('createBankAccount', (token: string, options: Partial<BankA
   });
 });
 
-// Clear test data command
+// Clear test data command - now uses MongoDB task
 Cypress.Commands.add('clearTestData', () => {
-  cy.request({
-    method: 'POST',
-    url: `${Cypress.env('apiUrl')}/api/test/clear-data`,
-    failOnStatusCode: false
-  }).then((response) => {
-    if (response.status !== 200) {
-      cy.log('Warning: Failed to clear test database');
-    }
-    // Clear localStorage regardless of DB clear result
+  cy.task('db:clearTestData', null, { timeout: 10000 }).then(() => {
     localStorage.clear();
   });
 });
