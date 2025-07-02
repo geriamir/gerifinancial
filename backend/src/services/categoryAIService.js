@@ -1,5 +1,5 @@
 const natural = require('natural');
-const translate = require('@vitalets/google-translate-api');
+const translate = require('@vitalets/google-translate-api').default;
 const WordTokenizer = natural.WordTokenizer;
 const PorterStemmer = natural.PorterStemmer;
 const VendorMapping = require('../models/VendorMapping');
@@ -48,12 +48,6 @@ class CategoryAIService {
   processText(text) {
     const tokens = this.tokenizer.tokenize(text.toLowerCase());
     const stemmed = tokens.map(token => PorterStemmer.stem(token));
-    
-    console.log('Text processing:', {
-      original: text,
-      tokens: tokens,
-      stemmed: stemmed
-    });
 
     return stemmed;
   }
