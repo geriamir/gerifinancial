@@ -1,6 +1,7 @@
-const { Transaction, SubCategory } = require('../models');
+const { Transaction, SubCategory, Category } = require('../models');
 const { ObjectId } = require('mongodb');
 const bankScraperService = require('./bankScraperService');
+const categoryAIService = require('./categoryAIService');
 
 const convertToObjectId = (id) => {
   try {
@@ -85,7 +86,7 @@ class TransactionService {
         return; // Transaction not found or already categorized
       }
 
-      // Look for matching subcategories based on description
+      // First try keyword-based matching
       const matchingSubCategories = await SubCategory.findMatchingSubCategories(
         transaction.description
       );
@@ -98,6 +99,52 @@ class TransactionService {
           subCategory._id,
           true
         );
+        return;
+      }
+
+      // If no keyword matches, try AI categorization
+      const availableCategories = await Category.find({ userId: dbTransaction.userId })
+        .populate('subCategories')
+        .lean();
+
+      const suggestion = await categoryAIService.suggestCategory(
+        transaction.description,
+        transaction.amount,
+        availableCategories.map(cat => ({
+          id: cat._id.toString(),
+          name: cat.name,
+          type: cat.type,
+          subCategories: cat.subCategories.map(sub => ({
+            id: sub._id.toString(),
+            name: sub.name,
+            keywords: sub.keywords || []
+          }))
+        }))
+      );
+
+      if (suggestion.confidence >= 0.8) {
+        await dbTransaction.categorize(
+          suggestion.categoryId,
+          suggestion.subCategoryId,
+          true
+        );
+
+        // If AI categorization was successful, suggest new keywords
+        const newKeywords = await categoryAIService.suggestNewKeywords(
+          suggestion.subCategoryId,
+          transaction.description
+        );
+
+        if (newKeywords.length > 0) {
+          const subCategory = await SubCategory.findById(suggestion.subCategoryId);
+          if (subCategory) {
+            // Add new keywords if they don't exist
+            const existingKeywords = new Set(subCategory.keywords || []);
+            newKeywords.forEach(keyword => existingKeywords.add(keyword.toLowerCase()));
+            subCategory.keywords = Array.from(existingKeywords);
+            await subCategory.save();
+          }
+        }
       }
     } catch (error) {
       console.error('Auto-categorization failed:', error);

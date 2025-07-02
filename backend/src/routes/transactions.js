@@ -3,6 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const { Category, SubCategory } = require('../models');
 const transactionService = require('../services/transactionService');
+const categoryAIService = require('../services/categoryAIService');
 
 // Get transactions with pagination and filtering
 router.get('/', auth, async (req, res) => {
@@ -271,6 +272,53 @@ router.delete('/categories/:categoryId', auth, async (req, res) => {
     res.json({ message: 'Category and subcategories deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Request AI suggestion for transaction categorization
+router.post('/:transactionId/suggest-category', auth, async (req, res) => {
+  try {
+    const transaction = await Transaction.findOne({
+      _id: req.params.transactionId,
+      userId: req.user._id
+    });
+
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    // Get all categories for the user
+    const availableCategories = await Category.find({ userId: req.user._id })
+      .populate('subCategories')
+      .lean();
+
+    // Get AI suggestion
+    const suggestion = await categoryAIService.suggestCategory(
+      transaction.description,
+      transaction.amount,
+      availableCategories.map(cat => ({
+        id: cat._id.toString(),
+        name: cat.name,
+        type: cat.type,
+        subCategories: cat.subCategories.map(sub => ({
+          id: sub._id.toString(),
+          name: sub.name,
+          keywords: sub.keywords || []
+        }))
+      }))
+    );
+
+    res.json({
+      suggestion,
+      transaction: {
+        id: transaction._id,
+        description: transaction.description,
+        amount: transaction.amount
+      }
+    });
+  } catch (error) {
+    console.error('Error getting AI category suggestion:', error);
+    res.status(500).json({ error: 'Failed to get category suggestion' });
   }
 });
 
