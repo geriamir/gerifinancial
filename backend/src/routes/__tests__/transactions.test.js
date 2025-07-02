@@ -4,7 +4,8 @@ const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../../app');
 const { createTestUser } = require('../../test/testUtils');
-const { User, BankAccount, Category, SubCategory, Transaction, VendorMapping } = require('../../models');
+const { User, BankAccount, Category, SubCategory, Transaction } = require('../../models');
+const VendorMapping = require('../../models/VendorMapping');
 const transactionService = require('../../services/transactionService');
 
 describe('Transaction Routes', () => {
@@ -18,7 +19,9 @@ describe('Transaction Routes', () => {
 
   beforeEach(async () => {
     // Clean up vendor mappings
-    await VendorMapping.deleteMany({});
+    if (mongoose.connection.collections.vendormappings) {
+      await mongoose.connection.collections.vendormappings.deleteMany({});
+    }
     // Create test user with unique email
     const testData = await createTestUser(User, {
       email: `test${Date.now()}@example.com`
@@ -360,12 +363,10 @@ describe('Transaction Routes', () => {
         }
       });
 
-      await transactionService.attemptAutoCategorization({
-        identifier: newTx.identifier,
-        description: newTx.description,
-        amount: newTx.amount,
-        rawData: newTx.rawData
-      }, bankAccount._id);
+      await transactionService.attemptAutoCategorization(newTx, bankAccount._id);
+      
+      // Wait for any async operations to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       const updatedTx = await Transaction.findById(newTx._id);
       expect(updatedTx.category.toString()).toBe(category._id.toString());

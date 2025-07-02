@@ -1,31 +1,5 @@
-const mockCategories = {
-  '1': {
-    id: '1',
-    name: 'Food',
-    subCategories: [{
-      id: '1a',
-      name: 'Restaurants'
-    }]
-  }
-};
-
-const mockSuggestion = {
-  categoryId: '1',
-  subCategoryId: '1a',
-  confidence: 0.9,
-  reasoning: 'Strong match for Restaurants subcategory in Food'
-};
-
-const mockAmbiguousSuggestion = {
-  categoryId: 'mock-category-id',
-  subCategoryId: 'mock-subcategory-id',
-  confidence: 0.3,
-  reasoning: 'Low confidence match'
-};
-
-const mockKeywords = ['restaurant', 'dining', 'food'];
-
-const mockTranslation = {
+let mockCategories = {};
+let mockTranslation = {
   'בית קפה': 'coffee shop',
   'מסעדה': 'restaurant',
   'סופרמרקט': 'supermarket'
@@ -33,18 +7,35 @@ const mockTranslation = {
 
 let translationCache = new Map();
 
+const createMockSuggestion = (categoryId, subCategoryId) => ({
+  categoryId: categoryId.toString(),
+  subCategoryId: subCategoryId.toString(),
+  confidence: 0.9,
+  reasoning: 'Strong match for Restaurants subcategory in Food'
+});
+
 module.exports = {
   suggestCategory: jest.fn().mockImplementation((description, amount, categories, userId) => {
     // First check for Hebrew text
     const translatedDesc = mockTranslation[description] || description;
     const searchDesc = translatedDesc.toLowerCase();
 
+    // Use the first available category/subcategory for restaurant matches
     if (searchDesc.includes('restaurant') || searchDesc.includes('coffee shop')) {
-      return Promise.resolve(mockSuggestion);
+      const category = categories[0];
+      const subCategory = category.subCategories[0];
+      return Promise.resolve(createMockSuggestion(category.id, subCategory.id));
     }
+
     if (searchDesc.includes('general')) {
-      return Promise.resolve(mockAmbiguousSuggestion);
+      return Promise.resolve({
+        categoryId: null,
+        subCategoryId: null,
+        confidence: 0.3,
+        reasoning: 'Low confidence match'
+      });
     }
+
     if (!description || !categories?.length || !userId) {
       return Promise.resolve({
         categoryId: null,
@@ -53,6 +44,7 @@ module.exports = {
         reasoning: 'Missing input parameters'
       });
     }
+
     return Promise.resolve({
       categoryId: null,
       subCategoryId: null,
@@ -86,6 +78,15 @@ module.exports = {
     if (!description) {
       return [];
     }
-    return mockKeywords;
-  })
+    return ['restaurant', 'dining', 'food'];
+  }),
+
+  // For testing purposes
+  __setMockCategories: (categories) => {
+    mockCategories = categories;
+  },
+
+  __setMockTranslations: (translations) => {
+    mockTranslation = { ...mockTranslation, ...translations };
+  }
 };
