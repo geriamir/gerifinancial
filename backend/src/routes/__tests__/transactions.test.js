@@ -158,8 +158,73 @@ describe('Transaction Routes', () => {
         .get('/api/transactions');
 
       expect(res.status).toBe(401);
+  });
+
+  describe('POST /api/transactions/:transactionId/suggest-category', () => {
+    it('should suggest category using AI analysis', async () => {
+      const res = await request(app)
+        .post(`/api/transactions/${transaction._id}/suggest-category`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('suggestion');
+      expect(res.body.suggestion).toHaveProperty('categoryId');
+      expect(res.body.suggestion).toHaveProperty('subCategoryId');
+      expect(res.body.suggestion).toHaveProperty('confidence');
+      expect(res.body.suggestion).toHaveProperty('reasoning');
+    });
+
+    it('should provide relevant suggestions for restaurant transactions', async () => {
+      const restaurantTx = await Transaction.create({
+        identifier: 'test-restaurant-tx',
+        accountId: bankAccount._id,
+        userId: user._id,
+        amount: -75,
+        currency: 'ILS',
+        date: new Date(),
+        type: 'Expense',
+        description: 'Local Restaurant Dining'
+      });
+
+      const res = await request(app)
+        .post(`/api/transactions/${restaurantTx._id}/suggest-category`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.suggestion.categoryId).toBe(category._id.toString());
+      expect(res.body.suggestion.subCategoryId).toBe(subCategory._id.toString());
+      expect(res.body.suggestion.confidence).toBeGreaterThan(0.5);
+    });
+
+    it('should handle ambiguous transactions with lower confidence', async () => {
+      const ambiguousTx = await Transaction.create({
+        identifier: 'test-ambiguous-tx',
+        accountId: bankAccount._id,
+        userId: user._id,
+        amount: -50,
+        currency: 'ILS',
+        date: new Date(),
+        type: 'Expense',
+        description: 'General Payment'
+      });
+
+      const res = await request(app)
+        .post(`/api/transactions/${ambiguousTx._id}/suggest-category`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.suggestion).toHaveProperty('confidence');
+      expect(res.body.suggestion.confidence).toBeLessThan(0.5);
+    });
+
+    it('should require authentication', async () => {
+      const res = await request(app)
+        .post(`/api/transactions/${transaction._id}/suggest-category`);
+
+      expect(res.status).toBe(401);
     });
   });
+});
 
   describe('GET /api/transactions/account/:accountId', () => {
     it('should return transactions for valid account', async () => {
