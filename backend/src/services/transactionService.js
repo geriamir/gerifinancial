@@ -157,7 +157,6 @@ class TransactionService {
 
         // If AI categorization was successful, suggest new keywords
         const newKeywords = await categoryAIService.suggestNewKeywords(
-          suggestion.subCategoryId,
           transaction.description
         );
 
