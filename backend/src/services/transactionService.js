@@ -76,6 +76,12 @@ class TransactionService {
 
   async attemptAutoCategorization(transaction, bankAccountId) {
     try {
+      console.log('Attempting auto-categorization for transaction:', {
+        identifier: transaction.identifier,
+        description: transaction.description,
+        amount: transaction.amount
+      });
+
       // Find the transaction in our database
       const dbTransaction = await Transaction.findOne({
         identifier: transaction.identifier,
@@ -83,7 +89,11 @@ class TransactionService {
       });
 
       if (!dbTransaction || dbTransaction.category) {
-        return; // Transaction not found or already categorized
+        console.log('Skipping auto-categorization:', {
+          reason: !dbTransaction ? 'Transaction not found' : 'Already categorized',
+          transactionId: dbTransaction?._id
+        });
+        return;
       }
 
       // First try keyword-based matching
@@ -92,6 +102,11 @@ class TransactionService {
       );
 
       if (matchingSubCategories.length === 1) {
+        console.log('Found exact keyword match:', {
+          description: transaction.description,
+          matchedSubCategory: matchingSubCategories[0].name,
+          keywords: matchingSubCategories[0].keywords
+        });
         // If we have exactly one match, use it for auto-categorization
         const subCategory = matchingSubCategories[0];
         await dbTransaction.categorize(
@@ -122,7 +137,18 @@ class TransactionService {
         }))
       );
 
+      console.log('AI suggestion received:', {
+        description: transaction.description,
+        suggestion
+      });
+
       if (suggestion.confidence >= 0.8) {
+        console.log('Applying AI suggestion:', {
+          confidence: suggestion.confidence,
+          categoryId: suggestion.categoryId,
+          subCategoryId: suggestion.subCategoryId,
+          reasoning: suggestion.reasoning
+        });
         await dbTransaction.categorize(
           suggestion.categoryId,
           suggestion.subCategoryId,

@@ -16,7 +16,15 @@ class CategoryAIService {
    */
   processText(text) {
     const tokens = this.tokenizer.tokenize(text.toLowerCase());
-    return tokens.map(token => stemmer.stem(token));
+    const stemmed = tokens.map(token => stemmer.stem(token));
+    
+    console.log('Text processing:', {
+      original: text,
+      tokens: tokens,
+      stemmed: stemmed
+    });
+
+    return stemmed;
   }
 
   /**
@@ -32,7 +40,16 @@ class CategoryAIService {
     const intersection = new Set([...tokens1].filter(x => tokens2.has(x)));
     const union = new Set([...tokens1, ...tokens2]);
 
-    return intersection.size / union.size;
+    const similarity = intersection.size / union.size;
+    console.log('Similarity calculation:', {
+      text1,
+      text2,
+      intersection: Array.from(intersection),
+      union: Array.from(union),
+      similarity
+    });
+
+    return similarity;
   }
 
   /**
@@ -42,6 +59,14 @@ class CategoryAIService {
   buildCorpus(subCategories) {
     this.tfidf = new natural.TfIdf();
     
+    console.log('Building corpus from subcategories:', {
+      subCategoryCount: subCategories.length,
+      subCategories: subCategories.map(sub => ({
+        name: sub.name,
+        keywords: sub.keywords
+      }))
+    });
+
     subCategories.forEach((sub, index) => {
       const text = `${sub.name} ${(sub.keywords || []).join(' ')}`;
       this.tfidf.addDocument(this.processText(text).join(' '));
@@ -58,6 +83,16 @@ class CategoryAIService {
    */
   async suggestCategory(description, amount, availableCategories) {
     try {
+      console.log('Starting category suggestion for:', {
+        description,
+        amount,
+        availableCategories: availableCategories.map(cat => ({
+          name: cat.name,
+          type: cat.type,
+          subCategoriesCount: cat.subCategories.length
+        }))
+      });
+
       let bestMatch = {
         categoryId: null,
         subCategoryId: null,
@@ -69,6 +104,8 @@ class CategoryAIService {
       const processedDesc = this.processText(description.toLowerCase());
       
       for (const category of availableCategories) {
+        console.log(`Processing category: ${category.name}`);
+        
         // Build corpus for this category's subcategories
         this.buildCorpus(category.subCategories);
         
@@ -81,12 +118,28 @@ class CategoryAIService {
           });
         });
 
+        console.log('TF-IDF Scores:', {
+          category: category.name,
+          scores: scores.map(s => ({
+            subCategory: s.subCategory.name,
+            score: s.score,
+            keywords: s.subCategory.keywords
+          }))
+        });
+
         // Find best matching subcategory
         const bestSubMatch = scores.reduce((best, current) => {
           // Also consider exact keyword matches
           const keywordMatch = current.subCategory.keywords?.some(keyword =>
             description.toLowerCase().includes(keyword.toLowerCase())
           ) ? 0.5 : 0;
+
+          console.log('Subcategory match calculation:', {
+            subCategory: current.subCategory.name,
+            tfidfScore: current.score,
+            keywordMatch,
+            totalScore: current.score + keywordMatch
+          });
 
           const totalScore = current.score + keywordMatch;
           return totalScore > best.score ? 
@@ -95,6 +148,12 @@ class CategoryAIService {
         }, { subCategory: null, score: 0 });
 
         if (bestSubMatch.score > bestMatch.confidence) {
+          console.log('New best match found:', {
+            category: category.name,
+            subCategory: bestSubMatch.subCategory.name,
+            score: bestSubMatch.score
+          });
+
           bestMatch = {
             categoryId: category.id,
             subCategoryId: bestSubMatch.subCategory.id,
@@ -104,6 +163,7 @@ class CategoryAIService {
         }
       }
 
+      console.log('Final suggestion:', bestMatch);
       return bestMatch;
     } catch (error) {
       console.error('Error in category suggestion:', error);
@@ -118,6 +178,8 @@ class CategoryAIService {
    */
   async suggestNewKeywords(description) {
     try {
+      console.log('Starting keyword suggestion for:', description);
+      
       const tokens = this.processText(description);
       
       // Filter out common words and short tokens
@@ -126,17 +188,25 @@ class CategoryAIService {
         !natural.stopwords.includes(token)
       );
 
+      console.log('Filtered tokens:', {
+        allTokens: tokens,
+        significantTokens
+      });
+
       // Get most relevant tokens based on frequency
       const wordFreq = {};
       significantTokens.forEach(token => {
         wordFreq[token] = (wordFreq[token] || 0) + 1;
       });
 
+      console.log('Word frequencies:', wordFreq);
+
       const keywords = Object.entries(wordFreq)
         .sort(([, a], [, b]) => b - a)
         .slice(0, 3)
         .map(([token]) => token);
 
+      console.log('Selected keywords:', keywords);
       return keywords;
     } catch (error) {
       console.error('Error suggesting keywords:', error);
