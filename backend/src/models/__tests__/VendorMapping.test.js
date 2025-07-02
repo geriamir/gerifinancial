@@ -9,7 +9,9 @@ describe('VendorMapping Model', () => {
   let subCategory;
 
   beforeEach(async () => {
-    const testData = await createTestUser(User);
+    const testData = await createTestUser(User, {
+      email: `test${Date.now()}@example.com`
+    });
     user = testData.user;
 
     category = await Category.create({
@@ -72,8 +74,11 @@ describe('VendorMapping Model', () => {
       await VendorMapping.findOrCreate(vendorData);
 
       // Create another user and try to use the same vendor name
-      const otherTestData = await createTestUser(User);
-      const otherUser = otherTestData.user;
+      const otherUser = await User.create({
+        email: `test${Date.now()}@example.com`,
+        password: 'password123',
+        name: 'Other Test User'
+      });
 
       const otherVendorData = {
         ...vendorData,

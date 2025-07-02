@@ -17,8 +17,12 @@ describe('Transaction Routes', () => {
   let transactions = [];
 
   beforeEach(async () => {
-    // Create test user
-    const testData = await createTestUser(User);
+    // Clean up vendor mappings
+    await VendorMapping.deleteMany({});
+    // Create test user with unique email
+    const testData = await createTestUser(User, {
+      email: `test${Date.now()}@example.com`
+    });
     user = testData.user;
     token = testData.token;
 
