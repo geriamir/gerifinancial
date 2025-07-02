@@ -60,15 +60,19 @@ describe('Transaction Routes', () => {
 
     // Create a test transaction for account-specific tests
     transaction = await Transaction.create({
-      identifier: 'test-transaction-1',
-      accountId: bankAccount._id,
-      userId: user._id,
-      amount: -100,  // Negative for Expense
-      currency: 'ILS',
-      date: new Date(),
-      type: 'Expense',
-      description: 'Test Restaurant',
-      rawData: { originalData: 'test' }
+        identifier: 'test-transaction-1',
+        accountId: bankAccount._id,
+        userId: user._id,
+        amount: -100,  // Negative for Expense
+        currency: 'ILS',
+        date: new Date(),
+        type: 'Expense',
+        description: 'Test Restaurant',
+        rawData: { 
+          originalData: 'test',
+          description: 'Test Restaurant',
+          chargedAmount: -100
+        }
     });
 
     // Create another account for pagination test data
@@ -101,7 +105,11 @@ describe('Transaction Routes', () => {
         date: dates[i % 3],
         type: type,
         description: `Test Transaction ${i + 2}`,
-        rawData: { originalData: `test-${i + 2}` }
+        rawData: { 
+          originalData: `test-${i + 2}`,
+          description: `Test Transaction ${i + 2}`,
+          chargedAmount: amount
+        }
       });
       transactions.push(tx);
     }
@@ -198,7 +206,12 @@ describe('Transaction Routes', () => {
         date: new Date(),
         type: 'Expense',
         description: 'Local Restaurant Dining',
-        rawData: { originalData: 'test' }
+        rawData: { 
+          originalData: 'test',
+          description: 'Local Restaurant Dining',
+          chargedAmount: -75,
+          memo: 'Restaurant'
+        }
       });
 
       const res = await request(app)
@@ -221,7 +234,12 @@ describe('Transaction Routes', () => {
         date: new Date(),
         type: 'Expense',
         description: 'General Payment',
-        rawData: { originalData: 'test' }
+        rawData: { 
+          originalData: 'test',
+          description: 'General Payment',
+          chargedAmount: -50,
+          memo: 'Payment'
+        }
       });
 
       const res = await request(app)
