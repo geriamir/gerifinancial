@@ -1,5 +1,5 @@
 const natural = require('natural');
-const translate = require('@vitalets/google-translate-api').default;
+const { translate } = require('@vitalets/google-translate-api');
 const WordTokenizer = natural.WordTokenizer;
 const PorterStemmer = natural.PorterStemmer;
 const VendorMapping = require('../models/VendorMapping');
