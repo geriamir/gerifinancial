@@ -2,6 +2,7 @@ const { Transaction, SubCategory, Category } = require('../models');
 const { ObjectId } = require('mongodb');
 const bankScraperService = require('./bankScraperService');
 const categoryAIService = require('./categoryAIService');
+const { CategorizationMethod, TransactionType, TransactionStatus } = require('../constants/enums');
 
 const convertToObjectId = (id) => {
   try {
@@ -96,23 +97,73 @@ class TransactionService {
         return;
       }
 
-      // First try keyword-based matching
-      const matchingSubCategories = await SubCategory.findMatchingSubCategories(
-        transaction.description
-      );
+      // First try to find a similar transaction with matching description, memo or category
+      const searchTerms = [
+        transaction.description,
+        transaction.memo,
+        transaction.rawData?.description,
+        transaction.rawData?.memo,
+        transaction.rawData?.category
+      ].filter(Boolean);
+
+      const searchQueries = searchTerms.map(term => ({
+        $or: [
+          { description: term },
+          { memo: term },
+          { 'rawData.description': term },
+          { 'rawData.memo': term },
+          { 'rawData.category': term }
+        ]
+      }));
+
+      const similarTransaction = await Transaction.findOne({
+        userId: dbTransaction.userId,
+        category: { $ne: null },
+        _id: { $ne: dbTransaction._id },
+        $or: searchQueries
+      }).populate('category subCategory');
+
+      if (similarTransaction) {
+        console.log('Found previous similar transaction:', {
+          currentDesc: transaction.description,
+          currentMemo: transaction.memo,
+          matchDesc: similarTransaction.description,
+          matchMemo: similarTransaction.memo,
+          category: similarTransaction.category?.name,
+          subCategory: similarTransaction.subCategory?.name
+        });
+
+        await dbTransaction.categorize(
+          similarTransaction.category,
+          similarTransaction.subCategory,
+          CategorizationMethod.PREVIOUS_DATA
+        );
+        return;
+      }
+
+      // Next try keyword-based matching using all available description data
+      const searchText = [
+        transaction.description,
+        transaction.memo,
+        transaction.rawData?.description,
+        transaction.rawData?.memo,
+        transaction.rawData?.category
+      ].filter(Boolean).join(' ');
+
+      const matchingSubCategories = await SubCategory.findMatchingSubCategories(searchText);
 
       if (matchingSubCategories.length === 1) {
-        console.log('Found exact keyword match:', {
-          description: transaction.description,
+        console.log('Found keyword match:', {
+          searchText,
           matchedSubCategory: matchingSubCategories[0].name,
           keywords: matchingSubCategories[0].keywords
         });
-        // If we have exactly one match, use it for auto-categorization
+
         const subCategory = matchingSubCategories[0];
         await dbTransaction.categorize(
           subCategory.parentCategory._id,
           subCategory._id,
-          true
+          CategorizationMethod.PREVIOUS_DATA
         );
         return;
       }
@@ -152,7 +203,7 @@ class TransactionService {
         await dbTransaction.categorize(
           suggestion.categoryId,
           suggestion.subCategoryId,
-          true
+          CategorizationMethod.AI
         );
 
         // If AI categorization was successful, suggest new keywords
