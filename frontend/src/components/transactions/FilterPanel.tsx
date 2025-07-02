@@ -113,8 +113,11 @@ const CategorySelectBase: React.FC<CategorySelectProps> = ({ onFilterChange }) =
         select
         size="small"
         label="Category"
-        defaultValue=""
-        onChange={(e) => handleCategorySelect(e.target.value)}
+        value={category}
+        onChange={(e) => {
+          setCategory(e.target.value);
+          handleCategorySelect(e.target.value);
+        }}
         sx={{ minWidth: 120 }}
         aria-label="Filter by category"
         title="Type to quickly search categories"
