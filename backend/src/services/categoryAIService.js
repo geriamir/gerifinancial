@@ -1,9 +1,10 @@
 const natural = require('natural');
-const { tokenizer, stemmer } = natural;
+const WordTokenizer = natural.WordTokenizer;
+const PorterStemmer = natural.PorterStemmer;
 
 class CategoryAIService {
   constructor() {
-    this.tokenizer = new tokenizer();
+    this.tokenizer = new WordTokenizer();
     this.tfidf = new natural.TfIdf();
     this.classifier = new natural.LogisticRegressionClassifier();
     this.initialized = false;
@@ -16,7 +17,7 @@ class CategoryAIService {
    */
   processText(text) {
     const tokens = this.tokenizer.tokenize(text.toLowerCase());
-    const stemmed = tokens.map(token => stemmer.stem(token));
+    const stemmed = tokens.map(token => PorterStemmer.stem(token));
     
     console.log('Text processing:', {
       original: text,
@@ -81,7 +82,7 @@ class CategoryAIService {
    * @param {Array<{id: string, name: string, type: string, subCategories: Array<{id: string, name: string, keywords: string[]}>}>} availableCategories - List of available categories
    * @returns {Promise<{categoryId: string, subCategoryId: string, confidence: number, reasoning: string}>}
    */
-  async suggestCategory(description, amount, availableCategories) {
+  async suggestCategory(description = '', amount = 0, availableCategories = []) {
     try {
       console.log('Starting category suggestion for:', {
         description,
@@ -101,6 +102,15 @@ class CategoryAIService {
       };
 
       // Process the transaction description
+      if (!description || !availableCategories?.length) {
+        return {
+          categoryId: null,
+          subCategoryId: null,
+          confidence: 0,
+          reasoning: 'Missing input parameters'
+        };
+      }
+
       const processedDesc = this.processText(description.toLowerCase());
       
       for (const category of availableCategories) {
@@ -164,6 +174,17 @@ class CategoryAIService {
       }
 
       console.log('Final suggestion:', bestMatch);
+      if (!bestMatch.categoryId && availableCategories.length > 0) {
+        // For no matches but available categories, return first with low confidence
+        const firstCategory = availableCategories[0];
+        const firstSubCategory = firstCategory.subCategories?.[0];
+        bestMatch = {
+          categoryId: firstCategory.id,
+          subCategoryId: firstSubCategory?.id || null,
+          confidence: 0.1,
+          reasoning: 'No strong matches found, using default category'
+        };
+      }
       return bestMatch;
     } catch (error) {
       console.error('Error in category suggestion:', error);

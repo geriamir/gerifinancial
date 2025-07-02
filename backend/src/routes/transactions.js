@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { Category, SubCategory } = require('../models');
+const { Category, SubCategory, Transaction } = require('../models');
 const transactionService = require('../services/transactionService');
 const categoryAIService = require('../services/categoryAIService');
 
@@ -293,20 +293,30 @@ router.post('/:transactionId/suggest-category', auth, async (req, res) => {
       .lean();
 
     // Get AI suggestion
+    const availableCategoriesMapped = availableCategories.map(cat => ({
+      id: cat._id.toString(),
+      name: cat.name,
+      type: cat.type,
+      subCategories: cat.subCategories.map(sub => ({
+        id: sub._id.toString(),
+        name: sub.name,
+        keywords: sub.keywords || []
+      }))
+    }));
+    
+    console.log('Requesting AI suggestion for:', {
+      description: transaction.description,
+      amount: transaction.amount,
+      categoriesCount: availableCategoriesMapped.length
+    });
+
     const suggestion = await categoryAIService.suggestCategory(
       transaction.description,
       transaction.amount,
-      availableCategories.map(cat => ({
-        id: cat._id.toString(),
-        name: cat.name,
-        type: cat.type,
-        subCategories: cat.subCategories.map(sub => ({
-          id: sub._id.toString(),
-          name: sub.name,
-          keywords: sub.keywords || []
-        }))
-      }))
+      availableCategoriesMapped
     );
+
+    console.log('Received AI suggestion:', suggestion);
 
     res.json({
       suggestion,
