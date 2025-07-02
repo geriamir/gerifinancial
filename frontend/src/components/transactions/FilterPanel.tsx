@@ -57,7 +57,7 @@ const CategorySelectBase: React.FC<CategorySelectProps> = ({ onFilterChange }) =
 
   const sortedCategories = useMemo(() => {
     performance.startOperation('sortCategories');
-    const sorted = categories.sort((a, b) => a.name.localeCompare(b.name));
+    const sorted = [...categories].sort((a, b) => a.name.localeCompare(b.name));
     performance.endOperation('sortCategories');
     return sorted;
   }, [categories, performance]);
