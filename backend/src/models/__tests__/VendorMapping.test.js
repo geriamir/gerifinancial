@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { createTestUser } = require('../../test/testUtils');
-const { User, Category, SubCategory, VendorMapping } = require('..');
+const { User, Category, SubCategory } = require('..');
+const VendorMapping = require('../VendorMapping');
 
 describe('VendorMapping Model', () => {
   let user;
@@ -71,10 +72,8 @@ describe('VendorMapping Model', () => {
       await VendorMapping.findOrCreate(vendorData);
 
       // Create another user and try to use the same vendor name
-      const otherUser = await User.create({
-        email: 'other@test.com',
-        password: 'password123'
-      });
+      const otherTestData = await createTestUser(User);
+      const otherUser = otherTestData.user;
 
       const otherVendorData = {
         ...vendorData,
