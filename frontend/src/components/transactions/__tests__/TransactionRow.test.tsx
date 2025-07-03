@@ -1,7 +1,8 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import TransactionRow from '../TransactionRow';
 import { Transaction } from '../../../services/api/types';
+import { categoryIcons } from '../../../constants/categoryIcons';
 
 describe('TransactionRow', () => {
   const mockTransaction: Transaction = {
@@ -32,19 +33,69 @@ describe('TransactionRow', () => {
     }
   };
 
-  it('should display transaction with category and subcategory', () => {
+  it('should display transaction basic information', () => {
     render(<TransactionRow transaction={mockTransaction} />);
 
-    // Check category chip
-    // Check all elements are displayed correctly
-    expect(screen.getByTestId('transaction-test-transaction-1-category')).toHaveTextContent('Food');
-    expect(screen.getByTestId('transaction-test-transaction-1-subcategory')).toHaveTextContent('Restaurants');
+    // Check description, date and amount
     expect(screen.getByTestId('transaction-test-transaction-1-description')).toHaveTextContent('Test Transaction');
     expect(screen.getByTestId('transaction-test-transaction-1-amount')).toHaveTextContent('₪100.00');
     expect(screen.getByTestId('transaction-test-transaction-1-date')).toHaveTextContent('02/07/2025');
   });
 
-  it('should display transaction without subcategory', () => {
+  it('should display transaction with mapped subcategory', () => {
+    const txWithMappedCategory = {
+      ...mockTransaction,
+      subCategory: {
+        _id: 'subcat-2',
+        name: 'Mortgage',
+        parentCategory: {
+          _id: 'cat-2',
+          name: 'Household',
+          type: 'Expense'
+        },
+        keywords: ['mortgage', 'loan'],
+        isDefault: true
+      }
+    };
+
+    render(<TransactionRow transaction={txWithMappedCategory} />);
+
+    // Check that the icon button is rendered within the transaction row
+    const iconContainer = screen.getByTestId('transaction-test-transaction-1-subcategory');
+    expect(iconContainer).toBeInTheDocument();
+    
+    // Check that the icon button within the container has correct aria-label
+    const iconButton = within(iconContainer).getByTestId('transaction-test-transaction-1-subcategory-chip-icon');
+    expect(iconButton).toBeInTheDocument();
+    expect(iconButton).toHaveAttribute('aria-label', 'Mortgage');
+  });
+
+  it('should handle transaction with unmapped subcategory', () => {
+    const txWithUnmappedCategory = {
+      ...mockTransaction,
+      subCategory: {
+        _id: 'subcat-3',
+        name: 'Custom Category',
+        parentCategory: {
+          _id: 'cat-2',
+          name: 'Household',
+          type: 'Expense'
+        },
+        keywords: [],
+        isDefault: false
+      }
+    };
+
+    render(<TransactionRow transaction={txWithUnmappedCategory} />);
+
+    // Check that the text chip is rendered with correct text
+    const container = screen.getByTestId('transaction-test-transaction-1-subcategory');
+    expect(container).toBeInTheDocument();
+    const textChip = within(container).getByTestId('transaction-test-transaction-1-subcategory-chip-text');
+    expect(textChip).toBeInTheDocument();
+  });
+
+  it('should handle transaction without subcategory', () => {
     const txWithoutSubCategory = {
       ...mockTransaction,
       subCategory: undefined
@@ -52,25 +103,8 @@ describe('TransactionRow', () => {
 
     render(<TransactionRow transaction={txWithoutSubCategory} />);
 
-    // Check only category chip is present
-    expect(screen.getByTestId('transaction-test-transaction-1-category')).toHaveTextContent('Food');
-    expect(screen.queryByTestId('transaction-test-transaction-1-subcategory')).toBeNull();
+    // Check that no subcategory element is rendered
+    const subcategoryElement = screen.queryByTestId('transaction-test-transaction-1-subcategory');
+    expect(subcategoryElement).not.toBeInTheDocument();
   });
-
-  it('should display transaction without category or subcategory', () => {
-    const txWithoutCategories = {
-      ...mockTransaction,
-      category: undefined,
-      subCategory: undefined
-    };
-
-    render(<TransactionRow transaction={txWithoutCategories} />);
-
-    // Neither chip should exist
-    const categoryChip = screen.queryByTestId('transaction-test-transaction-1-category');
-    const subcategoryChip = screen.queryByTestId('transaction-test-transaction-1-subcategory');
-    expect(categoryChip).toBeNull();
-    expect(subcategoryChip).toBeNull();
-  });
-
 });

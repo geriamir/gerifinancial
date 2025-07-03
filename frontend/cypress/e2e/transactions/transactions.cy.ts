@@ -55,8 +55,6 @@ const recuresiveWait = (searchTerm: string, maxRetries: number, currentRetry: nu
     .its('request.url')
     .then((url) => {
 
-      cy.task('console:log', `Checking URL for search term "${searchTerm}": ${url}`);
-
       if (url.includes(searchTerm)) {
         return cy.wrap(url);
       }

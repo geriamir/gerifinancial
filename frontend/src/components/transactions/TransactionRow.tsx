@@ -3,12 +3,12 @@ import {
   Box,
   Paper,
   Typography,
-  Chip,
   IconButton,
   Tooltip,
 } from '@mui/material';
 import { Edit as EditIcon } from '@mui/icons-material';
 import { Transaction } from '../../services/api/types';
+import IconChip from '../common/IconChip';
 
 interface TransactionRowProps {
   transaction: Transaction;
@@ -68,27 +68,17 @@ const TransactionRow: React.FC<TransactionRowProps> = ({ transaction, 'data-test
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Box sx={{ display: 'flex', gap: 0.5 }}>
-          {transaction.category && (
-            <Chip
-              label={transaction.category.name}
-              size="small"
-              variant="outlined"
-              data-testid={`${baseTestId}-category`}
-              sx={{ bgcolor: 'background.paper' }}
+        {transaction.subCategory && (
+          <Box 
+            data-testid={`${baseTestId}-subcategory`}
+            sx={{ display: 'flex', alignItems: 'center' }}
+          >
+            <IconChip
+              subCategory={transaction.subCategory}
+              data-testid={`${baseTestId}-subcategory-chip`}
             />
-          )}
-          {transaction.subCategory && (
-            <Chip
-              label={transaction.subCategory.name}
-              size="small"
-              variant="outlined"
-              color="secondary"
-              data-testid={`${baseTestId}-subcategory`}
-              sx={{ bgcolor: 'background.paper' }}
-            />
-          )}
-        </Box>
+          </Box>
+        )}
         
         <Box sx={{ textAlign: 'right', minWidth: 120 }}>
           <Typography
