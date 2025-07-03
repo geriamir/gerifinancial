@@ -3,12 +3,12 @@ import {
   Box,
   Paper,
   Typography,
-  Chip,
   IconButton,
   Tooltip,
 } from '@mui/material';
 import { Edit as EditIcon } from '@mui/icons-material';
 import { Transaction } from '../../services/api/types';
+import IconChip from '../common/IconChip';
 
 interface TransactionRowProps {
   transaction: Transaction;
@@ -17,33 +17,21 @@ interface TransactionRowProps {
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
-  return date.toLocaleDateString('he-IL', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
 };
 
 const formatAmount = (amount: number, currency: string) => {
-  return new Intl.NumberFormat('he-IL', {
-    style: 'currency',
-    currency,
+  const value = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(Math.abs(amount));
+
+  return `₪${value}`;
 };
 
-const getTypeColor = (type: Transaction['type']) => {
-  switch (type) {
-    case 'Expense':
-      return 'error';
-    case 'Income':
-      return 'success';
-    case 'Transfer':
-      return 'info';
-    default:
-      return 'default';
-  }
-};
 
 const TransactionRow: React.FC<TransactionRowProps> = ({ transaction, 'data-testid': testId }) => {
   const baseTestId = testId || `transaction-${transaction._id}`;
@@ -80,13 +68,16 @@ const TransactionRow: React.FC<TransactionRowProps> = ({ transaction, 'data-test
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        {transaction.category && (
-          <Chip
-            label={transaction.category.name}
-            size="small"
-            variant="outlined"
-            data-testid={`${baseTestId}-category`}
-          />
+        {transaction.subCategory && (
+          <Box 
+            data-testid={`${baseTestId}-subcategory`}
+            sx={{ display: 'flex', alignItems: 'center' }}
+          >
+            <IconChip
+              subCategory={transaction.subCategory}
+              data-testid={`${baseTestId}-subcategory-chip`}
+            />
+          </Box>
         )}
         
         <Box sx={{ textAlign: 'right', minWidth: 120 }}>
@@ -97,12 +88,6 @@ const TransactionRow: React.FC<TransactionRowProps> = ({ transaction, 'data-test
           >
             {formatAmount(transaction.amount, transaction.currency)}
           </Typography>
-          <Chip
-            label={transaction.type}
-            size="small"
-            color={getTypeColor(transaction.type)}
-            data-testid={`${baseTestId}-type`}
-          />
         </Box>
 
         <Tooltip title="Edit transaction">

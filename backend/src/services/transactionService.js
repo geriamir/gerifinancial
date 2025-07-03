@@ -1,6 +1,9 @@
-const { Transaction, SubCategory } = require('../models');
+const { Transaction, SubCategory, Category } = require('../models');
 const { ObjectId } = require('mongodb');
 const bankScraperService = require('./bankScraperService');
+const categoryAIService = require('./categoryAIService');
+const VendorMapping = require('../models/VendorMapping');
+const { CategorizationMethod, TransactionType, TransactionStatus } = require('../constants/enums');
 
 const convertToObjectId = (id) => {
   try {
@@ -43,20 +46,19 @@ class TransactionService {
 
     for (const account of scrapedAccounts) {
       for (const transaction of account.txns) {
-        // Log raw transaction data for debugging
         try {
-          await Transaction.createFromScraperData(
+          const savedTx = await Transaction.createFromScraperData(
             transaction, 
             bankAccount._id, 
             bankAccount.defaultCurrency,
-            bankAccount.userId // Add userId from the bank account
+            bankAccount.userId
           );
           results.newTransactions++;
           
           // Attempt auto-categorization
-          await this.attemptAutoCategorization(transaction, bankAccount._id);
+          await this.attemptAutoCategorization(savedTx, bankAccount._id);
         } catch (error) {
-          if (error.code === 11000) { // Duplicate key error
+          if (error.code === 11000) {
             results.duplicates++;
           } else {
             results.errors.push({
@@ -69,39 +71,126 @@ class TransactionService {
     }
 
     console.log(`Scraping completed for account ${bankAccount._id}:`, results);
-
     return results;
   }
 
   async attemptAutoCategorization(transaction, bankAccountId) {
     try {
-      // Find the transaction in our database
-      const dbTransaction = await Transaction.findOne({
-        identifier: transaction.identifier,
-        accountId: bankAccountId
+
+      // First try to match by vendor mapping
+      const vendorMapping = await VendorMapping.findOne({
+        vendorName: transaction.description.toLowerCase(),
+        userId: transaction.userId
       });
 
-      if (!dbTransaction || dbTransaction.category) {
-        return; // Transaction not found or already categorized
+      if (vendorMapping) {
+        await transaction.categorize(
+          vendorMapping.category,
+          vendorMapping.subCategory,
+          CategorizationMethod.PREVIOUS_DATA
+        );
+        return;
       }
 
-      // Look for matching subcategories based on description
-      const matchingSubCategories = await SubCategory.findMatchingSubCategories(
-        transaction.description
-      );
+      // Try to find a similar transaction with matching description
+      const searchTerms = [
+        transaction.description,
+        transaction.memo,
+        transaction.rawData?.description,
+        transaction.rawData?.memo,
+        transaction.rawData?.category
+      ].filter(Boolean);
+
+      const searchQueries = searchTerms.map(term => ({
+        $or: [
+          { description: term },
+          { memo: term },
+          { 'rawData.description': term },
+          { 'rawData.memo': term },
+          { 'rawData.category': term }
+        ]
+      }));
+
+      const similarTransaction = await Transaction.findOne({
+        userId: transaction.userId,
+        category: { $ne: null },
+        _id: { $ne: transaction._id },
+        $or: searchQueries
+      }).populate('category subCategory');
+
+      if (similarTransaction) {
+        await transaction.categorize(
+          similarTransaction.category,
+          similarTransaction.subCategory,
+          CategorizationMethod.PREVIOUS_DATA
+        );
+        return;
+      }
+
+      // Try keyword-based matching
+      const searchText = [
+        transaction.description,
+        transaction.memo,
+        transaction.rawData?.description,
+        transaction.rawData?.memo,
+        transaction.rawData?.category
+      ].filter(Boolean).join(' ');
+
+      const matchingSubCategories = await SubCategory.findMatchingSubCategories(searchText);
 
       if (matchingSubCategories.length === 1) {
-        // If we have exactly one match, use it for auto-categorization
         const subCategory = matchingSubCategories[0];
-        await dbTransaction.categorize(
+        await transaction.categorize(
           subCategory.parentCategory._id,
           subCategory._id,
-          true
+          CategorizationMethod.PREVIOUS_DATA
         );
+        return;
+      }
+
+      // Try AI categorization as last resort
+      const availableCategories = await Category.find({ userId: transaction.userId })
+        .populate('subCategories')
+        .lean();
+
+      const suggestion = await categoryAIService.suggestCategory(
+        transaction.description,
+        transaction.amount,
+        availableCategories.map(cat => ({
+          id: cat._id.toString(),
+          name: cat.name,
+          type: cat.type,
+          subCategories: cat.subCategories.map(sub => ({
+            id: sub._id.toString(),
+            name: sub.name,
+            keywords: sub.keywords || []
+          }))
+        })),
+        transaction.userId,
+        transaction.rawData?.category || ''
+      );
+
+      if (suggestion.confidence >= 0.8) {
+        await transaction.categorize(
+          suggestion.categoryId,
+          suggestion.subCategoryId,
+          CategorizationMethod.AI
+        );
+
+        // Suggest new keywords for future matching
+        const newKeywords = await categoryAIService.suggestNewKeywords(transaction.description);
+        if (newKeywords.length > 0) {
+          const subCategory = await SubCategory.findById(suggestion.subCategoryId);
+          if (subCategory) {
+            const existingKeywords = new Set(subCategory.keywords || []);
+            newKeywords.forEach(keyword => existingKeywords.add(keyword.toLowerCase()));
+            subCategory.keywords = Array.from(existingKeywords);
+            await subCategory.save();
+          }
+        }
       }
     } catch (error) {
       console.error('Auto-categorization failed:', error);
-      // Don't throw - auto-categorization failure shouldn't stop the process
     }
   }
 
@@ -121,7 +210,17 @@ class TransactionService {
       throw new Error('Transaction not found');
     }
 
-    await transaction.categorize(categoryId, subCategoryId, false);
+    // Create vendor mapping for future auto-categorization
+    const vendorName = transaction.description.toLowerCase().trim();
+    await VendorMapping.findOrCreate({
+      vendorName,
+      userId: transaction.userId,
+      category: categoryId,
+      subCategory: subCategoryId,
+      language: 'he' // Assuming Hebrew as default
+    });
+
+    await transaction.categorize(categoryId, subCategoryId, CategorizationMethod.MANUAL);
     return transaction;
   }
 
@@ -140,7 +239,6 @@ class TransactionService {
     accountId,
     userId
   }) {
-    // Build base query - userId is required for security
     if (!userId) {
       throw new Error('userId is required');
     }
@@ -149,12 +247,10 @@ class TransactionService {
       userId: convertToObjectId(userId)
     };
     
-    // Only add accountId filter if specifically requested
     if (accountId) {
       query.accountId = convertToObjectId(accountId);
     }
 
-    // Add other filters - ensure proper date handling with start/end of day
     if (startDate || endDate) {
       query.date = {};
       if (startDate) {
@@ -169,12 +265,6 @@ class TransactionService {
       }
     }
     if (type) {
-      console.log('Processing type filter:', { 
-        rawType: type,
-        typeType: typeof type,
-        validTypes: ['Expense', 'Income', 'Transfer'],
-        isValidType: ['Expense', 'Income', 'Transfer'].includes(type)
-      });
       if (['Expense', 'Income', 'Transfer'].includes(type)) {
         query.type = type;
       } else {
@@ -186,41 +276,14 @@ class TransactionService {
       query.description = { $regex: search, $options: 'i' };
     }
 
-    // Log the query for debugging
-    console.log('MongoDB query:', {
-      userId: query.userId.toString(),
-      dateRange: query.date,
-      type: query.type,
-      description: query.description
-    });
-
-    // Debug: Check collection for matching documents
-    const count = await Transaction.countDocuments(query);
-    console.log('Query results:', {
-      matchingDocuments: count,
-      totalUserDocs: await Transaction.countDocuments({ userId: query.userId })
-    });
-    if (count === 0) {
-      const userCount = await Transaction.countDocuments({
-        userId: convertToObjectId(userId)
-      });
-      console.log('Total transactions for user:', userCount);
-    }
-
-    // Get total count for pagination
     const total = await Transaction.countDocuments(query);
-
-    // Get paginated transactions
     const transactions = await Transaction.find(query)
       .sort({ date: -1 })
       .skip(skip)
       .limit(limit)
       .populate('category subCategory');
 
-    // Calculate if there are more transactions
     const hasMore = total > skip + transactions.length;
-
-    console.log(`Fetched ${transactions.length} transactions, total: ${total}, hasMore: ${hasMore}`);
 
     return {
       transactions,
