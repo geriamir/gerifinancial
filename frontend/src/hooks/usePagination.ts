@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useDebounce } from './useDebounce';
 import type {
   PaginationParams,
   PagePaginationParams,
@@ -49,6 +50,8 @@ export function usePagination<T>(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [params, setParams] = useState<PaginationParams>(() => createPagination(options));
+  const [pendingPage, setPendingPage] = useState<number | null>(null);
+  const debouncedPage = useDebounce(pendingPage, 300);
 
   const pageSize = useMemo(() => {
     if (isPagePagination(params)) {
@@ -123,15 +126,50 @@ export function usePagination<T>(
     }
   }, [params]);
 
-  const goToPage = useCallback(async (page: number) => {
-    const updatedParams: PaginationParams = isPagePagination(params)
-      ? { ...params, page }
-      : { ...params, offset: page * pageSize };
+  const goToPage = useCallback((page: number): Promise<void> => {
+    setPendingPage(page);
+    return Promise.resolve();
+  }, []);
 
-    const response = await fetchPage(updatedParams);
-    setItems(response.items);
-    setParams(updatedParams);
-  }, [params, pageSize, fetchPage]);
+  useEffect(() => {
+    if (debouncedPage === null) return;
+
+    let mounted = true;
+
+    const handlePageChange = async () => {
+      try {
+        const updatedParams: PaginationParams = isPagePagination(params)
+          ? { ...params, page: debouncedPage }
+          : { ...params, offset: debouncedPage * pageSize };
+
+        if (!mounted) return;
+        setLoading(true);
+        setError(null);
+
+        const response = await fetchPage(updatedParams);
+        
+        if (!mounted) return;
+
+        setItems(response.items);
+        setParams(updatedParams);
+      } catch (error) {
+        if (!mounted) return;
+        if (error instanceof Error) {
+          setError(error);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    handlePageChange();
+
+    return () => {
+      mounted = false;
+    };
+  }, [debouncedPage, params, pageSize, fetchPage]);
 
   const hasMore = !isPaginationComplete({ total, items, hasMore: true }, params);
   const isFirstPage = currentPage === 0;
