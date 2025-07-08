@@ -27,7 +27,10 @@ export interface Analytics {
   logError: (error: Error, context?: Record<string, any>) => string;
   logException: (error: unknown, context?: Record<string, any>) => Promise<string>;
   startPerformanceTracking: (name: string, options?: PerformanceOptions) => PerformanceTracker;
-  // Test helper methods
+}
+
+// Test-only interface extending Analytics
+export interface TestAnalytics extends Analytics {
   getEventQueue: () => Array<{
     category: string;
     action: string;
@@ -37,6 +40,7 @@ export interface Analytics {
   }>;
   getErrorQueue: () => Array<ErrorEvent>;
 }
+
 
 interface ErrorEvent {
   error: {
@@ -131,7 +135,7 @@ class PerformanceTrackerImpl implements PerformanceTracker {
   }
 }
 
-export class AnalyticsService implements Analytics {
+export class AnalyticsService implements TestAnalytics {
   private debugMode: boolean;
   private eventQueue: Array<{
     category: string;
@@ -300,8 +304,8 @@ export class AnalyticsService implements Analytics {
 
   async logException(error: unknown, context: Record<string, any> = {}): Promise<string> {
     try {
-      let errorEvent: ErrorEvent;
       const errorId = this.generateErrorId();
+      let errorEvent: ErrorEvent;
 
       try {
         if (error instanceof Error) {
@@ -320,17 +324,37 @@ export class AnalyticsService implements Analytics {
             extra: { ...context, errorId }
           });
         } else {
+          let errorString: string;
+          try {
+            errorString = String(error);
+          } catch (stringifyError) {
+            // If toString() fails, create a fallback error event
+            errorEvent = {
+              error: {
+                name: 'ErrorTrackingFailure',
+                message: 'Failed to track error'
+              },
+              context: {
+                originalError: error,
+                trackingError: stringifyError instanceof Error ? stringifyError.message : String(stringifyError)
+              },
+              timestamp: new Date().toISOString(),
+              errorId
+            };
+            throw new Error('Error in toString');
+          }
+
           errorEvent = {
             error: {
-              name: 'UnknownError',
-              message: String(error)
+              name: 'ErrorTrackingFailure',
+              message: errorString
             },
             context,
             timestamp: new Date().toISOString(),
             errorId
           };
 
-          Sentry.captureMessage(String(error), {
+          Sentry.captureMessage(errorString, {
             level: 'error',
             extra: { ...context, errorId }
           });
@@ -345,14 +369,15 @@ export class AnalyticsService implements Analytics {
         return errorId;
       } catch (trackingError) {
         // If error tracking itself fails, create a special error event
+        const trackingErrorMsg = trackingError instanceof Error ? trackingError.message : String(trackingError);
         errorEvent = {
           error: {
             name: 'ErrorTrackingFailure',
-            message: 'Failed to track error'
+            message: 'Failed to track error',
           },
           context: { 
-            originalError: String(error), 
-            trackingError: trackingError instanceof Error ? trackingError.message : String(trackingError)
+            originalError: String(error),
+            trackingError: trackingErrorMsg
           },
           timestamp: new Date().toISOString(),
           errorId
