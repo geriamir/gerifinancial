@@ -16,7 +16,8 @@ import {
 } from '@mui/material';
 import { bankAccountsApi } from '../../services/api/bank';
 import { SUPPORTED_BANKS } from '../../constants/banks';
-import { track, BANK_ACCOUNT_EVENTS } from '../../utils/analytics';
+import { track } from '../../utils/analytics';
+import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
 
 interface BankAccountFormProps {
   open: boolean;
@@ -59,7 +60,7 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
     setLoading(true);
     setError('');
 
-    track(BANK_ACCOUNT_EVENTS.START_ADD, {
+    track(BANK_ACCOUNT_EVENTS.ADD, {
       bankId: formData.bankId,
       bankName: SUPPORTED_BANKS.find(bank => bank.id === formData.bankId)?.name
     });
@@ -115,7 +116,6 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
   }, [open]);
 
   const handleDialogClose = () => {
-    track(BANK_ACCOUNT_EVENTS.CLOSE_ADD_FORM);
     resetForm();
     onClose();
   };

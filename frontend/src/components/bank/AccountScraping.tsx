@@ -1,9 +1,18 @@
 import React, { useState } from 'react';
-import { Button, CircularProgress, Typography } from '@mui/material';
+import { Button, CircularProgress, Typography, Stack, Alert, Chip } from '@mui/material';
+import { FactCheck as VerifyIcon } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { bankAccountsApi } from '../../services/api/bank';
 import { format } from 'date-fns';
 import { track } from '../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
+
+interface ScrapeResult {
+  newTransactions: number;
+  duplicates: number;
+  needsVerification: number;
+  errors: Array<{ error: string }>;
+}
 
 interface AccountScrapingProps {
   accountId: string;
@@ -19,12 +28,15 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
   onScrapingComplete 
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [scrapeResult, setScrapeResult] = useState<ScrapeResult | null>(null);
+  const navigate = useNavigate();
 
   const handleScrape = async () => {
     setIsLoading(true);
     track(BANK_ACCOUNT_EVENTS.SCRAPE, { accountId });
     try {
-      await bankAccountsApi.scrape(accountId, {});
+      const result = await bankAccountsApi.scrape(accountId, {});
+      setScrapeResult(result);
       track(BANK_ACCOUNT_EVENTS.SCRAPE_SUCCESS, { accountId });
       onScrapingComplete?.();
     } catch (err) {
@@ -36,22 +48,72 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
     }
   };
 
+  const handleVerifyClick = () => {
+    navigate('/verify');
+  };
+
   return (
-    <>
+    <Stack spacing={2}>
       <Typography variant="body2" color="text.secondary">
         {lastScraped 
           ? `Last scraped: ${format(new Date(lastScraped), 'PPpp')}`
           : 'Never scraped'}
       </Typography>
-      <Button
-        variant="outlined"
-        size="small"
-        onClick={handleScrape}
-        disabled={isLoading || isDisabled}
-        startIcon={isLoading ? <CircularProgress size={20} /> : undefined}
-      >
-        {isLoading ? 'Scraping...' : 'Scrape Now'}
-      </Button>
-    </>
+      <Stack direction="row" spacing={1}>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={handleScrape}
+          disabled={isLoading || isDisabled}
+          startIcon={isLoading ? <CircularProgress size={20} /> : undefined}
+        >
+          {isLoading ? 'Scraping...' : 'Scrape Now'}
+        </Button>
+
+        {scrapeResult?.needsVerification ? (
+          <Button
+            variant="outlined"
+            size="small"
+            color="warning"
+            onClick={handleVerifyClick}
+            startIcon={<VerifyIcon />}
+          >
+            Verify {scrapeResult.needsVerification} Transactions
+          </Button>
+        ) : null}
+      </Stack>
+
+      {scrapeResult && (
+        <Stack spacing={1}>
+          <Stack direction="row" spacing={1}>
+            <Chip
+              label={`${scrapeResult.newTransactions} New`}
+              size="small"
+              color="primary"
+            />
+            {scrapeResult.needsVerification > 0 && (
+              <Chip
+                label={`${scrapeResult.needsVerification} Need Verification`}
+                size="small"
+                color="warning"
+              />
+            )}
+            {scrapeResult.duplicates > 0 && (
+              <Chip
+                label={`${scrapeResult.duplicates} Duplicates`}
+                size="small"
+                color="default"
+              />
+            )}
+          </Stack>
+          
+          {scrapeResult.errors.length > 0 && (
+            <Alert severity="error" sx={{ mt: 1 }}>
+              {scrapeResult.errors.length} error(s) occurred during scraping
+            </Alert>
+          )}
+        </Stack>
+      )}
+    </Stack>
   );
 };

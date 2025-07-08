@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Category } from '../services/api/types';
+import { Category } from '../services/api/types/categories';
 import { transactionsApi } from '../services/api/transactions';
 
 export const useCategories = () => {
@@ -24,5 +24,10 @@ export const useCategories = () => {
     fetchCategories();
   }, []);
 
-  return { categories, loading, error };
+  const getSubCategories = (categoryId: string) => {
+    const category = categories.find(cat => cat._id === categoryId);
+    return category?.subCategories || [];
+  };
+
+  return { categories, getSubCategories, loading, error };
 };

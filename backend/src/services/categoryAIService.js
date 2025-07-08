@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const natural = require('natural');
 const { translate } = require('@vitalets/google-translate-api');
 const WordTokenizer = natural.WordTokenizer;
@@ -11,6 +12,27 @@ class CategoryAIService {
     this.classifier = new natural.LogisticRegressionClassifier();
     this.initialized = false;
     this.translationCache = new Map();
+  }
+
+  /**
+   * Generate detailed reasoning for category suggestion
+   * @private
+   * @param {number} score - Match confidence score
+   * @param {string} subCategoryName - Name of the matched subcategory
+   * @param {boolean} hasRawCategory - Whether rawCategory was used in matching
+   * @returns {string} Detailed reasoning message
+   */
+  _generateReasoning(score, subCategoryName, hasRawCategory) {
+    const confidence = score > 0.8 ? 'Very strong confidence' :
+                      score > 0.6 ? 'Strong confidence' :
+                      score > 0.4 ? 'Moderate confidence' :
+                      'Low confidence';
+    
+    const source = hasRawCategory ? 
+      'based on bank-provided category' :
+      'based on transaction description';
+
+    return `${confidence} match for ${subCategoryName} ${source}`;
   }
 
   /**
@@ -30,7 +52,7 @@ class CategoryAIService {
       
       return result.text;
     } catch (error) {
-      console.error('Translation failed:', error);
+      logger.error('Translation failed:', error);
       return text; // Return original text on failure
     }
   }
@@ -61,7 +83,7 @@ class CategoryAIService {
     const union = new Set([...tokens1, ...tokens2]);
 
     const similarity = intersection.size / union.size;
-    console.log('Similarity calculation:', {
+    logger.info('Similarity calculation:', {
       text1,
       text2,
       intersection: Array.from(intersection),
@@ -85,6 +107,76 @@ class CategoryAIService {
     });
   }
 
+  async categorizeByAI(text, availableCategories, isRawCategory = false) {
+      const translatedText = await this.translateText(text);
+      const processedText = this.processText(translatedText.toLowerCase());
+
+      // Exact keyword match check first
+      for (const category of availableCategories) {
+        for (const subCategory of category.subCategories) {
+          const exactMatch = subCategory.keywords?.some(
+            kw => text.toLowerCase().includes(kw.toLowerCase()) || 
+                 translatedText.toLowerCase().includes(kw.toLowerCase())
+          );
+
+          if (exactMatch) {
+            // Higher confidence for exact keyword matches
+            const confidence = isRawCategory ? 0.95 : 0.85;
+            return {
+              categoryId: category.id,
+              subCategoryId: subCategory.id,
+              confidence,
+              reasoning: confidence > 0.9 
+                ? 'Very strong confidence match from transaction description' 
+                : 'Moderate confidence match from transaction description'
+            };
+          }
+        }
+      }
+
+      let bestMatch = {
+        categoryId: null,
+        subCategoryId: null,
+        confidence: 0,
+        reasoning: 'Missing input parameters'
+      };
+
+      // TF-IDF based matching
+      for (const category of availableCategories) {
+        this.buildCorpus(category.subCategories);
+        
+        const scores = [];
+        this.tfidf.tfidfs(processedText.join(' '), (index, score) => {
+          scores.push({
+            subCategory: category.subCategories[index],
+            score: score
+          });
+        });
+
+        const bestSubMatch = scores.reduce((best, current) => 
+          current.score > best.score ? current : best,
+          { score: 0, subCategory: null }
+        );
+
+        if (bestSubMatch.score > bestMatch.confidence) {
+          const confidence = isRawCategory ? 
+            Math.min(bestSubMatch.score * 0.8, 1) : 
+            Math.min(bestSubMatch.score * 0.6, 1);
+
+          bestMatch = {
+            categoryId: category.id,
+            subCategoryId: bestSubMatch.subCategory?.id || null,
+            confidence,
+            reasoning: this._generateReasoning(confidence, 
+              bestSubMatch.subCategory?.name || '', 
+              isRawCategory)
+          };
+        }
+      }
+
+      return bestMatch;
+  }
+
   /**
    * Suggests a category and subcategory for a transaction using NLP
    * @param {string} description - Transaction description
@@ -96,20 +188,22 @@ class CategoryAIService {
   async suggestCategory(description = '', amount = 0, availableCategories = [], userId = null, rawCategory = '') {
     try {
 
-      if (!description || !availableCategories?.length || !userId) {
-        return {
+      const noMatch = {
           categoryId: null,
           subCategoryId: null,
           confidence: 0,
           reasoning: 'Missing input parameters'
         };
+
+      if (!description || !availableCategories?.length || !userId) {
+        return noMatch;
       }
 
       // First try to find an exact vendor match
       const vendorMatches = await VendorMapping.findMatches(description, userId);
       if (vendorMatches.length > 0) {
         const match = vendorMatches[0];
-        console.log('Found exact vendor match:', {
+        logger.info('Found exact vendor match:', {
           vendor: match.vendorName,
           category: match.category,
           subCategory: match.subCategory
@@ -125,7 +219,7 @@ class CategoryAIService {
       // Try similar vendor match
       const similarVendor = await VendorMapping.suggestMapping(description, userId);
       if (similarVendor) {
-        console.log('Found similar vendor:', {
+        logger.info('Found similar vendor:', {
           original: description,
           matchedVendor: similarVendor.vendorName,
           category: similarVendor.category,
@@ -140,80 +234,57 @@ class CategoryAIService {
       }
 
       // No vendor match, try translation and keyword matching
-      const [translatedDesc, translatedCategory] = await Promise.all([
-        this.translateText(description),
-        rawCategory ? this.translateText(rawCategory) : Promise.resolve('')
-      ]);
 
-      // Combine translated texts for matching
-      const combinedText = [translatedDesc, translatedCategory].filter(Boolean).join(' ');
-      console.log('Processing text:', {
-        description: translatedDesc,
-        rawCategory: translatedCategory,
-        combined: combinedText
-      });
-
-      const processedDesc = this.processText(combinedText.toLowerCase());
-      let bestMatch = {
-        categoryId: null,
-        subCategoryId: null,
-        confidence: 0,
-        reasoning: ''
-      };
-      
-      for (const category of availableCategories) {
-        this.buildCorpus(category.subCategories);
+      // Process rawCategory first
+      let match;
+      if (rawCategory.length > 0) {
+        match = await this.categorizeByAI(rawCategory, availableCategories, true);
         
-        const scores = [];
-        this.tfidf.tfidfs(processedDesc.join(' '), (index, score) => {
-          scores.push({
-            subCategory: category.subCategories[index],
-            score
-          });
-        });
-
-        const bestSubMatch = scores.reduce((best, current) => {
-          const keywordMatch = current.subCategory.keywords?.some(keyword =>
-            translatedDesc.toLowerCase().includes(keyword.toLowerCase())
-          ) ? 0.5 : 0;
-
-          const totalScore = current.score + keywordMatch;
-          return totalScore > best.score ? 
-            { subCategory: current.subCategory, score: totalScore } : 
-            best;
-        }, { subCategory: null, score: 0 });
-
-        if (bestSubMatch.score > bestMatch.confidence) {
-          console.log('New best match found:', {
-            description: translatedDesc,
-            category: category.name,
-            subCategory: bestSubMatch.subCategory.name,
-            score: bestSubMatch.score
+        if (match.confidence > 0.5) {
+          logger.info('Matched by raw category: ', {
+            category: match.categoryId,
+            subCategory: match.subCategoryId,
+            confidence: match.confidence
           });
 
-          bestMatch = {
-            categoryId: category.id,
-            subCategoryId: bestSubMatch.subCategory.id,
-            confidence: Math.min(bestSubMatch.score / 2, 1),
-            reasoning: `Matched based on ${bestSubMatch.score > 0.5 ? 'strong' : 'partial'} similarity to subcategory "${bestSubMatch.subCategory.name}"`
+          const boostedConfidence = match.confidence * 1.2;
+          const subCategoryName = availableCategories
+            .find(c => c.id === match.categoryId)
+            ?.subCategories.find(s => s.id === match.subCategoryId)?.name;
+          
+          return {
+            categoryId: match.categoryId,
+            subCategoryId: match.subCategoryId,
+            confidence: boostedConfidence,
+              reasoning: boostedConfidence > 0.8 
+              ? 'Very strong confidence match from bank-provided category'
+              : 'Moderate confidence match from bank-provided category'
           };
         }
       }
 
-      if (!bestMatch.categoryId && availableCategories.length > 0) {
-        const firstCategory = availableCategories[0];
-        const firstSubCategory = firstCategory.subCategories?.[0];
-        bestMatch = {
-          categoryId: firstCategory.id,
-          subCategoryId: firstSubCategory?.id || null,
-          confidence: 0.1,
-          reasoning: 'No strong matches found, using default category'
-        };
+      // Process description
+      match = await this.categorizeByAI(description, availableCategories, false);
+      if (match.confidence > 0.5) {
+          const subCategoryName = availableCategories
+            .find(c => c.id === match.categoryId)
+            ?.subCategories.find(s => s.id === match.subCategoryId)?.name;
+            
+          return {
+              categoryId: match.categoryId,
+              subCategoryId: match.subCategoryId,
+              confidence: match.confidence,
+              reasoning: match.confidence > 0.8 
+                ? 'Very strong confidence match from transaction description'
+                : 'Moderate confidence match from transaction description'
+          };
       }
 
-      return bestMatch;
+      logger.info(`No suitable category match found for description ${description}, rawCategory ${rawCategory}. Match confidence: ${match?.confidence || 0}`);
+
+      return noMatch;
     } catch (error) {
-      console.error('Error in category suggestion:', error);
+      logger.error('Error in category suggestion:', error);
       throw new Error('Failed to get category suggestion');
     }
   }
@@ -225,7 +296,6 @@ class CategoryAIService {
    */
   async suggestNewKeywords(description) {
     try {
-      console.log('Starting keyword suggestion for:', description);
       
       // First try with original text
       let tokens = this.processText(description);
@@ -242,11 +312,6 @@ class CategoryAIService {
         !natural.stopwords.includes(token)
       );
 
-      console.log('Filtered tokens:', {
-        allTokens: tokens,
-        significantTokens
-      });
-
       // Get most relevant tokens based on frequency
       const wordFreq = {};
       significantTokens.forEach(token => {
@@ -258,10 +323,9 @@ class CategoryAIService {
         .slice(0, 3)
         .map(([token]) => token);
 
-      console.log('Selected keywords:', keywords);
       return keywords;
     } catch (error) {
-      console.error('Error suggesting keywords:', error);
+      logger.error('Error suggesting keywords:', error);
       return [];
     }
   }

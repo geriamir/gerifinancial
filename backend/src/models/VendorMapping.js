@@ -85,14 +85,29 @@ vendorMappingSchema.statics.findOrCreate = async function(vendorData) {
 vendorMappingSchema.statics.findMatches = async function(description, userId) {
   const normalizedDescription = description.toLowerCase().trim();
   
-  return this.find({
+  // First try exact match
+  let matches = await this.find({
     userId,
-    vendorName: normalizedDescription,
-    confidence: { $gte: 0.5 } // Only return relatively confident matches
+    vendorName: normalizedDescription
+  })
+  .sort({ matchCount: -1, lastUsed: -1 })
+  .populate('category subCategory');
+
+  if (matches.length > 0) {
+    return matches;
+  }
+
+  // Then try partial match
+  matches = await this.find({
+    userId,
+    vendorName: new RegExp(normalizedDescription, 'i'),
+    confidence: { $gte: 0.5 }
   })
   .sort({ matchCount: -1, lastUsed: -1 })
   .limit(1)
   .populate('category subCategory');
+
+  return matches;
 };
 
 // Static method to suggest new vendor mappings based on similar vendors

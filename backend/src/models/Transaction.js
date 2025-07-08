@@ -6,6 +6,10 @@ const transactionSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  // The original identifier from the scraper, kept for reference
+  originalIdentifier: {
+    type: String,
+  },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -91,7 +95,7 @@ const transactionSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: Object.values(TransactionStatus),
-    default: TransactionStatus.PENDING,
+    default: TransactionStatus.VERIFIED, // All transactions in main storage are verified
   },
   rawData: {
     type: mongoose.Schema.Types.Mixed,
@@ -115,7 +119,6 @@ transactionSchema.methods.categorize = async function(categoryId, subCategoryId,
   this.subCategory = subCategoryId;
   this.categorizationMethod = method;
   this.processedDate = new Date();
-  this.status = TransactionStatus.PROCESSED;
   await this.save();
 };
 
@@ -144,6 +147,35 @@ transactionSchema.statics.findUncategorized = async function(accountId, userId) 
     category: null
   })
   .sort({ date: -1 });
+};
+
+// Static method to find transactions needing verification
+transactionSchema.statics.findNeedingVerification = async function(userId, options = {}) {
+  if (!userId) throw new Error('userId is required');
+  
+  const query = {
+    userId,
+    status: TransactionStatus.NEEDS_VERIFICATION
+  };
+
+  if (options.accountId) {
+    query.accountId = options.accountId;
+  }
+
+  const baseQuery = this.find(query)
+    .sort({ date: -1 })
+    .populate('category')
+    .populate('subCategory');
+
+  if (options.limit) {
+    baseQuery.limit(options.limit);
+  }
+
+  if (options.skip) {
+    baseQuery.skip(options.skip);
+  }
+
+  return baseQuery;
 };
 
 // Static method to get spending summary by category
@@ -213,7 +245,7 @@ transactionSchema.statics.getSpendingSummary = async function(accountId, startDa
   };
 };
 
-// Method to create transaction from scraper data
+// Method to create transaction from scraper data (now only used for migrating from pending)
 transactionSchema.statics.createFromScraperData = async function(scraperTransaction, accountId, defaultCurrency, userId) {
   if (!userId) {
     throw new Error('userId is required when creating a transaction');
@@ -221,21 +253,19 @@ transactionSchema.statics.createFromScraperData = async function(scraperTransact
 
   const type = determineTransactionType(scraperTransaction);
   
-  // Generate a unique identifier if one is not provided by the scraper
-  let identifier = scraperTransaction.identifier;
-  if (!identifier) {
-    identifier = [
-      accountId,
-      scraperTransaction.date,
-      scraperTransaction.chargedAmount,
-      scraperTransaction.description,
-      Date.now(),
-      Math.random().toString(36).slice(2, 8)
-    ].join('_');
-  }
+  // Use provided identifier or generate a unique one
+  const identifier = scraperTransaction.identifier || [
+    accountId,
+    scraperTransaction.date,
+    scraperTransaction.chargedAmount,
+    scraperTransaction.description,
+    Date.now(),
+    Math.random().toString(36).slice(2, 8)
+  ].join('_');
   
-  return this.create({
+  return await this.create({
     identifier,
+    originalIdentifier: scraperTransaction.originalIdentifier || scraperTransaction.identifier || null,
     accountId,
     userId,
     amount: scraperTransaction.chargedAmount,
@@ -245,7 +275,7 @@ transactionSchema.statics.createFromScraperData = async function(scraperTransact
     description: scraperTransaction.description,
     memo: scraperTransaction.memo || '',
     rawData: scraperTransaction,
-    status: TransactionStatus.PENDING
+    status: TransactionStatus.VERIFIED // All transactions in main storage are verified
   });
 };
 

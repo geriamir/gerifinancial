@@ -20,7 +20,8 @@ import { bankAccountsApi } from '../../services/api/bank';
 import { BankAccount } from '../../services/api/types';
 import { SUPPORTED_BANKS } from '../../constants/banks';
 import { BankAccountForm } from './BankAccountForm';
-import { track, BANK_ACCOUNT_EVENTS } from '../../utils/analytics';
+import { track } from '../../utils/analytics';
+import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
 import { ScrapeAllAccounts } from './ScrapeAllAccounts';
 import { AccountScraping } from './AccountScraping';
 

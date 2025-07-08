@@ -2,19 +2,43 @@ import React from 'react';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { transactionsApi } from '../../../services/api/transactions';
 import TransactionsList from '../TransactionsList';
+import type { Transaction } from '../../../services/api/types/transaction';
 
 // Mock the API module
 jest.mock('../../../services/api/transactions');
 
-const mockTransactions = (startId: number, count: number) => {
+const mockSubCategory = {
+  _id: 'sub1',
+  name: 'Restaurant',
+  parent: 'cat1',
+  isActive: true
+};
+
+const mockCategory = {
+  _id: 'cat1',
+  name: 'Food',
+  type: 'Expense' as const,
+  subCategories: [mockSubCategory],
+  isActive: true
+};
+
+const mockTransactions = (startId: number, count: number): Transaction[] => {
   return Array.from({ length: count }, (_, i) => ({
     _id: `transaction-${startId + i}`,
+    identifier: `test-tx-${startId + i}`,
+    accountId: 'acc1',
+    userId: 'user1',
     amount: 100 + i,
     currency: 'ILS',
     date: new Date(2025, 5, i + 1).toISOString(),
     description: `Test Transaction ${startId + i}`,
     type: i % 2 === 0 ? 'Expense' : 'Income',
-    status: 'pending'
+    status: 'pending',
+    category: mockCategory,
+    subCategory: mockSubCategory,
+    rawData: {},
+    createdAt: new Date(2025, 5, i + 1).toISOString(),
+    updatedAt: new Date(2025, 5, i + 1).toISOString()
   }));
 };
 
@@ -84,20 +108,16 @@ describe('TransactionsList', () => {
     const initialTransactions = mockTransactions(1, 10);
     const nextPageTransactions = mockTransactions(11, 10);
 
-    // Set up mock responses with debug logging
+    // Set up mock responses
     (transactionsApi.getTransactions as jest.Mock).mockImplementation(async (params) => {
-      console.log('Mock API called with params:', params);
-      
       // Return different responses based on skip parameter
       if (params.skip === 0) {
-        console.log('Returning initial page');
         return Promise.resolve({
           transactions: initialTransactions,
           total: 30,
           hasMore: true
         });
       } else {
-        console.log('Returning next page');
         return Promise.resolve({
           transactions: nextPageTransactions,
           total: 30,
@@ -113,7 +133,6 @@ describe('TransactionsList', () => {
       expect(screen.getByText('Test Transaction 1')).toBeInTheDocument();
     });
 
-    // Simulate intersection observer callback
     // Wait for initial page to load
     await waitFor(() => {
       const items = screen.getAllByTestId(/^transaction-item-/);

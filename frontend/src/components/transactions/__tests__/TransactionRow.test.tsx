@@ -1,12 +1,14 @@
 import React from 'react';
 import { render, screen, within } from '@testing-library/react';
 import TransactionRow from '../TransactionRow';
-import { Transaction } from '../../../services/api/types';
+import { Transaction } from '../../../services/api/types/transactions';
 import { categoryIcons } from '../../../constants/categoryIcons';
+import type { Category, SubCategory } from '../../../services/api/types/categories';
 
 describe('TransactionRow', () => {
   const mockTransaction: Transaction = {
     _id: 'test-transaction-1',
+    identifier: 'test-transaction-1',
     userId: 'user-1',
     accountId: 'account-1',
     amount: -100,
@@ -14,22 +16,29 @@ describe('TransactionRow', () => {
     date: '2025-07-02T12:00:00.000Z',
     description: 'Test Transaction',
     type: 'Expense',
-    status: 'processed',
+    status: 'verified',
+    categorizationMethod: 'manual',
+    rawData: {},
+    createdAt: '2025-07-02T12:00:00.000Z',
+    updatedAt: '2025-07-02T12:00:00.000Z',
     category: {
       _id: 'cat-1',
       name: 'Food',
-      type: 'Expense'
+      type: 'Expense',
+      userId: 'user-1',
+      subCategories: [],
+      createdAt: '2025-07-02T12:00:00.000Z',
+      updatedAt: '2025-07-02T12:00:00.000Z'
     },
     subCategory: {
       _id: 'subcat-1',
       name: 'Restaurants',
-      parentCategory: {
-        _id: 'cat-1',
-        name: 'Food',
-        type: 'Expense'
-      },
+      userId: 'user-1',
       keywords: ['restaurant', 'dining'],
-      isDefault: false
+      isDefault: false,
+      parentCategory: 'cat-1',
+      createdAt: '2025-07-02T12:00:00.000Z',
+      updatedAt: '2025-07-02T12:00:00.000Z'
     }
   };
 
@@ -48,13 +57,12 @@ describe('TransactionRow', () => {
       subCategory: {
         _id: 'subcat-2',
         name: 'Mortgage',
-        parentCategory: {
-          _id: 'cat-2',
-          name: 'Household',
-          type: 'Expense'
-        },
+        userId: 'user-1',
+        parentCategory: 'cat-2',
         keywords: ['mortgage', 'loan'],
-        isDefault: true
+        isDefault: true,
+        createdAt: '2025-07-02T12:00:00.000Z',
+        updatedAt: '2025-07-02T12:00:00.000Z'
       }
     };
 
@@ -76,13 +84,12 @@ describe('TransactionRow', () => {
       subCategory: {
         _id: 'subcat-3',
         name: 'Custom Category',
-        parentCategory: {
-          _id: 'cat-2',
-          name: 'Household',
-          type: 'Expense'
-        },
+        userId: 'user-1',
+        parentCategory: 'cat-2',
         keywords: [],
-        isDefault: false
+        isDefault: false,
+        createdAt: '2025-07-02T12:00:00.000Z',
+        updatedAt: '2025-07-02T12:00:00.000Z'
       }
     };
 

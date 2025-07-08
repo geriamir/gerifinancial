@@ -1,75 +1,103 @@
+import { AxiosResponse } from 'axios';
 import api from './base';
-import { Transaction, TransactionFilters, Category } from './types';
-
-export interface TransactionApiResponse {
-  transactions: Transaction[];
-  total: number;
-  hasMore: boolean;
-}
+import {
+  Transaction,
+  PendingTransaction,
+  GetTransactionsResponse,
+  GetPendingTransactionsResponse,
+  ProcessingStats,
+  VerifyTransactionsResponse,
+  SimilarTransactionsResponse,
+  CategorizeTransactionRequest,
+  TransactionSummary,
+  CategorySuggestion
+} from './types/transactions';
+import { Category } from './types/categories';
 
 export const transactionsApi = {
-  getCategories: async (): Promise<Category[]> => {
-    const response = await api.get('/transactions/categories');
-    return response.data;
-  },
+  // Main transaction methods
+  getTransactions: (filters: {
+    startDate?: Date;
+    endDate?: Date;
+    type?: string;
+    category?: string;
+    search?: string;
+    limit?: number;
+    skip?: number;
+    accountId?: string;
+  }): Promise<GetTransactionsResponse> =>
+    api.get<GetTransactionsResponse>('/transactions', { params: filters })
+      .then((res: AxiosResponse<GetTransactionsResponse>) => res.data),
 
-  getTransactions: async (
-    filters: Partial<TransactionFilters>
-  ): Promise<TransactionApiResponse> => {
-    const {
-      startDate,
-      endDate,
-      type,
-      category,
-      search,
-      limit = 20,
-      skip = 0,
-      accountId,
-      userId,
-    } = filters;
+  getTransaction: (id: string): Promise<Transaction> =>
+    api.get<Transaction>(`/transactions/${id}`)
+      .then((res: AxiosResponse<Transaction>) => res.data),
 
-    const params = new URLSearchParams();
-    if (startDate) params.append('startDate', startDate.toISOString());
-    if (endDate) params.append('endDate', endDate.toISOString());
-    if (type) params.append('type', type); // Only add if type is a valid TransactionType
-    if (category) params.append('category', category);
-    if (search) params.append('search', search);
-    if (accountId) params.append('accountId', accountId);
-    if (userId) params.append('userId', userId);
-    params.append('limit', limit.toString());
-    params.append('skip', skip.toString());
+  // Pending transaction methods
+  getPendingTransactions: (params: { limit?: number; skip?: number; accountId?: string }): Promise<GetPendingTransactionsResponse> =>
+    api.get<GetPendingTransactionsResponse>('/transactions/pending', { params })
+      .then((res: AxiosResponse<GetPendingTransactionsResponse>) => res.data),
 
-    const response = await api.get(`/transactions?${params}`);
-    return response.data;
-  },
+  getProcessingStats: (): Promise<ProcessingStats> =>
+    api.get<ProcessingStats>('/transactions/processing-stats')
+      .then((res: AxiosResponse<ProcessingStats>) => res.data),
 
-  getUncategorized: async (accountId: string): Promise<Transaction[]> => {
-    const response = await api.get(`/transactions/uncategorized/${accountId}`);
-    return response.data;
-  },
+  verifyTransaction: (transactionId: string): Promise<Transaction> =>
+    api.post<Transaction>(`/transactions/${transactionId}/verify`)
+      .then((res: AxiosResponse<Transaction>) => res.data),
 
-  getSummary: async (
-    accountId: string,
-  startDate: Date | undefined,
-  endDate: Date | undefined
-  ) => {
-    const params = new URLSearchParams();
-    if (startDate) params.append('startDate', startDate.toISOString());
-    if (endDate) params.append('endDate', endDate.toISOString());
+  verifyBatch: (transactionIds: string[]): Promise<VerifyTransactionsResponse> =>
+    api.post<VerifyTransactionsResponse>('/transactions/verify-batch', { transactionIds })
+      .then((res: AxiosResponse<VerifyTransactionsResponse>) => res.data),
 
-    const response = await api.get(`/transactions/summary/${accountId}?${params}`);
-    return response.data;
-  },
-
-  categorizeTransaction: async (
+  // Categorization methods
+  categorizeTransaction: (
     transactionId: string,
-    categoryId: string,
-    subCategoryId: string
-  ): Promise<Transaction> => {
-    const response = await api.post(`/transactions/${transactionId}/categorize`, {
-      categoryId,
-      subCategoryId,
-    });
-    return response.data;
-  },
+    data: CategorizeTransactionRequest,
+  ): Promise<Transaction | PendingTransaction> =>
+    api.post<Transaction | PendingTransaction>(`/transactions/${transactionId}/categorize`, data)
+      .then((res: AxiosResponse<Transaction | PendingTransaction>) => res.data),
+
+  getSuggestion: (transactionId: string): Promise<{
+    suggestion: CategorySuggestion;
+    transaction: {
+      id: string;
+      description: string;
+      amount: number;
+    };
+  }> =>
+    api.post<{
+      suggestion: CategorySuggestion;
+      transaction: {
+        id: string;
+        description: string;
+        amount: number;
+      };
+    }>(`/transactions/${transactionId}/suggest-category`)
+      .then((res: AxiosResponse) => res.data),
+
+  // Transaction detail methods
+  getByAccount: (accountId: string, startDate?: Date, endDate?: Date): Promise<Transaction[]> =>
+    api.get<Transaction[]>(`/transactions/account/${accountId}`, {
+      params: { startDate, endDate }
+    }).then((res: AxiosResponse<Transaction[]>) => res.data),
+
+  getUncategorized: (accountId: string): Promise<Transaction[]> =>
+    api.get<Transaction[]>(`/transactions/uncategorized/${accountId}`)
+      .then((res: AxiosResponse<Transaction[]>) => res.data),
+
+  getSummary: (accountId: string, startDate?: Date, endDate?: Date): Promise<TransactionSummary> =>
+    api.get<TransactionSummary>(`/transactions/summary/${accountId}`, {
+      params: { startDate, endDate }
+    }).then((res: AxiosResponse<TransactionSummary>) => res.data),
+
+  // Find similar pending transactions for batch verification
+  findSimilarPendingTransactions: (transactionId: string): Promise<SimilarTransactionsResponse> =>
+    api.get<SimilarTransactionsResponse>(`/transactions/${transactionId}/similar`)
+      .then((res: AxiosResponse<SimilarTransactionsResponse>) => res.data),
+
+  // Categories
+  getCategories: (): Promise<Category[]> =>
+    api.get<Category[]>('/transactions/categories')
+      .then((res: AxiosResponse<Category[]>) => res.data)
 };

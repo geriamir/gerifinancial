@@ -5,9 +5,8 @@ const CategorizationMethod = {
 };
 
 const TransactionStatus = {
-  PENDING: 'pending',
-  PROCESSED: 'processed',
-  ERROR: 'error'
+  VERIFIED: 'verified',  // For transactions in permanent storage
+  ERROR: 'error'        // For failed transactions
 };
 
 const TransactionType = {

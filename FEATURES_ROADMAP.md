@@ -7,11 +7,11 @@
    - [x] Add search functionality
    - [x] Add sorting capabilities
 
-2. Transaction categorization UI:
-   - [ ] Create category selection component
-   - [ ] Add bulk categorization feature
-   - [ ] Implement auto-categorization rules
-   - [ ] Add category management UI
+2. ✓ Transaction categorization UI:
+   - [x] Create category selection component
+   - [x] Add single transaction categorization
+   - [x] Add date grouping with totals
+   - [x] Implement shared transaction list component
 
 3. Dashboard improvements:
    - [ ] Add spending summary charts
@@ -41,7 +41,7 @@
 ## Testing
 1. Frontend tests:
    - [x] Add Cypress tests for transaction list
-   - [ ] Add tests for categorization UI
+   - [x] Add tests for categorization UI
    - [ ] Test charts and visualizations
    - [x] Add error handling tests
 

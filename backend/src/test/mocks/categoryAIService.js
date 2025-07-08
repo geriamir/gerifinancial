@@ -7,50 +7,60 @@ let mockTranslation = {
 
 let translationCache = new Map();
 
-const createMockSuggestion = (categoryId, subCategoryId) => ({
-  categoryId: categoryId.toString(),
-  subCategoryId: subCategoryId.toString(),
-  confidence: 0.9,
-  reasoning: 'Strong match for Restaurants subcategory in Food'
+const createMockSuggestion = (categoryId, subCategoryId, confidence = 0.9, fromRawCategory = false) => ({
+  categoryId: categoryId?.toString() || null,
+  subCategoryId: subCategoryId?.toString() || null,
+  confidence,
+  reasoning: confidence > 0.8 
+    ? `very strong confidence match from ${fromRawCategory ? 'bank-provided category' : 'transaction description'}`
+    : confidence > 0.5
+      ? `moderate confidence match from ${fromRawCategory ? 'bank-provided category' : 'transaction description'}`
+      : 'partial confidence match'
 });
 
 module.exports = {
-  suggestCategory: jest.fn().mockImplementation((description, amount, categories, userId) => {
-    // First check for Hebrew text
+  suggestCategory: jest.fn().mockImplementation((description, amount, categories, userId, rawCategory = '') => {
+    if (!description || !categories?.length || !userId) {
+      return Promise.resolve(createMockSuggestion(null, null, 0));
+    }
+
+    // First check raw category if provided
+    if (rawCategory) {
+      const translatedRaw = mockTranslation[rawCategory] || rawCategory;
+      const searchRaw = translatedRaw.toLowerCase();
+      
+      // Check both raw category translations and specific keywords
+      if (searchRaw.includes('coffee shop') || 
+          searchRaw.includes('restaurant') || 
+          searchRaw.includes('dining')) {
+        const category = categories[0];
+        const subCategory = category?.subCategories?.[0];
+        if (category && subCategory) {
+          return Promise.resolve(createMockSuggestion(category.id, subCategory.id, 0.95, true));
+        }
+      }
+    }
+
+    // Then check description
     const translatedDesc = mockTranslation[description] || description;
     const searchDesc = translatedDesc.toLowerCase();
 
-    // Use the first available category/subcategory for restaurant matches
-    if (searchDesc.includes('restaurant') || searchDesc.includes('coffee shop')) {
+    // Check both description translations and keywords
+    if (searchDesc.includes('restaurant') || 
+        searchDesc.includes('coffee shop') ||
+        searchDesc.includes('dining')) {
       const category = categories[0];
-      const subCategory = category.subCategories[0];
-      return Promise.resolve(createMockSuggestion(category.id, subCategory.id));
+      const subCategory = category?.subCategories?.[0];
+      if (category && subCategory) {
+        return Promise.resolve(createMockSuggestion(category.id, subCategory.id, 0.9, false));
+      }
     }
 
     if (searchDesc.includes('general')) {
-      return Promise.resolve({
-        categoryId: null,
-        subCategoryId: null,
-        confidence: 0.3,
-        reasoning: 'Low confidence match'
-      });
+      return Promise.resolve(createMockSuggestion(null, null, 0.3, false));
     }
 
-    if (!description || !categories?.length || !userId) {
-      return Promise.resolve({
-        categoryId: null,
-        subCategoryId: null,
-        confidence: 0,
-        reasoning: 'Missing input parameters'
-      });
-    }
-
-    return Promise.resolve({
-      categoryId: null,
-      subCategoryId: null,
-      confidence: 0.1,
-      reasoning: 'No strong match found'
-    });
+    return Promise.resolve(createMockSuggestion(null, null, 0.1, false));
   }),
 
   translateText: jest.fn().mockImplementation((text) => {

@@ -68,6 +68,7 @@ class BankScraperService {
     let attempts = 0;
     let error = null;
 
+    logger.info(`Starting transaction scraping for bank account ${bankAccount._id}...`);
     while (attempts < this.MAX_RETRIES) {
       try {
         const scraperResult = await scraper.scrape(bankAccount.getScraperOptions().credentials);
