@@ -12,7 +12,7 @@ import {
   TransactionSummary,
   CategorySuggestion
 } from './types/transactions';
-import { Category } from './types/categories';
+import type { Category } from './types';
 
 export const transactionsApi = {
   // Main transaction methods

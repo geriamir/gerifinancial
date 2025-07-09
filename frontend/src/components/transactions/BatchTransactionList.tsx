@@ -11,7 +11,7 @@ import {
   Checkbox,
   ListItemIcon
 } from '@mui/material';
-import type { Transaction } from '../../services/api/types/transaction';
+import type { Transaction } from '../../services/api/types/transactions';
 
 interface BatchTransactionListProps {
   transactions: Transaction[];
@@ -53,9 +53,9 @@ export const BatchTransactionList: React.FC<BatchTransactionListProps> = ({
   };
 
   return (
-    <Paper 
-      variant="outlined" 
-      sx={{ 
+    <Paper
+      variant="outlined"
+      sx={{
         maxHeight: maxHeight ? `${maxHeight}px` : undefined,
         overflow: maxHeight ? 'auto' : undefined
       }}
@@ -106,7 +106,7 @@ export const BatchTransactionList: React.FC<BatchTransactionListProps> = ({
                   }
                   secondary={
                     <Typography variant="body2" color="text.secondary">
-                      {formatDate(transaction.date)} • 
+                      {formatDate(transaction.date)} •
                       {formatAmount(transaction.amount, transaction.currency)}
                     </Typography>
                   }

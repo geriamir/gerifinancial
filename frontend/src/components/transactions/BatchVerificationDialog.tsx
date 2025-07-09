@@ -13,7 +13,7 @@ import {
   Typography,
   Divider
 } from '@mui/material';
-import type { Transaction } from '../../services/api/types/transaction';
+import type { Transaction } from '../../services/api/types/transactions';
 import type { BatchProgress } from '../../services/api/types/verification';
 import { useVerificationAnalytics } from '../../hooks/useVerificationAnalytics';
 import { useBatchVerificationKeyboard } from '../../hooks/useBatchVerificationKeyboard';
@@ -40,10 +40,11 @@ export const BatchVerificationDialog: React.FC<BatchVerificationDialogProps> = (
   progress
 }) => {
   const [isProcessing, setIsProcessing] = useState(!!progress);
-  
+
   useEffect(() => {
     setIsProcessing(!!progress);
   }, [progress]);
+
   const [error, setError] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [showPerformance, setShowPerformance] = useState(false);
@@ -57,13 +58,14 @@ export const BatchVerificationDialog: React.FC<BatchVerificationDialogProps> = (
       setFocusedId(transactions[0]._id);
     }
   }, [open, transactions]);
-  
+
   // Initialize with main transaction selected
   useEffect(() => {
     if (mainTransaction) {
       setSelectedIds([mainTransaction._id]);
     }
   }, [mainTransaction]);
+
   const { trackVerificationBatch } = useVerificationAnalytics();
 
   const { startTracking, stopTracking, addData } = usePerformanceTracking({
@@ -124,7 +126,7 @@ export const BatchVerificationDialog: React.FC<BatchVerificationDialogProps> = (
 
   const handleSelectionChange = (id: string, selected: boolean) => {
     if (id === mainTransaction?._id) return; // Prevent unselecting main transaction
-    setSelectedIds(prev => 
+    setSelectedIds(prev =>
       selected ? [...prev, id] : prev.filter(x => x !== id)
     );
   };
@@ -153,16 +155,9 @@ export const BatchVerificationDialog: React.FC<BatchVerificationDialogProps> = (
     return () => unregisterShortcuts();
   }, [open, registerShortcuts, unregisterShortcuts]);
 
-  const progressMessage = progress ? (
-    <Typography variant="body2" color="text.secondary">
-      Progress: {progress.current} / {progress.total} 
-      ({progress.successful} successful, {progress.failed} failed)
-    </Typography>
-  ) : null;
-
   return (
     <>
-      <Dialog 
+      <Dialog
         open={open}
         onClose={!isProcessing ? onClose : undefined}
         maxWidth="md"
@@ -186,14 +181,19 @@ export const BatchVerificationDialog: React.FC<BatchVerificationDialogProps> = (
             {isProcessing ? (
               <Box sx={{ width: '100%' }}>
                 <LinearProgress />
-                <Typography 
-                  variant="caption" 
+                <Typography
+                  variant="caption"
                   color="text.secondary"
                   sx={{ display: 'block', mt: 1 }}
                 >
                   Verifying transactions...
                 </Typography>
-                {progressMessage}
+                {progress && (
+                  <Typography variant="body2" color="text.secondary">
+                    Progress: {progress.current} / {progress.total}
+                    ({progress.successful} successful, {progress.failed} failed)
+                  </Typography>
+                )}
               </Box>
             ) : (
               <>

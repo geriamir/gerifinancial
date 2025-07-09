@@ -1,6 +1,6 @@
 import React from 'react';
 import { Chip, ChipProps } from '@mui/material';
-import type { SubCategory } from '../../services/api/types/categories';
+import type { SubCategory } from '../../services/api/types';
 import { getIconForSubcategory } from '../../constants/categoryIcons';
 
 interface IconChipProps extends Omit<ChipProps, 'label'> {

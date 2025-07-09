@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Category } from '../services/api/types/categories';
+import type { Category } from '../services/api/types';
 import { transactionsApi } from '../services/api/transactions';
 
 export const useCategories = () => {

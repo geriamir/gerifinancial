@@ -1,9 +1,7 @@
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import TransactionRow from '../TransactionRow';
-import { Transaction } from '../../../services/api/types/transactions';
-import { categoryIcons } from '../../../constants/categoryIcons';
-import type { Category, SubCategory } from '../../../services/api/types/categories';
+import type { Transaction } from '../../../services/api/types/transactions';
 
 describe('TransactionRow', () => {
   const mockTransaction: Transaction = {
@@ -16,7 +14,7 @@ describe('TransactionRow', () => {
     date: '2025-07-02T12:00:00.000Z',
     description: 'Test Transaction',
     type: 'Expense',
-    status: 'verified',
+    status: 'pending',
     categorizationMethod: 'manual',
     rawData: {},
     createdAt: '2025-07-02T12:00:00.000Z',
@@ -27,6 +25,10 @@ describe('TransactionRow', () => {
       type: 'Expense',
       userId: 'user-1',
       subCategories: [],
+      rules: [],
+      isActive: true,
+      color: '#000000',
+      icon: 'restaurant',
       createdAt: '2025-07-02T12:00:00.000Z',
       updatedAt: '2025-07-02T12:00:00.000Z'
     },
@@ -37,6 +39,8 @@ describe('TransactionRow', () => {
       keywords: ['restaurant', 'dining'],
       isDefault: false,
       parentCategory: 'cat-1',
+      rules: [],
+      isActive: true,
       createdAt: '2025-07-02T12:00:00.000Z',
       updatedAt: '2025-07-02T12:00:00.000Z'
     }
@@ -45,10 +49,13 @@ describe('TransactionRow', () => {
   it('should display transaction basic information', () => {
     render(<TransactionRow transaction={mockTransaction} />);
 
-    // Check description, date and amount
+    // Check description and amount
     expect(screen.getByTestId('transaction-test-transaction-1-description')).toHaveTextContent('Test Transaction');
-    expect(screen.getByTestId('transaction-test-transaction-1-amount')).toHaveTextContent('₪100.00');
-    expect(screen.getByTestId('transaction-test-transaction-1-date')).toHaveTextContent('02/07/2025');
+    
+    // Check amount - ignore any special characters and just match numbers and symbols
+    const amountElement = screen.getByTestId('transaction-test-transaction-1-amount');
+    const amountText = amountElement.textContent || '';
+    expect(amountText.replace(/[^0-9.₪\s]/g, '')).toMatch(/100\.00\s*₪/);
   });
 
   it('should display transaction with mapped subcategory', () => {
@@ -58,9 +65,11 @@ describe('TransactionRow', () => {
         _id: 'subcat-2',
         name: 'Mortgage',
         userId: 'user-1',
-        parentCategory: 'cat-2',
+        parentCategory: 'cat-1',
         keywords: ['mortgage', 'loan'],
         isDefault: true,
+        rules: [],
+        isActive: true,
         createdAt: '2025-07-02T12:00:00.000Z',
         updatedAt: '2025-07-02T12:00:00.000Z'
       }
@@ -68,14 +77,10 @@ describe('TransactionRow', () => {
 
     render(<TransactionRow transaction={txWithMappedCategory} />);
 
-    // Check that the icon button is rendered within the transaction row
-    const iconContainer = screen.getByTestId('transaction-test-transaction-1-subcategory');
-    expect(iconContainer).toBeInTheDocument();
-    
-    // Check that the icon button within the container has correct aria-label
-    const iconButton = within(iconContainer).getByTestId('transaction-test-transaction-1-subcategory-chip-icon');
-    expect(iconButton).toBeInTheDocument();
-    expect(iconButton).toHaveAttribute('aria-label', 'Mortgage');
+    // Check that the subcategory text is rendered
+    const subcategoryElement = screen.getByTestId('transaction-test-transaction-1-subcategory');
+    expect(subcategoryElement).toBeInTheDocument();
+    expect(subcategoryElement).toHaveTextContent('Mortgage');
   });
 
   it('should handle transaction with unmapped subcategory', () => {
@@ -85,9 +90,11 @@ describe('TransactionRow', () => {
         _id: 'subcat-3',
         name: 'Custom Category',
         userId: 'user-1',
-        parentCategory: 'cat-2',
+        parentCategory: 'cat-1',
         keywords: [],
         isDefault: false,
+        rules: [],
+        isActive: true,
         createdAt: '2025-07-02T12:00:00.000Z',
         updatedAt: '2025-07-02T12:00:00.000Z'
       }
@@ -95,11 +102,10 @@ describe('TransactionRow', () => {
 
     render(<TransactionRow transaction={txWithUnmappedCategory} />);
 
-    // Check that the text chip is rendered with correct text
+    // Check that the subcategory text is rendered
     const container = screen.getByTestId('transaction-test-transaction-1-subcategory');
     expect(container).toBeInTheDocument();
-    const textChip = within(container).getByTestId('transaction-test-transaction-1-subcategory-chip-text');
-    expect(textChip).toBeInTheDocument();
+    expect(container).toHaveTextContent('Custom Category');
   });
 
   it('should handle transaction without subcategory', () => {

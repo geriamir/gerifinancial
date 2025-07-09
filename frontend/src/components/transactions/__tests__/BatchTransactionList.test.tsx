@@ -65,8 +65,8 @@ describe('BatchTransactionList', () => {
     render(<BatchTransactionList transactions={mockTransactions} />);
     
     // Hebrew locale formatting
-    expect(screen.getByText(/₪100\.00/)).toBeInTheDocument();
-    expect(screen.getByText(/₪75\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/‏100\.00 ‏₪/)).toBeInTheDocument();
+    expect(screen.getByText(/‏75\.00 ‏₪/)).toBeInTheDocument();
   });
 
   it('formats date correctly', () => {

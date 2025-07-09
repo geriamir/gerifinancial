@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Button, Paper } from '@mui/material';
 import type { PendingTransaction, CategorySuggestion } from '../../services/api/types/transactions';
-import type { Category, SubCategory } from '../../services/api/types/categories';
+import type { Category, SubCategory } from '../../services/api/types';
 import { CategorySelectionDialog } from './CategorySelectionDialog';
 import { transactionsApi } from '../../services/api/transactions';
 import TransactionsList from './TransactionsList';

@@ -26,7 +26,7 @@ import {
   Star as StarIcon
 } from '@mui/icons-material';
 import { useCategories } from '../../hooks/useCategories';
-import type { Category, SubCategory } from '../../services/api/types/categories';
+import type { Category, SubCategory } from '../../services/api/types';
 import { useKeyboardShortcut } from '../../hooks/useKeyboardShortcut';
 
 interface CategorySelectionDialogProps {

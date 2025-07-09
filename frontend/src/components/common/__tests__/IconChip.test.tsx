@@ -1,103 +1,98 @@
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import IconChip from '../IconChip';
-import { SubCategory } from '../../../services/api/types';
+import type { SubCategory } from '../../../services/api/types';
 import { Home } from '@mui/icons-material';
-import { categoryIcons } from '../../../constants/categoryIcons';
+import * as categoryIconsModule from '../../../constants/categoryIcons';
+
+// Mock the getIconForSubcategory function
+jest.mock('../../../constants/categoryIcons', () => ({
+  getIconForSubcategory: jest.fn()
+}));
+
+const { getIconForSubcategory } = categoryIconsModule;
 
 describe('IconChip', () => {
   const mockSubCategory: SubCategory = {
     _id: '123',
     name: 'Mortgage',
-    parentCategory: {
-      _id: '456',
-      name: 'Household',
-      type: 'expense'
-    },
+    parentCategory: 'cat1',
+    userId: 'user1',
     keywords: ['mortgage', 'loan'],
-    isDefault: true
+    isDefault: true,
+    createdAt: '2025-07-09T10:00:00Z',
+    updatedAt: '2025-07-09T10:00:00Z'
   };
 
   const mockCustomSubCategory: SubCategory = {
     _id: '789',
     name: 'Custom Category',
-    parentCategory: {
-      _id: '456',
-      name: 'Household',
-      type: 'expense'
-    },
+    parentCategory: 'cat1',
+    userId: 'user1',
     keywords: [],
-    isDefault: false
+    isDefault: false,
+    createdAt: '2025-07-09T10:00:00Z',
+    updatedAt: '2025-07-09T10:00:00Z'
   };
 
-  it('renders icon for mapped subcategory', () => {
-    render(<IconChip subCategory={mockSubCategory} data-testid="test-chip" />);
-    
-    // Check that the icon button is rendered
-    const iconButton = screen.getByTestId('test-chip-icon');
-    expect(iconButton).toBeInTheDocument();
-    
-    // Check that the button has correct tooltip text
-    expect(iconButton).toHaveAttribute('aria-label', 'Mortgage');
+  beforeEach(() => {
+    // Reset all mocks before each test
+    jest.clearAllMocks();
+    // Default mock implementation
+    (getIconForSubcategory as jest.Mock).mockReturnValue({
+      icon: Home,
+      tooltip: 'Mortgage'
+    });
   });
 
-  it('renders text fallback for unmapped subcategory', () => {
-    render(<IconChip subCategory={mockCustomSubCategory} data-testid="test-chip" />);
-    
-    // Check that the text fallback is rendered
-    const textFallback = screen.getByTestId('test-chip-text');
-    expect(textFallback).toBeInTheDocument();
-    expect(textFallback).toHaveTextContent('Custom Category');
-    
-    // Check that the icon button is not rendered
-    const iconButton = screen.queryByTestId('test-chip-icon');
-    expect(iconButton).not.toBeInTheDocument();
-  });
-
-  it('applies correct styling to icon button', () => {
+  it('renders with basic content', () => {
     render(<IconChip subCategory={mockSubCategory} data-testid="test-chip" />);
     
-    const iconButton = screen.getByTestId('test-chip-icon');
-    
-    // Check that the button has the correct styling classes
-    expect(iconButton).toHaveClass('MuiIconButton-root');
-    expect(iconButton).toHaveClass('MuiIconButton-sizeSmall');
-    
-    // Verify icon presence
-    const icon = within(iconButton).getByTestId('HomeIcon');
+    const chip = screen.getByTestId('test-chip-text');
+    expect(chip).toBeInTheDocument();
+    expect(chip).toHaveTextContent('Mortgage');
+  });
+
+  it('renders with icon for mapped subcategory', () => {
+    render(<IconChip subCategory={mockSubCategory} data-testid="test-chip" />);
+
+    const icon = screen.getByTestId('test-chip-icon');
     expect(icon).toBeInTheDocument();
-    expect(icon).toHaveClass('MuiSvgIcon-fontSizeSmall');
-    expect(icon).toHaveClass('MuiSvgIcon-colorAction');
+    expect(icon).toHaveAttribute('role', 'button');
+    expect(icon).toHaveAttribute('aria-label', 'Mortgage');
   });
 
-  it('applies correct styling to text fallback', () => {
+  it('renders text only for unmapped subcategory', () => {
+    // Mock no icon mapping found
+    (getIconForSubcategory as jest.Mock).mockReturnValueOnce(null);
+
     render(<IconChip subCategory={mockCustomSubCategory} data-testid="test-chip" />);
-    
-    const textFallback = screen.getByTestId('test-chip-text');
-    
-    // Check that the text fallback has the correct styling classes
-    expect(textFallback).toHaveClass('MuiBox-root');
-    const textElement = within(textFallback).getByText('Custom Category');
-    expect(textElement).toHaveClass('MuiTypography-root');
-    expect(textElement).toHaveClass('MuiTypography-body2');
+
+    // Check that only text is rendered
+    expect(screen.getByTestId('test-chip-text')).toHaveTextContent('Custom Category');
+    expect(screen.queryByTestId('test-chip-icon')).not.toBeInTheDocument();
   });
 
-  it('handles subcategories with special characters in name', () => {
+  it('handles special characters in subcategory name', () => {
     const specialCharSubCategory: SubCategory = {
       _id: '101',
       name: 'Special & Category',
-      parentCategory: {
-        _id: '456',
-        name: 'Household',
-        type: 'expense'
-      },
+      parentCategory: 'cat1',
+      userId: 'user1',
       keywords: [],
-      isDefault: false
+      isDefault: false,
+      createdAt: '2025-07-09T10:00:00Z',
+      updatedAt: '2025-07-09T10:00:00Z'
     };
 
     render(<IconChip subCategory={specialCharSubCategory} data-testid="test-chip" />);
-    
-    const textFallback = screen.getByTestId('test-chip-text');
-    expect(textFallback).toHaveTextContent('Special & Category');
+    expect(screen.getByTestId('test-chip-text')).toHaveTextContent('Special & Category');
+  });
+
+  it('applies proper styling', () => {
+    render(<IconChip subCategory={mockSubCategory} data-testid="test-chip" />);
+
+    const iconContainer = screen.getByTestId('test-chip-icon');
+    expect(iconContainer).toHaveClass('MuiIconButton-root', 'MuiIconButton-sizeSmall');
   });
 });
