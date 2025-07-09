@@ -1,4 +1,4 @@
-import type { Transaction } from '../../../services/api/types/transaction';
+import type { Transaction } from '../../../services/api/types/transactions';
 
 export const mockMainTransaction: Transaction = {
   _id: 'tx1',
@@ -10,7 +10,8 @@ export const mockMainTransaction: Transaction = {
   date: '2025-07-03T12:00:00Z',
   type: 'Expense',
   description: 'Test Restaurant',
-  status: 'needs_verification',
+  status: 'pending',
+  categorizationMethod: 'ai',
   category: {
     _id: 'cat1',
     name: 'Food',

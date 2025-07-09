@@ -1,8 +1,8 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { BatchVerificationDialog } from '../BatchVerificationDialog';
-import type { Transaction } from '../../../services/api/types/transaction';
-import { mockMainTransaction, mockTransactions } from './__fixtures__/transactions';
+import type { Transaction } from '../../../services/api/types/transactions';
+import { mockMainTransaction, mockTransactions } from '../__fixtures__/transactions';
 
 describe('BatchVerificationDialog Keyboard Navigation', () => {
   const defaultProps = {
