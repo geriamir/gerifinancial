@@ -58,10 +58,12 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
     }
   }, [page, props]);
 
+  const filtersString = 'filters' in props ? JSON.stringify(props.filters) : null;
+  
   useEffect(() => {
     setPage(0);
     loadTransactions(true);
-  }, ['filters' in props ? JSON.stringify(props.filters) : null]);
+  }, [filtersString, loadTransactions]);
 
   const transactions = ('transactions' in props) ? props.transactions as T[] : (fetchedTransactions as T[]);
 
@@ -185,8 +187,6 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
             // Only add ref to the last transaction of the last group
             const isLastGroup = groupIndex === groupTransactionsByDate(transactions).length - 1;
             const isLastTransaction = index === dateTransactions.length - 1;
-            const needsRef = isLastGroup && isLastTransaction;
-
             return (
               <li
                 key={transaction._id}

@@ -7,6 +7,8 @@ export const formatCurrency = (amount: number, currency: string = 'ILS'): string
   }).format(Math.abs(amount));
 };
 
-export default {
+const formatters = {
   formatCurrency
 };
+
+export default formatters;

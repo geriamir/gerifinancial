@@ -141,7 +141,7 @@ export const PendingTransactions: React.FC = () => {
       ]);
     };
     loadInitialData();
-  }, []);
+  }, [loadTransactions, loadStats]);
 
   // Periodic stats refresh
   useEffect(() => {
@@ -150,7 +150,7 @@ export const PendingTransactions: React.FC = () => {
     }, 30000); // Refresh stats every 30 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [loadStats]);
 
   const handleVerify = async (transactionId: string) => {
     try {

@@ -11,12 +11,10 @@ import {
   Home as HomeIcon,
   AccountBalance as AccountIcon,
   Receipt as TransactionsIcon,
-  Category as CategoryIcon,
   Pending as PendingIcon
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { transactionsApi } from '../../services/api/transactions';
-import type { ProcessingStats } from '../../services/api/types/transactions';
 
 const REFRESH_INTERVAL = 30000; // 30 seconds
 

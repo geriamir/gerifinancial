@@ -11,7 +11,6 @@ import {
   MenuItem,
   Avatar,
   Drawer,
-  List,
   Divider
 } from '@mui/material';
 import {
