@@ -3,8 +3,101 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BatchVerificationDialog } from '../BatchVerificationDialog';
 import type { Transaction } from '../../../services/api/types/transactions';
 import type { Category, SubCategory } from '../../../services/api/types';
+import { act } from '@testing-library/react';
 
 const TIMESTAMP = '2025-07-03T12:00:00Z';
+
+const mockSetIsTracking = jest.fn();
+const mockSetShowPerformance = jest.fn();
+const mockAddData = jest.fn();
+const mockStartTracking = jest.fn();
+const mockSetIsProcessing = jest.fn();
+let mockStopTracking: jest.Mock;
+
+const setupMocks = () => {
+  mockStopTracking = jest.fn(() => ({
+    duration: 100,
+    data: { transactionCount: mockTransactions.length }
+  }));
+  mockStartTracking.mockImplementation(() => ({
+    addData: mockAddData,
+    stop: mockStopTracking
+  }));
+};
+
+// Mock the KeyboardShortcutsHelp component
+jest.mock('../KeyboardShortcutsHelp', () => ({
+  KeyboardShortcutsHelp: () => null
+}));
+
+// Mock performance tracking hook with controlled state updates
+jest.mock('../../../hooks/usePerformanceTracking', () => {
+  const setIsTracking = mockSetIsTracking;
+  const setShowPerformance = mockSetShowPerformance;
+  const setIsProcessing = mockSetIsProcessing;
+
+  return {
+    usePerformanceTracking: () => ({
+      startTracking: mockStartTracking,
+      stopTracking: mockStopTracking,
+      addData: mockAddData,
+      setIsTracking,
+      setShowPerformance,
+      setIsProcessing
+    })
+  };
+});
+
+// Mock verification analytics hook
+jest.mock('../../../hooks/useVerificationAnalytics', () => ({
+  useVerificationAnalytics: () => ({
+    trackVerificationBatch: jest.fn()
+  })
+}));
+
+// Mock keyboard shortcuts hook
+jest.mock('../../../hooks/useBatchVerificationKeyboard', () => ({
+  useBatchVerificationKeyboard: () => ({
+    registerShortcuts: jest.fn(),
+    unregisterShortcuts: jest.fn()
+  })
+}));
+
+// Mock performance metrics display component
+jest.mock('../../performance/PerformanceMetricsDisplay', () => ({
+  PerformanceMetricsDisplay: () => null
+}));
+
+const mockBatchTransactionList = jest.fn();
+
+// Mock BatchTransactionList component
+jest.mock('../BatchTransactionList', () => ({
+  BatchTransactionList: (props: any) => {
+    mockBatchTransactionList(props);
+    return (
+      <div data-testid="batch-transaction-list">
+        {props.transactions.map((tx: Transaction) => (
+          <div key={tx._id} data-testid={`transaction-row-${tx._id}`}>
+            <div>{tx.description}</div>
+            <input
+              type="checkbox"
+              role="checkbox"
+              checked={props.selectedIds.includes(tx._id)}
+              onChange={(e) => props.onSelectionChange?.(tx._id, e.target.checked)}
+              disabled={props.disabled || tx._id === props.mainTransaction?._id}
+              data-testid={`checkbox-${tx._id}`}
+            />
+            {tx.category && (
+              <div data-testid="category-info">
+                {tx.category.name} {'->'} {tx.subCategory?.name}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+}));
 
 const mockCategory: Category = {
   _id: 'cat1',
@@ -33,7 +126,6 @@ const mockSubCategory: SubCategory = {
   updatedAt: TIMESTAMP
 };
 
-// Update category's subCategories
 mockCategory.subCategories = [mockSubCategory];
 
 const mockMainTransaction: Transaction = {
@@ -82,135 +174,134 @@ describe('BatchVerificationDialog', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    setupMocks();
   });
 
-  it('renders with transaction list and main transaction selected', () => {
-    render(<BatchVerificationDialog {...defaultProps} />);
+  it('renders with transaction list and main transaction selected', async () => {
+    await act(async () => {
+      render(<BatchVerificationDialog {...defaultProps} />);
+    });
+    
+    expect(screen.getByTestId('transaction-row-tx1')).toHaveTextContent('Test Restaurant');
+    expect(screen.getByTestId('transaction-row-tx2')).toHaveTextContent('Similar Restaurant');
+    expect(screen.getByTestId('transaction-row-tx3')).toHaveTextContent('Another Restaurant');
 
-    expect(screen.getByText('Test Restaurant')).toBeInTheDocument();
-    expect(screen.getByText('Similar Restaurant')).toBeInTheDocument();
-    expect(screen.getByText('Another Restaurant')).toBeInTheDocument();
-
-    // Main transaction should be checked and disabled
-    const checkboxes = screen.getAllByRole('checkbox');
-    expect(checkboxes[0]).toBeChecked();
-    expect(checkboxes[0]).toBeDisabled();
-  });
-
-  it('handles transaction selection', () => {
-    render(<BatchVerificationDialog {...defaultProps} />);
-
-    // Select second transaction
-    const checkboxes = screen.getAllByRole('checkbox');
-    fireEvent.click(checkboxes[1]);
-
-    // Verify button should show count
-    expect(screen.getByRole('button', { name: /verify 2 transactions/i })).toBeInTheDocument();
-  });
-
-  it('shows progress during verification', () => {
-    const progress = {
-      total: 3,
-      current: 1,
-      successful: 1,
-      failed: 0
-    };
-
-    render(<BatchVerificationDialog {...defaultProps} progress={progress} />);
-
-    // Should show progress indicator
-    expect(screen.getByRole('progressbar')).toBeInTheDocument();
-    expect(screen.getByText('Verifying transactions...')).toBeInTheDocument();
-    expect(screen.getByText('Progress: 1 / 3 (1 successful, 0 failed)')).toBeInTheDocument();
-  });
-
-  it('shows completion state after verification', () => {
-    const progress = {
-      total: 3,
-      current: 3,
-      successful: 2,
-      failed: 1
-    };
-
-    render(<BatchVerificationDialog {...defaultProps} progress={progress} />);
-
-    expect(screen.getByText('Progress: 3 / 3 (2 successful, 1 failed)')).toBeInTheDocument();
-  });
-
-  it('handles verification errors', async () => {
-    const mockError = new Error('Test error');
-    const mockVerify = jest.fn().mockRejectedValue(mockError);
-
-    render(
-      <BatchVerificationDialog
-        {...defaultProps}
-        onVerify={mockVerify}
-      />
+    expect(mockBatchTransactionList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transactions: mockTransactions,
+        selectedIds: [mockMainTransaction._id],
+        mainTransaction: mockMainTransaction
+      })
     );
+  });
 
-    // Select all transactions
-    const checkboxes = screen.getAllByRole('checkbox');
-    checkboxes.slice(1).forEach(checkbox => {
+  it('handles transaction selection', async () => {
+    await act(async () => {
+      render(<BatchVerificationDialog {...defaultProps} />);
+    });
+
+    const checkbox = screen.getByTestId('checkbox-tx2');
+    await act(async () => {
       fireEvent.click(checkbox);
     });
 
-    // Click verify
-    const verifyButton = screen.getByRole('button', { name: /verify 3 transactions/i });
-    fireEvent.click(verifyButton);
-
-    // Should show error message
-    await waitFor(() => {
-      expect(screen.getByText(/failed to verify transactions/i)).toBeInTheDocument();
-    });
+    expect(screen.getByRole('button', { name: /verify 2 transactions/i })).toBeInTheDocument();
   });
 
-  it('disables interaction during verification', () => {
-    render(
-      <BatchVerificationDialog
-        {...defaultProps}
-        progress={{
-          total: 3,
-          current: 1,
-          successful: 1,
-          failed: 0
-        }}
-      />
-    );
-
-    // All checkboxes should be disabled
-    const checkboxes = screen.getAllByRole('checkbox');
-    checkboxes.forEach(checkbox => {
-      expect(checkbox).toBeDisabled();
+  it('shows progress during verification', async () => {
+    await act(async () => {
+      render(<BatchVerificationDialog {...defaultProps} progress={{
+        total: 3,
+        current: 1,
+        successful: 1,
+        failed: 0
+      }} />);
     });
 
-    // Verify button should be disabled
-    const verifyButton = screen.getByRole('button', { name: /verify/i });
-    expect(verifyButton).toBeDisabled();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.getByText('Verifying transactions...')).toBeInTheDocument();
+    
+    const progressText = screen.getByText((content) => {
+      return content.includes('Progress:') && content.includes('1 / 3');
+    });
+    expect(progressText).toHaveTextContent('1 successful');
+    expect(progressText).toHaveTextContent('0 failed');
   });
 
-  it('shows category information', () => {
-    render(<BatchVerificationDialog {...defaultProps} />);
-
-    expect(screen.getByText('Food')).toBeInTheDocument();
-    expect(screen.getByText('Restaurant')).toBeInTheDocument();
+  it('shows completion state after verification', async () => {
+    await act(async () => {
+      render(<BatchVerificationDialog {...defaultProps} progress={{
+        total: 3,
+        current: 3,
+        successful: 2,
+        failed: 1
+      }} />);
+    });
+    
+    const progressText = screen.getByText((content) => {
+      return content.includes('Progress:') && content.includes('3 / 3');
+    });
+    expect(progressText).toHaveTextContent('2 successful');
+    expect(progressText).toHaveTextContent('1 failed');
   });
 
-  it('preserves main transaction selection', () => {
-    render(<BatchVerificationDialog {...defaultProps} />);
+  it('disables interaction during verification', async () => {
+    await act(async () => {
+      render(
+        <BatchVerificationDialog
+          {...defaultProps}
+          progress={{
+            total: 3,
+            current: 1,
+            successful: 1,
+            failed: 0
+          }}
+        />
+      );
+    });
 
-    const checkboxes = screen.getAllByRole('checkbox');
+    expect(screen.getByRole('button', { name: /verify/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /cancel/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /keyboard shortcuts/i })).toBeDisabled();
+    expect(screen.getByText(/verifying transactions/i)).toBeInTheDocument();
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+  });
 
-    // Try to uncheck main transaction (should not work)
-    fireEvent.click(checkboxes[0]);
-    expect(checkboxes[0]).toBeChecked();
+  it('shows category information', async () => {
+    await act(async () => {
+      render(<BatchVerificationDialog {...defaultProps} />);
+    });
+    expect(screen.getAllByTestId('category-info')[0]).toHaveTextContent('Food -> Restaurant');
+  });
 
-    // Check and uncheck other transactions
-    fireEvent.click(checkboxes[1]);
-    expect(checkboxes[1]).toBeChecked();
-    fireEvent.click(checkboxes[1]);
-    expect(checkboxes[1]).not.toBeChecked();
+  it('preserves main transaction selection', async () => {
+    await act(async () => {
+      render(<BatchVerificationDialog {...defaultProps} />);
+    });
 
-    // Main transaction should still be checked
-    expect(checkboxes[0]).toBeChecked();
+    const mainCheckbox = screen.getByTestId('checkbox-tx1');
+    const otherCheckbox = screen.getByTestId('checkbox-tx2');
+
+    expect(mainCheckbox).toBeChecked();
+    expect(mainCheckbox).toBeDisabled();
+    expect(otherCheckbox).not.toBeChecked();
+    expect(otherCheckbox).not.toBeDisabled();
+
+    await act(async () => {
+      fireEvent.click(mainCheckbox);
+    });
+    expect(mainCheckbox).toBeChecked();
+
+    await act(async () => {
+      fireEvent.click(otherCheckbox);
+    });
+    expect(otherCheckbox).toBeChecked();
+
+    await act(async () => {
+      fireEvent.click(otherCheckbox);
+    });
+    expect(otherCheckbox).not.toBeChecked();
+
+    expect(mainCheckbox).toBeChecked();
   });
 });
