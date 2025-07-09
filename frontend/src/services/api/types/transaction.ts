@@ -1,4 +1,4 @@
-import { Category, SubCategory } from './category';
+import type { Category, SubCategory } from '../types';
 
 export type { Category, SubCategory };
 

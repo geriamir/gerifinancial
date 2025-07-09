@@ -14,18 +14,27 @@ export const mockMainTransaction: Transaction = {
   category: {
     _id: 'cat1',
     name: 'Food',
-    type: 'Expense'
+    type: 'Expense',
+    userId: 'user1',
+    createdAt: '2025-07-03T12:00:00Z',
+    updatedAt: '2025-07-03T12:00:00Z'
   },
   subCategory: {
     _id: 'sub1',
     name: 'Restaurant',
     keywords: ['food'],
+    userId: 'user1',
     parentCategory: {
       _id: 'cat1',
       name: 'Food',
-      type: 'Expense'
+      type: 'Expense',
+      userId: 'user1',
+      createdAt: '2025-07-03T12:00:00Z',
+      updatedAt: '2025-07-03T12:00:00Z'
     },
-    isDefault: false
+    isDefault: false,
+    createdAt: '2025-07-03T12:00:00Z',
+    updatedAt: '2025-07-03T12:00:00Z'
   },
   rawData: {},
   createdAt: '2025-07-03T12:00:00Z',
