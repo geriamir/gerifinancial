@@ -28,7 +28,7 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
   const [fetchedTransactions, setFetchedTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
+  const [, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
 
   const loadTransactions = useCallback(async (reset = false) => {
@@ -183,10 +183,8 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
             </Typography>
           </Box>
           
-          {dateTransactions.map((transaction, index) => {
+          {dateTransactions.map((transaction) => {
             // Only add ref to the last transaction of the last group
-            const isLastGroup = groupIndex === groupTransactionsByDate(transactions).length - 1;
-            const isLastTransaction = index === dateTransactions.length - 1;
             return (
               <li
                 key={transaction._id}

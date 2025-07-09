@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Box,
   Container,
@@ -88,7 +88,7 @@ export const PendingTransactions: React.FC = () => {
     return () => unregisterShortcuts();
   }, [registerShortcuts, unregisterShortcuts]);
 
-  const loadTransactions = async (pageNum: number = 1, showLoading = true) => {
+  const loadTransactions = useCallback(async (pageNum: number = 1, showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
       setError(null);
@@ -116,9 +116,9 @@ export const PendingTransactions: React.FC = () => {
     } finally {
       if (showLoading) setLoading(false);
     }
-  };
+  }, []);
 
-  const loadStats = async (showLoading = true) => {
+  const loadStats = useCallback(async (showLoading = true) => {
     try {
       if (showLoading) setStatsLoading(true);
       const stats = await transactionsApi.getProcessingStats();
@@ -130,7 +130,7 @@ export const PendingTransactions: React.FC = () => {
     } finally {
       if (showLoading) setStatsLoading(false);
     }
-  };
+  }, [trackEvent]);
 
   // Initial load
   useEffect(() => {
