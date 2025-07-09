@@ -97,12 +97,14 @@ export const useTutorialGuide = (options: TutorialGuideOptions = {}) => {
   }, [currentStep, options, trackStepCompleted, trackStepViewed, trackTutorialCompleted]);
 
   const skipTutorial = useCallback(() => {
+    if (currentStep) {
+      trackTutorialSkipped(currentStep.id);
+    }
     setCurrentStep(null);
     setIsCompleted(true);
     localStorage.setItem(STORAGE_KEY, "true");
-    trackTutorialSkipped();
     options.onComplete?.();
-  }, [trackTutorialSkipped, options]);
+  }, [currentStep, trackTutorialSkipped, options]);
 
   const resetTutorial = useCallback(() => {
     setIsCompleted(false);
