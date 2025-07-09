@@ -1,4 +1,4 @@
-import { mockMainTransaction, mockTransactions, mockVerificationProgress, mockCompletedProgress } from './__fixtures__/transactions';
+import { mockMainTransaction, mockTransactions, mockVerificationProgress, mockCompletedProgress } from '../__fixtures__/transactions';
 
 describe('Transaction Fixtures', () => {
   describe('mockMainTransaction', () => {

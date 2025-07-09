@@ -1,20 +1,5 @@
 import type { Transaction } from '../../../services/api/types/transaction';
 
-const mockSubCategory = {
-  _id: 'sub1',
-  name: 'Restaurant',
-  parent: 'cat1',
-  isActive: true
-};
-
-const mockCategory = {
-  _id: 'cat1',
-  name: 'Food',
-  type: 'Expense' as const,
-  subCategories: [mockSubCategory],
-  isActive: true
-};
-
 export const mockMainTransaction: Transaction = {
   _id: 'tx1',
   identifier: 'test-tx-1',
@@ -26,8 +11,22 @@ export const mockMainTransaction: Transaction = {
   type: 'Expense',
   description: 'Test Restaurant',
   status: 'needs_verification',
-  category: mockCategory,
-  subCategory: mockSubCategory,
+  category: {
+    _id: 'cat1',
+    name: 'Food',
+    type: 'Expense'
+  },
+  subCategory: {
+    _id: 'sub1',
+    name: 'Restaurant',
+    keywords: ['food'],
+    parentCategory: {
+      _id: 'cat1',
+      name: 'Food',
+      type: 'Expense'
+    },
+    isDefault: false
+  },
   rawData: {},
   createdAt: '2025-07-03T12:00:00Z',
   updatedAt: '2025-07-03T12:00:00Z'
