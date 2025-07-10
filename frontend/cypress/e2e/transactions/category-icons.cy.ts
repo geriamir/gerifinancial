@@ -12,6 +12,12 @@ describe('Transaction Category Icons', () => {
             date: '2025-07-02T12:00:00.000Z',
             description: 'Monthly Mortgage Payment',
             type: 'Expense',
+            userId: Cypress.env('testUserId'),
+            identifier: 'tx1',
+            accountId: 'acc1',
+            status: 'pending',
+            createdAt: '2025-07-02T12:00:00.000Z',
+            updatedAt: '2025-07-02T12:00:00.000Z',
             category: {
               _id: 'cat1',
               name: 'Household',
@@ -36,6 +42,12 @@ describe('Transaction Category Icons', () => {
             date: '2025-07-02T12:00:00.000Z',
             description: 'Custom Expense',
             type: 'Expense',
+            userId: Cypress.env('testUserId'),
+            identifier: 'tx2',
+            accountId: 'acc1',
+            status: 'pending',
+            createdAt: '2025-07-02T12:00:00.000Z',
+            updatedAt: '2025-07-02T12:00:00.000Z',
             category: {
               _id: 'cat2',
               name: 'Other',
@@ -66,34 +78,27 @@ describe('Transaction Category Icons', () => {
       // Visit transactions page after setting token
       cy.visit('/transactions');
       cy.wait('@getTransactions');
+      
+      // Wait for transactions to render
+      cy.get('[data-testid="transactions-list"]')
+        .should('be.visible')
+        .find('li')
+        .should('have.length.at.least', 1);
     });
   });
 
-  it('should display mapped subcategory as icon with tooltip', () => {
-    // Debug: Log all data-testid attributes
-    cy.get('[data-testid]').each($el => {
-      cy.log(`Found element with data-testid: ${$el.attr('data-testid')}`);
-    });
-
-    // Find the first transaction's IconChip
-    cy.get('[data-testid="transaction-tx1-content-subcategory-chip-icon"]')
+  it('should display subcategory name for mapped subcategory', () => {
+    // Find the first transaction's subcategory
+    cy.get('[data-testid="transaction-tx1-content-subcategory"]')
       .should('exist')
-      .trigger('mouseover');
-
-    // Verify tooltip shows correct text
-    cy.get('[role="tooltip"]')
-      .should('be.visible')
-      .and('contain.text', 'Mortgage');
+      .and('have.text', 'Mortgage');
   });
 
-  it('should display unmapped subcategory as text chip', () => {
-    // Find the second transaction's text chip
-    cy.get('[data-testid="transaction-tx2-content-subcategory-chip-text"]')
+  it('should display subcategory name for unmapped subcategory', () => {
+    // Find the second transaction's subcategory
+    cy.get('[data-testid="transaction-tx2-content-subcategory"]')
       .should('exist')
-      .within(() => {
-        cy.get('.MuiTypography-root')
-          .should('have.text', 'Custom Category');
-      });
+      .and('have.text', 'Custom Category');
   });
 
   it('should handle transaction without subcategory', () => {
@@ -129,14 +134,16 @@ describe('Transaction Category Icons', () => {
     cy.get('[data-testid*="subcategory"]').should('not.exist');
   });
 
-  it('should maintain consistent layout with different subcategory displays', () => {
-    // Check alignment and spacing of subcategory containers
+  it('should maintain consistent typography for subcategories', () => {
+    // Check typography styles are consistent
     cy.get('[data-testid="transaction-tx1-content-subcategory"]')
-      .should('have.css', 'display', 'flex')
-      .and('have.css', 'align-items', 'center');
+      .should('have.css', 'display', 'block')
+      .invoke('css', 'font-size')
+      .should('match', /(0.75rem|12px)/);
 
     cy.get('[data-testid="transaction-tx2-content-subcategory"]')
-      .should('have.css', 'display', 'flex')
-      .and('have.css', 'align-items', 'center');
+      .should('have.css', 'display', 'block')
+      .invoke('css', 'font-size')
+      .should('match', /(0.75rem|12px)/);
   });
 });
