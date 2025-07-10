@@ -11,18 +11,13 @@ import {
   MenuItem,
   Avatar,
   Drawer,
-  List,
-  ListItemIcon,
-  ListItemText,
-  ListItemButton
+  Divider
 } from '@mui/material';
 import {
   AccountCircle as AccountCircleIcon,
-  Menu as MenuIcon,
-  Dashboard as DashboardIcon,
-  AccountBalance as AccountBalanceIcon,
-  Receipt as ReceiptIcon
+  Menu as MenuIcon
 } from '@mui/icons-material';
+import { NavigationMenu } from './NavigationMenu';
 import { useAuth } from '../../contexts/AuthContext';
 
 const AuthLayout: React.FC = () => {
@@ -30,12 +25,6 @@ const AuthLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
-
-  const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Bank Accounts', icon: <AccountBalanceIcon />, path: '/banks' },
-    { text: 'Transactions', icon: <ReceiptIcon />, path: '/transactions' }
-  ];
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -115,21 +104,25 @@ const AuthLayout: React.FC = () => {
         onClose={() => setDrawerOpen(false)}
       >
         <Box
-          sx={{ width: 250 }}
+          sx={{
+            width: 250,
+            pt: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%'
+          }}
           role="presentation"
           onClick={() => setDrawerOpen(false)}
         >
-          <List>
-            {menuItems.map((item) => (
-              <ListItemButton
-                key={item.text}
-                onClick={() => navigate(item.path)}
-              >
-                <ListItemIcon>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.text} />
-              </ListItemButton>
-            ))}
-          </List>
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{ px: 2, py: 1 }}
+          >
+            GeriFinancial
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          <NavigationMenu />
         </Box>
       </Drawer>
 

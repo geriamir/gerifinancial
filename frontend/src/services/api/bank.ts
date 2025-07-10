@@ -4,8 +4,9 @@ import {
   AddBankAccountDto, 
   UpdateScrapingConfigDto,
   ScrapeOptionsDto,
-  ScrapeResult 
-} from './types';
+  SingleAccountScrapeResult,
+  BulkScrapeResult 
+} from './types/bankAccount';
 
 export const bankAccountsApi = {
   getAll: async (): Promise<BankAccount[]> => {
@@ -48,12 +49,13 @@ export const bankAccountsApi = {
     return response.data;
   },
 
-  scrape: async (id: string, options: ScrapeOptionsDto): Promise<void> => {
-    await api.post(`/bank-accounts/${id}/scrape`, options);
+  scrape: async (id: string, options: ScrapeOptionsDto): Promise<SingleAccountScrapeResult> => {
+    const response = await api.post<SingleAccountScrapeResult>(`/bank-accounts/${id}/scrape`, options);
+    return response.data;
   },
 
-  scrapeAll: async (): Promise<ScrapeResult> => {
-    const response = await api.post<ScrapeResult>('/bank-accounts/scrape-all');
+  scrapeAll: async (): Promise<BulkScrapeResult> => {
+    const response = await api.post<BulkScrapeResult>('/bank-accounts/scrape-all');
     return response.data;
   }
 };

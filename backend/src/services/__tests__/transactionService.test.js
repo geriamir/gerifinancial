@@ -1,195 +1,325 @@
 const mongoose = require('mongoose');
-const { Transaction, Category, SubCategory } = require('../../models');
 const transactionService = require('../transactionService');
+const { Transaction, PendingTransaction, Category, SubCategory, User } = require('../../models');
 const { createTestUser } = require('../../test/testUtils');
-const { User, BankAccount } = require('../../models');
+const { TransactionType, CategorizationMethod } = require('../../constants/enums');
 
 describe('TransactionService', () => {
-  let user;
-  let bankAccount;
-  let transactions = [];
+  let user, category, subCategory, accountId;
 
   beforeEach(async () => {
-    // Create test user
-    const testData = await createTestUser(User);
-    user = testData.user;
+    const testUser = await createTestUser(User);
+    user = testUser.user;
+    category = await Category.create({
+      name: 'Food',
+      type: 'Expense',
+      userId: user._id
+    });
+    subCategory = await SubCategory.create({
+      name: 'Restaurant',
+      parentCategory: category._id,
+      userId: user._id
+    });
+    accountId = new mongoose.Types.ObjectId();
+  });
 
-    // Create test bank account
-    bankAccount = await BankAccount.create({
-      userId: user._id,
-      bankId: 'hapoalim',
-      name: 'Test Account',
-      credentials: {
-        username: 'testuser',
-        password: 'bankpass123'
-      }
+  describe('processScrapedTransactions', () => {
+    const mockScrapedAccounts = [{
+      txns: [
+        {
+          identifier: 'tx1',
+          date: new Date(),
+          chargedAmount: -100,
+          description: 'Restaurant 1',
+          currency: 'ILS'
+        },
+        {
+          identifier: 'tx2',
+          date: new Date(),
+          chargedAmount: -50,
+          description: 'Restaurant 2',
+          currency: 'ILS'
+        }
+      ]
+    }];
+
+    const mockBankAccount = {
+      _id: new mongoose.Types.ObjectId(),
+      userId: null,
+      defaultCurrency: 'ILS'
+    };
+
+    beforeEach(() => {
+      mockBankAccount.userId = user._id;
     });
 
-    // Create test transactions with different dates and types
-    const dates = [
-      new Date('2025-06-01'),
-      new Date('2025-06-15'),
-      new Date('2025-06-30')
-    ];
+    it('should save scraped transactions to pending store', async () => {
+      const result = await transactionService.processScrapedTransactions(
+        mockScrapedAccounts,
+        mockBankAccount
+      );
 
-    for (let i = 0; i < 25; i++) {
-      const type = i % 2 === 0 ? 'Expense' : 'Income';
-      const amount = type === 'Expense' ? -(50 + i) : (50 + i);
-      const tx = await Transaction.create({
-        identifier: `test-transaction-${i + 1}`,
-        accountId: bankAccount._id,
-        userId: user._id,  // Add required userId
-        amount: amount,    // Make amount match type
+      expect(result.newTransactions).toBe(2);
+      expect(result.duplicates).toBe(0);
+      expect(result.errors).toHaveLength(0);
+
+      const pendingTxs = await PendingTransaction.find({
+        accountId: mockBankAccount._id
+      });
+      expect(pendingTxs).toHaveLength(2);
+    });
+
+    it('should handle duplicate transactions', async () => {
+      // First save
+      await transactionService.processScrapedTransactions(
+        mockScrapedAccounts,
+        mockBankAccount
+      );
+
+      // Try to save same transactions again
+      const result = await transactionService.processScrapedTransactions(
+        mockScrapedAccounts,
+        mockBankAccount
+      );
+
+      expect(result.newTransactions).toBe(0);
+      expect(result.duplicates).toBe(2);
+    });
+
+    it('should not save transaction if it exists in permanent storage', async () => {
+      // Create a transaction in permanent storage
+      await Transaction.create({
+        identifier: 'tx1',
+        userId: user._id,
+        accountId: mockBankAccount._id,
+        amount: -100,
         currency: 'ILS',
-        date: dates[i % 3],
-        type: type,
-        description: `Test Transaction ${i + 1}`,
-        rawData: { originalData: `test-${i + 1}` }
-      });
-      transactions.push(tx);
-    }
-  });
-
-  describe('getTransactions', () => {
-    it('should return paginated transactions', async () => {
-      const result = await transactionService.getTransactions({
-        limit: 10,
-        skip: 0,
-        userId: user._id  // Add required userId
-      });
-
-      expect(result.transactions).toHaveLength(10);
-      expect(result.total).toBe(25);
-      expect(result.hasMore).toBe(true);
-    });
-
-    it('should filter by date range', async () => {
-      const result = await transactionService.getTransactions({
-        startDate: new Date('2025-06-01'),
-        endDate: new Date('2025-06-15'),
-        userId: user._id  // Add required userId
-      });
-
-      expect(result.transactions.every(t => 
-        t.date >= new Date('2025-06-01') &&
-        t.date <= new Date('2025-06-15')
-      )).toBe(true);
-    });
-
-    it('should filter by type', async () => {
-      const result = await transactionService.getTransactions({
-        type: 'Expense',
-        userId: user._id  // Add required userId
-      });
-
-      expect(result.transactions.every(t => t.type === 'Expense')).toBe(true);
-    });
-
-    it('should filter by account', async () => {
-      const result = await transactionService.getTransactions({
-        accountId: bankAccount._id,
-        userId: user._id  // Add required userId
-      });
-
-      expect(result.transactions.every(t => 
-        t.accountId.toString() === bankAccount._id.toString()
-      )).toBe(true);
-    });
-
-    it('should search by description', async () => {
-      const result = await transactionService.getTransactions({
-        search: 'Transaction 1',
-        userId: user._id  // Add required userId
-      });
-
-      expect(result.transactions.every(t => 
-        t.description.includes('Transaction 1')
-      )).toBe(true);
-    });
-
-    it('should handle multiple filters combined', async () => {
-      const result = await transactionService.getTransactions({
-        type: 'Expense',
-        startDate: new Date('2025-06-01'),
-        endDate: new Date('2025-06-15'),
-        limit: 5,
-        userId: user._id  // Add required userId
-      });
-
-      expect(result.transactions).toHaveLength(5);
-      expect(result.transactions.every(t => t.type === 'Expense')).toBe(true);
-      expect(result.transactions.every(t => 
-        t.date >= new Date('2025-06-01') &&
-        t.date <= new Date('2025-06-15')
-      )).toBe(true);
-    });
-  });
-
-  describe('createFromScraperData', () => {
-    it('should generate unique identifier when none provided', async () => {
-      const scraperData = {
-        chargedAmount: -75,  // Negative amount will make it an Expense
         date: new Date(),
-        description: 'Auto ID Test'
+        type: TransactionType.EXPENSE,
+        description: 'Restaurant 1',
+        rawData: {}
+      });
+
+      const result = await transactionService.processScrapedTransactions(
+        mockScrapedAccounts,
+        mockBankAccount
+      );
+
+      expect(result.newTransactions).toBe(1); // Only tx2 should be saved
+      expect(result.duplicates).toBe(1);
+    });
+  });
+
+  describe('getPendingTransactions', () => {
+    beforeEach(async () => {
+      // Create some pending transactions
+      await PendingTransaction.create([
+        {
+          identifier: 'tx1',
+          userId: user._id,
+          accountId,
+          amount: -100,
+          currency: 'ILS',
+          date: new Date(),
+          type: TransactionType.EXPENSE,
+          description: 'Test 1',
+          rawData: {}
+        },
+        {
+          identifier: 'tx2',
+          userId: user._id,
+          accountId,
+          amount: -50,
+          currency: 'ILS',
+          date: new Date(),
+          type: TransactionType.EXPENSE,
+          description: 'Test 2',
+          rawData: {}
+        }
+      ]);
+    });
+
+    it('should get pending transactions with pagination', async () => {
+      const options = { limit: 1, skip: 0 };
+      const transactions = await transactionService.getPendingTransactions(user._id, options);
+      expect(transactions).toHaveLength(1);
+    });
+
+    it('should filter by account ID', async () => {
+      const otherAccountId = new mongoose.Types.ObjectId();
+      await PendingTransaction.create({
+        identifier: 'tx3',
+        userId: user._id,
+        accountId: otherAccountId,
+        amount: -75,
+        currency: 'ILS',
+        date: new Date(),
+        type: TransactionType.EXPENSE,
+        description: 'Test 3',
+        rawData: {}
+      });
+
+      const transactions = await transactionService.getPendingTransactions(user._id, {
+        accountId
+      });
+      expect(transactions).toHaveLength(2);
+      transactions.forEach(tx => {
+        expect(tx.accountId.toString()).toBe(accountId.toString());
+      });
+    });
+  });
+
+  describe('verifyTransactions', () => {
+    let pendingTxs;
+
+    beforeEach(async () => {
+      // Create pending transactions
+      const rawData = {
+        vendor: 'Test Restaurant',
+        description: 'Original Description',
+        chargedAmount: -100,
+        memo: 'Test Memo'
       };
 
-      const transaction = await Transaction.createFromScraperData(
-        scraperData,
-        bankAccount._id,
-        'ILS',
-        user._id  // Add required userId
-      );
-
-      expect(transaction.identifier).toBeTruthy();
-      expect(typeof transaction.identifier).toBe('string');
-      expect(transaction.identifier.includes(bankAccount._id.toString())).toBe(true);
-    });
-
-    it('should use provided identifier', async () => {
-      const providedId = 'test-provided-id';
-      const transaction = await Transaction.createFromScraperData(
-        {
-          identifier: providedId,
-          chargedAmount: -75,  // Negative amount will make it an Expense
+      // Create and categorize transactions
+      pendingTxs = await Promise.all([
+        PendingTransaction.create({
+          identifier: 'tx1',
+          userId: user._id,
+          accountId,
+          amount: -100,
+          currency: 'ILS',
           date: new Date(),
-          description: 'Provided ID Test'
-        },
-        bankAccount._id,
-        'ILS',
-        user._id  // Add required userId
-      );
-
-      expect(transaction.identifier).toBe(providedId);
+          type: TransactionType.EXPENSE,
+          description: 'Test 1',
+          rawData: rawData,
+          category: category._id,
+          subCategory: subCategory._id,
+          categorizationMethod: CategorizationMethod.MANUAL,
+          processedDate: new Date()
+        }),
+        PendingTransaction.create({
+          identifier: 'tx2',
+          userId: user._id,
+          accountId,
+          amount: -50,
+          currency: 'ILS',
+          date: new Date(),
+          type: TransactionType.EXPENSE,
+          description: 'Test 2',
+          rawData: rawData,
+          category: category._id,
+          subCategory: subCategory._id,
+          categorizationMethod: CategorizationMethod.MANUAL,
+          processedDate: new Date()
+        })
+      ]);
     });
 
-    it('should generate different identifiers for similar transactions', async () => {
-      const date = new Date();
-      const description = 'Similar Transaction';
-      const amount = -100;
-
-      const transaction1 = await Transaction.createFromScraperData(
-        {
-          chargedAmount: amount,  // Already negative from the test setup
-          date,
-          description
-        },
-        bankAccount._id,
-        'ILS',
-        user._id  // Add required userId
+    it('should verify and move transactions to permanent storage', async () => {
+      const result = await transactionService.verifyTransactions(
+        pendingTxs.map(tx => tx._id),
+        user._id
       );
 
-      const transaction2 = await Transaction.createFromScraperData(
-        {
-          chargedAmount: amount,
-          date,
-          description
-        },
-        bankAccount._id,
-        'ILS',
-        user._id  // Add required userId
+      expect(result.verifiedCount).toBe(2);
+      expect(result.errors).toHaveLength(0);
+
+      // Check transactions were moved
+      const permanent = await Transaction.find({
+        userId: user._id,
+        accountId
+      });
+      expect(permanent).toHaveLength(2);
+
+      const remaining = await PendingTransaction.find({
+        userId: user._id,
+        accountId
+      });
+      expect(remaining).toHaveLength(0);
+    });
+
+    it('should handle uncategorized transactions in batch verification', async () => {
+      // Create an uncategorized pending transaction
+      const uncategorizedTx = await PendingTransaction.create({
+        identifier: 'tx3',
+        userId: user._id,
+        accountId,
+        amount: -75,
+        currency: 'ILS',
+        date: new Date(),
+        type: TransactionType.EXPENSE,
+        description: 'Test 3',
+        rawData: {}
+      });
+
+      const result = await transactionService.verifyTransactions(
+        [...pendingTxs.map(tx => tx._id), uncategorizedTx._id],
+        user._id
       );
 
-      expect(transaction1.identifier).not.toBe(transaction2.identifier);
+      expect(result.verifiedCount).toBe(2);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].error).toContain('must be categorized before verification');
+    });
+  });
+
+  describe('findSimilarPendingTransactions', () => {
+    let baseTx;
+
+    beforeEach(async () => {
+      baseTx = await PendingTransaction.create({
+        identifier: 'tx1',
+        userId: user._id,
+        accountId,
+        amount: -100,
+        currency: 'ILS',
+        date: new Date(),
+        type: TransactionType.EXPENSE,
+        description: 'Restaurant A',
+        category: category._id,
+        subCategory: subCategory._id,
+        rawData: {}
+      });
+
+      // Create similar transactions
+      await PendingTransaction.create([
+        {
+          identifier: 'tx2',
+          userId: user._id,
+          accountId,
+          amount: -95,
+          currency: 'ILS',
+          date: new Date(),
+          type: TransactionType.EXPENSE,
+          description: 'Restaurant A',
+          category: category._id,
+          rawData: {}
+        },
+        {
+          identifier: 'tx3',
+          userId: user._id,
+          accountId,
+          amount: -50,
+          currency: 'ILS',
+          date: new Date(),
+          type: TransactionType.EXPENSE,
+          description: 'Completely Different',
+          category: category._id,
+          rawData: {}
+        }
+      ]);
+    });
+
+    it('should find similar transactions based on multiple factors', async () => {
+      const result = await transactionService.findSimilarPendingTransactions(
+        baseTx._id,
+        user._id
+      );
+
+      expect(result.transactions).toHaveLength(1);
+      expect(result.transactions[0].description).toBe('Restaurant A');
+      expect(result.similarity).toBeGreaterThan(0.7);
     });
   });
 });

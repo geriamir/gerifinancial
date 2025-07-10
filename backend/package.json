@@ -36,6 +36,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@vitalets/google-translate-api": "^9.2.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
@@ -43,7 +44,9 @@
     "israeli-bank-scrapers": "^6.1.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.16.0",
+    "natural": "^6.12.0",
     "node-cron": "^3.0.3",
+    "string-similarity": "^4.0.4",
     "winston": "^3.11.0"
   },
   "devDependencies": {

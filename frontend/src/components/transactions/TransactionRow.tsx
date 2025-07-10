@@ -3,49 +3,22 @@ import {
   Box,
   Paper,
   Typography,
-  Chip,
-  IconButton,
-  Tooltip,
 } from '@mui/material';
-import { Edit as EditIcon } from '@mui/icons-material';
-import { Transaction } from '../../services/api/types';
+import { Category as CategoryIcon } from '@mui/icons-material';
+import type { Transaction } from '../../services/api/types/transactions';
+import { formatCurrency } from '../../utils/formatters';
 
 interface TransactionRowProps {
   transaction: Transaction;
   'data-testid'?: string;
+  onClick?: () => void;
 }
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('he-IL', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-};
-
-const formatAmount = (amount: number, currency: string) => {
-  return new Intl.NumberFormat('he-IL', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-  }).format(Math.abs(amount));
-};
-
-const getTypeColor = (type: Transaction['type']) => {
-  switch (type) {
-    case 'Expense':
-      return 'error';
-    case 'Income':
-      return 'success';
-    case 'Transfer':
-      return 'info';
-    default:
-      return 'default';
-  }
-};
-
-const TransactionRow: React.FC<TransactionRowProps> = ({ transaction, 'data-testid': testId }) => {
+const TransactionRow: React.FC<TransactionRowProps> = ({ 
+  transaction, 
+  'data-testid': testId,
+  onClick 
+}) => {
   const baseTestId = testId || `transaction-${transaction._id}`;
   
   return (
@@ -53,66 +26,50 @@ const TransactionRow: React.FC<TransactionRowProps> = ({ transaction, 'data-test
       data-testid={baseTestId}
       sx={{
         p: 2,
-        mb: 1,
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'center',
         '&:hover': {
           bgcolor: 'action.hover',
+          cursor: onClick ? 'pointer' : 'default'
         },
       }}
-      elevation={1}
+      onClick={onClick}
+      elevation={0}
     >
-      <Box sx={{ flex: 1 }}>
-        <Typography 
-          variant="subtitle1"
-          data-testid={`${baseTestId}-description`}
-        >
-          {transaction.description}
-        </Typography>
-        <Typography 
-          variant="body2" 
-          color="text.secondary"
-          data-testid={`${baseTestId}-date`}
-        >
-          {formatDate(transaction.date)}
-        </Typography>
-      </Box>
-
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
         {transaction.category && (
-          <Chip
-            label={transaction.category.name}
-            size="small"
-            variant="outlined"
-            data-testid={`${baseTestId}-category`}
+          <CategoryIcon 
+            sx={{ color: 'primary.main' }}
+            data-testid={`${baseTestId}-category-icon`}
           />
         )}
-        
-        <Box sx={{ textAlign: 'right', minWidth: 120 }}>
-          <Typography
-            variant="subtitle1"
-            color={transaction.type === 'Expense' ? 'error' : 'success'}
-            data-testid={`${baseTestId}-amount`}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          {transaction.subCategory && (
+            <Typography 
+              variant="caption" 
+              color="primary"
+              data-testid={`${baseTestId}-subcategory`}
+              sx={{ mb: 0.25, display: 'block', fontSize: '0.75rem', lineHeight: 1.2, fontWeight: 'bold' }}
+            >
+              {transaction.subCategory.name}
+            </Typography>
+          )}
+          <Typography 
+            variant="body2"
+            data-testid={`${baseTestId}-description`}
+            color="text.secondary"
           >
-            {formatAmount(transaction.amount, transaction.currency)}
+            {transaction.description}
           </Typography>
-          <Chip
-            label={transaction.type}
-            size="small"
-            color={getTypeColor(transaction.type)}
-            data-testid={`${baseTestId}-type`}
-          />
         </Box>
-
-        <Tooltip title="Edit transaction">
-          <IconButton 
-            size="small"
-            data-testid={`${baseTestId}-edit`}
-          >
-            <EditIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
+        
+        <Typography
+          variant="subtitle1"
+          data-testid={`${baseTestId}-amount`}
+          sx={{ minWidth: 100, textAlign: 'right' }}
+        >
+          {formatCurrency(transaction.amount, transaction.currency)}
+        </Typography>
       </Box>
     </Paper>
   );

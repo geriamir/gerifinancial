@@ -36,7 +36,14 @@ export interface ScrapeOptionsDto {
   startDate?: string;
 }
 
-export interface ScrapeResult {
+export interface SingleAccountScrapeResult {
+  newTransactions: number;
+  duplicates: number;
+  needsVerification: number;
+  errors: Array<{ error: string }>;
+}
+
+export interface BulkScrapeResult {
   totalAccounts: number;
   successfulScrapes: number;
   failedScrapes: number;
@@ -45,6 +52,8 @@ export interface ScrapeResult {
     accountName: string;
     error: string;
   }>;
+  totalNewTransactions: number;
+  totalNeedingVerification: number;
 }
 
 export interface UpdateScrapingConfigDto {

@@ -1,3 +1,6 @@
+// Mock services
+jest.mock('../services/categoryAIService', () => require('./mocks/categoryAIService'));
+
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
@@ -21,8 +24,8 @@ beforeAll(async () => {
   await mongoose.connect(mongoUri);
   console.log('Successfully connected to MongoDB');
 
-  // Initialize required services
-  const scrapingSchedulerService = require('../services/scrapingSchedulerService');
+// Initialize required services
+const scrapingSchedulerService = require('../services/scrapingSchedulerService');
   
   // Load models
   const models = require('../models');

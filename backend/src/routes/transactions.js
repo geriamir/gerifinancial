@@ -1,8 +1,100 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { Category, SubCategory } = require('../models');
+const { Category, SubCategory, Transaction, PendingTransaction } = require('../models');
 const transactionService = require('../services/transactionService');
+const categoryAIService = require('../services/categoryAIService');
+
+// Get pending transactions
+router.get('/pending', auth, async (req, res) => {
+  try {
+    const { limit = '20', skip = '0', accountId } = req.query;
+    const options = {
+      limit: parseInt(limit),
+      skip: parseInt(skip),
+      accountId: accountId || undefined
+    };
+
+    console.log('GET /pending - Request received:', {
+      userId: req.user._id,
+      options,
+      headers: req.headers
+    });
+
+    const transactions = await transactionService.getPendingTransactions(req.user._id, options);
+    const total = await PendingTransaction.countDocuments({
+      userId: req.user._id,
+      ...(accountId ? { accountId } : {})
+    });
+
+    const response = {
+      transactions,
+      total,
+      hasMore: total > (options.skip + options.limit)
+    };
+
+    console.log('GET /pending - Response:', {
+      transactionsCount: transactions.length,
+      total,
+      hasMore: response.hasMore
+    });
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error fetching pending transactions:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Verify and move pending transactions to permanent storage
+router.post('/verify-batch', auth, async (req, res) => {
+  try {
+    const { transactionIds } = req.body;
+    
+    if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
+      return res.status(400).json({ error: 'Transaction IDs array is required' });
+    }
+
+    const result = await transactionService.verifyTransactions(transactionIds, req.user._id);
+
+    res.json({
+      message: `${result.verifiedCount} transaction(s) verified successfully`,
+      verifiedCount: result.verifiedCount,
+      errors: result.errors
+    });
+  } catch (error) {
+    console.error('Error in batch verification:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Verify a single pending transaction
+router.post('/:transactionId/verify', auth, async (req, res) => {
+  try {
+    const pendingTx = await PendingTransaction.findOne({
+      _id: req.params.transactionId,
+      userId: req.user._id
+    });
+
+    if (!pendingTx) {
+      return res.status(404).json({ error: 'Pending transaction not found' });
+    }
+
+    if (!pendingTx.category || !pendingTx.subCategory) {
+      return res.status(400).json({ error: 'Transaction must be categorized before verification' });
+    }
+
+    const verifiedTx = await pendingTx.verify();
+
+    res.json({
+      message: 'Transaction verified successfully',
+      transaction: verifiedTx
+    });
+  } catch (error) {
+    console.error('Error verifying transaction:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Get transactions with pagination and filtering
 router.get('/', auth, async (req, res) => {
@@ -30,35 +122,8 @@ router.get('/', auth, async (req, res) => {
       accountId,
       userId: req.user._id, // User ID from auth middleware
     };
-
-    console.log('Transaction request:', {
-      rawParams: req.query,
-      parsedQuery: {
-        type: query.type,
-        startDate: query.startDate?.toISOString(),
-        endDate: query.endDate?.toISOString(),
-        userId: query.userId.toString()
-      }
-    });
     
     const result = await transactionService.getTransactions(query);
-
-    console.log('Found transactions:', {
-      userId: req.user._id,
-      total: result.total,
-      transactionCount: result.transactions.length
-    });
-
-    // Log response sample
-    if (result.transactions.length > 0) {
-      console.log('First transaction:', {
-        _id: result.transactions[0]._id,
-        userId: result.transactions[0].userId,
-        description: result.transactions[0].description
-      });
-    } else {
-      console.log('No transactions found for query');
-    }
 
     res.json(result);
   } catch (error) {
@@ -271,6 +336,79 @@ router.delete('/categories/:categoryId', auth, async (req, res) => {
     res.json({ message: 'Category and subcategories deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Find similar pending transactions for batch verification
+router.get('/:transactionId/similar', auth, async (req, res) => {
+  try {
+    const result = await transactionService.findSimilarPendingTransactions(
+      req.params.transactionId,
+      req.user._id
+    );
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error finding similar transactions:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Request AI suggestion for transaction categorization
+router.post('/:transactionId/suggest-category', auth, async (req, res) => {
+  try {
+    const transaction = await Transaction.findOne({
+      _id: req.params.transactionId,
+      userId: req.user._id
+    });
+
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    // Get all categories for the user
+    const availableCategories = await Category.find({ userId: req.user._id })
+      .populate('subCategories')
+      .lean();
+
+    // Get AI suggestion
+    const availableCategoriesMapped = availableCategories.map(cat => ({
+      id: cat._id.toString(),
+      name: cat.name,
+      type: cat.type,
+      subCategories: cat.subCategories.map(sub => ({
+        id: sub._id.toString(),
+        name: sub.name,
+        keywords: sub.keywords || []
+      }))
+    }));
+    
+    console.log('Requesting AI suggestion for:', {
+      description: transaction.description,
+      amount: transaction.amount,
+      categoriesCount: availableCategoriesMapped.length
+    });
+
+    const suggestion = await categoryAIService.suggestCategory(
+      transaction.description,
+      transaction.amount,
+      availableCategoriesMapped,
+      req.user._id
+    );
+
+    console.log('Received AI suggestion:', suggestion);
+
+    res.json({
+      suggestion,
+      transaction: {
+        id: transaction._id,
+        description: transaction.description,
+        amount: transaction.amount
+      }
+    });
+  } catch (error) {
+    console.error('Error getting AI category suggestion:', error);
+    res.status(500).json({ error: 'Failed to get category suggestion' });
   }
 });
 
