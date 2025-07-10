@@ -4,7 +4,7 @@ export const formatCurrency = (amount: number, currency: string = 'ILS'): string
     currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(Math.abs(amount));
+  }).format(amount);
 };
 
 const formatters = {

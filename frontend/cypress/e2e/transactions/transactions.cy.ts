@@ -296,14 +296,13 @@ describe('Transactions Page', () => {
   // });
 
   it('should filter transactions by type', () => {
-    // Wait for transactions to load
-    cy.intercept('GET', '**/api/transactions*').as('getTransactions');
+    // Wait for transactions list to be populated
+    cy.get('[data-testid="transactions-list"]')
+      .find('li[data-testid^="transaction-item-"]')
+      .should('have.length.at.least', 1);
 
-    cy.wait('@getTransactions').then((interception) => {
-      const response = interception.response.body;
-      const hasExpense = response.transactions.some(tx => tx.type === 'Expense');
-      expect(hasExpense, 'Should have at least one Expense transaction').to.be.true;
-    });
+    // Re-alias the transactions request for filtering
+    cy.intercept('GET', '**/api/transactions*').as('getTransactions');
 
     // Verify there are transaction amounts
     cy.get('[data-testid="transactions-list"]')

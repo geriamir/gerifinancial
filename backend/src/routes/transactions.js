@@ -122,35 +122,8 @@ router.get('/', auth, async (req, res) => {
       accountId,
       userId: req.user._id, // User ID from auth middleware
     };
-
-    console.log('Transaction request:', {
-      rawParams: req.query,
-      parsedQuery: {
-        type: query.type,
-        startDate: query.startDate?.toISOString(),
-        endDate: query.endDate?.toISOString(),
-        userId: query.userId.toString()
-      }
-    });
     
     const result = await transactionService.getTransactions(query);
-
-    console.log('Found transactions:', {
-      userId: req.user._id,
-      total: result.total,
-      transactionCount: result.transactions.length
-    });
-
-    // Log response sample
-    if (result.transactions.length > 0) {
-      console.log('First transaction:', {
-        _id: result.transactions[0]._id,
-        userId: result.transactions[0].userId,
-        description: result.transactions[0].description
-      });
-    } else {
-      console.log('No transactions found for query');
-    }
 
     res.json(result);
   } catch (error) {
