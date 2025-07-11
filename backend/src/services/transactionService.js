@@ -5,6 +5,7 @@ const bankScraperService = require('./bankScraperService');
 const categoryAIService = require('./categoryAIService');
 const VendorMapping = require('../models/VendorMapping');
 const { CategorizationMethod, TransactionType, TransactionStatus } = require('../constants/enums');
+const logger = require('../utils/logger');
 
 const convertToObjectId = (id) => {
   try {
@@ -129,6 +130,7 @@ class TransactionService {
           });
 
           if (existingPermanent) {
+            logger.warn(`Duplicate transaction found: ${transaction.identifier}, description: ${transaction.description}, existing description: ${existingPermanent.description}`);
             results.duplicates++;
             continue;
           }
@@ -140,6 +142,7 @@ class TransactionService {
           });
 
           if (existingPending) {
+            logger.warn(`Duplicate pending transaction found: ${transaction.identifier}, description: ${transaction.description}, existing description: ${existingPending.description}`);
             results.duplicates++;
             continue;
           }
@@ -330,7 +333,8 @@ async attemptAutoCategorization(transaction, bankAccountId) {
           }))
         })),
         transaction.userId.toString(),
-        transaction.rawData?.category || ''
+        transaction.rawData?.category || '',
+        transaction.memo || ''
       );
 
       // Always categorize with AI suggestion, but mark for verification
@@ -341,18 +345,6 @@ async attemptAutoCategorization(transaction, bankAccountId) {
           CategorizationMethod.AI,
           false // needs verification
         );
-
-        // Suggest new keywords for future matching
-        const newKeywords = await categoryAIService.suggestNewKeywords(transaction.description);
-        if (newKeywords.length > 0) {
-          const subCategory = await SubCategory.findById(suggestion.subCategoryId);
-          if (subCategory) {
-            const existingKeywords = new Set(subCategory.keywords || []);
-            newKeywords.forEach(keyword => existingKeywords.add(keyword.toLowerCase()));
-            subCategory.keywords = Array.from(existingKeywords);
-            await subCategory.save();
-          }
-        }
       }
     } catch (error) {
       console.error('Auto-categorization failed:', error);
