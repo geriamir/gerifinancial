@@ -105,10 +105,19 @@ const transactionSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Ensure transactions are unique per account
-transactionSchema.index({ identifier: 1, accountId: 1 }, { unique: true });
+// Create regular index for identifier lookups
+transactionSchema.index({ identifier: 1, accountId: 1 });
 
 // Create indexes for common queries
+// Index for deduplication checks - includes all fields used in duplicate detection
+transactionSchema.index({ 
+  accountId: 1, 
+  date: 1, 
+  amount: 1, 
+  description: 1 
+});
+
+// Indexes for filtering and sorting
 transactionSchema.index({ accountId: 1, date: -1 });
 transactionSchema.index({ category: 1, date: -1 });
 transactionSchema.index({ status: 1 });

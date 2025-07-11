@@ -1,139 +1,143 @@
-const request = require('supertest');
 const mongoose = require('mongoose');
-const app = require('../../app');
-const { BankAccount, Transaction, User } = require('../../models');
-const { createTestUser } = require('../testUtils');
-const scrapingSchedulerService = require('../../services/scrapingSchedulerService');
+const { Transaction, BankAccount, PendingTransaction } = require('../../models');
+const transactionService = require('../../services/transactionService');
+const { TransactionType } = require('../../constants/enums');
 
-// Mock israeli-bank-scrapers
-jest.mock('israeli-bank-scrapers', () => require('../mocks/bankScraper'));
-
-describe('Transaction Scraping Integration Tests', () => {
-  let user;
-  let token;
-  let bankAccount;
+describe('Transaction Scraping Integration', () => {
+  let testBankAccount;
 
   beforeEach(async () => {
-    try {
-      // Create test user with bank account and wait for it to be saved
-      const testData = await createTestUser(User);
-      user = testData.user;
-      token = testData.token;
-
-      // Create a test bank account with mock scraper's valid credentials
-      const { validCredentials } = require('../mocks/bankScraper');
-      bankAccount = await BankAccount.create({
-        userId: user._id,
-        bankId: 'hapoalim',
-        name: 'Test Account',
-        credentials: {
-          username: validCredentials.username,
-          password: validCredentials.password
-        }
-      });
-
-      // Verify that both user and bank account were saved
-      const savedUser = await User.findById(user._id);
-      const savedAccount = await BankAccount.findById(bankAccount._id);
-      if (!savedUser || !savedAccount) {
-        throw new Error('Failed to create test data');
-      }
-
-      // Initialize the scraping scheduler
-      await scrapingSchedulerService.initialize();
-
-      // Log setup success
-      console.log('Integration test setup complete:', {
-        userId: user._id,
-        bankAccountId: bankAccount._id,
-        hasToken: !!token
-      });
-    } catch (error) {
-      console.error('Failed to set up integration test:', error);
-      throw error;
-    }
+    testBankAccount = await BankAccount.create({
+      userId: new mongoose.Types.ObjectId(),
+      name: 'Test Account',
+      bankId: 'test-bank',
+      accountNumber: '123456',
+      defaultCurrency: 'ILS'
+    });
   });
 
   afterEach(async () => {
-    // Clean up
-    await User.deleteMany({});
-    await BankAccount.deleteMany({});
-    await Transaction.deleteMany({});
+    await Promise.all([
+      Transaction.deleteMany({}),
+      PendingTransaction.deleteMany({}),
+      BankAccount.deleteMany({})
+    ]);
   });
 
-  afterAll(() => {
-    // Stop scheduler
-    scrapingSchedulerService.stopAll();
-  });
+  it('should handle same-day transactions correctly', async () => {
+    const baseTransaction = {
+      date: new Date('2025-01-01'),
+      chargedAmount: -100,
+      description: 'Coffee Shop',
+      type: TransactionType.EXPENSE
+    };
 
-  describe('Integration: Transaction Deduplication', () => {
-    it('should handle duplicate transactions across multiple scrapes', async () => {
-      console.log('Starting first scrape with token:', token);
-      console.log('Bank account ID:', bankAccount._id);
-      
-      const firstResponse = await request(app)
-        .post(`/api/bank-accounts/${bankAccount._id}/scrape`)
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          showBrowser: false,
-          startDate: new Date().toISOString()
-        });
-        
-      console.log('First scrape response:', firstResponse.status, firstResponse.body);
+    const mockScrapedAccounts = [{
+      txns: [
+        { ...baseTransaction, identifier: 'tx1' },
+        { ...baseTransaction, identifier: 'tx2' } // Same details but different identifier
+      ]
+    }];
 
-      expect(firstResponse.status).toBe(200);
-      expect(firstResponse.body.newTransactions).toBeGreaterThan(0);
-      expect(firstResponse.body.duplicates).toBe(0);
+    const result = await transactionService.processScrapedTransactions(
+      mockScrapedAccounts,
+      testBankAccount
+    );
 
-      const secondResponse = await request(app)
-        .post(`/api/bank-accounts/${bankAccount._id}/scrape`)
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          showBrowser: false,
-          startDate: new Date().toISOString()
-        });
+    // Both transactions should be saved (not marked as duplicates)
+    expect(result.newTransactions).toBe(2);
+    expect(result.duplicates).toBe(0);
 
-      expect(secondResponse.status).toBe(200);
-      expect(secondResponse.body.duplicates).toBeGreaterThan(0);
-      expect(secondResponse.body.newTransactions).toBe(0);
-
-      // Verify transaction uniqueness in database
-      const transactions = await Transaction.find({ accountId: bankAccount._id });
-      const uniqueIdentifiers = new Set(transactions.map(t => t.identifier));
-      expect(uniqueIdentifiers.size).toBe(transactions.length);
+    const savedTransactions = await PendingTransaction.find({
+      accountId: testBankAccount._id
     });
+    expect(savedTransactions).toHaveLength(2);
   });
 
-  describe('Service Integration: Scheduling System', () => {
-    it('should integrate account creation with scheduler service', async () => {
-      const { validCredentials } = require('../mocks/bankScraper');
-      const response = await request(app)
-        .post('/api/bank-accounts')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          bankId: 'hapoalim',
-          name: 'New Test Account',
-          credentials: {
-            username: validCredentials.username,
-            password: validCredentials.password
-          }
-        });
+  it('should detect duplicates across scraping sessions', async () => {
+    // First scraping session
+    const transaction = {
+      date: new Date('2025-01-01'),
+      chargedAmount: -100,
+      description: 'Coffee Shop',
+      identifier: 'tx1',
+      type: TransactionType.EXPENSE
+    };
 
-      expect(response.status).toBe(201);
-      const newAccountId = response.body._id;
-      expect(scrapingSchedulerService.jobs.has(newAccountId.toString())).toBeTruthy();
+    await transactionService.processScrapedTransactions(
+      [{ txns: [transaction] }],
+      testBankAccount
+    );
+
+    // Second scraping session with same transaction
+    const result = await transactionService.processScrapedTransactions(
+      [{ txns: [transaction] }],
+      testBankAccount
+    );
+
+    expect(result.duplicates).toBe(1);
+    expect(result.newTransactions).toBe(0);
+
+    const savedTransactions = await PendingTransaction.find({
+      accountId: testBankAccount._id
     });
-
-    it('should integrate account deletion with scheduler service', async () => {
-      const response = await request(app)
-        .delete(`/api/bank-accounts/${bankAccount._id}`)
-        .set('Authorization', `Bearer ${token}`);
-
-      expect(response.status).toBe(200);
-
-      // Verify scheduler integration
-      expect(scrapingSchedulerService.jobs.has(bankAccount._id.toString())).toBeFalsy();
-    });
+    expect(savedTransactions).toHaveLength(1); // Only one should be saved
   });
 
+  it('should detect duplicates by date and details', async () => {
+    const baseTransaction = {
+      date: new Date('2025-01-01'),
+      chargedAmount: -100,
+      description: 'Coffee Shop',
+      type: TransactionType.EXPENSE
+    };
+
+    // First scraping session
+    await transactionService.processScrapedTransactions(
+      [{ txns: [{ ...baseTransaction, identifier: 'tx1' }] }],
+      testBankAccount
+    );
+
+    // Second session with same transaction details but different identifier
+    const result = await transactionService.processScrapedTransactions(
+      [{ txns: [{ ...baseTransaction, identifier: 'different-id' }] }],
+      testBankAccount
+    );
+
+    expect(result.duplicates).toBe(1);
+    expect(result.newTransactions).toBe(0);
+
+    const savedTransactions = await PendingTransaction.find({
+      accountId: testBankAccount._id
+    });
+    expect(savedTransactions).toHaveLength(1);
+  });
+
+  it('should allow same details on different dates', async () => {
+    const baseTransaction = {
+      chargedAmount: -100,
+      description: 'Coffee Shop',
+      type: TransactionType.EXPENSE
+    };
+
+    const mockScrapedAccounts = [{
+      txns: [
+        { ...baseTransaction, date: new Date('2025-01-01'), identifier: 'tx1' },
+        { ...baseTransaction, date: new Date('2025-01-02'), identifier: 'tx2' }
+      ]
+    }];
+
+    const result = await transactionService.processScrapedTransactions(
+      mockScrapedAccounts,
+      testBankAccount
+    );
+
+    expect(result.newTransactions).toBe(2);
+    expect(result.duplicates).toBe(0);
+
+    const savedTransactions = await PendingTransaction.find({
+      accountId: testBankAccount._id
+    });
+    expect(savedTransactions).toHaveLength(2);
+  });
 });

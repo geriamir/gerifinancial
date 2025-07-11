@@ -90,10 +90,16 @@ const pendingTransactionSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Ensure pending transactions are unique per account
-pendingTransactionSchema.index({ identifier: 1, accountId: 1 }, { unique: true });
-
 // Create indexes for common queries
+// Index for deduplication checks
+pendingTransactionSchema.index({ 
+  accountId: 1, 
+  date: 1, 
+  amount: 1, 
+  description: 1 
+});
+
+// Indexes for filtering and sorting
 pendingTransactionSchema.index({ accountId: 1, date: -1 });
 pendingTransactionSchema.index({ category: 1, date: -1 });
 

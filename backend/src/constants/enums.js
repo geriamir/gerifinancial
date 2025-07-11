@@ -6,7 +6,8 @@ const CategorizationMethod = {
 
 const TransactionStatus = {
   VERIFIED: 'verified',  // For transactions in permanent storage
-  ERROR: 'error'        // For failed transactions
+  ERROR: 'error',       // For failed transactions
+  DUPLICATE: 'duplicate' // For duplicate transactions within scraping session
 };
 
 const TransactionType = {
@@ -15,8 +16,15 @@ const TransactionType = {
   TRANSFER: 'Transfer'
 };
 
+const ScrapingSessionStatus = {
+  ACTIVE: 'active',     // Currently processing transactions
+  COMPLETED: 'completed', // Successfully finished
+  ERROR: 'error'        // Failed with error
+};
+
 module.exports = {
   CategorizationMethod,
   TransactionStatus,
-  TransactionType
+  TransactionType,
+  ScrapingSessionStatus
 };
