@@ -10,7 +10,7 @@ export const mockMainTransaction: Transaction = {
   date: '2025-07-03T12:00:00Z',
   type: 'Expense',
   description: 'Test Restaurant',
-  status: 'pending',
+  status: 'verified',
   categorizationMethod: 'ai',
   category: {
     _id: 'cat1',

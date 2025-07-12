@@ -12,7 +12,6 @@ import {
   Box
 } from '@mui/material';
 import { Close as CloseIcon, Keyboard as KeyboardIcon } from '@mui/icons-material';
-import { useBatchVerificationKeyboard } from '../../hooks/useBatchVerificationKeyboard';
 
 interface KeyboardShortcutProps {
   shortcut: string;
@@ -79,7 +78,23 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
   open,
   onClose
 }) => {
-  const { shortcuts } = useBatchVerificationKeyboard({});
+  // Basic keyboard shortcuts for transaction management
+  const shortcuts = {
+    global: [
+      { key: '?', description: 'Show keyboard shortcuts' },
+      { key: 'Esc', description: 'Close dialog or cancel action' }
+    ],
+    transactionPage: [
+      { key: 'r', description: 'Reset filters' },
+      { key: 'f', description: 'Focus search field' },
+      { key: '/', description: 'Focus search field' }
+    ],
+    transactionList: [
+      { key: 'Enter', description: 'Open transaction details' },
+      { key: 'c', description: 'Categorize transaction' },
+      { key: '↑/↓', description: 'Navigate between transactions' }
+    ]
+  };
 
   return (
     <Dialog
@@ -110,13 +125,13 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
         <ShortcutSection title="Global Shortcuts" shortcuts={shortcuts.global} />
         <Divider sx={{ my: 2 }} />
         <ShortcutSection
-          title="Verification Page Shortcuts"
-          shortcuts={shortcuts.verificationPage}
+          title="Transaction Page Shortcuts"
+          shortcuts={shortcuts.transactionPage}
         />
         <Divider sx={{ my: 2 }} />
         <ShortcutSection
-          title="Batch Verification Dialog Shortcuts"
-          shortcuts={shortcuts.batchDialog}
+          title="Transaction List Shortcuts"
+          shortcuts={shortcuts.transactionList}
         />
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 3, fontStyle: 'italic' }}>

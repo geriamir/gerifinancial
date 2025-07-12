@@ -5,7 +5,8 @@ import {
   GetTransactionsResponse,
   CategorizeTransactionRequest,
   TransactionSummary,
-  CategorySuggestion
+  CategorySuggestion,
+  UncategorizedStats
 } from './types/transactions';
 import type { Category } from './types';
 
@@ -73,5 +74,10 @@ export const transactionsApi = {
   // Categories
   getCategories: (): Promise<Category[]> =>
     api.get<Category[]>('/transactions/categories')
-      .then((res: AxiosResponse<Category[]>) => res.data)
+      .then((res: AxiosResponse<Category[]>) => res.data),
+
+  // Uncategorized stats for dashboard
+  getUncategorizedStats: (): Promise<UncategorizedStats> =>
+    api.get<UncategorizedStats>('/transactions/uncategorized-stats')
+      .then((res: AxiosResponse<UncategorizedStats>) => res.data)
 };

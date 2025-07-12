@@ -69,3 +69,7 @@ export interface TransactionFilters {
   search?: string;
   accountId?: string;
 }
+
+export interface UncategorizedStats {
+  total: number;
+}

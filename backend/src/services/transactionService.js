@@ -278,7 +278,13 @@ class TransactionService {
         console.warn('Invalid transaction type received:', type);
       }
     }
-    if (category) query.category = convertToObjectId(category);
+    if (category) {
+      if (category === 'uncategorized') {
+        query.category = null; // Filter for uncategorized transactions
+      } else {
+        query.category = convertToObjectId(category);
+      }
+    }
     if (search) {
       query.description = { $regex: search, $options: 'i' };
     }
@@ -296,6 +302,22 @@ class TransactionService {
       transactions,
       total,
       hasMore
+    };
+  }
+
+  async getUncategorizedStats(userId) {
+    if (!userId) {
+      throw new Error('userId is required');
+    }
+
+    // Get total uncategorized count across all accounts
+    const total = await Transaction.countDocuments({
+      userId: convertToObjectId(userId),
+      category: null
+    });
+
+    return {
+      total
     };
   }
 }

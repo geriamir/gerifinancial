@@ -1,6 +1,7 @@
-import React from 'react';
-import { Box, Container, Typography, Button } from '@mui/material';
+import React, { useEffect } from 'react';
+import { Box, Container, Typography, Button, Alert } from '@mui/material';
 import { RestartAlt as ResetIcon } from '@mui/icons-material';
+import { useSearchParams } from 'react-router-dom';
 import TransactionsList from '../components/transactions/TransactionsList';
 import FilterPanel from '../components/transactions/FilterPanel';
 import { TransactionFilters } from '../services/api/types';
@@ -12,15 +13,34 @@ const defaultFilters: Partial<TransactionFilters> = {
 };
 
 const TransactionsPage: React.FC = () => {
-
+  const [searchParams, setSearchParams] = useSearchParams();
   const { filters, updateFilters, resetFilters } = useFilterPersistence(defaultFilters);
+
+  // Handle URL parameters on component mount
+  useEffect(() => {
+    const categoryParam = searchParams.get('category');
+    
+    if (categoryParam === 'uncategorized') {
+      // Set filters to show only uncategorized transactions
+      updateFilters({
+        category: 'uncategorized', // Special value to indicate uncategorized filter
+        startDate: undefined, // Remove date filter to show all uncategorized
+        endDate: undefined,
+      });
+      
+      // Clear the URL parameter after setting the filter
+      setSearchParams({});
+    }
+  }, [searchParams, updateFilters, setSearchParams]);
+
+  const isShowingUncategorized = filters.category === 'uncategorized';
 
   return (
     <Container maxWidth="lg">
       <Box sx={{ mt: 4, mb: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4" component="h1">
-            Transactions
+            {isShowingUncategorized ? 'Uncategorized Transactions' : 'Transactions'}
           </Typography>
           <Button
             startIcon={<ResetIcon />}
@@ -30,6 +50,13 @@ const TransactionsPage: React.FC = () => {
             Reset Filters
           </Button>
         </Box>
+
+        {isShowingUncategorized && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Showing all transactions that need categorization. Click on any transaction to categorize it.
+          </Alert>
+        )}
+
         <FilterPanel
           startDate={filters.startDate}
           endDate={filters.endDate}

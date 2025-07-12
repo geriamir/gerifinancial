@@ -71,6 +71,17 @@ router.get('/uncategorized/:accountId', auth, async (req, res) => {
   }
 });
 
+// Get uncategorized transactions statistics for dashboard
+router.get('/uncategorized-stats', auth, async (req, res) => {
+  try {
+    const stats = await transactionService.getUncategorizedStats(req.user._id);
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching uncategorized stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get spending summary
 router.get('/summary/:accountId', auth, async (req, res) => {
   try {
