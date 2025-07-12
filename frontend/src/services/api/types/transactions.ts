@@ -17,48 +17,13 @@ export interface Transaction {
   createdAt: string;
   updatedAt: string;
   userId: string;
-  status: 'pending' | 'verified' | 'deleted';
-}
-
-export interface PendingTransaction extends Omit<Transaction, 'status'> {
-  status: 'pending';
+  status: 'verified' | 'deleted';
 }
 
 export interface GetTransactionsResponse {
   transactions: Transaction[];
   total: number;
   hasMore: boolean;
-}
-
-export interface GetPendingTransactionsResponse {
-  transactions: PendingTransaction[];
-  total: number;
-  hasMore: boolean;
-}
-
-export interface ProcessingStats {
-  pending: number;
-  verified: number;
-  total: number;
-}
-
-export interface VerifyTransactionsResponse {
-  message: string;
-  successful: PendingTransaction[];
-  failed: Array<{
-    transaction: PendingTransaction;
-    error: string;
-  }>;
-  verifiedCount: number;
-  errors: Array<{
-    transactionId: string;
-    error: string;
-  }>;
-}
-
-export interface SimilarTransactionsResponse {
-  transactions: PendingTransaction[];
-  similarity: number;
 }
 
 export interface CategorizeTransactionRequest {
