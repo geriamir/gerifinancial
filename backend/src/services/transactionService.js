@@ -182,6 +182,14 @@ class TransactionService {
       }
     }
 
+    // Update lastScraped timestamp on successful scraping (even if no new transactions)
+    if (results.errors.length === 0 || results.newTransactions > 0) {
+      bankAccount.lastScraped = new Date();
+      bankAccount.status = 'active';
+      await bankAccount.save();
+      console.log(`Updated lastScraped for account ${bankAccount._id} to ${bankAccount.lastScraped}`);
+    }
+    
     console.log(`Scraping completed for account ${bankAccount._id}:`, results);
     return results;
   }
@@ -319,17 +327,6 @@ class TransactionService {
       total
     };
   }
-}
-
-// Helper function to determine transaction type
-function determineTransactionType(scraperTransaction) {
-  const amount = scraperTransaction.chargedAmount;
-  
-  if (scraperTransaction.type === 'CREDIT_CARD_PAYMENT') {
-    return TransactionType.TRANSFER;
-  }
-  
-  return amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME;
 }
 
 module.exports = new TransactionService();
