@@ -1,4 +1,5 @@
-const { VendorMapping, SubCategory, Category } = require('../models');
+const ManualCategorized = require('../models/ManualCategorized');
+const { SubCategory, Category, Transaction } = require('../models');
 const categoryAIService = require('./categoryAIService');
 const { CategorizationMethod, TransactionType } = require('../constants/enums');
 const logger = require('../utils/logger');
@@ -13,51 +14,62 @@ class CategoryMappingService {
   async attemptAutoCategorization(transaction) {
     // Skip if already categorized
     if (transaction.category && transaction.subCategory) {
-      return;
+        return await Transaction.findById(transaction._id)
+          .populate('category')
+          .populate('subCategory');
     }
 
     try {
-      // Determine valid category types - always include Transfer type
-      const categoryTypes = ['Transfer'];
-      categoryTypes.push(transaction.amount > 0 ? 'Income' : 'Expense');
+      // Determine valid category types
+      let categoryTypes = [];
+      // Allow Transfer type regardless of amount
+      if (transaction.type === TransactionType.TRANSFER) {
+        categoryTypes.push(TransactionType.TRANSFER);
+      } else {
+        // For non-transfer transactions, use appropriate type based on amount
+        categoryTypes.push(transaction.amount > 0 ? TransactionType.INCOME : TransactionType.EXPENSE);
+      }
 
-      // Try to match by vendor mapping
-      const vendorMappings = await VendorMapping.findMatches(
+      // Try to match by manual categorization
+      const manualMatches = await ManualCategorized.findMatches(
         transaction.description,
-        transaction.userId
+        transaction.userId,
+        transaction.memo || null
       );
       
-      // Filter vendor mappings by category type
-      const validVendorMappings = await Promise.all(
-        vendorMappings.map(async mapping => {
-          const category = await Category.findById(mapping.category);
-          return categoryTypes.includes(category?.type) ? mapping : null;
+      // Filter matches by category type
+      const validMatches = await Promise.all(
+        manualMatches.map(async match => {
+          const category = await Category.findById(match.category);
+          return categoryTypes.includes(category?.type) ? match : null;
         })
       );
 
-      const vendorMapping = validVendorMappings.filter(Boolean)[0];
+      const manualMatch = validMatches.filter(Boolean)[0];
 
-      if (vendorMapping) {
+      if (manualMatch) {
         await transaction.categorize(
-          vendorMapping.category,
-          vendorMapping.subCategory,
+          manualMatch.category,
+          manualMatch.subCategory,
           CategorizationMethod.PREVIOUS_DATA,
           false // needs verification
         );
-        return;
+        return await Transaction.findById(transaction._id)
+          .populate('category')
+          .populate('subCategory');
       }
 
-      // Try keyword-based matching
-      const searchText = [
+      // Try keyword-based matching - gather all potential search terms
+      const searchTerms = [
         transaction.description,
         transaction.memo,
         transaction.rawData?.description,
         transaction.rawData?.memo,
         transaction.rawData?.category
-      ].filter(Boolean).join(' ');
+      ].filter(Boolean);
 
       // Get subcategories and filter by parent category type
-      const allMatchingSubCategories = await SubCategory.findMatchingSubCategories(searchText);
+      const allMatchingSubCategories = await SubCategory.findMatchingSubCategories(searchTerms);
       const matchingSubCategories = await Promise.all(
         allMatchingSubCategories.map(async subCat => {
           await subCat.populate('parentCategory');
@@ -67,6 +79,14 @@ class CategoryMappingService {
 
       const filteredSubCategories = matchingSubCategories.filter(Boolean);
 
+      console.log('Matching subcategories for keywords:', {
+        searchTerms,
+        filteredSubCategories: filteredSubCategories.map(sc => ({
+          name: sc.name,
+          keywords: sc.keywords
+        }))
+      });
+
       if (filteredSubCategories.length === 1) {
         const subCategory = filteredSubCategories[0];
         await transaction.categorize(
@@ -75,7 +95,9 @@ class CategoryMappingService {
           CategorizationMethod.PREVIOUS_DATA,
           false // needs verification
         );
-        return;
+        return await Transaction.findById(transaction._id)
+          .populate('category')
+          .populate('subCategory');
       }
 
       // Try AI categorization as last resort
@@ -84,6 +106,12 @@ class CategoryMappingService {
         userId: transaction.userId,
         type: { $in: categoryTypes }
       }).populate('subCategories').lean();
+
+      console.log('Attempting AI categorization for transaction:', {
+        description: transaction.description,
+        rawCategory: transaction.rawData?.category,
+        memo: transaction.memo
+      });
 
       const suggestion = await categoryAIService.suggestCategory(
         transaction.description,
@@ -104,6 +132,8 @@ class CategoryMappingService {
       );
 
       // Always categorize with AI suggestion, but mark for verification
+      console.log('AI categorization result:', suggestion);
+
       if (suggestion.categoryId && suggestion.subCategoryId) {
         await transaction.categorize(
           suggestion.categoryId,
@@ -111,10 +141,15 @@ class CategoryMappingService {
           CategorizationMethod.AI,
           false // needs verification
         );
+        return await Transaction.findById(transaction._id)
+          .populate('category')
+          .populate('subCategory');
       }
     } catch (error) {
       logger.error('Auto-categorization failed:', error);
+      return undefined;
     }
+    return undefined;
   }
 }
 

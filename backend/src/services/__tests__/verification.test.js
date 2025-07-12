@@ -1,14 +1,15 @@
 const mongoose = require('mongoose');
-const { Transaction, Category, SubCategory, User, PendingTransaction, VendorMapping } = require('../../models');
+const { Transaction, Category, SubCategory, User } = require('../../models');
+const ManualCategorized = require('../../models/ManualCategorized');
 const transactionService = require('../transactionService');
 const { createTestUser } = require('../../test/testUtils');
-const { TransactionType, CategorizationMethod } = require('../../constants/enums');
+const { TransactionType, CategorizationMethod, TransactionStatus } = require('../../constants/enums');
 
 describe('Transaction Verification Flow', () => {
   let user;
   let category;
   let subCategory;
-  let pendingTransaction;
+  let testTransaction;
 
   beforeEach(async () => {
     // Create test user
@@ -33,8 +34,8 @@ describe('Transaction Verification Flow', () => {
       $push: { subCategories: subCategory._id }
     });
 
-    // Create test pending transaction
-    pendingTransaction = await PendingTransaction.create({
+    // Create test transaction
+    testTransaction = await Transaction.create({
       identifier: `test-${Date.now()}`,
       accountId: new mongoose.Types.ObjectId(),
       userId: user._id,
@@ -44,6 +45,7 @@ describe('Transaction Verification Flow', () => {
       type: TransactionType.EXPENSE,
       description: 'Test Restaurant',
       memo: 'Test Memo',
+      status: TransactionStatus.VERIFIED,
       rawData: {
         description: 'Test Restaurant',
         chargedAmount: -100
@@ -51,64 +53,68 @@ describe('Transaction Verification Flow', () => {
     });
   });
 
-  describe('Categorization with Verification', () => {
-    it('should categorize pending transaction without immediate verification', async () => {
-      await transactionService.categorizePendingTransaction(
-        pendingTransaction._id,
+  describe('Transaction Categorization', () => {
+    it('should categorize transactions', async () => {
+      await transactionService.categorizeTransaction(
+        testTransaction._id,
         category._id,
         subCategory._id,
-        user._id
+        true // saveAsManual
       );
 
-      const updated = await PendingTransaction.findById(pendingTransaction._id);
+      const updated = await Transaction.findById(testTransaction._id);
       expect(updated.category.toString()).toBe(category._id.toString());
       expect(updated.subCategory.toString()).toBe(subCategory._id.toString());
       expect(updated.categorizationMethod).toBe(CategorizationMethod.MANUAL);
     });
 
-    it('should move transaction to permanent storage when verifying', async () => {
-      // First categorize
-      await transactionService.categorizePendingTransaction(
-        pendingTransaction._id,
+    it('should save manual categorizations for future use', async () => {
+      await transactionService.categorizeTransaction(
+        testTransaction._id,
         category._id,
         subCategory._id,
-        user._id
+        true // saveAsManual
       );
 
-      // Then verify
-      const result = await transactionService.verifyTransactions(
-        [pendingTransaction._id],
-        user._id
-      );
+      // Create another transaction with same description
+      const newTransaction = await Transaction.create({
+        identifier: `test-${Date.now()}-2`,
+        accountId: new mongoose.Types.ObjectId(),
+        userId: user._id,
+        amount: -150,
+        currency: 'ILS',
+        date: new Date(),
+        type: TransactionType.EXPENSE,
+        description: 'Test Restaurant',
+        status: TransactionStatus.VERIFIED,
+        rawData: {
+          description: 'Test Restaurant',
+          chargedAmount: -150
+        }
+      });
 
-      expect(result.verifiedCount).toBe(1);
-      expect(result.errors).toHaveLength(0);
+      await transactionService.attemptAutoCategorization(newTransaction);
 
-      // Check it was moved to permanent storage
-      const permanent = await Transaction.findOne({ identifier: pendingTransaction.identifier });
-      expect(permanent).toBeTruthy();
-      expect(permanent.category.toString()).toBe(category._id.toString());
-      expect(permanent.subCategory.toString()).toBe(subCategory._id.toString());
-
-      // Check it was removed from pending
-      const pending = await PendingTransaction.findById(pendingTransaction._id);
-      expect(pending).toBeNull();
+      const updated = await Transaction.findById(newTransaction._id);
+      expect(updated.category.toString()).toBe(category._id.toString());
+      expect(updated.subCategory.toString()).toBe(subCategory._id.toString());
+      expect(updated.categorizationMethod).toBe(CategorizationMethod.PREVIOUS_DATA);
     });
   });
 
   describe('Auto-categorization', () => {
-    it('should use vendor mapping for new transactions', async () => {
-      // Create a vendor mapping for future categorization
-      await VendorMapping.findOrCreate({
-        vendorName: 'Test Restaurant',
+    it('should use previous categorization for new transactions', async () => {
+      // Create manual categorization entry
+      await ManualCategorized.create({
+        description: 'Test Restaurant',
         userId: user._id,
         category: category._id,
         subCategory: subCategory._id,
-        language: 'en'
+        language: 'he'
       });
 
-      // Create new pending transaction with same description
-      const newPending = await PendingTransaction.create({
+      // Create new transaction with same description
+      const newTransaction = await Transaction.create({
         identifier: `test-${Date.now()}-2`,
         accountId: new mongoose.Types.ObjectId(),
         userId: user._id,
@@ -118,22 +124,23 @@ describe('Transaction Verification Flow', () => {
         type: TransactionType.EXPENSE,
         description: 'Test Restaurant',
         memo: 'Test Memo',
+        status: TransactionStatus.VERIFIED,
         rawData: {
           description: 'Test Restaurant',
           chargedAmount: -150
         }
       });
 
-      await transactionService.attemptAutoCategorization(newPending);
+      await transactionService.attemptAutoCategorization(newTransaction);
 
-      const updated = await PendingTransaction.findById(newPending._id);
+      const updated = await Transaction.findById(newTransaction._id);
       expect(updated.category.toString()).toBe(category._id.toString());
       expect(updated.subCategory.toString()).toBe(subCategory._id.toString());
       expect(updated.categorizationMethod).toBe(CategorizationMethod.PREVIOUS_DATA);
     });
 
-    it('should apply AI categorization to pending transactions', async () => {
-      const newPending = await PendingTransaction.create({
+    it('should apply AI categorization to transactions', async () => {
+      const newTransaction = await Transaction.create({
         identifier: `test-${Date.now()}-3`,
         accountId: new mongoose.Types.ObjectId(),
         userId: user._id,
@@ -141,17 +148,18 @@ describe('Transaction Verification Flow', () => {
         currency: 'ILS',
         date: new Date(),
         type: TransactionType.EXPENSE,
-        description: 'New Restaurant',
+        description: 'XYZ24 Special Store',
+        status: TransactionStatus.VERIFIED,
         rawData: {
-          description: 'New Restaurant',
+          description: 'XYZ24 Special Store',
           chargedAmount: -80,
           category: 'Food & Dining'
         }
       });
 
-      await transactionService.attemptAutoCategorization(newPending);
+      await transactionService.attemptAutoCategorization(newTransaction);
 
-      const updated = await PendingTransaction.findById(newPending._id);
+      const updated = await Transaction.findById(newTransaction._id);
       expect(updated.category).toBeTruthy();
       expect(updated.subCategory).toBeTruthy();
       expect(updated.categorizationMethod).toBe(CategorizationMethod.AI);
@@ -159,16 +167,16 @@ describe('Transaction Verification Flow', () => {
   });
 
   describe('Vendor Mapping Integration', () => {
-    it('should create vendor mapping when categorizing pending transactions', async () => {
-      await transactionService.categorizePendingTransaction(
-        pendingTransaction._id,
+    it('should create vendor mapping when categorizing transactions', async () => {
+      await transactionService.categorizeTransaction(
+        testTransaction._id,
         category._id,
         subCategory._id,
-        user._id
+        true // saveAsManual
       );
 
       // Create new transaction with same description
-      const newPending = await PendingTransaction.create({
+      const newTransaction = await Transaction.create({
         identifier: `test-${Date.now()}-4`,
         accountId: new mongoose.Types.ObjectId(),
         userId: user._id,
@@ -177,15 +185,16 @@ describe('Transaction Verification Flow', () => {
         date: new Date(),
         type: TransactionType.EXPENSE,
         description: 'Test Restaurant',
+        status: TransactionStatus.VERIFIED,
         rawData: {
           description: 'Test Restaurant',
           chargedAmount: -90
         }
       });
 
-      await transactionService.attemptAutoCategorization(newPending);
+      await transactionService.attemptAutoCategorization(newTransaction);
 
-      const updated = await PendingTransaction.findById(newPending._id);
+      const updated = await Transaction.findById(newTransaction._id);
       expect(updated.category.toString()).toBe(category._id.toString());
       expect(updated.subCategory.toString()).toBe(subCategory._id.toString());
       expect(updated.categorizationMethod).toBe(CategorizationMethod.PREVIOUS_DATA);
