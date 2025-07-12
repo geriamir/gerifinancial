@@ -26,8 +26,7 @@ Improve the transaction categorization system by introducing a verification work
 #### B. Transaction Model Updates
 ```javascript
 enum TransactionStatus {
-  PENDING = 'pending',
-  NEEDS_VERIFICATION = 'needs_verification',  // New status
+  NEEDS_VERIFICATION = 'needs_verification',
   VERIFIED = 'verified',
   PROCESSED = 'processed'
 }

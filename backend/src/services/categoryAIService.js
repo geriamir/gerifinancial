@@ -1,9 +1,8 @@
 const logger = require('../utils/logger');
 const natural = require('natural');
-const { translate } = require('@vitalets/google-translate-api');
+const translationService = require('./translationService');
 const WordTokenizer = natural.WordTokenizer;
 const PorterStemmer = natural.PorterStemmer;
-const VendorMapping = require('../models/VendorMapping');
 
 class CategoryAIService {
   constructor() {
@@ -11,7 +10,6 @@ class CategoryAIService {
     this.tfidf = new natural.TfIdf();
     this.classifier = new natural.LogisticRegressionClassifier();
     this.initialized = false;
-    this.translationCache = new Map();
   }
 
   /**
@@ -35,27 +33,6 @@ class CategoryAIService {
     return `${confidence} match for ${subCategoryName} ${source}`;
   }
 
-  /**
-   * Translate text from Hebrew to English
-   * @param {string} text - Text to translate
-   * @returns {Promise<string>} - Translated text
-   */
-  async translateText(text) {
-    try {
-      // Check cache first
-      if (this.translationCache.has(text)) {
-        return this.translationCache.get(text);
-      }
-
-      const result = await translate(text, { from: 'he', to: 'en' });
-      this.translationCache.set(text, result.text);
-      
-      return result.text;
-    } catch (error) {
-      logger.error('Translation failed:', error);
-      return text; // Return original text on failure
-    }
-  }
 
   /**
    * Process text into tokens and stemmed words
@@ -108,7 +85,7 @@ class CategoryAIService {
   }
 
   async categorizeByAI(text, availableCategories, isRawCategory = false) {
-      const translatedText = await this.translateText(text);
+      const translatedText = await translationService.translate(text, { from: 'he', to: 'en' });
       const processedText = this.processText(translatedText.toLowerCase());
 
       // Exact keyword match check first
@@ -182,10 +159,12 @@ class CategoryAIService {
    * @param {string} description - Transaction description
    * @param {number} amount - Transaction amount
    * @param {Array<{id: string, name: string, type: string, subCategories: Array<{id: string, name: string, keywords: string[]}>}>} availableCategories - List of available categories
-   * @param {string} userId - User ID for vendor mapping lookup
+   * @param {string} userId - User ID for authentication
+   * @param {string} rawCategory - Raw category from bank
+   * @param {string} memo - Transaction memo
    * @returns {Promise<{categoryId: string, subCategoryId: string, confidence: number, reasoning: string}>}
    */
-  async suggestCategory(description = '', amount = 0, availableCategories = [], userId = null, rawCategory = '') {
+  async suggestCategory(description = '', amount = 0, availableCategories = [], userId = null, rawCategory = '', memo = '') {
     try {
 
       const noMatch = {
@@ -199,41 +178,7 @@ class CategoryAIService {
         return noMatch;
       }
 
-      // First try to find an exact vendor match
-      const vendorMatches = await VendorMapping.findMatches(description, userId);
-      if (vendorMatches.length > 0) {
-        const match = vendorMatches[0];
-        logger.info('Found exact vendor match:', {
-          vendor: match.vendorName,
-          category: match.category,
-          subCategory: match.subCategory
-        });
-        return {
-          categoryId: match.category.toString(),
-          subCategoryId: match.subCategory.toString(),
-          confidence: match.confidence,
-          reasoning: `Matched based on known vendor: ${match.vendorName}`
-        };
-      }
-
-      // Try similar vendor match
-      const similarVendor = await VendorMapping.suggestMapping(description, userId);
-      if (similarVendor) {
-        logger.info('Found similar vendor:', {
-          original: description,
-          matchedVendor: similarVendor.vendorName,
-          category: similarVendor.category,
-          subCategory: similarVendor.subCategory
-        });
-        return {
-          categoryId: similarVendor.category.toString(),
-          subCategoryId: similarVendor.subCategory.toString(),
-          confidence: 0.7,
-          reasoning: `Matched based on similar vendor: ${similarVendor.vendorName}`
-        };
-      }
-
-      // No vendor match, try translation and keyword matching
+      // Process text using AI categorization
 
       // Process rawCategory first
       let match;
@@ -242,9 +187,13 @@ class CategoryAIService {
         
         if (match.confidence > 0.5) {
           logger.info('Matched by raw category: ', {
+            description: description,
+            memo: memo,
+            rawCategory: rawCategory,
             category: match.categoryId,
             subCategory: match.subCategoryId,
-            confidence: match.confidence
+            confidence: match.confidence,
+            reasoning: match.reasoning
           });
 
           const boostedConfidence = match.confidence * 1.2;
@@ -256,19 +205,59 @@ class CategoryAIService {
             categoryId: match.categoryId,
             subCategoryId: match.subCategoryId,
             confidence: boostedConfidence,
-              reasoning: boostedConfidence > 0.8 
+            reasoning: boostedConfidence > 0.8 
               ? 'Very strong confidence match from bank-provided category'
               : 'Moderate confidence match from bank-provided category'
           };
         }
       }
 
-      // Process description
+      // Process memo next if available
+      if (memo?.length > 0) {
+        match = await this.categorizeByAI(memo, availableCategories, false);
+        
+        if (match.confidence > 0.5) {
+          logger.info('Matched by memo: ', {
+            description: description,
+            memo: memo,
+            category: match.categoryId,
+            subCategory: match.subCategoryId,
+            confidence: match.confidence,
+            reasoning: match.reasoning
+          });
+
+          const boostedConfidence = match.confidence * 1.1; // Slightly lower boost than rawCategory
+          const subCategoryName = availableCategories
+            .find(c => c.id === match.categoryId)
+            ?.subCategories.find(s => s.id === match.subCategoryId)?.name;
+          
+          return {
+            categoryId: match.categoryId,
+            subCategoryId: match.subCategoryId,
+            confidence: boostedConfidence,
+            reasoning: boostedConfidence > 0.8 
+              ? 'Very strong confidence match from transaction memo'
+              : 'Moderate confidence match from transaction memo'
+          };
+        }
+      }
+
+      // Process description last
       match = await this.categorizeByAI(description, availableCategories, false);
       if (match.confidence > 0.5) {
           const subCategoryName = availableCategories
             .find(c => c.id === match.categoryId)
             ?.subCategories.find(s => s.id === match.subCategoryId)?.name;
+
+          logger.info('Matched by description: ', {
+              description: description,
+              rawCategory: rawCategory,
+              memo: memo,
+              category: match.categoryId,
+              subCategory: match.subCategoryId,
+              confidence: match.confidence,
+            reasoning: match.reasoning
+          });
             
           return {
               categoryId: match.categoryId,
@@ -280,7 +269,7 @@ class CategoryAIService {
           };
       }
 
-      logger.info(`No suitable category match found for description ${description}, rawCategory ${rawCategory}. Match confidence: ${match?.confidence || 0}`);
+      logger.info(`No suitable category match found for description ${description}, rawCategory ${rawCategory}, memo ${memo}. Match confidence: ${match?.confidence || 0}`);
 
       return noMatch;
     } catch (error) {
@@ -302,7 +291,7 @@ class CategoryAIService {
       
       // If not enough tokens found, try with translated text
       if (tokens.length < 3) {
-        const translatedDesc = await this.translateText(description);
+        const translatedDesc = await translationService.translate(description, { from: 'he', to: 'en' });
         tokens = this.processText(translatedDesc);
       }
       

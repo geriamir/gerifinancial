@@ -3,6 +3,44 @@ const SubCategory = require('../models/SubCategory');
 
 const defaultCategories = [
   {
+    name: "Income",
+    type: "Income",
+    subCategories: [
+      "Salary",
+      "Allowance",
+      {
+        name: "Dividends and Profits",
+        keywords: ["דיבידנד", "רווחים", "רבית"]
+      },
+      {
+        name: "Income Miscellaneous",
+        keywords: ["פייבוקס", "ביט"]
+      }
+    ]
+  },
+  {
+    name: "Transfer",
+    type: "Transfer",
+    subCategories: [
+      { 
+        name: "Credit Card Payments",
+        keywords: ["דיינרס", "אשראי"]
+      },
+      {
+        name: "Savings",
+        keywords: ["אלטשולר"]
+      },
+      {
+        name: "Investments",
+        keywords: ["נייר ערך"]
+      },
+      {
+        name: "Cash Withdrawal",
+        keywords: ["מזומן", "משיכה", "כספומט"]
+      }
+    ]
+  },
+  {
     name: "Household",
     type: "Expense",
     subCategories: [
@@ -85,7 +123,10 @@ const defaultCategories = [
     name: "Miscellaneous",
     type: "Expense",
     subCategories: [
-      "Taxes and Government"
+      {
+        name: "Taxes and Government",
+        keywords: ["מס", "מיסים", 'מע"מ', "ביטוח לאומי", "מס הכנסה"]
+      }
     ]
   },
   {
@@ -123,12 +164,16 @@ async function initializeUserCategories(userId) {
       userCategories.push(category);
 
       // Create subcategories for this category
-      for (const subCategoryName of categoryData.subCategories) {
+      for (const subCatData of categoryData.subCategories) {
+        // Handle both string and object subcategory definitions
+        const subCategoryName = typeof subCatData === 'string' ? subCatData : subCatData.name;
+        const keywords = typeof subCatData === 'string' ? [subCategoryName.toLowerCase()] : subCatData.keywords;
+        
         const subCategory = new SubCategory({
           name: subCategoryName,
           parentCategory: category._id,
           isDefault: true,
-          keywords: [subCategoryName.toLowerCase()],
+          keywords: keywords,
           userId: userId // Associate subcategory with user
         });
         await subCategory.save();

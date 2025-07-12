@@ -65,7 +65,7 @@ const generateTransaction = (baseDate, index, userId, accountId) => {
     date: date, // Store as Date object instead of string
     description,
     type,
-    status: 'processed',
+    status: 'verified',
     createdAt: new Date(),
     updatedAt: new Date()
   };

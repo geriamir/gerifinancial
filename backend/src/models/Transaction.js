@@ -105,13 +105,21 @@ const transactionSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Ensure transactions are unique per account
-transactionSchema.index({ identifier: 1, accountId: 1 }, { unique: true });
+// Create regular index for identifier lookups
+transactionSchema.index({ identifier: 1, accountId: 1 });
 
 // Create indexes for common queries
+// Index for deduplication checks - includes all fields used in duplicate detection
+transactionSchema.index({ 
+  accountId: 1, 
+  date: 1, 
+  amount: 1, 
+  description: 1 
+});
+
+// Indexes for filtering and sorting
 transactionSchema.index({ accountId: 1, date: -1 });
 transactionSchema.index({ category: 1, date: -1 });
-transactionSchema.index({ status: 1 });
 
 // Helper method to categorize a transaction
 transactionSchema.methods.categorize = async function(categoryId, subCategoryId, method = CategorizationMethod.MANUAL) {
@@ -149,34 +157,6 @@ transactionSchema.statics.findUncategorized = async function(accountId, userId) 
   .sort({ date: -1 });
 };
 
-// Static method to find transactions needing verification
-transactionSchema.statics.findNeedingVerification = async function(userId, options = {}) {
-  if (!userId) throw new Error('userId is required');
-  
-  const query = {
-    userId,
-    status: TransactionStatus.NEEDS_VERIFICATION
-  };
-
-  if (options.accountId) {
-    query.accountId = options.accountId;
-  }
-
-  const baseQuery = this.find(query)
-    .sort({ date: -1 })
-    .populate('category')
-    .populate('subCategory');
-
-  if (options.limit) {
-    baseQuery.limit(options.limit);
-  }
-
-  if (options.skip) {
-    baseQuery.skip(options.skip);
-  }
-
-  return baseQuery;
-};
 
 // Static method to get spending summary by category
 transactionSchema.statics.getSpendingSummary = async function(accountId, startDate, endDate) {
@@ -245,7 +225,7 @@ transactionSchema.statics.getSpendingSummary = async function(accountId, startDa
   };
 };
 
-// Method to create transaction from scraper data (now only used for migrating from pending)
+// Method to create transaction from scraper data
 transactionSchema.statics.createFromScraperData = async function(scraperTransaction, accountId, defaultCurrency, userId) {
   if (!userId) {
     throw new Error('userId is required when creating a transaction');

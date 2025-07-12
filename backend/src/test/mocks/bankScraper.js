@@ -14,10 +14,10 @@ const mockTransactions = [
     processedDate: STATIC_DATE,
     description: 'Super Market Purchase',
     memo: 'Shopping',
-    type: 'EXPENSE',  // Change to match our transaction types
-    chargedAmount: -150.50,  // Correct - negative for expense
+    type: 'Expense',  // Matches our TransactionType enum
+    chargedAmount: -150.50,
     currency: 'ILS',
-    status: 'completed'
+    status: 'verified'
   },
   {
     identifier: 'mock-txn-2',
@@ -25,10 +25,10 @@ const mockTransactions = [
     processedDate: STATIC_DATE,
     description: 'Salary Payment',
     memo: 'Monthly Salary',
-    type: 'INCOME',  // Change to match our transaction types
-    chargedAmount: 5000.00,  // Correct - positive for income
+    type: 'Income',  // Matches our TransactionType enum
+    chargedAmount: 5000.00,
     currency: 'ILS',
-    status: 'completed'
+    status: 'verified'
   },
   {
     identifier: 'mock-txn-3',
@@ -36,10 +36,10 @@ const mockTransactions = [
     processedDate: STATIC_DATE,
     description: 'Credit Card Payment',
     memo: 'Monthly Payment',
-    type: 'CREDIT_CARD_PAYMENT',
-    chargedAmount: 2000.00,  // Fix - transfers should have positive amounts
+    type: 'Transfer',  // Matches our TransactionType enum
+    chargedAmount: 2000.00,
     currency: 'ILS',
-    status: 'completed'
+    status: 'verified'
   }
 ];
 

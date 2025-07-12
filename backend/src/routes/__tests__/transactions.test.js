@@ -5,7 +5,6 @@ const mongoose = require('mongoose');
 const app = require('../../app');
 const { createTestUser } = require('../../test/testUtils');
 const { User, BankAccount, Category, SubCategory, Transaction } = require('../../models');
-const VendorMapping = require('../../models/VendorMapping');
 const transactionService = require('../../services/transactionService');
 
 describe('Transaction Routes', () => {
@@ -18,10 +17,6 @@ describe('Transaction Routes', () => {
   let transactions = [];
 
   beforeEach(async () => {
-    // Clean up vendor mappings
-    if (mongoose.connection.collections.vendormappings) {
-      await mongoose.connection.collections.vendormappings.deleteMany({});
-    }
     // Create test user with unique email
     const testData = await createTestUser(User, {
       email: `test${Date.now()}@example.com`
@@ -287,7 +282,7 @@ describe('Transaction Routes', () => {
   });
 
   describe('POST /api/transactions/:transactionId/categorize', () => {
-    it('should categorize a transaction and create vendor mapping', async () => {
+    it('should categorize a transaction', async () => {
       const res = await request(app)
         .post(`/api/transactions/${transaction._id}/categorize`)
         .set('Authorization', `Bearer ${token}`)
@@ -299,16 +294,6 @@ describe('Transaction Routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.category.toString()).toBe(category._id.toString());
       expect(res.body.subCategory.toString()).toBe(subCategory._id.toString());
-
-      // Verify vendor mapping was created
-      const vendorMapping = await VendorMapping.findOne({
-        vendorName: transaction.description.toLowerCase(),
-        userId: user._id
-      });
-
-      expect(vendorMapping).toBeTruthy();
-      expect(vendorMapping.category.toString()).toBe(category._id.toString());
-      expect(vendorMapping.subCategory.toString()).toBe(subCategory._id.toString());
     });
 
     it('should fail with invalid category', async () => {
@@ -336,44 +321,6 @@ describe('Transaction Routes', () => {
     });
   });
 
-  describe('Auto-categorization with Vendor Mapping', () => {
-    it('should use vendor mapping for auto-categorization', async () => {
-      // Create a vendor mapping
-      await VendorMapping.findOrCreate({
-        vendorName: 'test restaurant',
-        userId: user._id,
-        category: category._id,
-        subCategory: subCategory._id,
-        language: 'he'
-      });
-
-      // Create a new transaction with same vendor name
-      const newTx = await Transaction.create({
-        identifier: 'test-auto-categorize',
-        accountId: bankAccount._id,
-        userId: user._id,
-        amount: -50,
-        currency: 'ILS',
-        date: new Date(),
-        type: 'Expense',
-        description: 'test restaurant',
-        rawData: { 
-          description: 'test restaurant',
-          chargedAmount: -50
-        }
-      });
-
-      await transactionService.attemptAutoCategorization(newTx, bankAccount._id);
-      
-      // Wait for any async operations to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      const updatedTx = await Transaction.findById(newTx._id);
-      expect(updatedTx.category.toString()).toBe(category._id.toString());
-      expect(updatedTx.subCategory.toString()).toBe(subCategory._id.toString());
-      expect(updatedTx.categorizationMethod).toBe('previous_data');
-    });
-  });
 
   describe('Transaction Identifier Generation', () => {
     it('should generate a unique identifier when none is provided', async () => {

@@ -1,10 +1,11 @@
-const { Transaction, SubCategory, Category, PendingTransaction } = require('../models');
+const { Transaction } = require('../models');
 const { ObjectId } = require('mongodb');
 const stringSimilarity = require('string-similarity');
 const bankScraperService = require('./bankScraperService');
-const categoryAIService = require('./categoryAIService');
-const VendorMapping = require('../models/VendorMapping');
+const categoryMappingService = require('./categoryMappingService');
+const ManualCategorized = require('../models/ManualCategorized');
 const { CategorizationMethod, TransactionType, TransactionStatus } = require('../constants/enums');
+const logger = require('../utils/logger');
 
 const convertToObjectId = (id) => {
   try {
@@ -116,47 +117,61 @@ class TransactionService {
     const results = {
       newTransactions: 0,
       duplicates: 0,
+      skippedPending: 0,
       errors: []
     };
 
     for (const account of scrapedAccounts) {
       for (const transaction of account.txns) {
         try {
-          // First check if this transaction already exists in permanent storage
-          const existingPermanent = await Transaction.findOne({
-            identifier: transaction.identifier || null,
-            accountId: bankAccount._id
+          const transactionDate = new Date(transaction.date);
+          
+          // Skip transactions with pending status from scraper
+          if (transaction.status === 'pending') {
+            logger.info(`Skipping pending transaction: ${transaction.identifier}, date: ${transactionDate}, description: ${transaction.description}`);
+            results.skippedPending++;
+            continue;
+          }
+
+          // Look for similar transaction on same date
+          const existingTransaction = await Transaction.findOne({
+            accountId: bankAccount._id,
+            date: transactionDate,
+            description: transaction.description,
+            amount: transaction.chargedAmount,
+            'rawData.memo': transaction.rawData?.memo || null
           });
 
-          if (existingPermanent) {
+          if (existingTransaction) {
+            logger.warn(`Similar transaction found: ${transaction.identifier}, date: ${transactionDate}, description: ${transaction.description}`);
             results.duplicates++;
             continue;
           }
 
-          // Then check pending storage
-          const existingPending = await PendingTransaction.findOne({
-            identifier: transaction.identifier || null,
-            accountId: bankAccount._id
+            // Create transaction directly with identifier from scraper
+          const savedTx = await Transaction.create({
+            identifier: transaction.identifier,
+            accountId: bankAccount._id,
+            userId: bankAccount.userId,
+            date: transactionDate,
+            description: transaction.description,
+            amount: transaction.chargedAmount,
+            currency: bankAccount.defaultCurrency,
+            type: transaction.type || 'Expense',
+            rawData: {
+              ...transaction,
+              memo: transaction.rawData?.memo || transaction.memo || null
+            },
+            status: TransactionStatus.VERIFIED
           });
-
-          if (existingPending) {
-            results.duplicates++;
-            continue;
-          }
-
-          // Save to pending transactions
-          const savedTx = await PendingTransaction.createFromScraperData(
-            transaction, 
-            bankAccount._id, 
-            bankAccount.defaultCurrency,
-            bankAccount.userId
-          );
+          
           results.newTransactions++;
           
           // Attempt auto-categorization
-          await this.attemptAutoCategorization(savedTx, bankAccount._id);
+          await this.attemptAutoCategorization(savedTx);
         } catch (error) {
           if (error.code === 11000) {
+            logger.warn(`Duplicate transaction detected: ${transaction.identifier}`, error);
             results.duplicates++;
           } else {
             results.errors.push({
@@ -172,191 +187,9 @@ class TransactionService {
     return results;
   }
 
-  /**
-   * Get all pending transactions that need review
-   */
-  async getPendingTransactions(userId, options = {}) {
-    const query = { userId: convertToObjectId(userId) };
-    
-    if (options.accountId) {
-      query.accountId = convertToObjectId(options.accountId);
-    }
 
-    const baseQuery = PendingTransaction.find(query)
-      .sort({ date: -1 })
-      .populate('category')
-      .populate('subCategory');
-
-    if (options.limit) {
-      baseQuery.limit(options.limit);
-    }
-
-    if (options.skip) {
-      baseQuery.skip(options.skip);
-    }
-
-    return baseQuery;
-  }
-
-  /**
-   * Verify and move transactions from pending to permanent storage
-   */
-  async verifyTransactions(transactionIds, userId) {
-    const verifiedTransactions = [];
-    const errors = [];
-    const failedIds = new Set();
-
-    try {
-      // First fetch all pending transactions in one query with references
-      const pendingTxs = await PendingTransaction.find({
-        _id: { $in: transactionIds.map(id => convertToObjectId(id)) },
-        userId: convertToObjectId(userId)
-      }).populate([
-        { path: 'category', model: 'Category' },
-        { path: 'subCategory', model: 'SubCategory' }
-      ]);
-
-      console.log('Found pending transactions:', pendingTxs.length);
-
-      // Create a map for quick lookup
-      const txMap = new Map(pendingTxs.map(tx => [tx._id.toString(), tx]));
-
-      // Process each transaction ID
-      for (const txId of transactionIds) {
-        try {
-          const pendingTx = txMap.get(txId.toString());
-          if (!pendingTx) {
-            throw new Error(`Transaction ${txId} not found`);
-          }
-
-          // Log category information for debugging
-          console.log(`Processing tx ${txId}:`, {
-            category: pendingTx.category?._id,
-            subCategory: pendingTx.subCategory?._id
-          });
-
-          // Verify transaction
-          const verifiedTx = await pendingTx.verify();
-          verifiedTransactions.push(verifiedTx);
-          console.log(`Successfully verified tx ${txId}`);
-        } catch (error) {
-          console.error(`Failed to verify tx ${txId}:`, error);
-          failedIds.add(txId.toString());
-          errors.push({
-            transactionId: txId,
-            error: error.message
-          });
-        }
-      }
-
-      console.log('Verification complete:', {
-        verified: verifiedTransactions.length,
-        errors: errors.length
-      });
-
-      return {
-        verifiedCount: verifiedTransactions.length,
-        errors
-      };
-    } catch (error) {
-      console.error('Verification process failed:', error);
-      throw error;
-    }
-  }
-
-async attemptAutoCategorization(transaction, bankAccountId) {
-    // Skip if already categorized
-    if (transaction.category && transaction.subCategory) {
-      return;
-    }
-
-    try {
-      // Try to match by vendor mapping
-      const vendorMappings = await VendorMapping.findMatches(
-        transaction.description,
-        transaction.userId
-      );
-      
-      const vendorMapping = vendorMappings.length > 0 ? vendorMappings[0] : null;
-
-      if (vendorMapping) {
-        await transaction.categorize(
-          vendorMapping.category,
-          vendorMapping.subCategory,
-          CategorizationMethod.PREVIOUS_DATA,
-          false // needs verification
-        );
-        return;
-      }
-
-      // Try keyword-based matching
-      const searchText = [
-        transaction.description,
-        transaction.memo,
-        transaction.rawData?.description,
-        transaction.rawData?.memo,
-        transaction.rawData?.category
-      ].filter(Boolean).join(' ');
-
-      const matchingSubCategories = await SubCategory.findMatchingSubCategories(searchText);
-
-      if (matchingSubCategories.length === 1) {
-        const subCategory = matchingSubCategories[0];
-        await transaction.categorize(
-          subCategory.parentCategory._id,
-          subCategory._id,
-          CategorizationMethod.PREVIOUS_DATA,
-          false // needs verification
-        );
-        return;
-      }
-
-      // Try AI categorization as last resort
-      const availableCategories = await Category.find({ userId: transaction.userId })
-        .populate('subCategories')
-        .lean();
-
-      const suggestion = await categoryAIService.suggestCategory(
-        transaction.description,
-        transaction.amount,
-        availableCategories.map(cat => ({
-          id: cat._id.toString(),
-          name: cat.name,
-          type: cat.type,
-          subCategories: cat.subCategories.map(sub => ({
-            id: sub._id.toString(),
-            name: sub.name,
-            keywords: sub.keywords || []
-          }))
-        })),
-        transaction.userId.toString(),
-        transaction.rawData?.category || ''
-      );
-
-      // Always categorize with AI suggestion, but mark for verification
-      if (suggestion.categoryId && suggestion.subCategoryId) {
-        await transaction.categorize(
-          suggestion.categoryId,
-          suggestion.subCategoryId,
-          CategorizationMethod.AI,
-          false // needs verification
-        );
-
-        // Suggest new keywords for future matching
-        const newKeywords = await categoryAIService.suggestNewKeywords(transaction.description);
-        if (newKeywords.length > 0) {
-          const subCategory = await SubCategory.findById(suggestion.subCategoryId);
-          if (subCategory) {
-            const existingKeywords = new Set(subCategory.keywords || []);
-            newKeywords.forEach(keyword => existingKeywords.add(keyword.toLowerCase()));
-            subCategory.keywords = Array.from(existingKeywords);
-            await subCategory.save();
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Auto-categorization failed:', error);
-    }
+  async attemptAutoCategorization(transaction) {
+    await categoryMappingService.attemptAutoCategorization(transaction);
   }
 
   async getTransactionsByDateRange(accountId, startDate, endDate, userId) {
@@ -369,96 +202,33 @@ async attemptAutoCategorization(transaction, bankAccountId) {
     return Transaction.findUncategorized(accountId, userId);
   }
 
-  async categorizePendingTransaction(transactionId, categoryId, subCategoryId, userId) {
-    const pendingTx = await PendingTransaction.findOne({
-      _id: convertToObjectId(transactionId),
-      userId: convertToObjectId(userId)
-    });
-
-    if (!pendingTx) {
-      throw new Error('Pending transaction not found');
-    }
-
-    // Create vendor mapping for future auto-categorization
-    const vendorName = pendingTx.description.toLowerCase().trim();
-    await VendorMapping.findOrCreate({
-      vendorName,
-      userId: pendingTx.userId,
-      category: categoryId,
-      subCategory: subCategoryId,
-      language: 'he' // Assuming Hebrew as default
-    });
-
-    // Categorize the pending transaction
-    await pendingTx.categorize(categoryId, subCategoryId, CategorizationMethod.MANUAL);
-    return pendingTx;
-  }
-
-  async categorizeTransaction(transactionId, categoryId, subCategoryId, verify = false) {
-    // Check if this is a pending transaction first
-    const pendingTx = await PendingTransaction.findById(transactionId);
-    if (pendingTx) {
-      await this.categorizePendingTransaction(transactionId, categoryId, subCategoryId, pendingTx.userId);
-      if (verify) {
-        return await pendingTx.verify();
-      }
-      return pendingTx;
-    }
-
-    // If not pending, it's a regular transaction
+  async categorizeTransaction(transactionId, categoryId, subCategoryId, saveAsManual = false) {
+    // Find and update transaction
     const transaction = await Transaction.findById(transactionId);
     if (!transaction) {
       throw new Error('Transaction not found');
     }
 
-    // Create vendor mapping for future auto-categorization
-    const vendorName = transaction.description.toLowerCase().trim();
-    await VendorMapping.findOrCreate({
-      vendorName,
-      userId: transaction.userId,
-      category: categoryId,
-      subCategory: subCategoryId,
-      language: 'he' // Assuming Hebrew as default
-    });
+    // Update and save transaction
+    transaction.category = categoryId;
+    transaction.subCategory = subCategoryId;
+    transaction.categorizationMethod = CategorizationMethod.MANUAL;
+    transaction.status = TransactionStatus.VERIFIED;
+    await transaction.save();
 
-    await transaction.categorize(categoryId, subCategoryId, CategorizationMethod.MANUAL);
-    return transaction;
-  }
-
-  /**
-   * Find similar pending transactions for batch verification
-   */
-  async findSimilarPendingTransactions(transactionId, userId) {
-    const baseTx = await PendingTransaction.findOne({
-      _id: convertToObjectId(transactionId),
-      userId: convertToObjectId(userId)
-    }).populate(['category', 'subCategory']);
-
-    if (!baseTx) {
-      throw new Error('Transaction not found');
+    // Save manual categorization for future auto-categorization if requested
+    if (saveAsManual) {
+      await ManualCategorized.saveManualCategorization({
+        description: transaction.description.toLowerCase().trim(),
+        memo: transaction.memo?.toLowerCase().trim() || null,
+        userId: transaction.userId,
+        category: categoryId,
+        subCategory: subCategoryId,
+        language: 'he' // Assuming Hebrew as default
+      });
     }
 
-    // Find potential matches with pending transactions
-    const potentialMatches = await PendingTransaction.find({
-      _id: { $ne: baseTx._id },
-      userId: convertToObjectId(userId)
-    }).populate(['category', 'subCategory']);
-
-    // No category filter in query, let similarity scoring handle it
-
-    // Calculate similarity scores
-    const similarTransactions = potentialMatches
-      .map(transaction => ({
-        transaction,
-        similarity: this._calculateSimilarityScore(baseTx, transaction)
-      }))
-      .filter(({ similarity }) => similarity >= 0.7) // Only include highly similar transactions
-      .sort((a, b) => b.similarity - a.similarity); // Sort by similarity score
-
-    return {
-      transactions: similarTransactions.map(({ transaction }) => transaction),
-      similarity: similarTransactions.length > 0 ? similarTransactions[0].similarity : 0
-    };
+    return transaction;
   }
 
   async getSpendingSummary(accountId, startDate, endDate) {

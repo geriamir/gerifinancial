@@ -1,63 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   Drawer,
   List,
   ListItemButton,
   ListItemIcon,
-  ListItemText,
-  Badge
+  ListItemText
 } from '@mui/material';
 import {
   Home as HomeIcon,
   AccountBalance as AccountIcon,
-  Receipt as TransactionsIcon,
-  Pending as PendingIcon
+  Receipt as TransactionsIcon
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { transactionsApi } from '../../services/api/transactions';
-
-const REFRESH_INTERVAL = 30000; // 30 seconds
 
 interface NavigationItem {
   title: string;
   path: string;
   icon: React.ReactElement;
-  showBadge?: boolean;
 }
 
 const navigationItems: NavigationItem[] = [
   { title: 'Dashboard', path: '/', icon: <HomeIcon /> },
   { title: 'Bank Accounts', path: '/banks', icon: <AccountIcon /> },
-  { title: 'Transactions', path: '/transactions', icon: <TransactionsIcon /> },
-  { 
-    title: 'Pending', 
-    path: '/pending', 
-    icon: <PendingIcon />, 
-    showBadge: true 
-  }
+  { title: 'Transactions', path: '/transactions', icon: <TransactionsIcon /> }
 ];
 
 export const NavigationMenu: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [pendingVerifications, setPendingVerifications] = useState(0);
-
-  useEffect(() => {
-  const loadProcessingStats = async () => {
-      try {
-        const stats = await transactionsApi.getProcessingStats();
-        setPendingVerifications(stats.pending);
-      } catch (err) {
-        console.error('Failed to load verification stats:', err);
-      }
-    };
-
-    loadProcessingStats();
-    const interval = setInterval(loadProcessingStats, REFRESH_INTERVAL);
-
-    return () => clearInterval(interval);
-  }, []);
-
   const handleNavigation = (path: string) => {
     navigate(path);
   };
@@ -85,13 +55,7 @@ export const NavigationMenu: React.FC = () => {
             onClick={() => handleNavigation(item.path)}
           >
             <ListItemIcon>
-              {item.showBadge && pendingVerifications > 0 ? (
-                <Badge badgeContent={pendingVerifications} color="error">
-                  {item.icon}
-                </Badge>
-              ) : (
-                item.icon
-              )}
+              {item.icon}
             </ListItemIcon>
             <ListItemText primary={item.title} />
           </ListItemButton>
