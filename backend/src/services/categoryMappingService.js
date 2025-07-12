@@ -36,7 +36,7 @@ class CategoryMappingService {
       const manualMatches = await ManualCategorized.findMatches(
         transaction.description,
         transaction.userId,
-        transaction.memo || null
+        transaction.memo || transaction.rawData?.memo || null
       );
       
       // Filter matches by category type
@@ -72,7 +72,7 @@ class CategoryMappingService {
       // Try keyword-based matching - gather all potential search terms
       const searchTerms = [
         transaction.description,
-        transaction.memo,
+        transaction.memo || transaction.rawData?.memo,
         transaction.rawData?.description,
         transaction.rawData?.memo,
         transaction.rawData?.category
@@ -127,7 +127,7 @@ class CategoryMappingService {
       console.log('Attempting AI categorization for transaction:', {
         description: transaction.description,
         rawCategory: transaction.rawData?.category,
-        memo: transaction.memo
+        memo: transaction.memo || transaction.rawData?.memo
       });
 
       const suggestion = await categoryAIService.suggestCategory(
@@ -145,7 +145,7 @@ class CategoryMappingService {
         })),
         transaction.userId.toString(),
         transaction.rawData?.category || '',
-        transaction.memo || ''
+        transaction.memo || transaction.rawData?.memo || ''
       );
 
       // Always categorize with AI suggestion, but mark for verification

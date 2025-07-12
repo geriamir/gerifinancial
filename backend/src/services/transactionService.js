@@ -227,7 +227,7 @@ class TransactionService {
     if (saveAsManual) {
       await ManualCategorized.saveManualCategorization({
         description: transaction.description.toLowerCase().trim(),
-        memo: transaction.memo?.toLowerCase().trim() || null,
+        memo: (transaction.memo || transaction.rawData?.memo)?.toLowerCase().trim() || null,
         userId: transaction.userId,
         category: categoryId,
         subCategory: subCategoryId,
