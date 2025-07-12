@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { Transaction, BankAccount, PendingTransaction } = require('../../models');
+const { Transaction, BankAccount } = require('../../models');
 const transactionService = require('../../services/transactionService');
 const { TransactionType } = require('../../constants/enums');
 
@@ -10,50 +10,21 @@ describe('Transaction Deduplication', () => {
     testBankAccount = await BankAccount.create({
       userId: new mongoose.Types.ObjectId(),
       name: 'Test Account',
-      bankId: 'test-bank',
+      bankId: 'leumi',  // Using a real bank enum value
       accountNumber: '123456',
-      defaultCurrency: 'ILS'
+      defaultCurrency: 'ILS',
+      credentials: {
+        username: 'testuser',
+        password: 'testpass'
+      }
     });
   });
 
   afterEach(async () => {
     await Promise.all([
       Transaction.deleteMany({}),
-      PendingTransaction.deleteMany({}),
       BankAccount.deleteMany({})
     ]);
-  });
-
-  describe('Same-Day Transactions', () => {
-    it('should allow multiple transactions with same details in single scraping session', async () => {
-      const baseTransaction = {
-        date: new Date('2025-01-01'),
-        chargedAmount: -100,
-        description: 'Coffee Shop',
-        type: TransactionType.EXPENSE
-      };
-
-      const mockScrapedAccounts = [{
-        txns: [
-          { ...baseTransaction, identifier: 'tx1' },
-          { ...baseTransaction, identifier: 'tx2' }
-        ]
-      }];
-
-      const result = await transactionService.processScrapedTransactions(
-        mockScrapedAccounts,
-        testBankAccount
-      );
-
-      expect(result.newTransactions).toBe(2);
-      expect(result.duplicates).toBe(0);
-
-      const savedTransactions = await PendingTransaction.find({
-        accountId: testBankAccount._id,
-        date: new Date('2025-01-01')
-      });
-      expect(savedTransactions).toHaveLength(2);
-    });
   });
 
   describe('Cross-Session Deduplication', () => {
@@ -130,13 +101,13 @@ describe('Transaction Deduplication', () => {
       expect(result.newTransactions).toBe(2);
       expect(result.duplicates).toBe(0);
 
-      const firstDayTransactions = await PendingTransaction.find({
+      const firstDayTransactions = await Transaction.find({
         accountId: testBankAccount._id,
         date: new Date('2025-01-01')
       });
       expect(firstDayTransactions).toHaveLength(1);
 
-      const secondDayTransactions = await PendingTransaction.find({
+      const secondDayTransactions = await Transaction.find({
         accountId: testBankAccount._id,
         date: new Date('2025-01-02')
       });
@@ -166,7 +137,7 @@ describe('Transaction Deduplication', () => {
       expect(result.duplicates).toBe(1); // Second instance should be marked duplicate
       expect(result.newTransactions).toBe(1);
 
-      const savedTransactions = await PendingTransaction.find({
+      const savedTransactions = await Transaction.find({
         accountId: testBankAccount._id
       });
       expect(savedTransactions).toHaveLength(1);

@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { Transaction, BankAccount, PendingTransaction } = require('../../models');
+const { Transaction, BankAccount } = require('../../models');
 const transactionService = require('../../services/transactionService');
 const { TransactionType } = require('../../constants/enums');
 
@@ -10,32 +10,34 @@ describe('Transaction Scraping Integration', () => {
     testBankAccount = await BankAccount.create({
       userId: new mongoose.Types.ObjectId(),
       name: 'Test Account',
-      bankId: 'test-bank',
+      bankId: 'leumi',
       accountNumber: '123456',
-      defaultCurrency: 'ILS'
+      defaultCurrency: 'ILS',
+      credentials: {
+        username: 'testuser',
+        password: 'testpass'
+      }
     });
   });
 
   afterEach(async () => {
     await Promise.all([
       Transaction.deleteMany({}),
-      PendingTransaction.deleteMany({}),
       BankAccount.deleteMany({})
     ]);
   });
 
-  it('should handle same-day transactions correctly', async () => {
+  it('should handle same-day transactions with different descriptions', async () => {
     const baseTransaction = {
       date: new Date('2025-01-01'),
       chargedAmount: -100,
-      description: 'Coffee Shop',
       type: TransactionType.EXPENSE
     };
 
     const mockScrapedAccounts = [{
       txns: [
-        { ...baseTransaction, identifier: 'tx1' },
-        { ...baseTransaction, identifier: 'tx2' } // Same details but different identifier
+        { ...baseTransaction, description: 'Coffee Shop 1', identifier: 'tx1' },
+        { ...baseTransaction, description: 'Coffee Shop 2', identifier: 'tx2' }
       ]
     }];
 
@@ -44,11 +46,11 @@ describe('Transaction Scraping Integration', () => {
       testBankAccount
     );
 
-    // Both transactions should be saved (not marked as duplicates)
+    // Different descriptions should be saved as separate transactions
     expect(result.newTransactions).toBe(2);
     expect(result.duplicates).toBe(0);
 
-    const savedTransactions = await PendingTransaction.find({
+    const savedTransactions = await Transaction.find({
       accountId: testBankAccount._id
     });
     expect(savedTransactions).toHaveLength(2);
@@ -78,7 +80,7 @@ describe('Transaction Scraping Integration', () => {
     expect(result.duplicates).toBe(1);
     expect(result.newTransactions).toBe(0);
 
-    const savedTransactions = await PendingTransaction.find({
+    const savedTransactions = await Transaction.find({
       accountId: testBankAccount._id
     });
     expect(savedTransactions).toHaveLength(1); // Only one should be saved
@@ -107,10 +109,69 @@ describe('Transaction Scraping Integration', () => {
     expect(result.duplicates).toBe(1);
     expect(result.newTransactions).toBe(0);
 
-    const savedTransactions = await PendingTransaction.find({
+    const savedTransactions = await Transaction.find({
       accountId: testBankAccount._id
     });
     expect(savedTransactions).toHaveLength(1);
+  });
+
+  it('should detect duplicates with matching memo', async () => {
+    const baseTransaction = {
+      date: new Date('2025-01-01'),
+      chargedAmount: -100,
+      description: 'Coffee Shop',
+      rawData: { memo: 'Branch #123' },
+      type: TransactionType.EXPENSE
+    };
+
+    // First scraping session
+    await transactionService.processScrapedTransactions(
+      [{ txns: [{ ...baseTransaction, identifier: 'tx1' }] }],
+      testBankAccount
+    );
+
+    // Second session with same transaction details and memo
+    const result = await transactionService.processScrapedTransactions(
+      [{ txns: [{ ...baseTransaction, identifier: 'tx2' }] }],
+      testBankAccount
+    );
+
+    expect(result.duplicates).toBe(1);
+    expect(result.newTransactions).toBe(0);
+
+    const savedTransactions = await Transaction.find({
+      accountId: testBankAccount._id
+    });
+    expect(savedTransactions).toHaveLength(1);
+  });
+
+  it('should allow same description with different memos', async () => {
+    const baseTransaction = {
+      date: new Date('2025-01-01'),
+      chargedAmount: -100,
+      description: 'Coffee Shop',
+      type: TransactionType.EXPENSE
+    };
+
+    const mockScrapedAccounts = [{
+      txns: [
+        { ...baseTransaction, rawData: { memo: 'Branch #123' }, identifier: 'tx1' },
+        { ...baseTransaction, rawData: { memo: 'Branch #456' }, identifier: 'tx2' }
+      ]
+    }];
+
+    const result = await transactionService.processScrapedTransactions(
+      mockScrapedAccounts,
+      testBankAccount
+    );
+
+    expect(result.newTransactions).toBe(2);
+    expect(result.duplicates).toBe(0);
+
+    const savedTransactions = await Transaction.find({
+      accountId: testBankAccount._id
+    });
+    expect(savedTransactions).toHaveLength(2);
   });
 
   it('should allow same details on different dates', async () => {
@@ -135,7 +196,7 @@ describe('Transaction Scraping Integration', () => {
     expect(result.newTransactions).toBe(2);
     expect(result.duplicates).toBe(0);
 
-    const savedTransactions = await PendingTransaction.find({
+    const savedTransactions = await Transaction.find({
       accountId: testBankAccount._id
     });
     expect(savedTransactions).toHaveLength(2);

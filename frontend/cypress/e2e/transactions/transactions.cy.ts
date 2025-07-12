@@ -27,7 +27,7 @@ interface Transaction {
   date: string;
   description: string;
   type: 'Expense' | 'Income' | 'Transfer';
-  status: 'pending' | 'processed' | 'error';
+  status: 'verified' | 'error' | 'duplicate';
   category?: Category;
   createdAt: string;
   updatedAt: string;

@@ -34,13 +34,16 @@ const subCategorySchema = new mongoose.Schema({
 // Ensure subcategory names are unique within their parent category and user
 subCategorySchema.index({ name: 1, parentCategory: 1, userId: 1 }, { unique: true });
 
-// Add method to find matching subcategories based on description
-subCategorySchema.statics.findMatchingSubCategories = async function(description) {
-  const normalizedDescription = description.toLowerCase();
+// Add method to find matching subcategories based on search terms
+subCategorySchema.statics.findMatchingSubCategories = async function(searchTerms) {
+  const normalizedTerms = searchTerms
+    .map(term => term.toLowerCase())
+    .flatMap(term => term.split(' '));
   
+  // Find subcategories where any keyword matches any of the search terms
   return this.find({
     keywords: {
-      $in: [new RegExp(normalizedDescription, 'i')]
+      $in: normalizedTerms.map(term => new RegExp(term, 'i'))
     }
   }).populate('parentCategory');
 };
