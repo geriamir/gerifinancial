@@ -78,7 +78,7 @@ const bankAccountSchema = new mongoose.Schema({
         type: Date,
         default: () => {
           const date = new Date();
-          date.setMonth(date.getMonth() - 3); // Default to 3 months ago
+          date.setMonth(date.getMonth() - 6); // Default to 6 months ago for first scraping
           return date;
         }
       },
@@ -87,7 +87,7 @@ const bankAccountSchema = new mongoose.Schema({
         type: Number,
         min: 1,
         max: 12,
-        default: 3
+        default: 6
       }
     }
   }

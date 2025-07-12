@@ -14,7 +14,7 @@ class BankScraperService {
 
   createScraper(bankAccount, options = {}) {
     const {
-      startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days by default
+      startDate = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000), // Last 6 months by default
       showBrowser = false,
       verbose = false,
       timeout = this.DEFAULT_TIMEOUT

@@ -19,7 +19,8 @@
     "test:e2e:auth": "concurrently \"npm run dev\" \"cd frontend && wait-on http://localhost:3000 http://localhost:3001 && npm run cypress:run --spec 'cypress/e2e/auth/**/*.cy.ts'\"",
     "test:e2e:bank": "concurrently \"npm run dev\" \"cd frontend && wait-on http://localhost:3000 http://localhost:3001 && npm run cypress:run --spec 'cypress/e2e/bank/**/*.cy.ts'\"",
     "test:e2e:new": "node scripts/test-e2e.js",
-    "test:all": "npm run test && npm run test:e2e:headless"
+    "test:all": "npm run test && npm run test:e2e:headless",
+    "clear-users": "cd backend && node src/scripts/clearUserData.js"
   },
   "repository": {
     "type": "git",
