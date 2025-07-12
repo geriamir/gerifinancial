@@ -3,7 +3,6 @@ const natural = require('natural');
 const translationService = require('./translationService');
 const WordTokenizer = natural.WordTokenizer;
 const PorterStemmer = natural.PorterStemmer;
-const VendorMapping = require('../models/VendorMapping');
 
 class CategoryAIService {
   constructor() {
@@ -160,7 +159,7 @@ class CategoryAIService {
    * @param {string} description - Transaction description
    * @param {number} amount - Transaction amount
    * @param {Array<{id: string, name: string, type: string, subCategories: Array<{id: string, name: string, keywords: string[]}>}>} availableCategories - List of available categories
-   * @param {string} userId - User ID for vendor mapping lookup
+   * @param {string} userId - User ID for authentication
    * @param {string} rawCategory - Raw category from bank
    * @param {string} memo - Transaction memo
    * @returns {Promise<{categoryId: string, subCategoryId: string, confidence: number, reasoning: string}>}
@@ -179,41 +178,7 @@ class CategoryAIService {
         return noMatch;
       }
 
-      // First try to find an exact vendor match
-      const vendorMatches = await VendorMapping.findMatches(description, userId);
-      if (vendorMatches.length > 0) {
-        const match = vendorMatches[0];
-        logger.info('Found exact vendor match:', {
-          vendor: match.vendorName,
-          category: match.category,
-          subCategory: match.subCategory
-        });
-        return {
-          categoryId: match.category.toString(),
-          subCategoryId: match.subCategory.toString(),
-          confidence: match.confidence,
-          reasoning: `Matched based on known vendor: ${match.vendorName}`
-        };
-      }
-
-      // Try similar vendor match
-      const similarVendor = await VendorMapping.suggestMapping(description, userId);
-      if (similarVendor) {
-        logger.info('Found similar vendor:', {
-          original: description,
-          matchedVendor: similarVendor.vendorName,
-          category: similarVendor.category,
-          subCategory: similarVendor.subCategory
-        });
-        return {
-          categoryId: similarVendor.category.toString(),
-          subCategoryId: similarVendor.subCategory.toString(),
-          confidence: 0.7,
-          reasoning: `Matched based on similar vendor: ${similarVendor.vendorName}`
-        };
-      }
-
-      // No vendor match, try translation and keyword matching
+      // Process text using AI categorization
 
       // Process rawCategory first
       let match;

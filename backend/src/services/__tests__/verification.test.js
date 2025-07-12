@@ -166,38 +166,4 @@ describe('Transaction Verification Flow', () => {
     });
   });
 
-  describe('Vendor Mapping Integration', () => {
-    it('should create vendor mapping when categorizing transactions', async () => {
-      await transactionService.categorizeTransaction(
-        testTransaction._id,
-        category._id,
-        subCategory._id,
-        true // saveAsManual
-      );
-
-      // Create new transaction with same description
-      const newTransaction = await Transaction.create({
-        identifier: `test-${Date.now()}-4`,
-        accountId: new mongoose.Types.ObjectId(),
-        userId: user._id,
-        amount: -90,
-        currency: 'ILS',
-        date: new Date(),
-        type: TransactionType.EXPENSE,
-        description: 'Test Restaurant',
-        status: TransactionStatus.VERIFIED,
-        rawData: {
-          description: 'Test Restaurant',
-          chargedAmount: -90
-        }
-      });
-
-      await transactionService.attemptAutoCategorization(newTransaction);
-
-      const updated = await Transaction.findById(newTransaction._id);
-      expect(updated.category.toString()).toBe(category._id.toString());
-      expect(updated.subCategory.toString()).toBe(subCategory._id.toString());
-      expect(updated.categorizationMethod).toBe(CategorizationMethod.PREVIOUS_DATA);
-    });
-  });
 });
