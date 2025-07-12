@@ -14,7 +14,6 @@ import Dashboard from './pages/Dashboard';
 import Banks from './pages/Banks';
 import TransactionsPage from './pages/Transactions';
 import { VerifyTransactions } from './pages/VerifyTransactions';
-import { PendingTransactions } from './pages/PendingTransactions';
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
@@ -63,7 +62,6 @@ const App: React.FC = () => {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="banks" element={<Banks />} />
               <Route path="transactions" element={<TransactionsPage />} />
-              <Route path="pending" element={<PendingTransactions />} />
               <Route path="verify" element={<VerifyTransactions />} />
               <Route path="profile" element={<Profile />} />
             </Route>
