@@ -114,7 +114,7 @@ class TranslationService {
       } catch (error) {
         if (error.message.toLowerCase().includes('too many requests') || error.response?.status === 429) {
           if (retryCount === maxRetries) {
-            logger.error(`Translation failed after ${maxRetries} retries:`, error);
+            logger.error(`Translation of ${text} failed after ${maxRetries} retries:`, error);
             return text; // Return original text after all retries exhausted
           }
 

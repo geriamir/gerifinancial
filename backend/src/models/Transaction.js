@@ -219,51 +219,6 @@ transactionSchema.statics.getSpendingSummary = async function(accountId, startDa
   };
 };
 
-// Method to create transaction from scraper data
-transactionSchema.statics.createFromScraperData = async function(scraperTransaction, accountId, defaultCurrency, userId) {
-  if (!userId) {
-    throw new Error('userId is required when creating a transaction');
-  }
-
-  const type = determineTransactionType(scraperTransaction);
-  
-  // Use provided identifier or generate a unique one
-  const identifier = scraperTransaction.identifier || [
-    accountId,
-    scraperTransaction.date,
-    scraperTransaction.chargedAmount,
-    scraperTransaction.description,
-    Date.now(),
-    Math.random().toString(36).slice(2, 8)
-  ].join('_');
-  
-  return await this.create({
-    identifier,
-    originalIdentifier: scraperTransaction.originalIdentifier || scraperTransaction.identifier || null,
-    accountId,
-    userId,
-    amount: scraperTransaction.chargedAmount,
-    currency: scraperTransaction.currency || defaultCurrency,
-    date: new Date(scraperTransaction.date),
-    type,
-    description: scraperTransaction.description,
-    memo: scraperTransaction.memo || '',
-    rawData: scraperTransaction,
-    status: TransactionStatus.VERIFIED // All transactions in main storage are verified
-  });
-};
-
-// Helper function to determine transaction type
-function determineTransactionType(scraperTransaction) {
-  const amount = scraperTransaction.chargedAmount;
-  
-  if (scraperTransaction.type === 'CREDIT_CARD_PAYMENT') {
-    return TransactionType.TRANSFER;
-  }
-  
-  return amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME;
-}
-
 const Transaction = mongoose.model('Transaction', transactionSchema);
 
 module.exports = Transaction;

@@ -167,7 +167,7 @@ class TransactionService {
           results.newTransactions++;
           
           // Attempt auto-categorization which will also set the transaction type
-          await this.attemptAutoCategorization(savedTx);
+          await categoryMappingService.attemptAutoCategorization(savedTx);
         } catch (error) {
           if (error.code === 11000) {
             logger.warn(`Duplicate transaction detected: ${transaction.identifier}`, error);
@@ -195,9 +195,6 @@ class TransactionService {
   }
 
 
-  async attemptAutoCategorization(transaction) {
-    await categoryMappingService.attemptAutoCategorization(transaction);
-  }
 
   async getTransactionsByDateRange(accountId, startDate, endDate, userId) {
     if (!userId) throw new Error('userId is required');
