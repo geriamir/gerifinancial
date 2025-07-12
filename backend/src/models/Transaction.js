@@ -26,15 +26,9 @@ const transactionSchema = new mongoose.Schema({
     required: [true, 'Amount is required'],
     validate: {
       validator: function(v) {
-        // Amount can be negative for expenses, positive for income/transfers
-        return typeof v === 'number' && !isNaN(v) &&
-               ((this.type === TransactionType.EXPENSE && v < 0) || 
-                ([TransactionType.INCOME, TransactionType.TRANSFER].includes(this.type) && v > 0));
+        return typeof v === 'number' && !isNaN(v);
       },
-      message: props => {
-        const sign = props.value < 0 ? 'negative' : 'positive';
-        return `Amount must be ${props.value < 0 ? 'negative for expenses' : 'positive for income/transfers'} (got ${sign} value for type ${props.type})`;
-      }
+      message: props => `${props.value} is not a valid amount!`
     }
   },
   currency: {
@@ -62,10 +56,10 @@ const transactionSchema = new mongoose.Schema({
       values: Object.values(TransactionType),
       message: '{VALUE} is not a valid transaction type'
     },
-    required: [true, 'Transaction type is required'],
+    required: false, // Allow transactions without type initially
     validate: {
       validator: function(v) {
-        return Object.values(TransactionType).includes(v);
+        return !v || Object.values(TransactionType).includes(v);
       },
       message: props => `${props.value} is not a valid transaction type. Must be one of: ${Object.values(TransactionType).join(', ')}`
     }

@@ -22,12 +22,14 @@ class CategoryMappingService {
     try {
       // Determine valid category types
       let categoryTypes = [];
-      // Allow Transfer type regardless of amount
-      if (transaction.type === TransactionType.TRANSFER) {
-        categoryTypes.push(TransactionType.TRANSFER);
+      if (transaction.type) {
+        // If transaction already has a type, use it
+        categoryTypes.push(transaction.type);
       } else {
-        // For non-transfer transactions, use appropriate type based on amount
-        categoryTypes.push(transaction.amount > 0 ? TransactionType.INCOME : TransactionType.EXPENSE);
+        // For transactions without type, consider all types but prefer amount-based logic
+        // Transfer type is allowed regardless of amount
+        categoryTypes.push(TransactionType.TRANSFER);
+        categoryTypes.push(transaction.amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME);
       }
 
       // Try to match by manual categorization
@@ -54,6 +56,14 @@ class CategoryMappingService {
           CategorizationMethod.PREVIOUS_DATA,
           false // needs verification
         );
+        
+        // Set transaction type based on the category type
+        const category = await Category.findById(manualMatch.category);
+        if (category && !transaction.type) {
+          transaction.type = category.type;
+          await transaction.save();
+        }
+        
         return await Transaction.findById(transaction._id)
           .populate('category')
           .populate('subCategory');
@@ -95,6 +105,13 @@ class CategoryMappingService {
           CategorizationMethod.PREVIOUS_DATA,
           false // needs verification
         );
+        
+        // Set transaction type based on the category type
+        if (!transaction.type) {
+          transaction.type = subCategory.parentCategory.type;
+          await transaction.save();
+        }
+        
         return await Transaction.findById(transaction._id)
           .populate('category')
           .populate('subCategory');
@@ -141,9 +158,23 @@ class CategoryMappingService {
           CategorizationMethod.AI,
           false // needs verification
         );
+        
+        // Set transaction type based on the category type
+        const category = await Category.findById(suggestion.categoryId);
+        if (category && !transaction.type) {
+          transaction.type = category.type;
+          await transaction.save();
+        }
+        
         return await Transaction.findById(transaction._id)
           .populate('category')
           .populate('subCategory');
+      }
+      
+      // If no categorization was successful and transaction has no type, set default type based on amount
+      if (!transaction.type) {
+        transaction.type = transaction.amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME;
+        await transaction.save();
       }
     } catch (error) {
       logger.error('Auto-categorization failed:', error);

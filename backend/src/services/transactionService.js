@@ -148,7 +148,7 @@ class TransactionService {
             continue;
           }
 
-            // Create transaction directly with identifier from scraper
+          // Create transaction without type initially
           const savedTx = await Transaction.create({
             identifier: transaction.identifier,
             accountId: bankAccount._id,
@@ -157,7 +157,6 @@ class TransactionService {
             description: transaction.description,
             amount: transaction.chargedAmount,
             currency: bankAccount.defaultCurrency,
-            type: transaction.type || 'Expense',
             rawData: {
               ...transaction,
               memo: transaction.rawData?.memo || transaction.memo || null
@@ -167,7 +166,7 @@ class TransactionService {
           
           results.newTransactions++;
           
-          // Attempt auto-categorization
+          // Attempt auto-categorization which will also set the transaction type
           await this.attemptAutoCategorization(savedTx);
         } catch (error) {
           if (error.code === 11000) {
@@ -320,6 +319,17 @@ class TransactionService {
       total
     };
   }
+}
+
+// Helper function to determine transaction type
+function determineTransactionType(scraperTransaction) {
+  const amount = scraperTransaction.chargedAmount;
+  
+  if (scraperTransaction.type === 'CREDIT_CARD_PAYMENT') {
+    return TransactionType.TRANSFER;
+  }
+  
+  return amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME;
 }
 
 module.exports = new TransactionService();
