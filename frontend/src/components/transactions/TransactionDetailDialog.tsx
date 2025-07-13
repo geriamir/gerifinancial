@@ -156,8 +156,8 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                     Amount
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="h5" component="div">
-                      {formatCurrency(transaction.amount, transaction.currency)}
+                    <Typography variant="h5" component="div" sx={{ fontFamily: 'monospace' }}>
+                      {formatCurrency(transaction.amount, transaction.currency).trim()}
                     </Typography>
                     {transaction.type && (
                       <Chip 
