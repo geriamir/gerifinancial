@@ -322,49 +322,78 @@ describe('Transaction Routes', () => {
   });
 
 
-  describe('Transaction Identifier Generation', () => {
-    it('should generate a unique identifier when none is provided', async () => {
-      const transaction = await Transaction.createFromScraperData({
-        chargedAmount: -75,
-        date: new Date(),
-        description: 'Auto ID Test'
-      }, bankAccount._id, 'ILS', user._id);
+  describe('Transaction Processing via Service', () => {
+    it('should process scraped transactions correctly', async () => {
+      const scrapedAccounts = [{
+        txns: [{
+          chargedAmount: -75,
+          date: new Date(),
+          description: 'Service Test Transaction',
+          identifier: 'service-test-1'
+        }]
+      }];
 
-      expect(transaction.identifier).toBeTruthy();
-      expect(typeof transaction.identifier).toBe('string');
-      expect(transaction.identifier.includes(bankAccount._id.toString())).toBe(true);
+      const result = await transactionService.processScrapedTransactions(
+        scrapedAccounts, 
+        bankAccount
+      );
+
+      expect(result.newTransactions).toBe(1);
+      expect(result.duplicates).toBe(0);
+
+      // Verify transaction was created
+      const savedTransaction = await Transaction.findOne({
+        description: 'Service Test Transaction'
+      });
+      expect(savedTransaction).toBeTruthy();
+      expect(savedTransaction.identifier).toBe('service-test-1');
     });
 
-    it('should use provided identifier when available', async () => {
-      const providedId = 'test-provided-id';
-      const transaction = await Transaction.createFromScraperData({
-        identifier: providedId,
-        chargedAmount: -75,
-        date: new Date(),
-        description: 'Provided ID Test'
-      }, bankAccount._id, 'ILS', user._id);
+    it('should handle duplicate detection correctly via MongoDB constraints', async () => {
+      const scrapedAccounts = [{
+        txns: [{
+          chargedAmount: -75,
+          date: new Date(),
+          description: 'Duplicate Test',
+          identifier: 'duplicate-test-1'
+        }]
+      }];
 
-      expect(transaction.identifier).toBe(providedId);
+      // Process first time
+      const result1 = await transactionService.processScrapedTransactions(
+        scrapedAccounts, 
+        bankAccount
+      );
+      expect(result1.newTransactions).toBe(1);
+
+      // Process same data again (same identifier should trigger duplicate key error)
+      const result2 = await transactionService.processScrapedTransactions(
+        scrapedAccounts, 
+        bankAccount
+      );
+      expect(result2.duplicates).toBe(1);
+      expect(result2.newTransactions).toBe(0);
     });
 
-    it('should generate unique identifiers for similar transactions', async () => {
-      const date = new Date();
-      const description = 'Similar Transaction';
-      const amount = -100;
+    it('should handle transactions without identifiers', async () => {
+      const scrapedAccounts = [{
+        txns: [{
+          chargedAmount: -100,
+          date: new Date(),
+          description: 'No ID Transaction'
+          // No identifier provided - should cause validation error
+        }]
+      }];
 
-      const transaction1 = await Transaction.createFromScraperData({
-        chargedAmount: amount,
-        date,
-        description
-      }, bankAccount._id, 'ILS', user._id);
+      const result = await transactionService.processScrapedTransactions(
+        scrapedAccounts, 
+        bankAccount
+      );
 
-      const transaction2 = await Transaction.createFromScraperData({
-        chargedAmount: amount,
-        date,
-        description
-      }, bankAccount._id, 'ILS', user._id);
-
-      expect(transaction1.identifier).not.toBe(transaction2.identifier);
+      // Should result in an error due to missing identifier
+      expect(result.newTransactions).toBe(0);
+      expect(result.errors.length).toBe(1);
+      expect(result.errors[0].error).toContain('identifier');
     });
   });
 });
