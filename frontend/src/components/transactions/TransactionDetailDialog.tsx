@@ -177,7 +177,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 </Typography>
               </Box>
               
-              {transaction.memo && (
+              {(transaction.memo || transaction.rawData?.memo) && (
                 <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mt: 1 }}>
                   <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
                   <Box>
@@ -185,7 +185,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                       Memo
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {transaction.memo}
+                      {transaction.memo || transaction.rawData?.memo}
                     </Typography>
                   </Box>
                 </Box>
