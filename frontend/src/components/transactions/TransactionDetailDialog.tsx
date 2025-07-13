@@ -207,42 +207,59 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                   </Box>
                 </Box>
               )}
-            </Paper>
 
-            {/* Category Information */}
-            <Paper sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <CategoryIcon color="primary" />
-                  <Typography variant="h6">
-                    Category
-                  </Typography>
+              {/* Category Information */}
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'flex-start', 
+                  gap: 1, 
+                  mt: 1,
+                  cursor: 'pointer',
+                  '&:hover': {
+                    bgcolor: 'rgba(0, 0, 0, 0.04)',
+                    borderRadius: 1
+                  },
+                  p: 1,
+                  ml: -1,
+                  mr: -1
+                }}
+                onClick={handleCategoryEdit}
+              >
+                <CategoryIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
+                <Box sx={{ flex: 1 }}>
+                  {transaction.category && transaction.subCategory ? (
+                    <>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        {transaction.category.name}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {transaction.subCategory.name}
+                      </Typography>
+                    </>
+                  ) : (
+                    <>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Category
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Uncategorized
+                        </Typography>
+                        <Chip label="Click to categorize" color="warning" size="small" />
+                      </Box>
+                    </>
+                  )}
+                  {updating && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                      <CircularProgress size={12} />
+                      <Typography variant="caption" color="text.secondary">
+                        Updating...
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
-                <Button
-                  startIcon={<EditIcon />}
-                  onClick={handleCategoryEdit}
-                  disabled={updating}
-                  size="small"
-                >
-                  {updating ? <CircularProgress size={16} /> : 'Edit'}
-                </Button>
               </Box>
-
-              {transaction.category && transaction.subCategory ? (
-                <Box>
-                  <Typography variant="body1" fontWeight="medium" gutterBottom>
-                    {transaction.category.name} → {transaction.subCategory.name}
-                  </Typography>
-                </Box>
-              ) : (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Uncategorized
-                  </Typography>
-                  <Chip label="Needs Categorization" color="warning" size="small" />
-                </Box>
-              )}
-
             </Paper>
           </Box>
         </DialogContent>
