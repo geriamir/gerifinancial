@@ -9,7 +9,6 @@ import {
   Card,
   CardActionArea,
   Button,
-  Grid,
   CircularProgress,
   Backdrop,
   ToggleButtonGroup,
@@ -107,11 +106,6 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
 
   const handleNextPage = () => {
     setCurrentPage(prev => Math.min(totalPages - 1, prev + 1));
-  };
-
-  const handleTypeSelect = (type: TransactionType) => {
-    setSelectedType(type);
-    setCurrentStep('category');
   };
 
   const handleCategorySelect = (category: Category) => {
