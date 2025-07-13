@@ -23,7 +23,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import type { Transaction } from '../../services/api/types/transactions';
-import { formatCurrency, formatCurrencyDisplay } from '../../utils/formatters';
+import { formatCurrencyDisplay } from '../../utils/formatters';
 import { CategorySelectionDialog } from './CategorySelectionDialog';
 import { transactionsApi } from '../../services/api/transactions';
 

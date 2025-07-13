@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import { Category as CategoryIcon } from '@mui/icons-material';
 import type { Transaction } from '../../services/api/types/transactions';
-import { formatCurrency, formatCurrencyDisplay } from '../../utils/formatters';
+import { formatCurrencyDisplay } from '../../utils/formatters';
 
 interface TransactionRowProps {
   transaction: Transaction;

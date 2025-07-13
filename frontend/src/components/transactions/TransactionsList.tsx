@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Alert, Typography, CircularProgress } from '@mui/material';
 import { format } from 'date-fns';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrencyDisplay } from '../../utils/formatters';
 import { transactionsApi } from '../../services/api/transactions';
 import type { Transaction, TransactionFilters } from '../../services/api/types/transactions';
 import TransactionRow from './TransactionRow';
@@ -176,10 +176,11 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
                 width: 'auto',
                 textAlign: 'right',
                 m: 0,
-                lineHeight: 1
+                lineHeight: 1,
+                fontFamily: 'monospace'
               }}
             >
-              {formatCurrency(calculateDailyTotal(dateTransactions), 'ILS')}
+              {formatCurrencyDisplay(calculateDailyTotal(dateTransactions), 'ILS')}
             </Typography>
           </Box>
           
