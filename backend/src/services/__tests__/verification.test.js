@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { Transaction, Category, SubCategory, User } = require('../../models');
 const ManualCategorized = require('../../models/ManualCategorized');
 const transactionService = require('../transactionService');
+const categoryMappingService = require('../categoryMappingService');
 const { createTestUser } = require('../../test/testUtils');
 const { TransactionType, CategorizationMethod, TransactionStatus } = require('../../constants/enums');
 
@@ -93,7 +94,7 @@ describe('Transaction Verification Flow', () => {
         }
       });
 
-      await transactionService.attemptAutoCategorization(newTransaction);
+      await categoryMappingService.attemptAutoCategorization(newTransaction);
 
       const updated = await Transaction.findById(newTransaction._id);
       expect(updated.category.toString()).toBe(category._id.toString());
@@ -131,7 +132,7 @@ describe('Transaction Verification Flow', () => {
         }
       });
 
-      await transactionService.attemptAutoCategorization(newTransaction);
+      await categoryMappingService.attemptAutoCategorization(newTransaction);
 
       const updated = await Transaction.findById(newTransaction._id);
       expect(updated.category.toString()).toBe(category._id.toString());
@@ -157,7 +158,7 @@ describe('Transaction Verification Flow', () => {
         }
       });
 
-      await transactionService.attemptAutoCategorization(newTransaction);
+      await categoryMappingService.attemptAutoCategorization(newTransaction);
 
       const updated = await Transaction.findById(newTransaction._id);
       expect(updated.category).toBeTruthy();

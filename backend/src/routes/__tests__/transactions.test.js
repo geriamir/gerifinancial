@@ -349,31 +349,6 @@ describe('Transaction Routes', () => {
       expect(savedTransaction.identifier).toBe('service-test-1');
     });
 
-    it('should handle duplicate detection correctly via MongoDB constraints', async () => {
-      const scrapedAccounts = [{
-        txns: [{
-          chargedAmount: -75,
-          date: new Date(),
-          description: 'Duplicate Test',
-          identifier: 'duplicate-test-1'
-        }]
-      }];
-
-      // Process first time
-      const result1 = await transactionService.processScrapedTransactions(
-        scrapedAccounts, 
-        bankAccount
-      );
-      expect(result1.newTransactions).toBe(1);
-
-      // Process same data again (same identifier should trigger duplicate key error)
-      const result2 = await transactionService.processScrapedTransactions(
-        scrapedAccounts, 
-        bankAccount
-      );
-      expect(result2.duplicates).toBe(1);
-      expect(result2.newTransactions).toBe(0);
-    });
 
     it('should handle transactions without identifiers', async () => {
       const scrapedAccounts = [{

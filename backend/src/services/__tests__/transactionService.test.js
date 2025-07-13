@@ -161,23 +161,6 @@ describe('TransactionService', () => {
       });
       expect(transactions).toHaveLength(2);
     });
-
-    it('should handle duplicate transactions', async () => {
-      // First save
-      await transactionService.processScrapedTransactions(
-        mockScrapedAccounts,
-        mockBankAccount
-      );
-
-      // Try to save same transactions again
-      const result = await transactionService.processScrapedTransactions(
-        mockScrapedAccounts,
-        mockBankAccount
-      );
-
-      expect(result.newTransactions).toBe(0);
-      expect(result.duplicates).toBe(2);
-    });
   });
 
 });

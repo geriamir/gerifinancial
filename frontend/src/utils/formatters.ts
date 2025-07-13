@@ -1,3 +1,12 @@
+export const formatCurrency = (amount: number, currency: string = 'ILS'): string => {
+  return new Intl.NumberFormat('he-IL', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount);
+};
+
 export const formatCurrencyDisplay = (amount: number, currency: string = 'ILS'): string => {
   // Custom formatting to ensure consistent spacing and alignment
   const isNegative = amount < 0;
@@ -13,6 +22,7 @@ export const formatCurrencyDisplay = (amount: number, currency: string = 'ILS'):
 };
 
 const formatters = {
+  formatCurrency,
   formatCurrencyDisplay
 };
 
