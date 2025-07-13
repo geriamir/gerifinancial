@@ -19,7 +19,6 @@ import {
   AccountBalance as MoneyIcon,
   CalendarToday as CalendarIcon,
   Description as DescriptionIcon,
-  Edit as EditIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import type { Transaction } from '../../services/api/types/transactions';
@@ -181,32 +180,6 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                   </Typography>
                 </Box>
               </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                <CalendarIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
-                <Box>
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    Date
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {formatDate(transaction.date)}
-                  </Typography>
-                </Box>
-              </Box>
-              
-              {(transaction.memo || transaction.rawData?.memo) && (
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mt: 1 }}>
-                  <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
-                  <Box>
-                    <Typography variant="caption" color="text.secondary" display="block">
-                      Additional Details
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {transaction.memo || transaction.rawData?.memo}
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
 
               {/* Category Information */}
               <Box 
@@ -214,7 +187,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                   display: 'flex', 
                   alignItems: 'flex-start', 
                   gap: 1, 
-                  mt: 1,
+                  mb: 1,
                   cursor: 'pointer',
                   '&:hover': {
                     bgcolor: 'rgba(0, 0, 0, 0.04)',
@@ -260,6 +233,32 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                   )}
                 </Box>
               </Box>
+              
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                <CalendarIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Date
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatDate(transaction.date)}
+                  </Typography>
+                </Box>
+              </Box>
+              
+              {(transaction.memo || transaction.rawData?.memo) && (
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mt: 1 }}>
+                  <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Additional Details
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {transaction.memo || transaction.rawData?.memo}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
             </Paper>
           </Box>
         </DialogContent>
