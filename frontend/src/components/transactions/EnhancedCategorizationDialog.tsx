@@ -3,13 +3,11 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
-  Button,
   IconButton,
 } from '@mui/material';
 import { ArrowBack, Close } from '@mui/icons-material';
 import { Transaction } from '../../services/api/types/transactions';
 import { Category, SubCategory } from '../../services/api/types/categories';
-import { getIconForSubcategory } from '../../constants/categoryIcons';
 import { formatCurrencyDisplay } from '../../utils/formatters';
 
 interface EnhancedCategorizationDialogProps {
@@ -64,7 +62,6 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
   const [currentStep, setCurrentStep] = useState<Step>('type');
   const [selectedType, setSelectedType] = useState<TransactionType>('Expense');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<SubCategory | null>(null);
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -74,7 +71,6 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
       setSelectedType(inferredType);
       setCurrentStep('type');
       setSelectedCategory(null);
-      setSelectedSubcategory(null);
     }
   }, [open, transaction]);
 
@@ -97,7 +93,6 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
   };
 
   const handleSubcategorySelect = (subcategory: SubCategory) => {
-    setSelectedSubcategory(subcategory);
     if (selectedCategory) {
       handleComplete(selectedCategory._id, subcategory._id);
     }
@@ -115,7 +110,6 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
   const handleBack = () => {
     if (currentStep === 'subcategory') {
       setCurrentStep('category');
-      setSelectedSubcategory(null);
     } else if (currentStep === 'category') {
       setCurrentStep('type');
       setSelectedCategory(null);

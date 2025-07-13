@@ -60,16 +60,6 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
     setCategoryDialogOpen(true);
   };
 
-  const handleCategorySelect = (category: any, subCategory?: any) => {
-    if (!transaction || !category) return;
-    
-    const categoryId = category._id;
-    const subCategoryId = subCategory?._id;
-    
-    if (!categoryId || !subCategoryId) return;
-    
-    handleCategoryUpdate(categoryId, subCategoryId);
-  };
 
   const handleCategoryUpdate = async (categoryId: string, subCategoryId: string) => {
     if (!transaction) return;
