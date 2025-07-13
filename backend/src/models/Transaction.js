@@ -86,6 +86,12 @@ const transactionSchema = new mongoose.Schema({
     enum: Object.values(CategorizationMethod),
     default: CategorizationMethod.MANUAL
   },
+  categorizationReasoning: {
+    type: String,
+    trim: true,
+    // Stores explanation of why this categorization was chosen
+    // e.g., "Matched keyword 'grocery' in description", "AI suggestion based on description pattern"
+  },
   status: {
     type: String,
     enum: Object.values(TransactionStatus),
@@ -116,10 +122,11 @@ transactionSchema.index({ accountId: 1, date: -1 });
 transactionSchema.index({ category: 1, date: -1 });
 
 // Helper method to categorize a transaction
-transactionSchema.methods.categorize = async function(categoryId, subCategoryId, method = CategorizationMethod.MANUAL) {
+transactionSchema.methods.categorize = async function(categoryId, subCategoryId, method = CategorizationMethod.MANUAL, reasoning = null) {
   this.category = categoryId;
   this.subCategory = subCategoryId;
   this.categorizationMethod = method;
+  this.categorizationReasoning = reasoning;
   this.processedDate = new Date();
   await this.save();
 };

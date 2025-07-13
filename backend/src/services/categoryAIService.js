@@ -60,13 +60,6 @@ class CategoryAIService {
     const union = new Set([...tokens1, ...tokens2]);
 
     const similarity = intersection.size / union.size;
-    logger.info('Similarity calculation:', {
-      text1,
-      text2,
-      intersection: Array.from(intersection),
-      union: Array.from(union),
-      similarity
-    });
 
     return similarity;
   }
@@ -186,15 +179,6 @@ class CategoryAIService {
         match = await this.categorizeByAI(rawCategory, availableCategories, true);
         
         if (match.confidence > 0.5) {
-          logger.info('Matched by raw category: ', {
-            description: description,
-            memo: memo,
-            rawCategory: rawCategory,
-            category: match.categoryId,
-            subCategory: match.subCategoryId,
-            confidence: match.confidence,
-            reasoning: match.reasoning
-          });
 
           const boostedConfidence = match.confidence * 1.2;
           const subCategoryName = availableCategories
@@ -217,14 +201,6 @@ class CategoryAIService {
         match = await this.categorizeByAI(memo, availableCategories, false);
         
         if (match.confidence > 0.5) {
-          logger.info('Matched by memo: ', {
-            description: description,
-            memo: memo,
-            category: match.categoryId,
-            subCategory: match.subCategoryId,
-            confidence: match.confidence,
-            reasoning: match.reasoning
-          });
 
           const boostedConfidence = match.confidence * 1.1; // Slightly lower boost than rawCategory
           const subCategoryName = availableCategories
@@ -249,16 +225,6 @@ class CategoryAIService {
             .find(c => c.id === match.categoryId)
             ?.subCategories.find(s => s.id === match.subCategoryId)?.name;
 
-          logger.info('Matched by description: ', {
-              description: description,
-              rawCategory: rawCategory,
-              memo: memo,
-              category: match.categoryId,
-              subCategory: match.subCategoryId,
-              confidence: match.confidence,
-            reasoning: match.reasoning
-          });
-            
           return {
               categoryId: match.categoryId,
               subCategoryId: match.subCategoryId,
@@ -269,7 +235,7 @@ class CategoryAIService {
           };
       }
 
-      logger.info(`No suitable category match found for description ${description}, rawCategory ${rawCategory}, memo ${memo}. Match confidence: ${match?.confidence || 0}`);
+      logger.warn(`No suitable category match found for description ${description}, rawCategory ${rawCategory}, memo ${memo}. Match confidence: ${match?.confidence || 0}`);
 
       return noMatch;
     } catch (error) {

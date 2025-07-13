@@ -1,4 +1,4 @@
-const { Transaction } = require('../models');
+const { Transaction, Category, SubCategory } = require('../models');
 const { ObjectId } = require('mongodb');
 const stringSimilarity = require('string-similarity');
 const bankScraperService = require('./bankScraperService');
@@ -213,12 +213,23 @@ class TransactionService {
       throw new Error('Transaction not found');
     }
 
+    // Get category and subcategory names for reasoning
+    const [category, subCategory] = await Promise.all([
+      Category.findById(categoryId),
+      SubCategory.findById(subCategoryId)
+    ]);
+
+    const reasoning = `Manual categorization: User manually selected "${category?.name}" > "${subCategory?.name}" for transaction with description: "${transaction.description}"`;
+
     // Update and save transaction
     transaction.category = categoryId;
     transaction.subCategory = subCategoryId;
     transaction.categorizationMethod = CategorizationMethod.MANUAL;
+    transaction.categorizationReasoning = reasoning;
     transaction.status = TransactionStatus.VERIFIED;
     await transaction.save();
+
+    console.log(`Transaction ${transaction._id} manually categorized: ${reasoning}`);
 
     // Save manual categorization for future auto-categorization if requested
     if (saveAsManual) {
