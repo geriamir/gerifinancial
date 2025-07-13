@@ -25,7 +25,7 @@ import {
 import { format } from 'date-fns';
 import type { Transaction } from '../../services/api/types/transactions';
 import { formatCurrency } from '../../utils/formatters';
-import CategorySelectionDialog from './CategorySelectionDialog';
+import { CategorySelectionDialog } from './CategorySelectionDialog';
 import { transactionsApi } from '../../services/api/transactions';
 
 interface TransactionDetailDialogProps {
@@ -60,6 +60,17 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
     setCategoryDialogOpen(true);
   };
 
+  const handleCategorySelect = (category: any, subCategory?: any) => {
+    if (!transaction || !category) return;
+    
+    const categoryId = category._id;
+    const subCategoryId = subCategory?._id;
+    
+    if (!categoryId || !subCategoryId) return;
+    
+    handleCategoryUpdate(categoryId, subCategoryId);
+  };
+
   const handleCategoryUpdate = async (categoryId: string, subCategoryId: string) => {
     if (!transaction) return;
     
@@ -72,15 +83,12 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
         subCategoryId,
       });
       
-      const updatedTransaction: Transaction = {
+      // Just update the current transaction state optimistically
+      onTransactionUpdated?.({
         ...transaction,
-        category: { _id: categoryId, name: 'Updated Category', type: transaction.type || 'Expense' },
-        subCategory: { _id: subCategoryId, name: 'Updated SubCategory' },
         categorizationMethod: 'manual',
         categorizationReasoning: `Manual categorization: User manually selected category for transaction with description: "${transaction.description}"`,
-      };
-      
-      onTransactionUpdated?.(updatedTransaction);
+      });
       setCategoryDialogOpen(false);
       
     } catch (err) {
@@ -231,8 +239,8 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
       <CategorySelectionDialog
         open={categoryDialogOpen}
         onClose={() => setCategoryDialogOpen(false)}
-        onCategorySelect={handleCategoryUpdate}
-        transaction={transaction}
+        onSelect={handleCategorySelect}
+        description={transaction.description}
       />
     </>
   );
