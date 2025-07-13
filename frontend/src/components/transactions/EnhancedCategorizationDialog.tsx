@@ -4,6 +4,14 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  Typography,
+  Box,
+  Card,
+  CardActionArea,
+  Button,
+  Grid,
+  CircularProgress,
+  Backdrop,
 } from '@mui/material';
 import { ArrowBack, Close } from '@mui/icons-material';
 import { Transaction } from '../../services/api/types/transactions';
@@ -131,8 +139,8 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
         },
       }}
     >
-      <div className="flex items-center justify-between p-6 border-b">
-        <div className="flex items-center gap-3">
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 3, borderBottom: 1, borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           {currentStep !== 'type' && (
             <IconButton
               onClick={handleBack}
@@ -141,73 +149,86 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
               <ArrowBack />
             </IconButton>
           )}
-          <div>
-            <DialogTitle className="text-lg font-semibold p-0">
+          <Box>
+            <DialogTitle sx={{ p: 0, fontSize: '1.125rem', fontWeight: 600 }}>
               {currentStep === 'type' && 'Choose Transaction Type'}
               {currentStep === 'category' && `${selectedType} Categories`}
               {currentStep === 'subcategory' && selectedCategory?.name}
             </DialogTitle>
-            <div className="text-sm text-gray-600 mt-1">
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               {formatCurrencyDisplay(transaction.amount, transaction.currency)} • {transaction.description}
-            </div>
-          </div>
-        </div>
+            </Typography>
+          </Box>
+        </Box>
         <IconButton
           onClick={onClose}
           size="small"
         >
           <Close />
         </IconButton>
-      </div>
+      </Box>
 
-      <DialogContent className="p-6">
+      <DialogContent sx={{ p: 3 }}>
         {/* Step 1: Type Selection */}
         {currentStep === 'type' && (
-          <div className="space-y-4">
-            <div className="text-sm text-gray-600 mb-6">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               What type of transaction is this?
-            </div>
-            <div className="grid gap-4">
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {typeOptions.map((option) => (
-                <button
+                <Card
                   key={option.type}
-                  onClick={() => handleTypeSelect(option.type)}
-                  className={`
-                    p-4 rounded-lg border-2 text-left transition-all
-                    hover:border-blue-300 hover:bg-blue-50
-                    ${selectedType === option.type 
-                      ? 'border-blue-500 bg-blue-50' 
-                      : 'border-gray-200 bg-white'
-                    }
-                  `}
+                  sx={{
+                    border: 2,
+                    borderColor: selectedType === option.type ? 'primary.main' : 'grey.200',
+                    bgcolor: selectedType === option.type ? 'primary.50' : 'background.paper',
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      borderColor: 'primary.light',
+                      bgcolor: 'primary.50',
+                    },
+                  }}
                 >
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: option.color }}
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">
-                        {option.label}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {option.description}
-                      </div>
-                    </div>
-                  </div>
-                </button>
+                  <CardActionArea onClick={() => handleTypeSelect(option.type)} sx={{ p: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box
+                        sx={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: '50%',
+                          bgcolor: option.color,
+                        }}
+                      />
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="subtitle1" fontWeight="medium">
+                          {option.label}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {option.description}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </CardActionArea>
+                </Card>
               ))}
-            </div>
-          </div>
+            </Box>
+          </Box>
         )}
 
         {/* Step 2: Category Selection */}
         {currentStep === 'category' && (
-          <div className="space-y-4">
-            <div className="text-sm text-gray-600 mb-6">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Choose a category for this {selectedType.toLowerCase()}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            </Typography>
+            <Box 
+              sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
+                gap: 2 
+              }}
+            >
               {filteredCategories.map((category) => {
                 // Simple emoji mapping for category icons
                 const getCategoryEmoji = (categoryName: string) => {
@@ -228,78 +249,123 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                 };
 
                 return (
-                  <button
+                  <Card
                     key={category._id}
-                    onClick={() => handleCategorySelect(category)}
-                    className="
-                      p-4 rounded-lg border-2 border-gray-200 
-                      hover:border-blue-300 hover:bg-blue-50
-                      transition-all text-center group
-                    "
+                    sx={{
+                      border: 1,
+                      borderColor: 'grey.200',
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
+                        borderColor: 'primary.main',
+                        bgcolor: 'primary.50',
+                        transform: 'translateY(-2px)',
+                        boxShadow: 2,
+                      },
+                    }}
                   >
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="text-2xl">
-                        {getCategoryEmoji(category.name)}
-                      </div>
-                      <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600">
-                        {category.name}
-                      </div>
-                      {category.subCategories && category.subCategories.length > 0 && (
-                        <div className="text-xs text-gray-500">
-                          {category.subCategories.length} options
-                        </div>
-                      )}
-                    </div>
-                  </button>
+                    <CardActionArea onClick={() => handleCategorySelect(category)} sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="h4" component="div">
+                          {getCategoryEmoji(category.name)}
+                        </Typography>
+                        <Typography 
+                          variant="body2" 
+                          fontWeight="medium" 
+                          textAlign="center"
+                          sx={{ 
+                            color: 'text.primary',
+                            '&:hover': { color: 'primary.main' },
+                          }}
+                        >
+                          {category.name}
+                        </Typography>
+                        {category.subCategories && category.subCategories.length > 0 && (
+                          <Typography variant="caption" color="text.secondary">
+                            {category.subCategories.length} options
+                          </Typography>
+                        )}
+                      </Box>
+                    </CardActionArea>
+                  </Card>
                 );
               })}
-            </div>
-          </div>
+            </Box>
+          </Box>
         )}
 
         {/* Step 3: Subcategory Selection */}
         {currentStep === 'subcategory' && selectedCategory && (
-          <div className="space-y-4">
-            <div className="text-sm text-gray-600 mb-6">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               Choose a specific subcategory
-            </div>
-            <div className="grid gap-2">
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {selectedCategory.subCategories?.map((subcategory) => (
-                <button
+                <Button
                   key={subcategory._id}
                   onClick={() => handleSubcategorySelect(subcategory)}
                   disabled={isLoading}
-                  className="
-                    p-3 rounded-lg border border-gray-200 text-left
-                    hover:border-blue-300 hover:bg-blue-50
-                    transition-all disabled:opacity-50
-                  "
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    textAlign: 'left',
+                    justifyContent: 'flex-start',
+                    border: 1,
+                    borderColor: 'grey.200',
+                    bgcolor: 'background.paper',
+                    color: 'text.primary',
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      bgcolor: 'primary.50',
+                    },
+                    '&:disabled': {
+                      opacity: 0.5,
+                    },
+                  }}
                 >
-                  <div className="font-medium text-gray-900">
-                    {subcategory.name}
-                  </div>
-                  {subcategory.keywords && subcategory.keywords.length > 0 && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      Keywords: {subcategory.keywords.join(', ')}
-                    </div>
-                  )}
-                </button>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <Typography variant="body1" fontWeight="medium">
+                      {subcategory.name}
+                    </Typography>
+                    {subcategory.keywords && subcategory.keywords.length > 0 && (
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                        Keywords: {subcategory.keywords.join(', ')}
+                      </Typography>
+                    )}
+                  </Box>
+                </Button>
               )) || (
-                <div className="text-center text-gray-500 py-8">
-                  No subcategories available
-                </div>
+                <Box sx={{ textAlign: 'center', py: 8 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No subcategories available
+                  </Typography>
+                </Box>
               )}
-            </div>
-          </div>
+            </Box>
+          </Box>
         )}
 
         {isLoading && (
-          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <div className="text-sm text-gray-600 mt-2">Categorizing...</div>
-            </div>
-          </div>
+          <Backdrop
+            sx={{ 
+              position: 'absolute', 
+              top: 0, 
+              left: 0, 
+              right: 0, 
+              bottom: 0, 
+              bgcolor: 'rgba(255, 255, 255, 0.75)',
+              zIndex: 1000 
+            }}
+            open={isLoading}
+          >
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+              <CircularProgress size={32} />
+              <Typography variant="body2" color="text.secondary">
+                Categorizing...
+              </Typography>
+            </Box>
+          </Backdrop>
         )}
       </DialogContent>
     </Dialog>
