@@ -12,6 +12,13 @@
 ### Phase 3: Transaction Detail View
 4. **✅ Transaction detail view** - Create a new transaction view - when clicking a transaction, display a view that contains the fields of the transaction, with an option to change the category by clicking the category field *(COMPLETED)*
 
+### Phase 4: Enhanced Manual Categorization Experience
+5. **🚀 Redesigned Categorization Dialog** - Create a new intuitive categorization dialog with the following workflow:
+   - **Top swipe/tab navigation** between transaction types: Expense, Income, Transfer
+   - **Category thumbnails view** - Visual grid of category icons/thumbnails for selected type
+   - **Subcategory selection** - Button list of subcategories with lightweight back navigation
+   - **Mobile-first design** - Touch-friendly with swipe gestures and large tap targets
+
 ## Current State Analysis
 
 ### ✅ Already Implemented
@@ -196,6 +203,26 @@ TransactionDetail/
 └── ActionButtons.tsx
 ```
 
+#### Phase 4: Enhanced Categorization Dialog
+```
+EnhancedCategorization/
+├── EnhancedCategorizationDialog.tsx
+├── TypeSelector/
+│   ├── TypeTabBar.tsx
+│   └── SwipeableTypeTabs.tsx
+├── CategoryGrid/
+│   ├── CategoryThumbnail.tsx
+│   ├── CategoryIconGrid.tsx
+│   └── CategorySearchBar.tsx
+├── SubcategorySelection/
+│   ├── SubcategoryList.tsx
+│   ├── SubcategoryButton.tsx
+│   └── BackButton.tsx
+└── MobileOptimizations/
+    ├── TouchGestures.tsx
+    └── SwipeHandler.tsx
+```
+
 ## Testing Strategy
 
 ### Backend Testing
@@ -232,6 +259,12 @@ TransactionDetail/
 - Day 1-3: Transaction detail dialog development
 - Day 4-5: Category editing functionality
 - Day 6-7: Testing and polish
+
+### Phase 4: Enhanced Categorization Dialog (Week 3-4)
+- Day 1-2: New categorization dialog architecture and design
+- Day 3-4: Type selector and category thumbnails implementation
+- Day 5-6: Subcategory selection and navigation flow
+- Day 7: Mobile optimization, testing, and polish
 
 ## Dependencies & Prerequisites
 

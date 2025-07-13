@@ -23,8 +23,9 @@ import {
 import { format } from 'date-fns';
 import type { Transaction } from '../../services/api/types/transactions';
 import { formatCurrencyDisplay } from '../../utils/formatters';
-import { CategorySelectionDialog } from './CategorySelectionDialog';
+import { EnhancedCategorizationDialog } from './EnhancedCategorizationDialog';
 import { transactionsApi } from '../../services/api/transactions';
+import { useCategories } from '../../hooks/useCategories';
 
 interface TransactionDetailDialogProps {
   open: boolean;
@@ -42,6 +43,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { categories } = useCategories();
 
   useEffect(() => {
     if (!open) {
@@ -270,11 +272,13 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
         </DialogActions>
       </Dialog>
 
-      <CategorySelectionDialog
+      <EnhancedCategorizationDialog
         open={categoryDialogOpen}
         onClose={() => setCategoryDialogOpen(false)}
-        onSelect={handleCategorySelect}
-        description={transaction.description}
+        transaction={transaction}
+        categories={categories}
+        onCategorize={handleCategoryUpdate}
+        isLoading={updating}
       />
     </>
   );
