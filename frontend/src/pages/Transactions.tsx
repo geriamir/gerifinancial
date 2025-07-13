@@ -7,7 +7,6 @@ import FilterPanel from '../components/transactions/FilterPanel';
 import TransactionDetailDialog from '../components/transactions/TransactionDetailDialog';
 import { TransactionFilters } from '../services/api/types';
 import type { Transaction } from '../services/api/types/transactions';
-import { useFilterPersistence } from '../hooks/useFilterPersistence';
 
 const defaultFilters: Partial<TransactionFilters> = {
   startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
@@ -15,27 +14,45 @@ const defaultFilters: Partial<TransactionFilters> = {
 };
 
 const TransactionsPage: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const { filters, updateFilters, resetFilters } = useFilterPersistence(defaultFilters);
+  const [searchParams] = useSearchParams();
+  const [filters, setFilters] = useState<Partial<TransactionFilters>>(() => {
+    // Check URL params on initial load
+    const categoryParam = searchParams.get('category');
+    if (categoryParam === 'uncategorized') {
+      return {
+        category: 'uncategorized',
+        startDate: undefined,
+        endDate: undefined,
+      };
+    }
+    return defaultFilters;
+  });
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
-  // Handle URL parameters on component mount
+  // Sync filters with URL parameters
   useEffect(() => {
     const categoryParam = searchParams.get('category');
     
     if (categoryParam === 'uncategorized') {
-      // Set filters to show only uncategorized transactions
-      updateFilters({
-        category: 'uncategorized', // Special value to indicate uncategorized filter
-        startDate: undefined, // Remove date filter to show all uncategorized
+      setFilters({
+        category: 'uncategorized',
+        startDate: undefined,
         endDate: undefined,
       });
-      
-      // Clear the URL parameter after setting the filter
-      setSearchParams({});
+    } else if (!categoryParam && filters.category === 'uncategorized') {
+      // If URL param is removed but filter is still uncategorized, reset to default
+      setFilters(defaultFilters);
     }
-  }, [searchParams, updateFilters, setSearchParams]);
+  }, [searchParams, filters.category]);
+
+  const updateFilters = (newFilters: Partial<TransactionFilters>) => {
+    setFilters(prev => ({ ...prev, ...newFilters }));
+  };
+
+  const resetFilters = () => {
+    setFilters(defaultFilters);
+  };
 
   const handleTransactionClick = (transaction: Transaction) => {
     setSelectedTransaction(transaction);

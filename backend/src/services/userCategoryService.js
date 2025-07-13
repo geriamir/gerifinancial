@@ -31,7 +31,7 @@ const defaultCategories = [
     subCategories: [
       { 
         name: "Credit Card",
-        keywords: ["דיינרס", "אשראי"]
+        keywords: ["דיינרס", "אשראי", "ישראכרט", "ויזה", "מאסטרקארד", "כרטיס אשראי"]
       },
       {
         name: "Savings",
@@ -140,7 +140,13 @@ const defaultCategories = [
     name: "Financial Services",
     type: "Expense",
     subCategories: [
-      "Fees"
+      {
+        name:"Bank Fees",
+        keywords: ["עמ.", "עמלת", "עמל"]
+      },
+      "Credit Card Fees",
+      "Investment Fees",
+      "Financial Services - Miscellaneous"
     ]
   },
   {

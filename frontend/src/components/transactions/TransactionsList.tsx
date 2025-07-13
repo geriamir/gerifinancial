@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Alert, Typography, CircularProgress } from '@mui/material';
 import { format } from 'date-fns';
 import { formatCurrencyDisplay } from '../../utils/formatters';
@@ -29,41 +29,68 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, setHasMore] = useState(true);
-  const [page, setPage] = useState(0);
 
-  const loadTransactions = useCallback(async (reset = false) => {
-    if (!('filters' in props) || !props.filters) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
-      const currentPage = reset ? 0 : page;
-      const response = await transactionsApi.getTransactions({
-        ...props.filters,
-        limit: PAGE_SIZE,
-        skip: currentPage * PAGE_SIZE
-      });
-      if (response) {
-        setFetchedTransactions(prev => reset ? response.transactions : [...prev, ...response.transactions]);
-        setHasMore(response.hasMore);
-        if (!reset) {
-          setPage(p => p + 1);
-        }
-      }
-    } catch (err) {
-      setError('Failed to load transactions');
-      console.error('Error fetching transactions:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, props]);
-
-  const filtersString = 'filters' in props ? JSON.stringify(props.filters) : null;
+  // Extract filter values for stable dependencies
+  const hasFilters = 'filters' in props;
+  const propsFilters = hasFilters ? props.filters : null;
+  
+  // Use ref to store stable filters and track changes
+  const filtersRef = useRef<Partial<TransactionFilters> | null>(null);
+  const filtersStringRef = useRef<string>('');
   
   useEffect(() => {
-    setPage(0);
-    loadTransactions(true);
-  }, [filtersString, loadTransactions]);
+    // Only process if we have filters
+    if (!hasFilters || !propsFilters) {
+      filtersRef.current = null;
+      return;
+    }
+    
+    // Create a stable string representation for comparison
+    const currentFiltersString = JSON.stringify({
+      startDate: propsFilters.startDate?.toISOString(),
+      endDate: propsFilters.endDate?.toISOString(),
+      type: propsFilters.type,
+      category: propsFilters.category,
+      search: propsFilters.search,
+      accountId: propsFilters.accountId
+    });
+    
+    // If the filters haven't actually changed, don't update
+    if (filtersStringRef.current === currentFiltersString) {
+      return;
+    }
+    
+    // Update refs with new values
+    filtersStringRef.current = currentFiltersString;
+    filtersRef.current = propsFilters;
+    
+    // Load transactions with new filters
+    const loadTransactions = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        setFetchedTransactions([]);
+        
+        const response = await transactionsApi.getTransactions({
+          ...propsFilters,
+          limit: PAGE_SIZE,
+          skip: 0
+        });
+        
+        if (response) {
+          setFetchedTransactions(response.transactions);
+          setHasMore(response.hasMore);
+        }
+      } catch (err) {
+        setError('Failed to load transactions');
+        console.error('Error fetching transactions:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTransactions();
+  }, [hasFilters, propsFilters]);
 
   const transactions = ('transactions' in props) ? props.transactions as T[] : (fetchedTransactions as T[]);
 
