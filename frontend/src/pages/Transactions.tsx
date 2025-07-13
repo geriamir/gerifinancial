@@ -4,7 +4,7 @@ import { RestartAlt as ResetIcon } from '@mui/icons-material';
 import { useSearchParams } from 'react-router-dom';
 import TransactionsList from '../components/transactions/TransactionsList';
 import FilterPanel from '../components/transactions/FilterPanel';
-import { TransactionDetailDialog } from '../components/transactions';
+import TransactionDetailDialog from '../components/transactions/TransactionDetailDialog';
 import { TransactionFilters } from '../services/api/types';
 import type { Transaction } from '../services/api/types/transactions';
 import { useFilterPersistence } from '../hooks/useFilterPersistence';
