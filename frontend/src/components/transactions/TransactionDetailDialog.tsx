@@ -151,30 +151,47 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
             <Paper sx={{ p: 3, bgcolor: 'grey.50' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                 <MoneyIcon color="primary" />
-                <Typography variant="h5" component="div">
-                  {formatCurrency(transaction.amount, transaction.currency)}
-                </Typography>
-                {transaction.type && (
-                  <Chip 
-                    label={transaction.type} 
-                    color={getTransactionTypeColor(transaction.type)}
-                    size="small"
-                  />
-                )}
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Amount
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="h5" component="div">
+                      {formatCurrency(transaction.amount, transaction.currency)}
+                    </Typography>
+                    {transaction.type && (
+                      <Chip 
+                        label={transaction.type} 
+                        color={getTransactionTypeColor(transaction.type)}
+                        size="small"
+                      />
+                    )}
+                  </Box>
+                </Box>
               </Box>
               
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20 }} />
-                <Typography variant="body1" fontWeight="medium">
-                  {transaction.description}
-                </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+                <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Description
+                  </Typography>
+                  <Typography variant="body1" fontWeight="medium">
+                    {transaction.description}
+                  </Typography>
+                </Box>
               </Box>
               
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CalendarIcon sx={{ color: 'grey.600', fontSize: 20 }} />
-                <Typography variant="body2" color="text.secondary">
-                  {formatDate(transaction.date)}
-                </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                <CalendarIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
+                <Box>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Date
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatDate(transaction.date)}
+                  </Typography>
+                </Box>
               </Box>
               
               {(transaction.memo || transaction.rawData?.memo) && (
@@ -182,7 +199,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                   <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
                   <Box>
                     <Typography variant="caption" color="text.secondary" display="block">
-                      Memo
+                      Additional Details
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       {transaction.memo || transaction.rawData?.memo}
