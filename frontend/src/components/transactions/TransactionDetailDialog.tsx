@@ -16,7 +16,7 @@ import {
 import {
   Close as CloseIcon,
   Category as CategoryIcon,
-  AttachMoney as MoneyIcon,
+  AccountBalance as MoneyIcon,
   CalendarToday as CalendarIcon,
   Description as DescriptionIcon,
   Edit as EditIcon,
