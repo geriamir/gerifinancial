@@ -120,7 +120,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
       <Dialog
         open={open}
         onClose={onClose}
-        maxWidth="md"
+        maxWidth="sm"
         fullWidth
         PaperProps={{
           sx: { borderRadius: 2 }
