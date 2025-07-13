@@ -9,7 +9,6 @@ import {
   Box,
   Chip,
   Paper,
-  Grid,
   IconButton,
   CircularProgress,
   Alert,
@@ -147,86 +146,84 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
             </Alert>
           )}
 
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <Paper sx={{ p: 3, bgcolor: 'grey.50' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                  <MoneyIcon color="primary" />
-                  <Typography variant="h5" component="div">
-                    {formatCurrency(transaction.amount, transaction.currency)}
-                  </Typography>
-                  {transaction.type && (
-                    <Chip 
-                      label={transaction.type} 
-                      color={getTransactionTypeColor(transaction.type)}
-                      size="small"
-                    />
-                  )}
-                </Box>
-                
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20 }} />
-                  <Typography variant="body1" fontWeight="medium">
-                    {transaction.description}
-                  </Typography>
-                </Box>
-                
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <CalendarIcon sx={{ color: 'grey.600', fontSize: 20 }} />
-                  <Typography variant="body2" color="text.secondary">
-                    {formatDate(transaction.date)}
-                  </Typography>
-                </Box>
-              </Paper>
-            </Grid>
-
-            <Grid item xs={12}>
-              <Paper sx={{ p: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <CategoryIcon color="primary" />
-                    <Typography variant="h6">
-                      Category
-                    </Typography>
-                  </Box>
-                  <Button
-                    startIcon={<EditIcon />}
-                    onClick={handleCategoryEdit}
-                    disabled={updating}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* Main Transaction Info */}
+            <Paper sx={{ p: 3, bgcolor: 'grey.50' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                <MoneyIcon color="primary" />
+                <Typography variant="h5" component="div">
+                  {formatCurrency(transaction.amount, transaction.currency)}
+                </Typography>
+                {transaction.type && (
+                  <Chip 
+                    label={transaction.type} 
+                    color={getTransactionTypeColor(transaction.type)}
                     size="small"
-                  >
-                    {updating ? <CircularProgress size={16} /> : 'Edit'}
-                  </Button>
+                  />
+                )}
+              </Box>
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20 }} />
+                <Typography variant="body1" fontWeight="medium">
+                  {transaction.description}
+                </Typography>
+              </Box>
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CalendarIcon sx={{ color: 'grey.600', fontSize: 20 }} />
+                <Typography variant="body2" color="text.secondary">
+                  {formatDate(transaction.date)}
+                </Typography>
+              </Box>
+            </Paper>
+
+            {/* Category Information */}
+            <Paper sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <CategoryIcon color="primary" />
+                  <Typography variant="h6">
+                    Category
+                  </Typography>
                 </Box>
+                <Button
+                  startIcon={<EditIcon />}
+                  onClick={handleCategoryEdit}
+                  disabled={updating}
+                  size="small"
+                >
+                  {updating ? <CircularProgress size={16} /> : 'Edit'}
+                </Button>
+              </Box>
 
-                {transaction.category && transaction.subCategory ? (
-                  <Box>
-                    <Typography variant="body1" fontWeight="medium" gutterBottom>
-                      {transaction.category.name} → {transaction.subCategory.name}
-                    </Typography>
-                  </Box>
-                ) : (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Uncategorized
-                    </Typography>
-                    <Chip label="Needs Categorization" color="warning" size="small" />
-                  </Box>
-                )}
+              {transaction.category && transaction.subCategory ? (
+                <Box>
+                  <Typography variant="body1" fontWeight="medium" gutterBottom>
+                    {transaction.category.name} → {transaction.subCategory.name}
+                  </Typography>
+                </Box>
+              ) : (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Uncategorized
+                  </Typography>
+                  <Chip label="Needs Categorization" color="warning" size="small" />
+                </Box>
+              )}
 
-                {transaction.categorizationReasoning && (
-                  <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                    <Typography variant="caption" color="text.secondary" fontWeight="medium" display="block" gutterBottom>
-                      Categorization Reasoning
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {transaction.categorizationReasoning}
-                    </Typography>
-                  </Box>
-                )}
-              </Paper>
-            </Grid>
-          </Grid>
+              {transaction.categorizationReasoning && (
+                <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight="medium" display="block" gutterBottom>
+                    Categorization Reasoning
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {transaction.categorizationReasoning}
+                  </Typography>
+                </Box>
+              )}
+            </Paper>
+          </Box>
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3 }}>
