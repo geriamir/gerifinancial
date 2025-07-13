@@ -1,10 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Box, Container, Typography, Button, Alert } from '@mui/material';
 import { RestartAlt as ResetIcon } from '@mui/icons-material';
 import { useSearchParams } from 'react-router-dom';
 import TransactionsList from '../components/transactions/TransactionsList';
 import FilterPanel from '../components/transactions/FilterPanel';
+import { TransactionDetailDialog } from '../components/transactions';
 import { TransactionFilters } from '../services/api/types';
+import type { Transaction } from '../services/api/types/transactions';
 import { useFilterPersistence } from '../hooks/useFilterPersistence';
 
 const defaultFilters: Partial<TransactionFilters> = {
@@ -15,6 +17,8 @@ const defaultFilters: Partial<TransactionFilters> = {
 const TransactionsPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { filters, updateFilters, resetFilters } = useFilterPersistence(defaultFilters);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
   // Handle URL parameters on component mount
   useEffect(() => {
@@ -32,6 +36,21 @@ const TransactionsPage: React.FC = () => {
       setSearchParams({});
     }
   }, [searchParams, updateFilters, setSearchParams]);
+
+  const handleTransactionClick = (transaction: Transaction) => {
+    setSelectedTransaction(transaction);
+    setDetailDialogOpen(true);
+  };
+
+  const handleDetailDialogClose = () => {
+    setDetailDialogOpen(false);
+    setSelectedTransaction(null);
+  };
+
+  const handleTransactionUpdated = (updatedTransaction: Transaction) => {
+    // Optionally refresh the transaction list or update local state
+    setSelectedTransaction(updatedTransaction);
+  };
 
   const isShowingUncategorized = filters.category === 'uncategorized';
 
@@ -65,8 +84,19 @@ const TransactionsPage: React.FC = () => {
           onFilterChange={updateFilters}
         />
         {/* TransactionsSummary will go here */}
-        <TransactionsList filters={filters} />
+        <TransactionsList 
+          filters={filters} 
+          onRowClick={handleTransactionClick}
+        />
       </Box>
+
+      {/* Transaction Detail Dialog */}
+      <TransactionDetailDialog
+        open={detailDialogOpen}
+        transaction={selectedTransaction}
+        onClose={handleDetailDialogClose}
+        onTransactionUpdated={handleTransactionUpdated}
+      />
     </Container>
   );
 };

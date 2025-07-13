@@ -7,10 +7,17 @@ const defaultCategories = [
     type: "Income",
     subCategories: [
       "Salary",
-      "Allowance",
+      {
+        name: "Allowance",
+        keywords: ["קצבה", "מענק", "פיצויים", "פיצוי", "קצבת"]
+      },
       {
         name: "Dividends and Profits",
         keywords: ["דיבידנד", "רווחים", "רבית"]
+      },
+      {
+        name: "Refunds",
+        keywords: ["החזר", "זיכוי"]
       },
       {
         name: "Income Miscellaneous",
@@ -23,7 +30,7 @@ const defaultCategories = [
     type: "Transfer",
     subCategories: [
       { 
-        name: "Credit Card Payments",
+        name: "Credit Card",
         keywords: ["דיינרס", "אשראי"]
       },
       {

@@ -7,12 +7,13 @@ export interface Transaction {
   amount: number;
   currency: string;
   date: string;
-  type: 'Expense' | 'Income' | 'Transfer';
+  type?: 'Expense' | 'Income' | 'Transfer';
   description: string;
   memo?: string;
   category?: Category;
   subCategory?: SubCategory;
   categorizationMethod: 'manual' | 'previous_data' | 'ai';
+  categorizationReasoning?: string;
   rawData: Record<string, any>;
   createdAt: string;
   updatedAt: string;
