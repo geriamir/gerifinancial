@@ -176,6 +176,20 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                   {formatDate(transaction.date)}
                 </Typography>
               </Box>
+              
+              {transaction.memo && (
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mt: 1 }}>
+                  <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
+                  <Box>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      Memo
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {transaction.memo}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
             </Paper>
 
             {/* Category Information */}
@@ -212,16 +226,6 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 </Box>
               )}
 
-              {transaction.categorizationReasoning && (
-                <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Typography variant="caption" color="text.secondary" fontWeight="medium" display="block" gutterBottom>
-                    Categorization Reasoning
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {transaction.categorizationReasoning}
-                  </Typography>
-                </Box>
-              )}
             </Paper>
           </Box>
         </DialogContent>

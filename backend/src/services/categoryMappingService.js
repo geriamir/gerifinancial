@@ -67,8 +67,6 @@ class CategoryMappingService {
           await transaction.save();
         }
         
-        console.log(`Transaction ${transaction._id} categorized via manual match: ${reasoning}`);
-        
         return await Transaction.findById(transaction._id)
           .populate('category')
           .populate('subCategory');
@@ -134,14 +132,12 @@ class CategoryMappingService {
             await transaction.save();
           }
           
-          console.log(`Transaction ${transaction._id} categorized via keyword match: ${reasoning}`);
-          
           return await Transaction.findById(transaction._id)
             .populate('category')
             .populate('subCategory');
         } else {
           // Log this case for debugging - should not happen if SubCategory.findMatchingSubCategories works correctly
-          console.warn(`Transaction ${transaction._id}: Keyword match found subcategory "${subCategory.name}" but no actual keywords or fields matched. This suggests an issue with keyword matching logic.`);
+          logger.warn(`Transaction ${transaction._id}: Keyword match found subcategory "${subCategory.name}" but no actual keywords or fields matched. This suggests an issue with keyword matching logic.`);
         }
       }
 
