@@ -23,7 +23,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import type { Transaction } from '../../services/api/types/transactions';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatCurrencyDisplay } from '../../utils/formatters';
 import { CategorySelectionDialog } from './CategorySelectionDialog';
 import { transactionsApi } from '../../services/api/transactions';
 
@@ -115,20 +115,6 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
     return format(new Date(dateString), 'EEEE, MMMM d, yyyy \'at\' h:mm a');
   };
 
-  const formatAmountDisplay = (amount: number, currency: string) => {
-    // Custom formatting to ensure consistent spacing
-    const isNegative = amount < 0;
-    const absAmount = Math.abs(amount);
-    const formattedNumber = new Intl.NumberFormat('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(absAmount);
-    
-    const currencySymbol = currency === 'ILS' ? '₪' : currency;
-    
-    return `${isNegative ? '-' : ''}${formattedNumber} ${currencySymbol}`;
-  };
-
   return (
     <>
       <Dialog
@@ -171,7 +157,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="h5" component="div" sx={{ fontFamily: 'monospace' }}>
-                      {formatAmountDisplay(transaction.amount, transaction.currency)}
+                      {formatCurrencyDisplay(transaction.amount, transaction.currency)}
                     </Typography>
                     {transaction.type && (
                       <Chip 

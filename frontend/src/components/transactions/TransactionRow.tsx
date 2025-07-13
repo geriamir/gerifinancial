@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import { Category as CategoryIcon } from '@mui/icons-material';
 import type { Transaction } from '../../services/api/types/transactions';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatCurrencyDisplay } from '../../utils/formatters';
 
 interface TransactionRowProps {
   transaction: Transaction;
@@ -66,9 +66,9 @@ const TransactionRow: React.FC<TransactionRowProps> = ({
         <Typography
           variant="subtitle1"
           data-testid={`${baseTestId}-amount`}
-          sx={{ minWidth: 100, textAlign: 'right' }}
+          sx={{ minWidth: 100, textAlign: 'right', fontFamily: 'monospace' }}
         >
-          {formatCurrency(transaction.amount, transaction.currency)}
+          {formatCurrencyDisplay(transaction.amount, transaction.currency)}
         </Typography>
       </Box>
     </Paper>
