@@ -12,8 +12,10 @@ import {
   Grid,
   CircularProgress,
   Backdrop,
+  ToggleButtonGroup,
+  ToggleButton,
 } from '@mui/material';
-import { ArrowBack, Close } from '@mui/icons-material';
+import { ArrowBack, Close, ChevronLeft, ChevronRight } from '@mui/icons-material';
 import { Transaction } from '../../services/api/types/transactions';
 import { Category, SubCategory } from '../../services/api/types/categories';
 import { formatCurrencyDisplay } from '../../utils/formatters';
@@ -67,9 +69,10 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
   onCategorize,
   isLoading,
 }) => {
-  const [currentStep, setCurrentStep] = useState<Step>('type');
+  const [currentStep, setCurrentStep] = useState<Step>('category');
   const [selectedType, setSelectedType] = useState<TransactionType>('Expense');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -77,13 +80,34 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
       // Pre-select type based on transaction amount
       const inferredType = transaction.amount < 0 ? 'Expense' : 'Income';
       setSelectedType(inferredType);
-      setCurrentStep('type');
+      setCurrentStep('category');
       setSelectedCategory(null);
+      setCurrentPage(0);
     }
   }, [open, transaction]);
 
+  // Reset page when type changes
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [selectedType]);
+
   // Filter categories by selected type
   const filteredCategories = categories.filter(cat => cat.type === selectedType);
+  
+  // Carousel pagination
+  const ITEMS_PER_PAGE = 6;
+  const totalPages = Math.ceil(filteredCategories.length / ITEMS_PER_PAGE);
+  const startIndex = currentPage * ITEMS_PER_PAGE;
+  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, filteredCategories.length);
+  const currentCategories = filteredCategories.slice(startIndex, endIndex);
+
+  const handlePrevPage = () => {
+    setCurrentPage(prev => Math.max(0, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => Math.min(totalPages - 1, prev + 1));
+  };
 
   const handleTypeSelect = (type: TransactionType) => {
     setSelectedType(type);
@@ -151,8 +175,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
           )}
           <Box>
             <DialogTitle sx={{ p: 0, fontSize: '1.125rem', fontWeight: 600 }}>
-              {currentStep === 'type' && 'Choose Transaction Type'}
-              {currentStep === 'category' && `${selectedType} Categories`}
+              {currentStep === 'category' && 'Choose Categorization'}
               {currentStep === 'subcategory' && selectedCategory?.name}
             </DialogTitle>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -169,126 +192,179 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
       </Box>
 
       <DialogContent sx={{ p: 3 }}>
-        {/* Step 1: Type Selection */}
-        {currentStep === 'type' && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              What type of transaction is this?
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {typeOptions.map((option) => (
-                <Card
-                  key={option.type}
-                  sx={{
-                    border: 2,
-                    borderColor: selectedType === option.type ? 'primary.main' : 'grey.200',
-                    bgcolor: selectedType === option.type ? 'primary.50' : 'background.paper',
-                    transition: 'all 0.2s ease-in-out',
+        {/* Step 1: Combined Type and Category Selection */}
+        {currentStep === 'category' && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {/* Type Selection */}
+            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+              <ToggleButtonGroup
+                value={selectedType}
+                exclusive
+                onChange={(event, newType) => {
+                  if (newType !== null) {
+                    setSelectedType(newType as TransactionType);
+                  }
+                }}
+                aria-label="transaction type"
+                size="large"
+                sx={{
+                  '& .MuiToggleButton-root': {
+                    px: 3,
+                    py: 2,
+                    border: 1,
+                    borderColor: 'grey.300',
+                    '&.Mui-selected': {
+                      bgcolor: 'primary.main',
+                      color: 'primary.contrastText',
+                      '&:hover': {
+                        bgcolor: 'primary.dark',
+                      },
+                    },
                     '&:hover': {
-                      borderColor: 'primary.light',
                       bgcolor: 'primary.50',
+                    },
+                  },
+                }}
+              >
+                {typeOptions.map((option) => (
+                  <ToggleButton
+                    key={option.type}
+                    value={option.type}
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1,
+                      minWidth: 120,
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        bgcolor: option.color,
+                      }}
+                    />
+                    <Typography variant="body2" fontWeight="medium">
+                      {option.label}
+                    </Typography>
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+            </Box>
+
+            {/* Category Selection with Side Navigation */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {/* Left Navigation */}
+              {totalPages > 1 && (
+                <IconButton
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 0}
+                  size="large"
+                  sx={{
+                    bgcolor: 'background.paper',
+                    border: 1,
+                    borderColor: 'grey.300',
+                    '&:hover': {
+                      bgcolor: 'primary.50',
+                    },
+                    '&:disabled': {
+                      opacity: 0.3,
                     },
                   }}
                 >
-                  <CardActionArea onClick={() => handleTypeSelect(option.type)} sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Box
-                        sx={{
-                          width: 16,
-                          height: 16,
-                          borderRadius: '50%',
-                          bgcolor: option.color,
-                        }}
-                      />
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="subtitle1" fontWeight="medium">
-                          {option.label}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {option.description}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </CardActionArea>
-                </Card>
-              ))}
-            </Box>
-          </Box>
-        )}
+                  <ChevronLeft />
+                </IconButton>
+              )}
 
-        {/* Step 2: Category Selection */}
-        {currentStep === 'category' && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Choose a category for this {selectedType.toLowerCase()}
-            </Typography>
-            <Box 
-              sx={{ 
-                display: 'grid', 
-                gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
-                gap: 2 
-              }}
-            >
-              {filteredCategories.map((category) => {
-                // Simple emoji mapping for category icons
-                const getCategoryEmoji = (categoryName: string) => {
-                  const name = categoryName.toLowerCase();
-                  if (name.includes('food') || name.includes('eating')) return '🍽️';
-                  if (name.includes('transport') || name.includes('car')) return '🚗';
-                  if (name.includes('shop') || name.includes('groceries')) return '🛍️';
-                  if (name.includes('entertainment') || name.includes('movie')) return '🎬';
-                  if (name.includes('health') || name.includes('medical')) return '🏥';
-                  if (name.includes('utilities') || name.includes('electric')) return '⚡';
-                  if (name.includes('education') || name.includes('school')) return '📚';
-                  if (name.includes('travel') || name.includes('flight')) return '✈️';
-                  if (name.includes('salary') || name.includes('income')) return '💰';
-                  if (name.includes('investment') || name.includes('savings')) return '📈';
-                  if (name.includes('household') || name.includes('home')) return '🏠';
-                  if (name.includes('family') || name.includes('kids')) return '👨‍👩‍👧‍👦';
-                  return '📁';
-                };
+              {/* Category Grid */}
+              <Box 
+                sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
+                  gap: 2,
+                  minHeight: '280px', // Fixed height to prevent jumping
+                  flex: 1,
+                }}
+              >
+                {currentCategories.map((category) => {
+                  // Simple emoji mapping for category icons
+                  const getCategoryEmoji = (categoryName: string) => {
+                    const name = categoryName.toLowerCase();
+                    if (name.includes('food') || name.includes('eating')) return '🍽️';
+                    if (name.includes('transport') || name.includes('car')) return '🚗';
+                    if (name.includes('shop') || name.includes('groceries')) return '🛍️';
+                    if (name.includes('entertainment') || name.includes('movie')) return '🎬';
+                    if (name.includes('health') || name.includes('medical')) return '🏥';
+                    if (name.includes('utilities') || name.includes('electric')) return '⚡';
+                    if (name.includes('education') || name.includes('school')) return '📚';
+                    if (name.includes('travel') || name.includes('flight')) return '✈️';
+                    if (name.includes('salary') || name.includes('income')) return '💰';
+                    if (name.includes('investment') || name.includes('savings')) return '📈';
+                    if (name.includes('household') || name.includes('home')) return '🏠';
+                    if (name.includes('family') || name.includes('kids')) return '👨‍👩‍👧‍👦';
+                    return '📁';
+                  };
 
-                return (
-                  <Card
-                    key={category._id}
-                    sx={{
-                      border: 1,
-                      borderColor: 'grey.200',
-                      transition: 'all 0.2s ease-in-out',
-                      '&:hover': {
-                        borderColor: 'primary.main',
-                        bgcolor: 'primary.50',
-                        transform: 'translateY(-2px)',
-                        boxShadow: 2,
-                      },
-                    }}
-                  >
-                    <CardActionArea onClick={() => handleCategorySelect(category)} sx={{ p: 2 }}>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="h4" component="div">
-                          {getCategoryEmoji(category.name)}
-                        </Typography>
-                        <Typography 
-                          variant="body2" 
-                          fontWeight="medium" 
-                          textAlign="center"
-                          sx={{ 
-                            color: 'text.primary',
-                            '&:hover': { color: 'primary.main' },
-                          }}
-                        >
-                          {category.name}
-                        </Typography>
-                        {category.subCategories && category.subCategories.length > 0 && (
-                          <Typography variant="caption" color="text.secondary">
-                            {category.subCategories.length} options
+                  return (
+                    <Card
+                      key={category._id}
+                      sx={{
+                        border: 1,
+                        borderColor: 'grey.200',
+                        transition: 'all 0.2s ease-in-out',
+                        '&:hover': {
+                          borderColor: 'primary.main',
+                          bgcolor: 'primary.50',
+                          transform: 'translateY(-2px)',
+                          boxShadow: 2,
+                        },
+                      }}
+                    >
+                      <CardActionArea onClick={() => handleCategorySelect(category)} sx={{ p: 2 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="h4" component="div">
+                            {getCategoryEmoji(category.name)}
                           </Typography>
-                        )}
-                      </Box>
-                    </CardActionArea>
-                  </Card>
-                );
-              })}
+                          <Typography 
+                            variant="body2" 
+                            fontWeight="medium" 
+                            textAlign="center"
+                            sx={{ 
+                              color: 'text.primary',
+                              '&:hover': { color: 'primary.main' },
+                            }}
+                          >
+                            {category.name}
+                          </Typography>
+                        </Box>
+                      </CardActionArea>
+                    </Card>
+                  );
+                })}
+              </Box>
+
+              {/* Right Navigation */}
+              {totalPages > 1 && (
+                <IconButton
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages - 1}
+                  size="large"
+                  sx={{
+                    bgcolor: 'background.paper',
+                    border: 1,
+                    borderColor: 'grey.300',
+                    '&:hover': {
+                      bgcolor: 'primary.50',
+                    },
+                    '&:disabled': {
+                      opacity: 0.3,
+                    },
+                  }}
+                >
+                  <ChevronRight />
+                </IconButton>
+              )}
             </Box>
           </Box>
         )}
