@@ -1,4 +1,4 @@
-const { Transaction, Category, SubCategory } = require('../models');
+const { Transaction, Category, SubCategory, BankAccount } = require('../models');
 const { ObjectId } = require('mongodb');
 const stringSimilarity = require('string-similarity');
 const bankScraperService = require('./bankScraperService');
@@ -184,10 +184,14 @@ class TransactionService {
 
     // Update lastScraped timestamp on successful scraping (even if no new transactions)
     if (results.errors.length === 0 || results.newTransactions > 0) {
-      bankAccount.lastScraped = new Date();
-      bankAccount.status = 'active';
-      await bankAccount.save();
-      console.log(`Updated lastScraped for account ${bankAccount._id} to ${bankAccount.lastScraped}`);
+      // Fetch fresh bankAccount from database to ensure we have a proper Mongoose model
+      const freshBankAccount = await BankAccount.findById(bankAccount._id);
+      if (freshBankAccount) {
+        freshBankAccount.lastScraped = new Date();
+        freshBankAccount.status = 'active';
+        await freshBankAccount.save();
+        console.log(`Updated lastScraped for account ${freshBankAccount._id} to ${freshBankAccount.lastScraped}`);
+      }
     }
     
     console.log(`Scraping completed for account ${bankAccount._id}:`, results);
