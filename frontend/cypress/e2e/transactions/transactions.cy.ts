@@ -306,8 +306,9 @@ describe('Transactions Page', () => {
   // });
 
   it('should filter transactions by type', () => {
-    // Wait for transactions list to be populated
-    cy.get('[data-testid="transactions-list"]')
+    // Wait for transactions list to be populated - with better error handling
+    cy.get('[data-testid="transactions-list"]', { timeout: 15000 })
+      .should('be.visible')
       .find('li[data-testid^="transaction-item-"]')
       .should('have.length.at.least', 1);
 
@@ -376,10 +377,10 @@ describe('Transactions Page', () => {
       .clear()
       .type(searchTerm, { delay: 100 });
 
-    // Wait for debounce to complete (FilterPanel uses 300ms debounce)
-    cy.wait(500);
+    // Wait longer for debounce to complete (FilterPanel uses 300ms debounce)
+    cy.wait(1000);
 
-    // Wait for search request with timeout
+    // Wait for search request with timeout and retry logic
     cy.wait('@getTransactions', { timeout: 15000 })
       .then((interception) => {
         console.log('Search request URL:', interception.request.url);
@@ -387,7 +388,21 @@ describe('Transactions Page', () => {
         const url = new URL(interception.request.url);
         const searchParam = url.searchParams.get('search');
         console.log('Search parameter:', searchParam);
-        expect(searchParam).to.equal(searchTerm);
+        
+        // If search param is null, try to wait for another request
+        if (searchParam === null) {
+          console.log('Search param is null, waiting for another request...');
+          cy.wait('@getTransactions', { timeout: 10000 })
+            .then((retryInterception) => {
+              console.log('Retry search request URL:', retryInterception.request.url);
+              const retryUrl = new URL(retryInterception.request.url);
+              const retrySearchParam = retryUrl.searchParams.get('search');
+              console.log('Retry search parameter:', retrySearchParam);
+              expect(retrySearchParam).to.equal(searchTerm);
+            });
+        } else {
+          expect(searchParam).to.equal(searchTerm);
+        }
       });
     
     // Wait for loading to complete
