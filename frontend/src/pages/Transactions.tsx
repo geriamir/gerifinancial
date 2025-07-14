@@ -29,6 +29,7 @@ const TransactionsPage: React.FC = () => {
   });
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Sync filters with URL parameters
   useEffect(() => {
@@ -65,8 +66,10 @@ const TransactionsPage: React.FC = () => {
   };
 
   const handleTransactionUpdated = (updatedTransaction: Transaction) => {
-    // Optionally refresh the transaction list or update local state
+    // Update the selected transaction
     setSelectedTransaction(updatedTransaction);
+    // Trigger a refresh of the transaction list
+    setRefreshTrigger(prev => prev + 1);
   };
 
   const isShowingUncategorized = filters.category === 'uncategorized';
@@ -104,6 +107,7 @@ const TransactionsPage: React.FC = () => {
         <TransactionsList 
           filters={filters} 
           onRowClick={handleTransactionClick}
+          key={refreshTrigger}
         />
       </Box>
 

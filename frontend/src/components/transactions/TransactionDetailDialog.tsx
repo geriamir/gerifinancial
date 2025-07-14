@@ -61,24 +61,36 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
   };
 
 
-  const handleCategoryUpdate = async (categoryId: string, subCategoryId: string) => {
+  const handleCategoryUpdate = async (categoryId: string, subCategoryId: string, saveAsManual?: boolean, matchingFields?: any) => {
     if (!transaction) return;
     
     try {
       setUpdating(true);
       setError(null);
       
-      await transactionsApi.categorizeTransaction(transaction._id, {
+      const response = await transactionsApi.categorizeTransaction(transaction._id, {
         categoryId,
         subCategoryId,
+        saveAsManual,
+        matchingFields,
       });
       
-      // Just update the current transaction state optimistically
-      onTransactionUpdated?.({
-        ...transaction,
-        categorizationMethod: 'manual',
-        categorizationReasoning: `Manual categorization: User manually selected category for transaction with description: "${transaction.description}"`,
-      });
+      // The response now always has the new format: { transaction: Transaction, historicalUpdates?: ... }
+      const updatedTransaction = response.transaction;
+      const historicalUpdates = response.historicalUpdates;
+      
+      // Update with the actual response from the server which includes populated category/subcategory
+      onTransactionUpdated?.(updatedTransaction);
+      
+      // Show notification if historical transactions were updated
+      if (historicalUpdates && historicalUpdates.updatedCount > 0) {
+        setError(null); // Clear any existing errors first
+        // Use a success message instead of error for this notification
+        setTimeout(() => {
+          alert(`✅ Successfully categorized this transaction and ${historicalUpdates.updatedCount} similar historical transactions!`);
+        }, 500);
+      }
+      
       setCategoryDialogOpen(false);
       
     } catch (err) {
@@ -193,16 +205,45 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
               >
                 <CategoryIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
                 <Box sx={{ flex: 1 }}>
-                  {transaction.category && transaction.subCategory ? (
+                  {transaction.category ? (
                     <>
-                      <Typography variant="caption" color="text.secondary" display="block">
-                        {transaction.category.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {transaction.subCategory.name}
-                      </Typography>
+                      {/* For Expense transactions: show category → subcategory */}
+                      {transaction.category.type === 'Expense' && transaction.subCategory ? (
+                        <>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {transaction.category.name}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {transaction.subCategory.name}
+                          </Typography>
+                        </>
+                      ) : transaction.category.type !== 'Expense' ? (
+                        /* For Income/Transfer transactions: show transaction type → category name */
+                        <>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {transaction.category.type}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {transaction.category.name}
+                          </Typography>
+                        </>
+                      ) : (
+                        /* Expense transaction without subcategory - show incomplete */
+                        <>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Category
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              {transaction.category.name} (incomplete)
+                            </Typography>
+                            <Chip label="Add subcategory" color="warning" size="small" />
+                          </Box>
+                        </>
+                      )}
                     </>
                   ) : (
+                    /* No category at all */
                     <>
                       <Typography variant="caption" color="text.secondary" display="block">
                         Category

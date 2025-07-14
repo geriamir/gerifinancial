@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Alert, Typography, CircularProgress } from '@mui/material';
 import { format } from 'date-fns';
 import { formatCurrencyDisplay } from '../../utils/formatters';
 import { transactionsApi } from '../../services/api/transactions';
 import type { Transaction, TransactionFilters } from '../../services/api/types/transactions';
 import TransactionRow from './TransactionRow';
+import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
 
 const PAGE_SIZE = 20; // Match test expectations
 
@@ -27,8 +28,10 @@ type TransactionsListProps<T extends Transaction> = ManagedTransactionsListProps
 function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>) {
   const [fetchedTransactions, setFetchedTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
 
   // Extract filter values for stable dependencies
   const hasFilters = 'filters' in props;
@@ -37,6 +40,59 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
   // Use ref to store stable filters and track changes
   const filtersRef = useRef<Partial<TransactionFilters> | null>(null);
   const filtersStringRef = useRef<string>('');
+  
+  // Load more transactions function
+  const loadMoreTransactions = useCallback(async () => {
+    if (!hasFilters || !propsFilters || loadingMore || !hasMore) {
+      console.log('Load more blocked:', { hasFilters, hasProps: !!propsFilters, loadingMore, hasMore });
+      return;
+    }
+    
+    console.log('Loading more transactions...', { currentPage, hasMore });
+    
+    try {
+      setLoadingMore(true);
+      setError(null);
+      
+      const nextPage = currentPage + 1;
+      const response = await transactionsApi.getTransactions({
+        ...propsFilters,
+        limit: PAGE_SIZE,
+        skip: nextPage * PAGE_SIZE
+      });
+      
+      if (response) {
+        console.log('Loaded more transactions:', response.transactions.length, 'hasMore:', response.hasMore);
+        setFetchedTransactions(prev => [...prev, ...response.transactions]);
+        setHasMore(response.hasMore);
+        setCurrentPage(nextPage);
+      }
+    } catch (err) {
+      setError('Failed to load more transactions');
+      console.error('Error fetching more transactions:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [hasFilters, propsFilters, loadingMore, hasMore, currentPage]);
+
+  // State to track scroll container for infinite scroll
+  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null);
+  
+  // Callback ref to set scroll container when element is mounted
+  const scrollContainerRef = useCallback((node: HTMLDivElement | null) => {
+    if (node !== null) {
+      setScrollContainer(node);
+    }
+  }, []);
+
+  // Infinite scroll hook
+  const { sentinelRef } = useInfiniteScroll({
+    hasMore,
+    loading: loadingMore,
+    onLoadMore: loadMoreTransactions,
+    root: scrollContainer,
+    rootMargin: '50px' // Trigger earlier for better UX
+  });
   
   useEffect(() => {
     // Only process if we have filters
@@ -64,12 +120,16 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
     filtersStringRef.current = currentFiltersString;
     filtersRef.current = propsFilters;
     
+    // Reset state for new filters
+    setCurrentPage(0);
+    setFetchedTransactions([]);
+    setHasMore(true);
+    
     // Load transactions with new filters
     const loadTransactions = async () => {
       try {
         setLoading(true);
         setError(null);
-        setFetchedTransactions([]);
         
         const response = await transactionsApi.getTransactions({
           ...propsFilters,
@@ -146,6 +206,7 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
 
   return (
     <Box
+      ref={scrollContainerRef}
       component="ul"
       sx={{
         mt: 2,
@@ -212,7 +273,6 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
           </Box>
           
           {dateTransactions.map((transaction) => {
-            // Only add ref to the last transaction of the last group
             return (
               <li
                 key={transaction._id}
@@ -228,9 +288,25 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
           })}
         </Box>
       ))}
-      {loading && (
+      
+      {/* Infinite scroll sentinel */}
+      {hasFilters && (
+        <Box ref={sentinelRef} sx={{ height: '20px', width: '100%' }} />
+      )}
+      
+      {/* Loading more indicator */}
+      {loadingMore && (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-          <CircularProgress data-testid="loading-indicator" size={24} />
+          <CircularProgress data-testid="loading-more-indicator" size={24} />
+        </Box>
+      )}
+      
+      {/* No more data indicator */}
+      {!hasMore && transactions.length > 0 && hasFilters && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+          <Typography variant="body2" color="text.secondary">
+            No more transactions to load
+          </Typography>
         </Box>
       )}
     </Box>

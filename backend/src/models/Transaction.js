@@ -80,6 +80,7 @@ const transactionSchema = new mongoose.Schema({
   subCategory: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'SubCategory',
+    required: false, // Optional - only required for Expense transactions
   },
   categorizationMethod: {
     type: String,

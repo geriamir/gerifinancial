@@ -18,17 +18,18 @@ import { ArrowBack, Close, ChevronLeft, ChevronRight } from '@mui/icons-material
 import { Transaction } from '../../services/api/types/transactions';
 import { Category, SubCategory } from '../../services/api/types/categories';
 import { formatCurrencyDisplay } from '../../utils/formatters';
+import ManualCategorizationDialog from './ManualCategorizationDialog';
 
 interface EnhancedCategorizationDialogProps {
   open: boolean;
   onClose: () => void;
   transaction: Transaction | null;
   categories: Category[];
-  onCategorize: (categoryId: string, subCategoryId: string) => Promise<void>;
+  onCategorize: (categoryId: string, subCategoryId: string, saveAsManual?: boolean, matchingFields?: any) => Promise<void>;
   isLoading: boolean;
 }
 
-type Step = 'type' | 'category' | 'subcategory';
+type Step = 'category' | 'subcategory';
 
 type TransactionType = 'Expense' | 'Income' | 'Transfer';
 
@@ -71,7 +72,9 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
   const [currentStep, setCurrentStep] = useState<Step>('category');
   const [selectedType, setSelectedType] = useState<TransactionType>('Expense');
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedSubCategory, setSelectedSubCategory] = useState<SubCategory | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [showManualDialog, setShowManualDialog] = useState(false);
 
   // Reset state when dialog opens/closes
   useEffect(() => {
@@ -110,23 +113,37 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
 
   const handleCategorySelect = (category: Category) => {
     setSelectedCategory(category);
-    if (category.subCategories && category.subCategories.length > 0) {
+    setSelectedSubCategory(null);
+    // Only proceed to subcategory step for Expense categories with subcategories
+    if (category.type === 'Expense' && category.subCategories && category.subCategories.length > 0) {
       setCurrentStep('subcategory');
     } else {
-      // No subcategories, complete categorization
-      handleComplete(category._id, '');
+      // Income/Transfer categories - show manual categorization dialog
+      setShowManualDialog(true);
     }
   };
 
   const handleSubcategorySelect = (subcategory: SubCategory) => {
     if (selectedCategory) {
-      handleComplete(selectedCategory._id, subcategory._id);
+      setSelectedSubCategory(subcategory);
+      setShowManualDialog(true);
     }
   };
 
-  const handleComplete = async (categoryId: string, subCategoryId: string) => {
+  const handleManualCategorization = async (data: {
+    saveAsManual: boolean;
+    matchingFields: any;
+  }) => {
+    if (!selectedCategory) return;
+    
     try {
-      await onCategorize(categoryId, subCategoryId);
+      await onCategorize(
+        selectedCategory._id, 
+        selectedSubCategory?._id || '', 
+        data.saveAsManual, 
+        data.matchingFields
+      );
+      setShowManualDialog(false);
       onClose();
     } catch (error) {
       console.error('Failed to categorize transaction:', error);
@@ -136,8 +153,6 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
   const handleBack = () => {
     if (currentStep === 'subcategory') {
       setCurrentStep('category');
-    } else if (currentStep === 'category') {
-      setCurrentStep('type');
       setSelectedCategory(null);
     }
   };
@@ -159,7 +174,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
     >
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 3, borderBottom: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {currentStep !== 'type' && (
+          {currentStep === 'subcategory' && (
             <IconButton
               onClick={handleBack}
               size="small"
@@ -170,7 +185,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
           <Box>
             <DialogTitle sx={{ p: 0, fontSize: '1.125rem', fontWeight: 600 }}>
               {currentStep === 'category' && 'Choose Categorization'}
-              {currentStep === 'subcategory' && selectedCategory?.name}
+              {currentStep === 'subcategory' && 'Choose a sub category'}
             </DialogTitle>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               {formatCurrencyDisplay(transaction.amount, transaction.currency)} • {transaction.description}
@@ -365,45 +380,42 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
 
         {/* Step 3: Subcategory Selection */}
         {currentStep === 'subcategory' && selectedCategory && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Choose a specific subcategory
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* Floating buttons for subcategories */}
+            <Box sx={{ 
+              display: 'flex', 
+              flexWrap: 'wrap', 
+              gap: 1.5,
+              justifyContent: 'center'
+            }}>
               {selectedCategory.subCategories?.map((subcategory) => (
                 <Button
                   key={subcategory._id}
                   onClick={() => handleSubcategorySelect(subcategory)}
                   disabled={isLoading}
-                  variant="outlined"
+                  variant="contained"
                   sx={{
-                    p: 2,
-                    textAlign: 'left',
-                    justifyContent: 'flex-start',
-                    border: 1,
-                    borderColor: 'grey.200',
-                    bgcolor: 'background.paper',
-                    color: 'text.primary',
+                    borderRadius: 3,
+                    px: 3,
+                    py: 1.5,
+                    textTransform: 'none',
+                    fontWeight: 'medium',
+                    bgcolor: 'primary.main',
+                    color: 'primary.contrastText',
+                    boxShadow: 2,
                     transition: 'all 0.2s ease-in-out',
                     '&:hover': {
-                      borderColor: 'primary.main',
-                      bgcolor: 'primary.50',
+                      bgcolor: 'primary.dark',
+                      transform: 'translateY(-2px)',
+                      boxShadow: 4,
                     },
                     '&:disabled': {
                       opacity: 0.5,
+                      transform: 'none',
                     },
                   }}
                 >
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                    <Typography variant="body1" fontWeight="medium">
-                      {subcategory.name}
-                    </Typography>
-                    {subcategory.keywords && subcategory.keywords.length > 0 && (
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Keywords: {subcategory.keywords.join(', ')}
-                      </Typography>
-                    )}
-                  </Box>
+                  {subcategory.name}
                 </Button>
               )) || (
                 <Box sx={{ textAlign: 'center', py: 8 }}>
@@ -438,6 +450,16 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
           </Backdrop>
         )}
       </DialogContent>
+
+      {/* Manual Categorization Dialog */}
+      <ManualCategorizationDialog
+        open={showManualDialog}
+        onClose={() => setShowManualDialog(false)}
+        onConfirm={handleManualCategorization}
+        transaction={transaction}
+        selectedCategory={selectedCategory}
+        selectedSubCategory={selectedSubCategory}
+      />
     </Dialog>
   );
 };

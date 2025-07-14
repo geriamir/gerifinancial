@@ -292,8 +292,8 @@ describe('Transaction Routes', () => {
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.category.toString()).toBe(category._id.toString());
-      expect(res.body.subCategory.toString()).toBe(subCategory._id.toString());
+      expect(res.body.transaction.category._id.toString()).toBe(category._id.toString());
+      expect(res.body.transaction.subCategory._id.toString()).toBe(subCategory._id.toString());
     });
 
     it('should fail with invalid category', async () => {
@@ -306,7 +306,7 @@ describe('Transaction Routes', () => {
         });
 
       expect(res.status).toBe(404);
-      expect(res.body.error).toBe('Category or subcategory not found');
+      expect(res.body.error).toBe('Category not found');
     });
 
     it('should require authentication', async () => {

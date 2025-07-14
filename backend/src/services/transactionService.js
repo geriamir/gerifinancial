@@ -210,20 +210,40 @@ class TransactionService {
     return Transaction.findUncategorized(accountId, userId);
   }
 
-  async categorizeTransaction(transactionId, categoryId, subCategoryId, saveAsManual = false) {
+  async categorizeTransaction(transactionId, categoryId, subCategoryId, saveAsManual = false, matchingFields = {}) {
     // Find and update transaction
     const transaction = await Transaction.findById(transactionId);
     if (!transaction) {
       throw new Error('Transaction not found');
     }
 
-    // Get category and subcategory names for reasoning
-    const [category, subCategory] = await Promise.all([
-      Category.findById(categoryId),
-      SubCategory.findById(subCategoryId)
-    ]);
+    // Get category to check type and validate subcategory requirement
+    const category = await Category.findById(categoryId);
+    if (!category) {
+      throw new Error('Category not found');
+    }
 
-    const reasoning = `Manual categorization: User manually selected "${category?.name}" > "${subCategory?.name}" for transaction with description: "${transaction.description}"`;
+    // Validate subcategory requirement based on category type
+    if (category.type === 'Expense') {
+      // Expense categories require subcategories
+      if (!subCategoryId) {
+        throw new Error('Subcategory is required for Expense transactions');
+      }
+    } else {
+      // Income/Transfer categories don't use subcategories
+      subCategoryId = null;
+    }
+
+    // Get subcategory name for reasoning if applicable
+    const subCategory = subCategoryId ? await SubCategory.findById(subCategoryId) : null;
+
+    // Generate reasoning based on category type
+    let reasoning;
+    if (category.type === 'Expense') {
+      reasoning = `Manual categorization: User manually selected "${category.name}" > "${subCategory?.name}" for transaction with description: "${transaction.description}"`;
+    } else {
+      reasoning = `Manual categorization: User manually selected "${category.name}" (${category.type}) for transaction with description: "${transaction.description}"`;
+    }
 
     // Update and save transaction
     transaction.category = categoryId;
@@ -237,14 +257,46 @@ class TransactionService {
 
     // Save manual categorization for future auto-categorization if requested
     if (saveAsManual) {
-      await ManualCategorized.saveManualCategorization({
-        description: transaction.description.toLowerCase().trim(),
-        memo: (transaction.memo || transaction.rawData?.memo)?.toLowerCase().trim() || null,
+      // Use custom matching fields if provided, otherwise use defaults
+      const matchingData = {
         userId: transaction.userId,
         category: categoryId,
         subCategory: subCategoryId,
         language: 'he' // Assuming Hebrew as default
-      });
+      };
+
+      // Add selected fields for matching
+      if (matchingFields.description && matchingFields.description.trim()) {
+        matchingData.description = matchingFields.description.toLowerCase().trim();
+      } else {
+        matchingData.description = transaction.description.toLowerCase().trim();
+      }
+
+      if (matchingFields.memo && matchingFields.memo.trim()) {
+        matchingData.memo = matchingFields.memo.toLowerCase().trim();
+      } else if (transaction.memo || transaction.rawData?.memo) {
+        matchingData.memo = (transaction.memo || transaction.rawData?.memo)?.toLowerCase().trim() || null;
+      }
+
+      if (matchingFields.rawCategory && matchingFields.rawCategory.trim()) {
+        matchingData.rawCategory = matchingFields.rawCategory.toLowerCase().trim();
+      } else if (transaction.rawData?.category) {
+        matchingData.rawCategory = transaction.rawData.category.toLowerCase().trim();
+      }
+
+      await ManualCategorized.saveManualCategorization(matchingData);
+
+      // Apply the new manual categorization rule to historical transactions
+      const historicalUpdates = await this.applyManualCategorizationToHistoricalTransactions(
+        transaction.userId,
+        matchingData,
+        categoryId,
+        subCategoryId,
+        transaction._id // Exclude current transaction from historical updates
+      );
+
+      // Add historical updates info to the transaction object for the response
+      transaction.historicalUpdates = historicalUpdates;
     }
 
     return transaction;
@@ -338,6 +390,103 @@ class TransactionService {
     return {
       total
     };
+  }
+
+  /**
+   * Apply manual categorization rule to historical transactions
+   */
+  async applyManualCategorizationToHistoricalTransactions(userId, matchingData, categoryId, subCategoryId, excludeTransactionId = null) {
+    try {
+      console.log(`Applying manual categorization rule to historical transactions for user ${userId}, with matching data: ${JSON.stringify(matchingData)}`);
+      
+      // Build query to find matching transactions
+      const query = {
+        userId: convertToObjectId(userId),
+        // Apply to both uncategorized and already categorized transactions
+        // This allows correcting wrongly categorized transactions
+      };
+
+      // Exclude the current transaction from historical updates
+      if (excludeTransactionId) {
+        query._id = { $ne: convertToObjectId(excludeTransactionId) };
+      }
+
+      // Add description matching if provided
+      if (matchingData.description) {
+        query.description = new RegExp(matchingData.description, 'i');
+      }
+
+      // Add memo matching if provided
+      if (matchingData.memo) {
+        query.$or = [
+          { memo: new RegExp(matchingData.memo, 'i') },
+          { 'rawData.memo': new RegExp(matchingData.memo, 'i') }
+        ];
+      }
+
+      // Add rawCategory matching if provided
+      if (matchingData.rawCategory) {
+        if (query.$or) {
+          query.$or.push({ 'rawData.category': new RegExp(matchingData.rawCategory, 'i') });
+        } else {
+          query['rawData.category'] = new RegExp(matchingData.rawCategory, 'i');
+        }
+      }
+
+      // Find matching transactions
+      const matchingTransactions = await Transaction.find(query);
+
+      if (matchingTransactions.length === 0) {
+        console.log('No historical transactions found matching the pattern');
+        return { updatedCount: 0 };
+      }
+
+      console.log(`Found ${matchingTransactions.length} historical transactions matching the pattern (includes both uncategorized and already categorized)`);
+
+      // Get category and subcategory for reasoning
+      const category = await Category.findById(categoryId);
+      const subCategory = subCategoryId ? await SubCategory.findById(subCategoryId) : null;
+
+      let updatedCount = 0;
+      
+      // Update each matching transaction
+      for (const transaction of matchingTransactions) {
+        try {
+          // Generate reasoning
+          let reasoning;
+          if (category.type === 'Expense' && subCategory) {
+            reasoning = `Auto-categorization from manual rule: Pattern matches user rule for "${category.name}" > "${subCategory.name}". Original transaction: "${transaction.description}"`;
+          } else {
+            reasoning = `Auto-categorization from manual rule: Pattern matches user rule for "${category.name}" (${category.type}). Original transaction: "${transaction.description}"`;
+          }
+
+          // Update transaction
+          transaction.category = categoryId;
+          transaction.subCategory = subCategoryId;
+          transaction.categorizationMethod = CategorizationMethod.PREVIOUS_DATA;
+          transaction.categorizationReasoning = reasoning;
+          
+          // Set transaction type based on category type
+          if (!transaction.type) {
+            transaction.type = category.type;
+          }
+          
+          await transaction.save();
+          updatedCount++;
+          
+          console.log(`Updated historical transaction ${transaction._id}: ${reasoning}`);
+        } catch (error) {
+          console.error(`Failed to update transaction ${transaction._id}:`, error);
+        }
+      }
+
+      console.log(`Successfully updated ${updatedCount} historical transactions`);
+      return { updatedCount };
+      
+    } catch (error) {
+      console.error('Error applying manual categorization to historical transactions:', error);
+      throw error;
+    }
   }
 }
 

@@ -11,6 +11,11 @@ const manualCategorizedSchema = new mongoose.Schema({
     trim: true,
     default: null
   },
+  rawCategory: {
+    type: String,
+    trim: true,
+    default: null
+  },
   language: {
     type: String,
     enum: ['en', 'he'],
@@ -24,7 +29,7 @@ const manualCategorizedSchema = new mongoose.Schema({
   subCategory: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'SubCategory',
-    required: true
+    required: false // Make optional for Income/Transfer categories
   },
   category: {
     type: mongoose.Schema.Types.ObjectId,
@@ -57,7 +62,7 @@ manualCategorizedSchema.index({ userId: 1, subCategory: 1 });
 
 // Static method to save manual categorization
 manualCategorizedSchema.statics.saveManualCategorization = async function(data) {
-  const { description, memo, userId, subCategory, category, language = 'he' } = data;
+  const { description, memo, rawCategory, userId, subCategory, category, language = 'he' } = data;
 
   const existingMapping = await this.findOne({
     description,
@@ -68,17 +73,17 @@ manualCategorizedSchema.statics.saveManualCategorization = async function(data) 
   if (existingMapping) {
     existingMapping.matchCount += 1;
     existingMapping.lastUsed = new Date();
-    if (subCategory) {
-      existingMapping.subCategory = subCategory;
-      existingMapping.category = category;
-      existingMapping.confidence = 1.0; // Reset confidence on manual update
-    }
+    existingMapping.subCategory = subCategory; // Can be null for Income/Transfer
+    existingMapping.category = category;
+    existingMapping.rawCategory = rawCategory || null;
+    existingMapping.confidence = 1.0; // Reset confidence on manual update
     return existingMapping.save();
   }
 
   const newMapping = new this({
     description,
     memo: memo || null,
+    rawCategory: rawCategory || null,
     userId,
     subCategory,
     category,

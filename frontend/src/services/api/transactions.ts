@@ -4,6 +4,7 @@ import {
   Transaction,
   GetTransactionsResponse,
   CategorizeTransactionRequest,
+  CategorizeTransactionResponse,
   TransactionSummary,
   CategorySuggestion,
   UncategorizedStats
@@ -33,9 +34,9 @@ export const transactionsApi = {
   categorizeTransaction: (
     transactionId: string,
     data: CategorizeTransactionRequest,
-  ): Promise<Transaction> =>
-    api.post<Transaction>(`/transactions/${transactionId}/categorize`, data)
-      .then((res: AxiosResponse<Transaction>) => res.data),
+  ): Promise<CategorizeTransactionResponse> =>
+    api.post<CategorizeTransactionResponse>(`/transactions/${transactionId}/categorize`, data)
+      .then((res: AxiosResponse<CategorizeTransactionResponse>) => res.data),
 
   getSuggestion: (transactionId: string): Promise<{
     suggestion: CategorySuggestion;

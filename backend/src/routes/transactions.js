@@ -101,32 +101,67 @@ router.get('/summary/:accountId', auth, async (req, res) => {
 // Categorize a transaction
 router.post('/:transactionId/categorize', auth, async (req, res) => {
   try {
-    const { categoryId, subCategoryId } = req.body;
+    const { categoryId, subCategoryId, saveAsManual = false, matchingFields = {} } = req.body;
     
-    if (!categoryId || !subCategoryId) {
-      return res.status(400).json({ error: 'Category and subcategory are required' });
+    if (!categoryId) {
+      return res.status(400).json({ error: 'Category is required' });
     }
 
     const category = await Category.findOne({
       _id: categoryId,
       userId: req.user._id
     });
-    const subCategory = await SubCategory.findOne({
-      _id: subCategoryId,
-      userId: req.user._id
-    });
 
-    if (!category || !subCategory) {
-      return res.status(404).json({ error: 'Category or subcategory not found' });
+    if (!category) {
+      return res.status(404).json({ error: 'Category not found' });
     }
 
-    const transaction = await transactionService.categorizeTransaction(
+    // For Expense categories, subcategory is required
+    if (category.type === 'Expense' && !subCategoryId) {
+      return res.status(400).json({ error: 'Subcategory is required for Expense transactions' });
+    }
+
+    // For Income/Transfer categories, ensure no subcategory is provided
+    const finalSubCategoryId = category.type === 'Expense' ? subCategoryId : null;
+
+    // Validate subcategory if provided for Expense
+    if (finalSubCategoryId) {
+      const subCategory = await SubCategory.findOne({
+        _id: finalSubCategoryId,
+        userId: req.user._id,
+        parentCategory: categoryId
+      });
+
+      if (!subCategory) {
+        return res.status(404).json({ error: 'Subcategory not found or does not belong to the selected category' });
+      }
+    }
+
+    const result = await transactionService.categorizeTransaction(
       req.params.transactionId,
       categoryId,
-      subCategoryId
+      finalSubCategoryId,
+      saveAsManual,
+      matchingFields
     );
 
-    res.json(transaction);
+    // Return the transaction with populated category and subcategory data
+    const populatedTransaction = await Transaction.findById(result._id)
+      .populate('category')
+      .populate('subCategory');
+
+    // If this was a manual categorization that was saved as a rule,
+    // the result might include information about historical transactions updated
+    const response = {
+      transaction: populatedTransaction,
+    };
+
+    // Add historical update info if available
+    if (result.historicalUpdates) {
+      response.historicalUpdates = result.historicalUpdates;
+    }
+
+    res.json(response);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

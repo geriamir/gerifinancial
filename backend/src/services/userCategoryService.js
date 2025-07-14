@@ -2,51 +2,54 @@ const Category = require('../models/Category');
 const SubCategory = require('../models/SubCategory');
 
 const defaultCategories = [
+  // Income categories (flattened - no subcategories)
   {
-    name: "Income",
+    name: "Salary",
     type: "Income",
-    subCategories: [
-      "Salary",
-      {
-        name: "Allowance",
-        keywords: ["קצבה", "מענק", "פיצויים", "פיצוי", "קצבת"]
-      },
-      {
-        name: "Dividends and Profits",
-        keywords: ["דיבידנד", "רווחים", "רבית"]
-      },
-      {
-        name: "Refunds",
-        keywords: ["החזר", "זיכוי"]
-      },
-      {
-        name: "Income Miscellaneous",
-        keywords: ["פייבוקס", "ביט"]
-      }
-    ]
+    keywords: ["salary", "משכורת", "שכר"]
   },
   {
-    name: "Transfer",
-    type: "Transfer",
-    subCategories: [
-      { 
-        name: "Credit Card",
-        keywords: ["דיינרס", "אשראי", "ישראכרט", "ויזה", "מאסטרקארד", "כרטיס אשראי"]
-      },
-      {
-        name: "Savings",
-        keywords: ["אלטשולר"]
-      },
-      {
-        name: "Investments",
-        keywords: ["נייר ערך"]
-      },
-      {
-        name: "Cash Withdrawal",
-        keywords: ["מזומן", "משיכה", "כספומט"]
-      }
-    ]
+    name: "Allowance",
+    type: "Income",
+    keywords: ["קצבה", "מענק", "פיצויים", "פיצוי", "קצבת"]
   },
+  {
+    name: "Dividends and Profits",
+    type: "Income",
+    keywords: ["דיבידנד", "רווחים", "רבית"]
+  },
+  {
+    name: "Refunds",
+    type: "Income",
+    keywords: ["החזר", "זיכוי"]
+  },
+  {
+    name: "Income Miscellaneous",
+    type: "Income",
+    keywords: ["פייבוקס", "ביט"]
+  },
+  // Transfer categories (flattened - no subcategories)
+  {
+    name: "Credit Card",
+    type: "Transfer",
+    keywords: ["דיינרס", "אשראי", "ישראכרט", "ויזה", "מאסטרקארד", "כרטיס אשראי"]
+  },
+  {
+    name: "Savings",
+    type: "Transfer",
+    keywords: ["אלטשולר"]
+  },
+  {
+    name: "Investments",
+    type: "Transfer",
+    keywords: ["נייר ערך"]
+  },
+  {
+    name: "Cash Withdrawal",
+    type: "Transfer",
+    keywords: ["מזומן", "משיכה", "כספומט"]
+  },
+  // Expense categories (unchanged - keep category → subcategory structure)
   {
     name: "Household",
     type: "Expense",
@@ -75,10 +78,11 @@ const defaultCategories = [
     name: "Family",
     type: "Expense",
     subCategories: [
-      "Activities",
+      "Daycare, Kids Activities and Sunmer Camps",
       "Pets",
       "School",
       "Toys",
+      "Babysitting",
       "Family Miscellaneous"
     ]
   },
@@ -144,9 +148,18 @@ const defaultCategories = [
         name:"Bank Fees",
         keywords: ["עמ.", "עמלת", "עמל"]
       },
-      "Credit Card Fees",
-      "Investment Fees",
-      "Financial Services - Miscellaneous"
+      {
+        name: "Loan Payments",
+        keywords: []
+      },
+      {
+        name: "Interest Payments",
+        keywords: []
+      },
+      {
+        name: "Financial Services - Miscellaneous",
+        keywords: []
+      },
     ]
   },
   {
@@ -171,32 +184,35 @@ async function initializeUserCategories(userId) {
       const category = new Category({
         name: categoryData.name,
         type: categoryData.type,
+        keywords: categoryData.keywords || [], // Add keywords for Income/Transfer categories
         userId: userId // Associate category with user
       });
       await category.save();
       userCategories.push(category);
 
-      // Create subcategories for this category
-      for (const subCatData of categoryData.subCategories) {
-        // Handle both string and object subcategory definitions
-        const subCategoryName = typeof subCatData === 'string' ? subCatData : subCatData.name;
-        const keywords = typeof subCatData === 'string' ? [subCategoryName.toLowerCase()] : subCatData.keywords;
-        
-        const subCategory = new SubCategory({
-          name: subCategoryName,
-          parentCategory: category._id,
-          isDefault: true,
-          keywords: keywords,
-          userId: userId // Associate subcategory with user
-        });
-        await subCategory.save();
+      // Create subcategories only for Expense categories
+      if (categoryData.subCategories && categoryData.subCategories.length > 0) {
+        for (const subCatData of categoryData.subCategories) {
+          // Handle both string and object subcategory definitions
+          const subCategoryName = typeof subCatData === 'string' ? subCatData : subCatData.name;
+          const keywords = typeof subCatData === 'string' ? [subCategoryName.toLowerCase()] : subCatData.keywords;
+          
+          const subCategory = new SubCategory({
+            name: subCategoryName,
+            parentCategory: category._id,
+            isDefault: true,
+            keywords: keywords,
+            userId: userId // Associate subcategory with user
+          });
+          await subCategory.save();
 
-        // Add subcategory reference to category
-        category.subCategories.push(subCategory._id);
+          // Add subcategory reference to category
+          category.subCategories.push(subCategory._id);
+        }
+
+        // Save category with subcategory references
+        await category.save();
       }
-
-      // Save category with subcategory references
-      await category.save();
     }
 
     return userCategories;

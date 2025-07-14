@@ -21,7 +21,7 @@ describe('Transaction Category Icons', () => {
             category: {
               _id: 'cat1',
               name: 'Household',
-              type: 'expense'
+              type: 'Expense'
             },
             subCategory: {
               _id: 'subcat1',
@@ -51,7 +51,7 @@ describe('Transaction Category Icons', () => {
             category: {
               _id: 'cat2',
               name: 'Other',
-              type: 'expense'
+              type: 'Expense'
             },
             subCategory: {
               _id: 'subcat2',
@@ -88,15 +88,15 @@ describe('Transaction Category Icons', () => {
   });
 
   it('should display subcategory name for mapped subcategory', () => {
-    // Find the first transaction's subcategory
-    cy.get('[data-testid="transaction-tx1-content-subcategory"]')
+    // Find the first transaction's category (shows subcategory for expense transactions)
+    cy.get('[data-testid="transaction-tx1-content-category"]')
       .should('exist')
       .and('have.text', 'Mortgage');
   });
 
   it('should display subcategory name for unmapped subcategory', () => {
-    // Find the second transaction's subcategory
-    cy.get('[data-testid="transaction-tx2-content-subcategory"]')
+    // Find the second transaction's category (shows subcategory for expense transactions)
+    cy.get('[data-testid="transaction-tx2-content-category"]')
       .should('exist')
       .and('have.text', 'Custom Category');
   });
@@ -136,12 +136,12 @@ describe('Transaction Category Icons', () => {
 
   it('should maintain consistent typography for subcategories', () => {
     // Check typography styles are consistent
-    cy.get('[data-testid="transaction-tx1-content-subcategory"]')
+    cy.get('[data-testid="transaction-tx1-content-category"]')
       .should('have.css', 'display', 'block')
       .invoke('css', 'font-size')
       .should('match', /(0.75rem|12px)/);
 
-    cy.get('[data-testid="transaction-tx2-content-subcategory"]')
+    cy.get('[data-testid="transaction-tx2-content-category"]')
       .should('have.css', 'display', 'block')
       .invoke('css', 'font-size')
       .should('match', /(0.75rem|12px)/);

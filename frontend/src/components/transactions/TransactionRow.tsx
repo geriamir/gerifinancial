@@ -44,14 +44,17 @@ const TransactionRow: React.FC<TransactionRowProps> = ({
           />
         )}
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          {transaction.subCategory && (
+          {/* Show category/subcategory info based on transaction type */}
+          {transaction.category && (
             <Typography 
               variant="caption" 
               color="primary"
-              data-testid={`${baseTestId}-subcategory`}
+              data-testid={`${baseTestId}-category`}
               sx={{ mb: 0.25, display: 'block', fontSize: '0.75rem', lineHeight: 1.2, fontWeight: 'bold' }}
             >
-              {transaction.subCategory.name}
+              {transaction.category.type === 'Expense' && transaction.subCategory 
+                ? transaction.subCategory.name 
+                : transaction.category.name}
             </Typography>
           )}
           <Typography 

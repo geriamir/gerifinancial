@@ -14,6 +14,11 @@ const categorySchema = new mongoose.Schema({
     required: true,
     enum: ['Expense', 'Income', 'Transfer'],
   },
+  // Keywords for Income/Transfer categories (used for AI categorization)
+  keywords: [{
+    type: String,
+    trim: true,
+  }],
   subCategories: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'SubCategory'

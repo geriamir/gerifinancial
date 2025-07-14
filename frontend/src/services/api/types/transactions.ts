@@ -30,6 +30,11 @@ export interface GetTransactionsResponse {
 export interface CategorizeTransactionRequest {
   categoryId: string;
   subCategoryId: string;
+  saveAsManual?: boolean;
+  matchingFields?: {
+    description?: string;
+    memo?: string;
+  };
 }
 
 export interface CategorySuggestion {
@@ -73,4 +78,11 @@ export interface TransactionFilters {
 
 export interface UncategorizedStats {
   total: number;
+}
+
+export interface CategorizeTransactionResponse {
+  transaction: Transaction;
+  historicalUpdates?: {
+    updatedCount: number;
+  };
 }

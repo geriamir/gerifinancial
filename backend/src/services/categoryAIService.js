@@ -83,8 +83,9 @@ class CategoryAIService {
 
       // Exact keyword match check first
       for (const category of availableCategories) {
-        for (const subCategory of category.subCategories) {
-          const exactMatch = subCategory.keywords?.some(
+        // Check category-level keywords (for Income/Transfer)
+        if (category.keywords && category.keywords.length > 0) {
+          const exactMatch = category.keywords.some(
             kw => text.toLowerCase().includes(kw.toLowerCase()) || 
                  translatedText.toLowerCase().includes(kw.toLowerCase())
           );
@@ -94,12 +95,35 @@ class CategoryAIService {
             const confidence = isRawCategory ? 0.95 : 0.85;
             return {
               categoryId: category.id,
-              subCategoryId: subCategory.id,
+              subCategoryId: null, // No subcategory for Income/Transfer
               confidence,
               reasoning: confidence > 0.9 
-                ? 'Very strong confidence match from transaction description' 
-                : 'Moderate confidence match from transaction description'
+                ? `Very strong confidence match for ${category.name} from transaction description` 
+                : `Moderate confidence match for ${category.name} from transaction description`
             };
+          }
+        }
+
+        // Check subcategory-level keywords (for Expenses)
+        if (category.subCategories && category.subCategories.length > 0) {
+          for (const subCategory of category.subCategories) {
+            const exactMatch = subCategory.keywords?.some(
+              kw => text.toLowerCase().includes(kw.toLowerCase()) || 
+                   translatedText.toLowerCase().includes(kw.toLowerCase())
+            );
+
+            if (exactMatch) {
+              // Higher confidence for exact keyword matches
+              const confidence = isRawCategory ? 0.95 : 0.85;
+              return {
+                categoryId: category.id,
+                subCategoryId: subCategory.id,
+                confidence,
+                reasoning: confidence > 0.9 
+                  ? 'Very strong confidence match from transaction description' 
+                  : 'Moderate confidence match from transaction description'
+              };
+            }
           }
         }
       }
@@ -113,34 +137,56 @@ class CategoryAIService {
 
       // TF-IDF based matching
       for (const category of availableCategories) {
-        this.buildCorpus(category.subCategories);
-        
-        const scores = [];
-        this.tfidf.tfidfs(processedText.join(' '), (index, score) => {
-          scores.push({
-            subCategory: category.subCategories[index],
-            score: score
+        // Handle categories with keywords (Income/Transfer)
+        if (category.keywords && category.keywords.length > 0) {
+          const categoryText = `${category.name} ${category.keywords.join(' ')}`;
+          const similarity = this.calculateSimilarity(processedText.join(' '), categoryText);
+          
+          if (similarity > bestMatch.confidence) {
+            const confidence = isRawCategory ? 
+              Math.min(similarity * 0.8, 1) : 
+              Math.min(similarity * 0.6, 1);
+
+            bestMatch = {
+              categoryId: category.id,
+              subCategoryId: null,
+              confidence,
+              reasoning: this._generateReasoning(confidence, category.name, isRawCategory)
+            };
+          }
+        }
+
+        // Handle categories with subcategories (Expenses)
+        if (category.subCategories && category.subCategories.length > 0) {
+          this.buildCorpus(category.subCategories);
+          
+          const scores = [];
+          this.tfidf.tfidfs(processedText.join(' '), (index, score) => {
+            scores.push({
+              subCategory: category.subCategories[index],
+              score: score
+            });
           });
-        });
 
-        const bestSubMatch = scores.reduce((best, current) => 
-          current.score > best.score ? current : best,
-          { score: 0, subCategory: null }
-        );
+          const bestSubMatch = scores.reduce((best, current) => 
+            current.score > best.score ? current : best,
+            { score: 0, subCategory: null }
+          );
 
-        if (bestSubMatch.score > bestMatch.confidence) {
-          const confidence = isRawCategory ? 
-            Math.min(bestSubMatch.score * 0.8, 1) : 
-            Math.min(bestSubMatch.score * 0.6, 1);
+          if (bestSubMatch.score > bestMatch.confidence) {
+            const confidence = isRawCategory ? 
+              Math.min(bestSubMatch.score * 0.8, 1) : 
+              Math.min(bestSubMatch.score * 0.6, 1);
 
-          bestMatch = {
-            categoryId: category.id,
-            subCategoryId: bestSubMatch.subCategory?.id || null,
-            confidence,
-            reasoning: this._generateReasoning(confidence, 
-              bestSubMatch.subCategory?.name || '', 
-              isRawCategory)
-          };
+            bestMatch = {
+              categoryId: category.id,
+              subCategoryId: bestSubMatch.subCategory?.id || null,
+              confidence,
+              reasoning: this._generateReasoning(confidence, 
+                bestSubMatch.subCategory?.name || '', 
+                isRawCategory)
+            };
+          }
         }
       }
 
