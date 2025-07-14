@@ -547,19 +547,33 @@ describe('Transactions Page', () => {
   // });
 
   it('should handle API errors gracefully', () => {
-    // Intercept with error
+    // This test doesn't need the beforeEach setup since we're testing error handling
+    // Clear any existing state and set up a clean test
+    cy.task('db:clearTestData', null, { timeout: 10000 });
+    
+    // Create test user without adding transactions
+    cy.createTestUser().then(token => {
+      const decodedToken = JSON.parse(atob(token.split('.')[1]));
+      Cypress.env('testUserId', decodedToken.userId);
+      
+      return cy.login('test@example.com', 'password123');
+    });
+
+    // Intercept with error BEFORE visiting the page
     cy.intercept(
       'GET',
-      `${Cypress.env('apiUrl')}/api/transactions*`,
+      '**/api/transactions*',
       { statusCode: 500 }
     ).as('apiError');
 
-    // Trigger new request
-    cy.reload();
+    // Visit the transactions page
+    cy.visit('/transactions');
+    
+    // Wait for the error response
     cy.wait('@apiError');
 
-    // Verify error message
-    cy.contains('Failed to load transactions')
+    // Verify error message appears
+    cy.contains('Failed to load transactions', { timeout: 10000 })
       .should('be.visible');
   });
 });
