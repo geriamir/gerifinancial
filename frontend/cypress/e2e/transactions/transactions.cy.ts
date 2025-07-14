@@ -108,6 +108,8 @@ describe('Transactions Page', () => {
       console.log('Transaction creation result:', result);
       expect(result.success).to.be.true;
       expect(result.insertedCount).to.equal(30);
+      
+      // More flexible check for transactions
       expect(result.transactions).to.have.length.at.least(1);
 
       // Verify transaction type distribution
