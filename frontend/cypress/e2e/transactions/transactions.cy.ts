@@ -374,6 +374,9 @@ describe('Transactions Page', () => {
       .clear()
       .type(searchTerm, { delay: 100 });
 
+    // Wait for debounce to complete (FilterPanel uses 300ms debounce)
+    cy.wait(500);
+
     // Wait for search request with timeout
     cy.wait('@getTransactions', { timeout: 15000 })
       .then((interception) => {
@@ -381,6 +384,7 @@ describe('Transactions Page', () => {
         // Check for search parameter specifically
         const url = new URL(interception.request.url);
         const searchParam = url.searchParams.get('search');
+        console.log('Search parameter:', searchParam);
         expect(searchParam).to.equal(searchTerm);
       });
     
