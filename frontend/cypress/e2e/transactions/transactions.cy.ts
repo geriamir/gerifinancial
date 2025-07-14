@@ -151,18 +151,15 @@ describe('Transactions Page', () => {
       });
     });
 
-    // Visit page after ensuring token is set
-    cy.visit('/transactions', {
-      onBeforeLoad(win) {
-        console.log('Verifying token before page load:', {
-          token: win.localStorage.getItem('token')
-        });
-      },
-    });
-    cy.contains('Transactions', { timeout: 10000 }).should('be.visible');
-
-    // Set up API spies with detailed logging
-    cy.intercept('GET', `${Cypress.env('apiUrl')}/api/transactions*`, (req) => {
+    // Set up API spies with detailed logging BEFORE visiting the page
+    cy.intercept('GET', '**/api/transactions*', (req) => {
+      console.log('API Request intercepted:', {
+        url: req.url,
+        method: req.method,
+        headers: req.headers,
+        query: req.query
+      });
+      
       // Add cache busting query param
       const url = new URL(req.url);
       url.searchParams.set('_', Date.now().toString());
@@ -181,7 +178,17 @@ describe('Transactions Page', () => {
         });
       });
     }).as('getTransactions');
-    cy.intercept('GET', `${Cypress.env('apiUrl')}/api/transactions/categories`).as('getCategories');
+    cy.intercept('GET', '**/api/transactions/categories').as('getCategories');
+
+    // Visit page after ensuring token is set
+    cy.visit('/transactions', {
+      onBeforeLoad(win) {
+        console.log('Verifying token before page load:', {
+          token: win.localStorage.getItem('token')
+        });
+      },
+    });
+    cy.contains('Transactions', { timeout: 10000 }).should('be.visible');
 
     // Wait for initial data load and verify response
     cy.wait('@getTransactions', { timeout: 15000 })
