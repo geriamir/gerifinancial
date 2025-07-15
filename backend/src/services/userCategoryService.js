@@ -68,10 +68,10 @@ const defaultCategories = [
     name: "Shopping",
     type: "Expense",
     subCategories: [
-      { name: "Furniture and Decorations", keywords: ["furniture", "decorations", "רהיטים", "עיצוב"] },
+      { name: "Groceries", keywords: ["groceries", "supermarket", "מכולת", "סופר", "מזון"] },
+      { name: "Furniture and Decorations", keywords: ["furniture", "decorations", "רהיטים"] },
       { name: "Appliances and Electronics", keywords: ["appliances", "electronics", "מוצרי חשמל"] },
-      { name: "Groceries", keywords: ["groceries", "supermarket", "מכולת", "סופר"] },
-      { name: "Apparel and Accessories", keywords: ["apparel", "clothing", "accessories", "בגדים", "אביזרים"] }
+      { name: "Apparel and Accessories", keywords: ["apparel", "clothing", "accessories", "בגדים", "אביזרים", "אופנה"] }
     ]
   },
   {
@@ -108,7 +108,8 @@ const defaultCategories = [
       { name: "Public Transportation", keywords: ["public transportation", "bus", "train", "תחבורה ציבורית"] },
       { name: "Fuel", keywords: ["fuel", "gas", "דלק"] },
       { name: "Toll Roads", keywords: ["toll roads", "כביש אגרה"] },
-      { name: "Parking", keywords: ["parking", "חניה"] },
+      { name: "Parking", keywords: ["parking", "חניה", "חניון"] },
+      { name: "Car Insurance", keywords: ["car insurance", "ביטוח רכב"] },
       { name: "Cars Miscellaneous", keywords: ["cars", "רכב"] }
     ]
   },
@@ -127,6 +128,7 @@ const defaultCategories = [
     subCategories: [
       { name: "Movies and Shows", keywords: ["movies", "shows", "cinema", "קולנוע"] },
       { name: "Music and Reading", keywords: ["music", "reading", "books", "מוזיקה", "ספרים"] },
+      { name: "Gifts, Weddings and Celebrations", keywords: ["gifts", "weddings", "celebrations", "מתנות", "חתונה", "מתנה"] },
       { name: "Entertainment - Miscellaneous", keywords: ["entertainment", "בילוי"] }
     ]
   },
@@ -166,10 +168,11 @@ const defaultCategories = [
     name: "Travel",
     type: "Expense",
     subCategories: [
-      { name: "Flights", keywords: ["flights", "airline", "טיסות"] },
+      { name: "Flights", keywords: ["flights", "airline", "טיסות", "airlines"] },
       { name: "Hotels", keywords: ["hotels", "accommodation", "בתי מלון"] },
       { name: "Recreation", keywords: ["recreation", "tourist", "תיירות"] },
       { name: "Travel Transportation", keywords: ["travel transportation", "taxi", "rental car", "תחבורה בנסיעות"] },
+      { name: "Travel Insurance", keywords: ["travel insurance", "ביטוח נסיעות"] },
       { name: "Travel - Miscellaneous", keywords: ["travel", "vacation", "נסיעות"] }
     ]
   }

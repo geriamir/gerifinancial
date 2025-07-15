@@ -98,6 +98,11 @@ manualCategorizedSchema.statics.findMatches = async function(description, userId
   const normalizedDescription = description.toLowerCase().trim();
   const normalizedMemo = memo ? memo.toLowerCase().trim() : null;
   
+  // Escape special regex characters to prevent regex errors
+  const escapeRegex = (string) => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
+  
   // Try exact match with memo if provided
   if (normalizedMemo) {
     const exactMatches = await this.find({
@@ -129,7 +134,7 @@ manualCategorizedSchema.statics.findMatches = async function(description, userId
   // Fallback to partial description match only for high confidence matches
   return this.find({
     userId,
-    description: new RegExp(normalizedDescription, 'i'),
+    description: new RegExp(escapeRegex(normalizedDescription), 'i'),
     confidence: { $gte: 0.5 }
   })
   .sort({ matchCount: -1, lastUsed: -1 })
@@ -141,10 +146,15 @@ manualCategorizedSchema.statics.findMatches = async function(description, userId
 manualCategorizedSchema.statics.suggestCategorization = async function(description, userId, memo = null) {
   const normalizedDescription = description.toLowerCase().trim();
   
+  // Escape special regex characters to prevent regex errors
+  const escapeRegex = (string) => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
+  
   // Find similar descriptions using partial matching
   const similarMappings = await this.find({
     userId,
-    description: new RegExp(normalizedDescription.slice(0, Math.max(3, normalizedDescription.length/2)), 'i')
+    description: new RegExp(escapeRegex(normalizedDescription.slice(0, Math.max(3, normalizedDescription.length/2))), 'i')
   })
   .sort({ matchCount: -1 })
   .limit(5)

@@ -40,10 +40,15 @@ subCategorySchema.statics.findMatchingSubCategories = async function(searchTerms
     .map(term => term.toLowerCase())
     .flatMap(term => term.split(' '));
   
+  // Escape special regex characters to prevent regex errors
+  const escapeRegex = (string) => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
+  
   // Find subcategories where any keyword matches any of the search terms
   return this.find({
     keywords: {
-      $in: normalizedTerms.map(term => new RegExp(term, 'i'))
+      $in: normalizedTerms.map(term => new RegExp(escapeRegex(term), 'i'))
     }
   }).populate('parentCategory');
 };
