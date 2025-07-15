@@ -292,8 +292,8 @@ describe('Transaction Routes', () => {
         });
 
       expect(res.status).toBe(200);
-      expect(res.body.category.toString()).toBe(category._id.toString());
-      expect(res.body.subCategory.toString()).toBe(subCategory._id.toString());
+      expect(res.body.transaction.category._id.toString()).toBe(category._id.toString());
+      expect(res.body.transaction.subCategory._id.toString()).toBe(subCategory._id.toString());
     });
 
     it('should fail with invalid category', async () => {
@@ -306,7 +306,7 @@ describe('Transaction Routes', () => {
         });
 
       expect(res.status).toBe(404);
-      expect(res.body.error).toBe('Category or subcategory not found');
+      expect(res.body.error).toBe('Category not found');
     });
 
     it('should require authentication', async () => {
@@ -322,49 +322,53 @@ describe('Transaction Routes', () => {
   });
 
 
-  describe('Transaction Identifier Generation', () => {
-    it('should generate a unique identifier when none is provided', async () => {
-      const transaction = await Transaction.createFromScraperData({
-        chargedAmount: -75,
-        date: new Date(),
-        description: 'Auto ID Test'
-      }, bankAccount._id, 'ILS', user._id);
+  describe('Transaction Processing via Service', () => {
+    it('should process scraped transactions correctly', async () => {
+      const scrapedAccounts = [{
+        txns: [{
+          chargedAmount: -75,
+          date: new Date(),
+          description: 'Service Test Transaction',
+          identifier: 'service-test-1'
+        }]
+      }];
 
-      expect(transaction.identifier).toBeTruthy();
-      expect(typeof transaction.identifier).toBe('string');
-      expect(transaction.identifier.includes(bankAccount._id.toString())).toBe(true);
+      const result = await transactionService.processScrapedTransactions(
+        scrapedAccounts, 
+        bankAccount
+      );
+
+      expect(result.newTransactions).toBe(1);
+      expect(result.duplicates).toBe(0);
+
+      // Verify transaction was created
+      const savedTransaction = await Transaction.findOne({
+        description: 'Service Test Transaction'
+      });
+      expect(savedTransaction).toBeTruthy();
+      expect(savedTransaction.identifier).toBe('service-test-1');
     });
 
-    it('should use provided identifier when available', async () => {
-      const providedId = 'test-provided-id';
-      const transaction = await Transaction.createFromScraperData({
-        identifier: providedId,
-        chargedAmount: -75,
-        date: new Date(),
-        description: 'Provided ID Test'
-      }, bankAccount._id, 'ILS', user._id);
 
-      expect(transaction.identifier).toBe(providedId);
-    });
+    it('should handle transactions without identifiers', async () => {
+      const scrapedAccounts = [{
+        txns: [{
+          chargedAmount: -100,
+          date: new Date(),
+          description: 'No ID Transaction'
+          // No identifier provided - should cause validation error
+        }]
+      }];
 
-    it('should generate unique identifiers for similar transactions', async () => {
-      const date = new Date();
-      const description = 'Similar Transaction';
-      const amount = -100;
+      const result = await transactionService.processScrapedTransactions(
+        scrapedAccounts, 
+        bankAccount
+      );
 
-      const transaction1 = await Transaction.createFromScraperData({
-        chargedAmount: amount,
-        date,
-        description
-      }, bankAccount._id, 'ILS', user._id);
-
-      const transaction2 = await Transaction.createFromScraperData({
-        chargedAmount: amount,
-        date,
-        description
-      }, bankAccount._id, 'ILS', user._id);
-
-      expect(transaction1.identifier).not.toBe(transaction2.identifier);
+      // Should result in an error due to missing identifier
+      expect(result.newTransactions).toBe(0);
+      expect(result.errors.length).toBe(1);
+      expect(result.errors[0].error).toContain('identifier');
     });
   });
 });

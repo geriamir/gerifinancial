@@ -16,7 +16,8 @@ export interface Category {
   name: string;
   type: 'Expense' | 'Income' | 'Transfer';
   userId: string;
-  subCategories?: SubCategory[];
+  keywords?: string[]; // Keywords for Income/Transfer categories (flattened structure)
+  subCategories?: SubCategory[]; // Only used for Expense categories
   rules?: string[];
   isActive?: boolean;
   color?: string;

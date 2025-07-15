@@ -1,100 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { Category, SubCategory, Transaction, PendingTransaction } = require('../models');
+const { Category, SubCategory, Transaction } = require('../models');
 const transactionService = require('../services/transactionService');
 const categoryAIService = require('../services/categoryAIService');
-
-// Get pending transactions
-router.get('/pending', auth, async (req, res) => {
-  try {
-    const { limit = '20', skip = '0', accountId } = req.query;
-    const options = {
-      limit: parseInt(limit),
-      skip: parseInt(skip),
-      accountId: accountId || undefined
-    };
-
-    console.log('GET /pending - Request received:', {
-      userId: req.user._id,
-      options,
-      headers: req.headers
-    });
-
-    const transactions = await transactionService.getPendingTransactions(req.user._id, options);
-    const total = await PendingTransaction.countDocuments({
-      userId: req.user._id,
-      ...(accountId ? { accountId } : {})
-    });
-
-    const response = {
-      transactions,
-      total,
-      hasMore: total > (options.skip + options.limit)
-    };
-
-    console.log('GET /pending - Response:', {
-      transactionsCount: transactions.length,
-      total,
-      hasMore: response.hasMore
-    });
-
-    res.json(response);
-  } catch (error) {
-    console.error('Error fetching pending transactions:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Verify and move pending transactions to permanent storage
-router.post('/verify-batch', auth, async (req, res) => {
-  try {
-    const { transactionIds } = req.body;
-    
-    if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
-      return res.status(400).json({ error: 'Transaction IDs array is required' });
-    }
-
-    const result = await transactionService.verifyTransactions(transactionIds, req.user._id);
-
-    res.json({
-      message: `${result.verifiedCount} transaction(s) verified successfully`,
-      verifiedCount: result.verifiedCount,
-      errors: result.errors
-    });
-  } catch (error) {
-    console.error('Error in batch verification:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Verify a single pending transaction
-router.post('/:transactionId/verify', auth, async (req, res) => {
-  try {
-    const pendingTx = await PendingTransaction.findOne({
-      _id: req.params.transactionId,
-      userId: req.user._id
-    });
-
-    if (!pendingTx) {
-      return res.status(404).json({ error: 'Pending transaction not found' });
-    }
-
-    if (!pendingTx.category || !pendingTx.subCategory) {
-      return res.status(400).json({ error: 'Transaction must be categorized before verification' });
-    }
-
-    const verifiedTx = await pendingTx.verify();
-
-    res.json({
-      message: 'Transaction verified successfully',
-      transaction: verifiedTx
-    });
-  } catch (error) {
-    console.error('Error verifying transaction:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // Get transactions with pagination and filtering
 router.get('/', auth, async (req, res) => {
@@ -162,6 +71,17 @@ router.get('/uncategorized/:accountId', auth, async (req, res) => {
   }
 });
 
+// Get uncategorized transactions statistics for dashboard
+router.get('/uncategorized-stats', auth, async (req, res) => {
+  try {
+    const stats = await transactionService.getUncategorizedStats(req.user._id);
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching uncategorized stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get spending summary
 router.get('/summary/:accountId', auth, async (req, res) => {
   try {
@@ -181,32 +101,67 @@ router.get('/summary/:accountId', auth, async (req, res) => {
 // Categorize a transaction
 router.post('/:transactionId/categorize', auth, async (req, res) => {
   try {
-    const { categoryId, subCategoryId } = req.body;
+    const { categoryId, subCategoryId, saveAsManual = false, matchingFields = {} } = req.body;
     
-    if (!categoryId || !subCategoryId) {
-      return res.status(400).json({ error: 'Category and subcategory are required' });
+    if (!categoryId) {
+      return res.status(400).json({ error: 'Category is required' });
     }
 
     const category = await Category.findOne({
       _id: categoryId,
       userId: req.user._id
     });
-    const subCategory = await SubCategory.findOne({
-      _id: subCategoryId,
-      userId: req.user._id
-    });
 
-    if (!category || !subCategory) {
-      return res.status(404).json({ error: 'Category or subcategory not found' });
+    if (!category) {
+      return res.status(404).json({ error: 'Category not found' });
     }
 
-    const transaction = await transactionService.categorizeTransaction(
+    // For Expense categories, subcategory is required
+    if (category.type === 'Expense' && !subCategoryId) {
+      return res.status(400).json({ error: 'Subcategory is required for Expense transactions' });
+    }
+
+    // For Income/Transfer categories, ensure no subcategory is provided
+    const finalSubCategoryId = category.type === 'Expense' ? subCategoryId : null;
+
+    // Validate subcategory if provided for Expense
+    if (finalSubCategoryId) {
+      const subCategory = await SubCategory.findOne({
+        _id: finalSubCategoryId,
+        userId: req.user._id,
+        parentCategory: categoryId
+      });
+
+      if (!subCategory) {
+        return res.status(404).json({ error: 'Subcategory not found or does not belong to the selected category' });
+      }
+    }
+
+    const result = await transactionService.categorizeTransaction(
       req.params.transactionId,
       categoryId,
-      subCategoryId
+      finalSubCategoryId,
+      saveAsManual,
+      matchingFields
     );
 
-    res.json(transaction);
+    // Return the transaction with populated category and subcategory data
+    const populatedTransaction = await Transaction.findById(result._id)
+      .populate('category')
+      .populate('subCategory');
+
+    // If this was a manual categorization that was saved as a rule,
+    // the result might include information about historical transactions updated
+    const response = {
+      transaction: populatedTransaction,
+    };
+
+    // Add historical update info if available
+    if (result.historicalUpdates) {
+      response.historicalUpdates = result.historicalUpdates;
+    }
+
+    res.json(response);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -339,20 +294,6 @@ router.delete('/categories/:categoryId', auth, async (req, res) => {
   }
 });
 
-// Find similar pending transactions for batch verification
-router.get('/:transactionId/similar', auth, async (req, res) => {
-  try {
-    const result = await transactionService.findSimilarPendingTransactions(
-      req.params.transactionId,
-      req.user._id
-    );
-
-    res.json(result);
-  } catch (error) {
-    console.error('Error finding similar transactions:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // Request AI suggestion for transaction categorization
 router.post('/:transactionId/suggest-category', auth, async (req, res) => {

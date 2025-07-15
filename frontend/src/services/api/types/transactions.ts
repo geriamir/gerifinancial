@@ -7,21 +7,18 @@ export interface Transaction {
   amount: number;
   currency: string;
   date: string;
-  type: 'Expense' | 'Income' | 'Transfer';
+  type?: 'Expense' | 'Income' | 'Transfer';
   description: string;
   memo?: string;
   category?: Category;
   subCategory?: SubCategory;
   categorizationMethod: 'manual' | 'previous_data' | 'ai';
+  categorizationReasoning?: string;
   rawData: Record<string, any>;
   createdAt: string;
   updatedAt: string;
   userId: string;
-  status: 'pending' | 'verified' | 'deleted';
-}
-
-export interface PendingTransaction extends Omit<Transaction, 'status'> {
-  status: 'pending';
+  status: 'verified' | 'deleted';
 }
 
 export interface GetTransactionsResponse {
@@ -30,40 +27,14 @@ export interface GetTransactionsResponse {
   hasMore: boolean;
 }
 
-export interface GetPendingTransactionsResponse {
-  transactions: PendingTransaction[];
-  total: number;
-  hasMore: boolean;
-}
-
-export interface ProcessingStats {
-  pending: number;
-  verified: number;
-  total: number;
-}
-
-export interface VerifyTransactionsResponse {
-  message: string;
-  successful: PendingTransaction[];
-  failed: Array<{
-    transaction: PendingTransaction;
-    error: string;
-  }>;
-  verifiedCount: number;
-  errors: Array<{
-    transactionId: string;
-    error: string;
-  }>;
-}
-
-export interface SimilarTransactionsResponse {
-  transactions: PendingTransaction[];
-  similarity: number;
-}
-
 export interface CategorizeTransactionRequest {
   categoryId: string;
   subCategoryId: string;
+  saveAsManual?: boolean;
+  matchingFields?: {
+    description?: string;
+    memo?: string;
+  };
 }
 
 export interface CategorySuggestion {
@@ -103,4 +74,15 @@ export interface TransactionFilters {
   category?: string;
   search?: string;
   accountId?: string;
+}
+
+export interface UncategorizedStats {
+  total: number;
+}
+
+export interface CategorizeTransactionResponse {
+  transaction: Transaction;
+  historicalUpdates?: {
+    updatedCount: number;
+  };
 }

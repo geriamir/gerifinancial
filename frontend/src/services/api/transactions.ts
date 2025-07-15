@@ -2,15 +2,12 @@ import { AxiosResponse } from 'axios';
 import api from './base';
 import {
   Transaction,
-  PendingTransaction,
   GetTransactionsResponse,
-  GetPendingTransactionsResponse,
-  ProcessingStats,
-  VerifyTransactionsResponse,
-  SimilarTransactionsResponse,
   CategorizeTransactionRequest,
+  CategorizeTransactionResponse,
   TransactionSummary,
-  CategorySuggestion
+  CategorySuggestion,
+  UncategorizedStats
 } from './types/transactions';
 import type { Category } from './types';
 
@@ -33,30 +30,13 @@ export const transactionsApi = {
     api.get<Transaction>(`/transactions/${id}`)
       .then((res: AxiosResponse<Transaction>) => res.data),
 
-  // Pending transaction methods
-  getPendingTransactions: (params: { limit?: number; skip?: number; accountId?: string }): Promise<GetPendingTransactionsResponse> =>
-    api.get<GetPendingTransactionsResponse>('/transactions/pending', { params })
-      .then((res: AxiosResponse<GetPendingTransactionsResponse>) => res.data),
-
-  getProcessingStats: (): Promise<ProcessingStats> =>
-    api.get<ProcessingStats>('/transactions/processing-stats')
-      .then((res: AxiosResponse<ProcessingStats>) => res.data),
-
-  verifyTransaction: (transactionId: string): Promise<Transaction> =>
-    api.post<Transaction>(`/transactions/${transactionId}/verify`)
-      .then((res: AxiosResponse<Transaction>) => res.data),
-
-  verifyBatch: (transactionIds: string[]): Promise<VerifyTransactionsResponse> =>
-    api.post<VerifyTransactionsResponse>('/transactions/verify-batch', { transactionIds })
-      .then((res: AxiosResponse<VerifyTransactionsResponse>) => res.data),
-
   // Categorization methods
   categorizeTransaction: (
     transactionId: string,
     data: CategorizeTransactionRequest,
-  ): Promise<Transaction | PendingTransaction> =>
-    api.post<Transaction | PendingTransaction>(`/transactions/${transactionId}/categorize`, data)
-      .then((res: AxiosResponse<Transaction | PendingTransaction>) => res.data),
+  ): Promise<CategorizeTransactionResponse> =>
+    api.post<CategorizeTransactionResponse>(`/transactions/${transactionId}/categorize`, data)
+      .then((res: AxiosResponse<CategorizeTransactionResponse>) => res.data),
 
   getSuggestion: (transactionId: string): Promise<{
     suggestion: CategorySuggestion;
@@ -91,13 +71,14 @@ export const transactionsApi = {
       params: { startDate, endDate }
     }).then((res: AxiosResponse<TransactionSummary>) => res.data),
 
-  // Find similar pending transactions for batch verification
-  findSimilarPendingTransactions: (transactionId: string): Promise<SimilarTransactionsResponse> =>
-    api.get<SimilarTransactionsResponse>(`/transactions/${transactionId}/similar`)
-      .then((res: AxiosResponse<SimilarTransactionsResponse>) => res.data),
 
   // Categories
   getCategories: (): Promise<Category[]> =>
     api.get<Category[]>('/transactions/categories')
-      .then((res: AxiosResponse<Category[]>) => res.data)
+      .then((res: AxiosResponse<Category[]>) => res.data),
+
+  // Uncategorized stats for dashboard
+  getUncategorizedStats: (): Promise<UncategorizedStats> =>
+    api.get<UncategorizedStats>('/transactions/uncategorized-stats')
+      .then((res: AxiosResponse<UncategorizedStats>) => res.data)
 };

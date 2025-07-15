@@ -19,21 +19,14 @@ interface TutorialGuideOptions {
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "welcome",
-    title: "Welcome to Pending Transactions",
-    content: "This is where you will find and verify new transactions from your bank accounts.",
-    position: "bottom"
-  },
-  {
-    id: "stats",
-    title: "Processing Stats",
-    content: "Here you can see how many transactions are pending and how many have been verified.",
-    target: ".processing-stats",
+    title: "Welcome to Transactions",
+    content: "This is where you will find and manage your bank transactions.",
     position: "bottom"
   },
   {
     id: "transactions",
     title: "Transaction List",
-    content: "Review your pending transactions here. Click the checkmark to verify a transaction once it is categorized.",
+    content: "Review your transactions here. You can filter, search, and categorize them.",
     target: ".transaction-list",
     position: "top"
   },
@@ -49,7 +42,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 ];
 
 export const useTutorialGuide = (options: TutorialGuideOptions = {}) => {
-  const STORAGE_KEY = "verification_tutorial_completed" as const;
+  const STORAGE_KEY = "transaction_tutorial_completed" as const;
   const [currentStep, setCurrentStep] = useState<TutorialStep | null>(null);
   const [isCompleted, setIsCompleted] = useState(() => {
     return localStorage.getItem(STORAGE_KEY) === "true";

@@ -78,7 +78,7 @@ const bankAccountSchema = new mongoose.Schema({
         type: Date,
         default: () => {
           const date = new Date();
-          date.setMonth(date.getMonth() - 3); // Default to 3 months ago
+          date.setMonth(date.getMonth() - 6); // Default to 6 months ago for first scraping
           return date;
         }
       },
@@ -87,7 +87,7 @@ const bankAccountSchema = new mongoose.Schema({
         type: Number,
         min: 1,
         max: 12,
-        default: 3
+        default: 6
       }
     }
   }
@@ -123,13 +123,25 @@ bankAccountSchema.pre('save', function(next) {
 
 // Method to get scraper options
 bankAccountSchema.methods.getScraperOptions = function() {
+  // Smart start date logic:
+  // - If lastScraped exists, use it (incremental scraping)
+  // - If no lastScraped, use 6 months back (first scrape)
+  let startDate;
+  if (this.lastScraped) {
+    startDate = this.lastScraped;
+  } else {
+    // First scrape: go back 6 months
+    startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - 6);
+  }
+
   const options = {
     companyId: this.bankId,
     credentials: {
       username: this.credentials.username,
       password: decrypt(this.credentials.password)
     },
-    startDate: this.scrapingConfig.options.startDate,
+    startDate: startDate,
     showBrowser: true,
     verbose: true
   };

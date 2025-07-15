@@ -13,28 +13,35 @@ class CategoryMappingService {
    */
   async attemptAutoCategorization(transaction) {
     // Skip if already categorized
-    if (transaction.category && transaction.subCategory) {
+    // For Expenses: need both category and subcategory
+    // For Income/Transfer: only need category (no subcategory)
+    if (transaction.category) {
+      const category = await Category.findById(transaction.category);
+      if (category && (category.type !== 'Expense' || transaction.subCategory)) {
         return await Transaction.findById(transaction._id)
           .populate('category')
           .populate('subCategory');
+      }
     }
 
     try {
       // Determine valid category types
       let categoryTypes = [];
-      // Allow Transfer type regardless of amount
-      if (transaction.type === TransactionType.TRANSFER) {
-        categoryTypes.push(TransactionType.TRANSFER);
+      if (transaction.type) {
+        // If transaction already has a type, use it
+        categoryTypes.push(transaction.type);
       } else {
-        // For non-transfer transactions, use appropriate type based on amount
-        categoryTypes.push(transaction.amount > 0 ? TransactionType.INCOME : TransactionType.EXPENSE);
+        // For transactions without type, consider all types but prefer amount-based logic
+        // Transfer type is allowed regardless of amount
+        categoryTypes.push(TransactionType.TRANSFER);
+        categoryTypes.push(transaction.amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME);
       }
 
       // Try to match by manual categorization
       const manualMatches = await ManualCategorized.findMatches(
         transaction.description,
         transaction.userId,
-        transaction.memo || null
+        transaction.memo || transaction.rawData?.memo || null
       );
       
       // Filter matches by category type
@@ -48,12 +55,23 @@ class CategoryMappingService {
       const manualMatch = validMatches.filter(Boolean)[0];
 
       if (manualMatch) {
+        // Build reasoning for manual match
+        const reasoning = `Manual categorization match: Found similar transaction previously categorized. Description: "${transaction.description}"${transaction.memo || transaction.rawData?.memo ? `, Memo: "${transaction.memo || transaction.rawData?.memo}"` : ''}`;
+        
         await transaction.categorize(
           manualMatch.category,
           manualMatch.subCategory,
           CategorizationMethod.PREVIOUS_DATA,
-          false // needs verification
+          reasoning
         );
+        
+        // Set transaction type based on the category type
+        const category = await Category.findById(manualMatch.category);
+        if (category && !transaction.type) {
+          transaction.type = category.type;
+          await transaction.save();
+        }
+        
         return await Transaction.findById(transaction._id)
           .populate('category')
           .populate('subCategory');
@@ -62,13 +80,73 @@ class CategoryMappingService {
       // Try keyword-based matching - gather all potential search terms
       const searchTerms = [
         transaction.description,
-        transaction.memo,
+        transaction.memo || transaction.rawData?.memo,
         transaction.rawData?.description,
         transaction.rawData?.memo,
         transaction.rawData?.category
       ].filter(Boolean);
 
-      // Get subcategories and filter by parent category type
+      // Try matching categories with keywords (Income/Transfer)
+      const categoriesWithKeywords = await Category.find({
+        userId: transaction.userId,
+        type: { $in: categoryTypes },
+        keywords: { $exists: true, $not: { $size: 0 } }
+      });
+
+      let categoryMatch = null;
+      let categoryMatchDetails = null;
+
+      for (const category of categoriesWithKeywords) {
+        const matchedKeywords = category.keywords.filter(keyword => 
+          keyword && keyword.trim() && 
+          searchTerms.some(term => term && term.trim() && term.toLowerCase().includes(keyword.toLowerCase()))
+        );
+        
+        if (matchedKeywords.length > 0) {
+          const matchingFields = [];
+          if (transaction.description && transaction.description.trim() && matchedKeywords.some(keyword => 
+            keyword && keyword.trim() && transaction.description.toLowerCase().includes(keyword.toLowerCase()))) {
+            matchingFields.push('description');
+          }
+          if ((transaction.memo || transaction.rawData?.memo) && (transaction.memo || transaction.rawData?.memo).trim() && matchedKeywords.some(keyword => 
+            keyword && keyword.trim() && (transaction.memo || transaction.rawData?.memo).toLowerCase().includes(keyword.toLowerCase()))) {
+            matchingFields.push('memo');
+          }
+          if (transaction.rawData?.category && transaction.rawData.category.trim() && matchedKeywords.some(keyword => 
+            keyword && keyword.trim() && transaction.rawData.category.toLowerCase().includes(keyword.toLowerCase()))) {
+            matchingFields.push('rawData.category');
+          }
+          
+          if (matchingFields.length > 0) {
+            categoryMatch = category;
+            categoryMatchDetails = { matchedKeywords, matchingFields };
+            break; // Use first match
+          }
+        }
+      }
+
+      if (categoryMatch) {
+        const reasoning = `Keyword match: Found "${categoryMatchDetails.matchedKeywords.join(', ')}" in ${categoryMatchDetails.matchingFields.join(', ')}. Matched category: "${categoryMatch.name}"`;
+        
+        await transaction.categorize(
+          categoryMatch._id,
+          null, // No subcategory for Income/Transfer
+          CategorizationMethod.PREVIOUS_DATA,
+          reasoning
+        );
+        
+        // Set transaction type based on the category type
+        if (!transaction.type) {
+          transaction.type = categoryMatch.type;
+          await transaction.save();
+        }
+        
+        return await Transaction.findById(transaction._id)
+          .populate('category')
+          .populate('subCategory');
+      }
+
+      // Try matching subcategories (for Expenses)
       const allMatchingSubCategories = await SubCategory.findMatchingSubCategories(searchTerms);
       const matchingSubCategories = await Promise.all(
         allMatchingSubCategories.map(async subCat => {
@@ -79,25 +157,53 @@ class CategoryMappingService {
 
       const filteredSubCategories = matchingSubCategories.filter(Boolean);
 
-      console.log('Matching subcategories for keywords:', {
-        searchTerms,
-        filteredSubCategories: filteredSubCategories.map(sc => ({
-          name: sc.name,
-          keywords: sc.keywords
-        }))
-      });
-
       if (filteredSubCategories.length === 1) {
         const subCategory = filteredSubCategories[0];
-        await transaction.categorize(
-          subCategory.parentCategory._id,
-          subCategory._id,
-          CategorizationMethod.PREVIOUS_DATA,
-          false // needs verification
+        
+        // Find which keywords matched for reasoning - ensure keywords and terms are not empty
+        const matchedKeywords = subCategory.keywords.filter(keyword => 
+          keyword && keyword.trim() && // Ensure keyword is not empty
+          searchTerms.some(term => term && term.trim() && term.toLowerCase().includes(keyword.toLowerCase()))
         );
-        return await Transaction.findById(transaction._id)
-          .populate('category')
-          .populate('subCategory');
+        
+        const matchingFields = [];
+        if (transaction.description && transaction.description.trim() && matchedKeywords.some(keyword => 
+          keyword && keyword.trim() && transaction.description.toLowerCase().includes(keyword.toLowerCase()))) {
+          matchingFields.push('description');
+        }
+        if ((transaction.memo || transaction.rawData?.memo) && (transaction.memo || transaction.rawData?.memo).trim() && matchedKeywords.some(keyword => 
+          keyword && keyword.trim() && (transaction.memo || transaction.rawData?.memo).toLowerCase().includes(keyword.toLowerCase()))) {
+          matchingFields.push('memo');
+        }
+        if (transaction.rawData?.category && transaction.rawData.category.trim() && matchedKeywords.some(keyword => 
+          keyword && keyword.trim() && transaction.rawData.category.toLowerCase().includes(keyword.toLowerCase()))) {
+          matchingFields.push('rawData.category');
+        }
+        
+        // Only proceed if we have actual keywords and fields matched
+        if (matchedKeywords.length > 0 && matchingFields.length > 0) {
+          const reasoning = `Keyword match: Found "${matchedKeywords.join(', ')}" in ${matchingFields.join(', ')}. Matched subcategory: "${subCategory.name}"`;
+          
+          await transaction.categorize(
+            subCategory.parentCategory._id,
+            subCategory._id,
+            CategorizationMethod.PREVIOUS_DATA,
+            reasoning
+          );
+          
+          // Set transaction type based on the category type
+          if (!transaction.type) {
+            transaction.type = subCategory.parentCategory.type;
+            await transaction.save();
+          }
+          
+          return await Transaction.findById(transaction._id)
+            .populate('category')
+            .populate('subCategory');
+        } else {
+          // Log this case for debugging - should not happen if SubCategory.findMatchingSubCategories works correctly
+          logger.warn(`Transaction ${transaction._id}: Keyword match found subcategory "${subCategory.name}" but no actual keywords or fields matched. This suggests an issue with keyword matching logic.`);
+        }
       }
 
       // Try AI categorization as last resort
@@ -107,12 +213,6 @@ class CategoryMappingService {
         type: { $in: categoryTypes }
       }).populate('subCategories').lean();
 
-      console.log('Attempting AI categorization for transaction:', {
-        description: transaction.description,
-        rawCategory: transaction.rawData?.category,
-        memo: transaction.memo
-      });
-
       const suggestion = await categoryAIService.suggestCategory(
         transaction.description,
         transaction.amount,
@@ -120,6 +220,7 @@ class CategoryMappingService {
           id: cat._id.toString(),
           name: cat.name,
           type: cat.type,
+          keywords: cat.keywords || [], // Category-level keywords for Income/Transfer
           subCategories: cat.subCategories.map(sub => ({
             id: sub._id.toString(),
             name: sub.name,
@@ -128,22 +229,51 @@ class CategoryMappingService {
         })),
         transaction.userId.toString(),
         transaction.rawData?.category || '',
-        transaction.memo || ''
+        transaction.memo || transaction.rawData?.memo || ''
       );
 
       // Always categorize with AI suggestion, but mark for verification
-      console.log('AI categorization result:', suggestion);
 
-      if (suggestion.categoryId && suggestion.subCategoryId) {
+      if (suggestion.categoryId) {
+        // Get category and subcategory names for reasoning
+        const category = await Category.findById(suggestion.categoryId);
+        const subCategory = suggestion.subCategoryId ? await SubCategory.findById(suggestion.subCategoryId) : null;
+        
+        // Build reasoning based on what fields were used for AI analysis
+        const usedFields = [];
+        if (transaction.description) usedFields.push(`description: "${transaction.description}"`);
+        if (transaction.memo || transaction.rawData?.memo) usedFields.push(`memo: "${transaction.memo || transaction.rawData?.memo}"`);
+        if (transaction.rawData?.category) usedFields.push(`rawData.category: "${transaction.rawData.category}"`);
+        
+        let reasoning;
+        if (subCategory) {
+          reasoning = `AI categorization: Analyzed ${usedFields.join(', ')}. AI suggested category: "${category?.name}" > "${subCategory.name}"${suggestion.reasoning ? `. AI reasoning: ${suggestion.reasoning}` : ''}`;
+        } else {
+          reasoning = `AI categorization: Analyzed ${usedFields.join(', ')}. AI suggested category: "${category?.name}"${suggestion.reasoning ? `. AI reasoning: ${suggestion.reasoning}` : ''}`;
+        }
+        
         await transaction.categorize(
           suggestion.categoryId,
           suggestion.subCategoryId,
           CategorizationMethod.AI,
-          false // needs verification
+          reasoning
         );
+        
+        // Set transaction type based on the category type
+        if (category && !transaction.type) {
+          transaction.type = category.type;
+          await transaction.save();
+        }
+        
         return await Transaction.findById(transaction._id)
           .populate('category')
           .populate('subCategory');
+      }
+      
+      // If no categorization was successful and transaction has no type, set default type based on amount
+      if (!transaction.type) {
+        transaction.type = transaction.amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME;
+        await transaction.save();
       }
     } catch (error) {
       logger.error('Auto-categorization failed:', error);

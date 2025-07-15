@@ -26,15 +26,9 @@ const transactionSchema = new mongoose.Schema({
     required: [true, 'Amount is required'],
     validate: {
       validator: function(v) {
-        // Amount can be negative for expenses, positive for income/transfers
-        return typeof v === 'number' && !isNaN(v) &&
-               ((this.type === TransactionType.EXPENSE && v < 0) || 
-                ([TransactionType.INCOME, TransactionType.TRANSFER].includes(this.type) && v > 0));
+        return typeof v === 'number' && !isNaN(v);
       },
-      message: props => {
-        const sign = props.value < 0 ? 'negative' : 'positive';
-        return `Amount must be ${props.value < 0 ? 'negative for expenses' : 'positive for income/transfers'} (got ${sign} value for type ${props.type})`;
-      }
+      message: props => `${props.value} is not a valid amount!`
     }
   },
   currency: {
@@ -62,10 +56,10 @@ const transactionSchema = new mongoose.Schema({
       values: Object.values(TransactionType),
       message: '{VALUE} is not a valid transaction type'
     },
-    required: [true, 'Transaction type is required'],
+    required: false, // Allow transactions without type initially
     validate: {
       validator: function(v) {
-        return Object.values(TransactionType).includes(v);
+        return !v || Object.values(TransactionType).includes(v);
       },
       message: props => `${props.value} is not a valid transaction type. Must be one of: ${Object.values(TransactionType).join(', ')}`
     }
@@ -86,11 +80,18 @@ const transactionSchema = new mongoose.Schema({
   subCategory: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'SubCategory',
+    required: false, // Optional - only required for Expense transactions
   },
   categorizationMethod: {
     type: String,
     enum: Object.values(CategorizationMethod),
     default: CategorizationMethod.MANUAL
+  },
+  categorizationReasoning: {
+    type: String,
+    trim: true,
+    // Stores explanation of why this categorization was chosen
+    // e.g., "Matched keyword 'grocery' in description", "AI suggestion based on description pattern"
   },
   status: {
     type: String,
@@ -122,10 +123,11 @@ transactionSchema.index({ accountId: 1, date: -1 });
 transactionSchema.index({ category: 1, date: -1 });
 
 // Helper method to categorize a transaction
-transactionSchema.methods.categorize = async function(categoryId, subCategoryId, method = CategorizationMethod.MANUAL) {
+transactionSchema.methods.categorize = async function(categoryId, subCategoryId, method = CategorizationMethod.MANUAL, reasoning = null) {
   this.category = categoryId;
   this.subCategory = subCategoryId;
   this.categorizationMethod = method;
+  this.categorizationReasoning = reasoning;
   this.processedDate = new Date();
   await this.save();
 };
@@ -224,51 +226,6 @@ transactionSchema.statics.getSpendingSummary = async function(accountId, startDa
     totalIncome: income.reduce((sum, group) => sum + group.total, 0)
   };
 };
-
-// Method to create transaction from scraper data
-transactionSchema.statics.createFromScraperData = async function(scraperTransaction, accountId, defaultCurrency, userId) {
-  if (!userId) {
-    throw new Error('userId is required when creating a transaction');
-  }
-
-  const type = determineTransactionType(scraperTransaction);
-  
-  // Use provided identifier or generate a unique one
-  const identifier = scraperTransaction.identifier || [
-    accountId,
-    scraperTransaction.date,
-    scraperTransaction.chargedAmount,
-    scraperTransaction.description,
-    Date.now(),
-    Math.random().toString(36).slice(2, 8)
-  ].join('_');
-  
-  return await this.create({
-    identifier,
-    originalIdentifier: scraperTransaction.originalIdentifier || scraperTransaction.identifier || null,
-    accountId,
-    userId,
-    amount: scraperTransaction.chargedAmount,
-    currency: scraperTransaction.currency || defaultCurrency,
-    date: new Date(scraperTransaction.date),
-    type,
-    description: scraperTransaction.description,
-    memo: scraperTransaction.memo || '',
-    rawData: scraperTransaction,
-    status: TransactionStatus.VERIFIED // All transactions in main storage are verified
-  });
-};
-
-// Helper function to determine transaction type
-function determineTransactionType(scraperTransaction) {
-  const amount = scraperTransaction.chargedAmount;
-  
-  if (scraperTransaction.type === 'CREDIT_CARD_PAYMENT') {
-    return TransactionType.TRANSFER;
-  }
-  
-  return amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME;
-}
 
 const Transaction = mongoose.model('Transaction', transactionSchema);
 

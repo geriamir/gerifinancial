@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import { Category as CategoryIcon } from '@mui/icons-material';
 import type { Transaction } from '../../services/api/types/transactions';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrencyDisplay } from '../../utils/formatters';
 
 interface TransactionRowProps {
   transaction: Transaction;
@@ -44,14 +44,17 @@ const TransactionRow: React.FC<TransactionRowProps> = ({
           />
         )}
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          {transaction.subCategory && (
+          {/* Show category/subcategory info based on transaction type */}
+          {transaction.category && (
             <Typography 
               variant="caption" 
               color="primary"
-              data-testid={`${baseTestId}-subcategory`}
+              data-testid={`${baseTestId}-category`}
               sx={{ mb: 0.25, display: 'block', fontSize: '0.75rem', lineHeight: 1.2, fontWeight: 'bold' }}
             >
-              {transaction.subCategory.name}
+              {transaction.category.type === 'Expense' && transaction.subCategory 
+                ? transaction.subCategory.name 
+                : transaction.category.name}
             </Typography>
           )}
           <Typography 
@@ -66,9 +69,9 @@ const TransactionRow: React.FC<TransactionRowProps> = ({
         <Typography
           variant="subtitle1"
           data-testid={`${baseTestId}-amount`}
-          sx={{ minWidth: 100, textAlign: 'right' }}
+          sx={{ minWidth: 100, textAlign: 'right', fontFamily: 'monospace' }}
         >
-          {formatCurrency(transaction.amount, transaction.currency)}
+          {formatCurrencyDisplay(transaction.amount, transaction.currency)}
         </Typography>
       </Box>
     </Paper>
