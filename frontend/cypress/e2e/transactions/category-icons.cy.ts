@@ -1,7 +1,7 @@
 describe('Transaction Category Icons', () => {
   beforeEach(() => {
     // Intercept API calls and provide mock data
-    cy.intercept('GET', '/api/transactions*', {
+    cy.intercept('GET', '**/api/transactions*', {
       statusCode: 200,
       body: {
         transactions: [
@@ -103,7 +103,7 @@ describe('Transaction Category Icons', () => {
 
   it('should handle transaction without subcategory', () => {
     // Intercept and mock transaction without subcategory
-    cy.intercept('GET', '/api/transactions*', {
+    cy.intercept('GET', '**/api/transactions*', {
       statusCode: 200,
       body: {
         transactions: [

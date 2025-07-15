@@ -92,12 +92,12 @@ describe('Transactions Page', () => {
     // Login to set up auth state properly
       return cy.login('test@example.com', 'password123').then(() => {
         // Add test transactions for the user
-        // Create test transactions with explicit ISO dates
-        const baseDate = new Date(2025, 5, 1);
+        // Create test transactions relative to current date
+        const baseDate = new Date(); // Use current date
         baseDate.setUTCHours(0, 0, 0, 0);
         return cy.task<AddTransactionsResult>('db:addTransactions', {
           count: 30,
-          baseDate: baseDate.toISOString(), // June 1st, 2025
+          baseDate: baseDate.toISOString(), // Current date
           userId: storedUserId
         });
       });
@@ -133,9 +133,15 @@ describe('Transactions Page', () => {
       });
       expect(result.transactions[0].userId.toString()).to.equal(Cypress.env('testUserId'));
 
-      // Verify transaction dates are within expected range
-      const startDate = new Date('2025-05-13T00:00:00.000Z'); // -17 days from June 1st
-      const endDate = new Date('2025-06-17T23:59:59.999Z');   // +17 days from June 1st
+      // Verify transaction dates are within expected range (relative to current date)
+      const currentDate = new Date();
+      const startDate = new Date(currentDate);
+      startDate.setDate(startDate.getDate() - 17); // -17 days from current date
+      startDate.setUTCHours(0, 0, 0, 0);
+      
+      const endDate = new Date(currentDate);
+      endDate.setDate(endDate.getDate() + 17); // +17 days from current date
+      endDate.setUTCHours(23, 59, 59, 999);
       
       result.transactions.forEach(tx => {
         const txDate = new Date(tx.date);
