@@ -54,80 +54,80 @@ const defaultCategories = [
     name: "Household",
     type: "Expense",
     subCategories: [
-      "Mortgage",
-      "Maintenance and Repairs",
-      "Property Tax",
-      "Cleaning and Laundry",
-      "Communication",
-      "Home Insurance",
-      "Utilities",
-      "Gardening"
+      { name: "Mortgage", keywords: ["mortgage", "משכנתא"] },
+      { name: "Maintenance and Repairs", keywords: ["maintenance", "repairs", "תיקונים", "אחזקה"] },
+      { name: "Property Tax", keywords: ["property tax", "arnona", "ארנונה"] },
+      { name: "Cleaning and Laundry", keywords: ["cleaning", "laundry", "כביסה", "ניקיון"] },
+      { name: "Communication", keywords: ["communication", "phone", "internet", "טלפון", "אינטרנט"] },
+      { name: "Home Insurance", keywords: ["home insurance", "ביטוח דירה"] },
+      { name: "Utilities", keywords: ["utilities", "electricity", "water", "gas", "חשמל", "מים", "גז"] },
+      { name: "Gardening", keywords: ["gardening", "גינון"] }
     ]
   },
   {
     name: "Shopping",
     type: "Expense",
     subCategories: [
-      "Furniture and Decorations",
-      "Appliances and Electronics",
-      "Groceries",
-      "Apparel and Accessories"
+      { name: "Furniture and Decorations", keywords: ["furniture", "decorations", "רהיטים", "עיצוב"] },
+      { name: "Appliances and Electronics", keywords: ["appliances", "electronics", "מוצרי חשמל"] },
+      { name: "Groceries", keywords: ["groceries", "supermarket", "מכולת", "סופר"] },
+      { name: "Apparel and Accessories", keywords: ["apparel", "clothing", "accessories", "בגדים", "אביזרים"] }
     ]
   },
   {
     name: "Family",
     type: "Expense",
     subCategories: [
-      "Daycare, Kids Activities and Sunmer Camps",
-      "Pets",
-      "School",
-      "Toys",
-      "Babysitting",
-      "Family Miscellaneous"
+      { name: "Daycare, Kids Activities and Summer Camps", keywords: ["daycare", "kids", "summer camps", "פעילויות ילדים", "קייטנה"] },
+      { name: "Pets", keywords: ["pets", "vet", "חיות מחמד", "וטרינר"] },
+      { name: "School", keywords: ["school", "education", "בית ספר", "חינוך"] },
+      { name: "Toys", keywords: ["toys", "צעצועים"] },
+      { name: "Babysitting", keywords: ["babysitting", "בייביסיטר"] },
+      { name: "Family Miscellaneous", keywords: ["family", "משפחה"] }
     ]
   },
   {
     name: "Health",
     type: "Expense",
     subCategories: [
-      "Pharm",
-      "Fitness",
-      "Health Insurance",
-      "Grooming",
-      "Health Services",
-      "Dental",
-      "Optometry",
-      "Health Miscellaneous"
+      { name: "Pharmacy", keywords: ["pharmacy", "pharm", "בית מרקחת"] },
+      { name: "Fitness", keywords: ["fitness", "gym", "כושר"] },
+      { name: "Health Insurance", keywords: ["health insurance", "ביטוח בריאות"] },
+      { name: "Grooming", keywords: ["grooming", "hairdresser", "מספרה"] },
+      { name: "Health Services", keywords: ["health services", "doctor", "רופא"] },
+      { name: "Dental", keywords: ["dental", "dentist", "שיניים"] },
+      { name: "Optometry", keywords: ["optometry", "glasses", "משקפיים"] },
+      { name: "Health Miscellaneous", keywords: ["health", "בריאות"] }
     ]
   },
   {
     name: "Cars and Transportation",
     type: "Expense",
     subCategories: [
-      "Car Services",
-      "Public Transportation",
-      "Fuel",
-      "Toll Roads",
-      "Parking",
-      "Cars Miscellaneous"
+      { name: "Car Services", keywords: ["car services", "mechanic", "מוסך"] },
+      { name: "Public Transportation", keywords: ["public transportation", "bus", "train", "תחבורה ציבורית"] },
+      { name: "Fuel", keywords: ["fuel", "gas", "דלק"] },
+      { name: "Toll Roads", keywords: ["toll roads", "כביש אגרה"] },
+      { name: "Parking", keywords: ["parking", "חניה"] },
+      { name: "Cars Miscellaneous", keywords: ["cars", "רכב"] }
     ]
   },
   {
     name: "Eating Out",
     type: "Expense",
     subCategories: [
-      "Coffee shops, Restaurant and Pubs",
-      "Take Away",
-      "Eating Out - Miscellaneous"
+      { name: "Coffee shops, Restaurant and Pubs", keywords: ["restaurant", "coffee", "pub", "מסעדה", "בית קפה"] },
+      { name: "Take Away", keywords: ["take away", "delivery", "משלוח"] },
+      { name: "Eating Out - Miscellaneous", keywords: ["eating out", "אוכל בחוץ"] }
     ]
   },
   {
     name: "Entertainment",
     type: "Expense",
     subCategories: [
-      "Movies and Shows",
-      "Music and Reading",
-      "Entertainment - Miscellaneous"
+      { name: "Movies and Shows", keywords: ["movies", "shows", "cinema", "קולנוע"] },
+      { name: "Music and Reading", keywords: ["music", "reading", "books", "מוזיקה", "ספרים"] },
+      { name: "Entertainment - Miscellaneous", keywords: ["entertainment", "בילוי"] }
     ]
   },
   {
@@ -145,7 +145,7 @@ const defaultCategories = [
     type: "Expense",
     subCategories: [
       {
-        name:"Bank Fees",
+        name: "Bank Fees",
         keywords: ["עמ.", "עמלת", "עמל"]
       },
       {
@@ -159,18 +159,18 @@ const defaultCategories = [
       {
         name: "Financial Services - Miscellaneous",
         keywords: []
-      },
+      }
     ]
   },
   {
     name: "Travel",
     type: "Expense",
     subCategories: [
-      "Flights",
-      "Hotels",
-      "Recreation",
-      "Travel Transportation",
-      "Travel - Miscellaneous"
+      { name: "Flights", keywords: ["flights", "airline", "טיסות"] },
+      { name: "Hotels", keywords: ["hotels", "accommodation", "בתי מלון"] },
+      { name: "Recreation", keywords: ["recreation", "tourist", "תיירות"] },
+      { name: "Travel Transportation", keywords: ["travel transportation", "taxi", "rental car", "תחבורה בנסיעות"] },
+      { name: "Travel - Miscellaneous", keywords: ["travel", "vacation", "נסיעות"] }
     ]
   }
 ];
@@ -193,15 +193,12 @@ async function initializeUserCategories(userId) {
       // Create subcategories only for Expense categories
       if (categoryData.subCategories && categoryData.subCategories.length > 0) {
         for (const subCatData of categoryData.subCategories) {
-          // Handle both string and object subcategory definitions
-          const subCategoryName = typeof subCatData === 'string' ? subCatData : subCatData.name;
-          const keywords = typeof subCatData === 'string' ? [subCategoryName.toLowerCase()] : subCatData.keywords;
-          
+          // All subcategories now use consistent object format
           const subCategory = new SubCategory({
-            name: subCategoryName,
+            name: subCatData.name,
             parentCategory: category._id,
             isDefault: true,
-            keywords: keywords,
+            keywords: subCatData.keywords || [],
             userId: userId // Associate subcategory with user
           });
           await subCategory.save();
