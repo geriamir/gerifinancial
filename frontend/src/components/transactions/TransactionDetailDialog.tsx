@@ -174,7 +174,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 </Box>
               </Box>
               
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 1 }}>
                 <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
                 <Box>
                   <Typography variant="caption" color="text.secondary" display="block">
@@ -191,7 +191,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 sx={{ 
                   display: 'flex', 
                   alignItems: 'flex-start', 
-                  gap: 1, 
+                  gap: 2, 
                   mb: 1,
                   cursor: 'pointer',
                   '&:hover': {
@@ -204,13 +204,15 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 }}
                 onClick={handleCategoryEdit}
               >
-                <CategoryIcon 
-                  categoryName={transaction.category?.name}
-                  subcategoryName={transaction.subCategory?.name}
-                  size="small"
-                  variant="plain"
-                  showTooltip={false}
-                />
+                <Box sx={{ mt: 0.25 }}>
+                  <CategoryIcon 
+                    categoryName={transaction.category?.name}
+                    subcategoryName={transaction.subCategory?.name}
+                    size="small"
+                    variant="plain"
+                    showTooltip={false}
+                  />
+                </Box>
                 <Box sx={{ flex: 1 }}>
                   {transaction.category ? (
                     <>
@@ -274,7 +276,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 </Box>
               </Box>
               
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
                 <CalendarIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
                 <Box>
                   <Typography variant="caption" color="text.secondary" display="block">
@@ -287,7 +289,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
               </Box>
               
               {(transaction.memo || transaction.rawData?.memo) && (
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mt: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mt: 1 }}>
                   <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
                   <Box>
                     <Typography variant="caption" color="text.secondary" display="block">
