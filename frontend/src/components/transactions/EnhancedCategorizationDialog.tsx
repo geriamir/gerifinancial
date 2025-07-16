@@ -306,14 +306,13 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                       key={category._id}
                       sx={{
                         border: 1,
-                        borderColor: theme.border,
+                        borderColor: 'grey.200',
                         transition: 'all 0.2s ease-in-out',
-                        backgroundColor: theme.background,
+                        backgroundColor: 'transparent',
                         '&:hover': {
                           borderColor: theme.primary,
-                          bgcolor: theme.hover,
                           transform: 'translateY(-2px)',
-                          boxShadow: `0 4px 8px ${theme.primary}20`,
+                          boxShadow: 2,
                         },
                       }}
                     >
@@ -322,7 +321,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                           <CategoryIcon
                             categoryName={category.name}
                             size="large"
-                            variant="filled"
+                            variant="plain"
                             showBackground={false}
                             showTooltip={false}
                             data-testid={`category-icon-${category._id}`}
@@ -332,8 +331,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                             fontWeight="medium" 
                             textAlign="center"
                             sx={{ 
-                              color: theme.text,
-                              '&:hover': { color: theme.primary },
+                              color: 'text.primary',
                             }}
                           >
                             {category.name}
