@@ -15,7 +15,6 @@ import {
 } from '@mui/material';
 import {
   Close as CloseIcon,
-  Category as CategoryIconMui,
   AccountBalance as MoneyIcon,
   CalendarToday as CalendarIcon,
   Description as DescriptionIcon,
