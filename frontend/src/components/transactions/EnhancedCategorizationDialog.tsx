@@ -324,6 +324,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                             variant="plain"
                             showBackground={false}
                             showTooltip={false}
+                            onClick={() => handleCategorySelect(category)}
                             data-testid={`category-icon-${category._id}`}
                           />
                           <Typography 
