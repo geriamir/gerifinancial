@@ -80,12 +80,12 @@ export const categoryIconConfigs: Record<string, CategoryIconConfig> = {
   },
   'Allowance': {
     iconPath: '/icons/categories/allowancegreen.png',
-    theme: getCategoryTheme('Cash'),
+    theme: getCategoryTheme('Allowance'),
     aliases: ['allowance', 'pocket money', 'stipend'],
   },
   'Refunds': {
     iconPath: '/icons/categories/refunds.png',
-    theme: getCategoryTheme('Cash'),
+    theme: getCategoryTheme('Refunds'),
     aliases: ['refund', 'return', 'reimbursement'],
   },
   'Income - Miscellaneous': {
@@ -105,15 +105,10 @@ export const categoryIconConfigs: Record<string, CategoryIconConfig> = {
     theme: getCategoryTheme('Health'),
     aliases: ['health', 'medical', 'healthcare', 'medicine'],
   },
-  'Cars': {
-    iconPath: '/icons/categories/cars.png',
-    theme: getCategoryTheme('Cars'),
-    aliases: ['cars', 'vehicle', 'automobile', 'transportation', 'transport'],
-  },
   'Cars and Transportation': {
     iconPath: '/icons/categories/cars.png',
-    theme: getCategoryTheme('Cars'),
-    aliases: ['cars and transportation', 'transportation', 'transport'],
+    theme: getCategoryTheme('Cars and Transportation'),
+    aliases: ['cars', 'vehicle', 'automobile', 'transportation', 'transport', 'cars and transportation'],
   },
   'Eating Out': {
     iconPath: '/icons/categories/eatingout.png',
@@ -166,7 +161,7 @@ export const categoryIconConfigs: Record<string, CategoryIconConfig> = {
   // Default/fallback categories
   'Cash': {
     iconPath: '/icons/categories/cash.png',
-    theme: getCategoryTheme('Cash'),
+    theme: getCategoryTheme('Cash Withdrawal'),
     aliases: ['cash', 'money', 'currency'],
   },
   'Miscellaneous': {
@@ -215,12 +210,12 @@ export const subcategoryToCategoryMap: Record<string, string> = {
   'Health Miscellaneous': 'Health',
   
   // Cars subcategories
-  'Car Services': 'Cars',
-  'Public Transportation': 'Cars',
-  'Fuel': 'Cars',
-  'Toll Roads': 'Cars',
-  'Parking': 'Cars',
-  'Cars Miscellaneous': 'Cars',
+  'Car Services': 'Cars and Transportation',
+  'Public Transportation': 'Cars and Transportation',
+  'Fuel': 'Cars and Transportation',
+  'Toll Roads': 'Cars and Transportation',
+  'Parking': 'Cars and Transportation',
+  'Cars Miscellaneous': 'Cars and Transportation',
   
   // Eating Out subcategories
   'Coffee shops, Restaurant and Pubs': 'Eating Out',

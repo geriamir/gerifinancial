@@ -156,27 +156,7 @@ export const debounce = <T extends (...args: any[]) => any>(
   };
 };
 
-/**
- * Check if a URL is a valid image URL
- * @param url - URL to check
- * @returns True if URL appears to be an image
- */
-export const isImageUrl = (url: string): boolean => {
-  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
-  const lowercaseUrl = url.toLowerCase();
-  
-  return imageExtensions.some(ext => lowercaseUrl.includes(ext));
-};
 
-/**
- * Get the file extension from a URL
- * @param url - URL to extract extension from
- * @returns File extension or empty string
- */
-export const getFileExtension = (url: string): string => {
-  const match = url.match(/\.([^.?]+)(?:\?|$)/);
-  return match ? match[1].toLowerCase() : '';
-};
 
 /**
  * Validate if a category icon path exists

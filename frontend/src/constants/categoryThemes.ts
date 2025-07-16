@@ -345,9 +345,9 @@ export const getTransactionTypeTheme = (transactionType: string): CategoryTheme 
 export const lightenColor = (color: string, opacity: number = 0.1): string => {
   // Convert hex to RGB
   const hex = color.replace('#', '');
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
   
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 };
@@ -360,9 +360,9 @@ export const lightenColor = (color: string, opacity: number = 0.1): string => {
 export const getContrastingTextColor = (backgroundColor: string): string => {
   // Simple contrast calculation - in a real app you might want a more sophisticated approach
   const hex = backgroundColor.replace('#', '');
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
   
   const brightness = (r * 299 + g * 587 + b * 114) / 1000;
   return brightness > 128 ? '#000000' : '#ffffff';
