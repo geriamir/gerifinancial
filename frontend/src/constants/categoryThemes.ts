@@ -77,159 +77,243 @@ export const transactionTypeThemes: Record<string, CategoryTheme> = {
  * Specific category themes - detailed colors for specific categories
  */
 export const categoryThemes: Record<string, CategoryTheme> = {
-  // Household categories
-  Household: {
-    primary: '#f97316',     // orange-500
-    secondary: '#ea580c',   // orange-600
-    background: '#fff7ed',  // orange-50
-    hover: '#c2410c',       // orange-700
-    selected: '#fed7aa',    // orange-100
-    border: '#fdba74',      // orange-200
-    text: '#9a3412',        // orange-800
-    contrastText: '#ffffff',
-  },
-  
-  // Health categories
-  Health: {
-    primary: '#8b5cf6',     // violet-500
-    secondary: '#7c3aed',   // violet-600
-    background: '#f5f3ff',  // violet-50
-    hover: '#6d28d9',       // violet-700
-    selected: '#e9d5ff',    // violet-100
-    border: '#c4b5fd',      // violet-200
-    text: '#5b21b6',        // violet-800
-    contrastText: '#ffffff',
-  },
-  
-  // Entertainment categories
-  Entertainment: {
-    primary: '#ec4899',     // pink-500
-    secondary: '#db2777',   // pink-600
-    background: '#fdf2f8',  // pink-50
-    hover: '#be185d',       // pink-700
-    selected: '#fce7f3',    // pink-100
-    border: '#f9a8d4',      // pink-200
-    text: '#9d174d',        // pink-800
-    contrastText: '#ffffff',
-  },
-  
-  // Financial services
-  'Financial Services': {
-    primary: '#6366f1',     // indigo-500
-    secondary: '#4f46e5',   // indigo-600
-    background: '#eef2ff',  // indigo-50
-    hover: '#4338ca',       // indigo-700
-    selected: '#e0e7ff',    // indigo-100
-    border: '#a5b4fc',      // indigo-200
-    text: '#3730a3',        // indigo-800
-    contrastText: '#ffffff',
-  },
-  
-  // Cars and transportation
-  Cars: {
-    primary: '#06b6d4',     // cyan-500
-    secondary: '#0891b2',   // cyan-600
-    background: '#ecfeff',  // cyan-50
-    hover: '#0e7490',       // cyan-700
-    selected: '#cffafe',    // cyan-100
-    border: '#67e8f9',      // cyan-200
-    text: '#155e75',        // cyan-800
-    contrastText: '#ffffff',
-  },
-  
-  // Shopping
-  Shopping: {
-    primary: '#84cc16',     // lime-500
-    secondary: '#65a30d',   // lime-600
-    background: '#f7fee7',  // lime-50
-    hover: '#4d7c0f',       // lime-700
-    selected: '#ecfccb',    // lime-100
-    border: '#bef264',      // lime-200
-    text: '#365314',        // lime-800
-    contrastText: '#ffffff',
-  },
-  
-  // Eating Out
-  'Eating Out': {
-    primary: '#f59e0b',     // amber-500
-    secondary: '#d97706',   // amber-600
-    background: '#fffbeb',  // amber-50
-    hover: '#b45309',       // amber-700
-    selected: '#fef3c7',    // amber-100
-    border: '#fcd34d',      // amber-200
-    text: '#92400e',        // amber-800
-    contrastText: '#ffffff',
-  },
-  
-  // Family
-  Family: {
-    primary: '#10b981',     // emerald-500
-    secondary: '#059669',   // emerald-600
-    background: '#ecfdf5',  // emerald-50
-    hover: '#047857',       // emerald-700
-    selected: '#d1fae5',    // emerald-100
-    border: '#86efac',      // emerald-200
-    text: '#065f46',        // emerald-800
-    contrastText: '#ffffff',
-  },
-  
-  // Travel
+  // Travel - #4DD0E1 (Light Blue)
   Travel: {
-    primary: '#8b5cf6',     // violet-500
-    secondary: '#7c3aed',   // violet-600
-    background: '#f5f3ff',  // violet-50
-    hover: '#6d28d9',       // violet-700
-    selected: '#e9d5ff',    // violet-100
-    border: '#c4b5fd',      // violet-200
-    text: '#5b21b6',        // violet-800
+    primary: '#4DD0E1',
+    secondary: '#26C6DA',
+    background: '#E0F7FA',
+    hover: '#00BCD4',
+    selected: '#B2EBF2',
+    border: '#80DEEA',
+    text: '#006064',
     contrastText: '#ffffff',
   },
   
-  // Investments
-  Investments: {
-    primary: '#0ea5e9',     // sky-500
-    secondary: '#0284c7',   // sky-600
-    background: '#f0f9ff',  // sky-50
-    hover: '#0369a1',       // sky-700
-    selected: '#e0f2fe',    // sky-100
-    border: '#7dd3fc',      // sky-200
-    text: '#0c4a6e',        // sky-800
+  // Salary - #4CAF50 (Green)
+  'Salary': {
+    primary: '#4CAF50',
+    secondary: '#43A047',
+    background: '#E8F5E8',
+    hover: '#388E3C',
+    selected: '#C8E6C9',
+    border: '#81C784',
+    text: '#2E7D32',
     contrastText: '#ffffff',
   },
   
-  // Savings
+  // Shopping - #FF8A65 (Light Orange)
+  Shopping: {
+    primary: '#FF8A65',
+    secondary: '#FF7043',
+    background: '#FBE9E7',
+    hover: '#FF5722',
+    selected: '#FFCCBC',
+    border: '#FFAB91',
+    text: '#BF360C',
+    contrastText: '#ffffff',
+  },
+  
+  // Credit Card - #2196F3 (Blue)
+  'Credit Card': {
+    primary: '#2196F3',
+    secondary: '#1976D2',
+    background: '#E3F2FD',
+    hover: '#1565C0',
+    selected: '#BBDEFB',
+    border: '#64B5F6',
+    text: '#0D47A1',
+    contrastText: '#ffffff',
+  },
+  
+  // Savings - #64B5F6 (Light Blue)
   Savings: {
-    primary: '#059669',     // emerald-600
-    secondary: '#047857',   // emerald-700
-    background: '#ecfdf5',  // emerald-50
-    hover: '#065f46',       // emerald-800
-    selected: '#d1fae5',    // emerald-100
-    border: '#86efac',      // emerald-200
-    text: '#064e3b',        // emerald-900
+    primary: '#64B5F6',
+    secondary: '#42A5F5',
+    background: '#E3F2FD',
+    hover: '#2196F3',
+    selected: '#BBDEFB',
+    border: '#90CAF9',
+    text: '#1565C0',
     contrastText: '#ffffff',
   },
   
-  // Cash/Miscellaneous
-  Cash: {
-    primary: '#6b7280',     // gray-500
-    secondary: '#4b5563',   // gray-600
-    background: '#f9fafb',  // gray-50
-    hover: '#374151',       // gray-700
-    selected: '#f3f4f6',    // gray-100
-    border: '#d1d5db',      // gray-200
-    text: '#1f2937',        // gray-800
+  // Investments - #42A5F5 (Medium Blue)
+  Investments: {
+    primary: '#42A5F5',
+    secondary: '#2196F3',
+    background: '#E3F2FD',
+    hover: '#1976D2',
+    selected: '#BBDEFB',
+    border: '#64B5F6',
+    text: '#1565C0',
     contrastText: '#ffffff',
   },
   
-  // Default fallback
+  // Cash Withdrawal - #90CAF9 (Light Blue)
+  'Cash Withdrawal': {
+    primary: '#90CAF9',
+    secondary: '#64B5F6',
+    background: '#E3F2FD',
+    hover: '#42A5F5',
+    selected: '#BBDEFB',
+    border: '#90CAF9',
+    text: '#1976D2',
+    contrastText: '#000000',
+  },
+  
+  // Allowance - #AED581 (Light Green)
+  Allowance: {
+    primary: '#AED581',
+    secondary: '#9CCC65',
+    background: '#F1F8E9',
+    hover: '#8BC34A',
+    selected: '#DCEDC8',
+    border: '#C5E1A5',
+    text: '#689F38',
+    contrastText: '#000000',
+  },
+  
+  // Dividends & Profits - #43A047 (Green)
+  'Dividends & Profits': {
+    primary: '#43A047',
+    secondary: '#388E3C',
+    background: '#E8F5E8',
+    hover: '#2E7D32',
+    selected: '#C8E6C9',
+    border: '#66BB6A',
+    text: '#1B5E20',
+    contrastText: '#ffffff',
+  },
+  
+  // Refunds - #B2DFDB (Light Teal)
+  Refunds: {
+    primary: '#B2DFDB',
+    secondary: '#80CBC4',
+    background: '#E0F2F1',
+    hover: '#4DB6AC',
+    selected: '#B2DFDB',
+    border: '#80CBC4',
+    text: '#00695C',
+    contrastText: '#000000',
+  },
+  
+  // Income Misc. - #1B5E20 (Dark Green)
+  'Income Misc.': {
+    primary: '#1B5E20',
+    secondary: '#2E7D32',
+    background: '#E8F5E8',
+    hover: '#388E3C',
+    selected: '#C8E6C9',
+    border: '#66BB6A',
+    text: '#1B5E20',
+    contrastText: '#ffffff',
+  },
+  
+  // Household - #FF7043 (Orange)
+  Household: {
+    primary: '#FF7043',
+    secondary: '#FF5722',
+    background: '#FBE9E7',
+    hover: '#E64A19',
+    selected: '#FFCCBC',
+    border: '#FF8A65',
+    text: '#BF360C',
+    contrastText: '#ffffff',
+  },
+  
+  // Family - #FFB74D (Orange/Yellow)
+  Family: {
+    primary: '#FFB74D',
+    secondary: '#FFA726',
+    background: '#FFF8E1',
+    hover: '#FF9800',
+    selected: '#FFE0B2',
+    border: '#FFCC02',
+    text: '#E65100',
+    contrastText: '#000000',
+  },
+  
+  // Health - #E57373 (Light Red)
+  Health: {
+    primary: '#E57373',
+    secondary: '#F44336',
+    background: '#FFEBEE',
+    hover: '#D32F2F',
+    selected: '#FFCDD2',
+    border: '#EF9A9A',
+    text: '#C62828',
+    contrastText: '#ffffff',
+  },
+  
+  // Cars and Transportation - #BA68C8 (Purple)
+  'Cars and Transportation': {
+    primary: '#BA68C8',
+    secondary: '#AB47BC',
+    background: '#F3E5F5',
+    hover: '#8E24AA',
+    selected: '#E1BEE7',
+    border: '#CE93D8',
+    text: '#6A1B9A',
+    contrastText: '#ffffff',
+  },
+  
+  // Eating Out - #F06292 (Pink)
+  'Eating Out': {
+    primary: '#F06292',
+    secondary: '#E91E63',
+    background: '#FCE4EC',
+    hover: '#C2185B',
+    selected: '#F8BBD9',
+    border: '#F48FB1',
+    text: '#AD1457',
+    contrastText: '#ffffff',
+  },
+  
+  // Entertainment - #9575CD (Purple)
+  Entertainment: {
+    primary: '#9575CD',
+    secondary: '#7E57C2',
+    background: '#EDE7F6',
+    hover: '#5E35B1',
+    selected: '#D1C4E9',
+    border: '#B39DDB',
+    text: '#4527A0',
+    contrastText: '#ffffff',
+  },
+  
+  // Miscellaneous - #A1887F (Brown)
   Miscellaneous: {
-    primary: '#6b7280',     // gray-500
-    secondary: '#4b5563',   // gray-600
-    background: '#f9fafb',  // gray-50
-    hover: '#374151',       // gray-700
-    selected: '#f3f4f6',    // gray-100
-    border: '#d1d5db',      // gray-200
-    text: '#1f2937',        // gray-800
+    primary: '#A1887F',
+    secondary: '#8D6E63',
+    background: '#EFEBE9',
+    hover: '#6D4C41',
+    selected: '#D7CCC8',
+    border: '#BCAAA4',
+    text: '#5D4037',
+    contrastText: '#ffffff',
+  },
+  
+  // Financial Services - #8D6E63 (Brown)
+  'Financial Services': {
+    primary: '#8D6E63',
+    secondary: '#795548',
+    background: '#EFEBE9',
+    hover: '#5D4037',
+    selected: '#D7CCC8',
+    border: '#A1887F',
+    text: '#3E2723',
+    contrastText: '#ffffff',
+  },
+  
+  // Default fallback - using Miscellaneous colors
+  'Default': {
+    primary: '#A1887F',
+    secondary: '#8D6E63',
+    background: '#EFEBE9',
+    hover: '#6D4C41',
+    selected: '#D7CCC8',
+    border: '#BCAAA4',
+    text: '#5D4037',
     contrastText: '#ffffff',
   },
 };
