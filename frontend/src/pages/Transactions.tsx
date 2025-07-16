@@ -107,7 +107,7 @@ const TransactionsPage: React.FC = () => {
         <TransactionsList 
           filters={filters} 
           onRowClick={handleTransactionClick}
-          key={refreshTrigger}
+          refreshTrigger={refreshTrigger}
         />
       </Box>
 

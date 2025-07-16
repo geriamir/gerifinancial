@@ -20,7 +20,7 @@ class CategoryAIService {
    * @param {boolean} hasRawCategory - Whether rawCategory was used in matching
    * @returns {string} Detailed reasoning message
    */
-  _generateReasoning(score, subCategoryName, hasRawCategory) {
+  _generateReasoning(score, subCategoryName, hasRawCategory, matchingType) {
     const confidence = score > 0.8 ? 'Very strong confidence' :
                       score > 0.6 ? 'Strong confidence' :
                       score > 0.4 ? 'Moderate confidence' :
@@ -30,7 +30,7 @@ class CategoryAIService {
       'based on bank-provided category' :
       'based on transaction description';
 
-    return `${confidence} match for ${subCategoryName} ${source}`;
+    return `${confidence} match for ${subCategoryName} ${source}, with matching type: ${matchingType}. Confidence score: ${score.toFixed(2)}`;
   }
 
 
@@ -98,8 +98,8 @@ class CategoryAIService {
               subCategoryId: null, // No subcategory for Income/Transfer
               confidence,
               reasoning: confidence > 0.9 
-                ? `Very strong confidence match for ${category.name} from transaction description` 
-                : `Moderate confidence match for ${category.name} from transaction description`
+                ? `Very strong confidence match for ${category.name} from transaction description based on keywords` 
+                : `Moderate confidence match for ${category.name} from transaction description based on keywords`
             };
           }
         }
@@ -120,8 +120,8 @@ class CategoryAIService {
                 subCategoryId: subCategory.id,
                 confidence,
                 reasoning: confidence > 0.9 
-                  ? 'Very strong confidence match from transaction description' 
-                  : 'Moderate confidence match from transaction description'
+                  ? 'Very strong confidence match from transaction description based on keywords' 
+                  : 'Moderate confidence match from transaction description based on keywords'
               };
             }
           }
@@ -151,13 +151,14 @@ class CategoryAIService {
               categoryId: category.id,
               subCategoryId: null,
               confidence,
-              reasoning: this._generateReasoning(confidence, category.name, isRawCategory)
+              reasoning: this._generateReasoning(confidence, category.name, isRawCategory, "similarity to category keywords")
             };
           }
         }
 
         // Handle categories with subcategories (Expenses)
         if (category.subCategories && category.subCategories.length > 0) {
+
           this.buildCorpus(category.subCategories);
           
           const scores = [];
@@ -184,7 +185,8 @@ class CategoryAIService {
               confidence,
               reasoning: this._generateReasoning(confidence, 
                 bestSubMatch.subCategory?.name || '', 
-                isRawCategory)
+                isRawCategory,
+                "based on tfidf score for subcategories")
             };
           }
         }
@@ -227,17 +229,12 @@ class CategoryAIService {
         if (match.confidence > 0.5) {
 
           const boostedConfidence = match.confidence * 1.2;
-          const subCategoryName = availableCategories
-            .find(c => c.id === match.categoryId)
-            ?.subCategories.find(s => s.id === match.subCategoryId)?.name;
           
           return {
             categoryId: match.categoryId,
             subCategoryId: match.subCategoryId,
             confidence: boostedConfidence,
-            reasoning: boostedConfidence > 0.8 
-              ? 'Very strong confidence match from bank-provided category'
-              : 'Moderate confidence match from bank-provided category'
+            reasoning: match.reasoning + `, with rawCategory match confidence: ${boostedConfidence.toFixed(2)}`
           };
         }
       }
@@ -257,9 +254,7 @@ class CategoryAIService {
             categoryId: match.categoryId,
             subCategoryId: match.subCategoryId,
             confidence: boostedConfidence,
-            reasoning: boostedConfidence > 0.8 
-              ? 'Very strong confidence match from transaction memo'
-              : 'Moderate confidence match from transaction memo'
+            reasoning: match.reasoning + `, with memo match confidence: ${boostedConfidence.toFixed(2)}`
           };
         }
       }
@@ -267,17 +262,12 @@ class CategoryAIService {
       // Process description last
       match = await this.categorizeByAI(description, availableCategories, false);
       if (match.confidence > 0.5) {
-          const subCategoryName = availableCategories
-            .find(c => c.id === match.categoryId)
-            ?.subCategories.find(s => s.id === match.subCategoryId)?.name;
 
           return {
               categoryId: match.categoryId,
               subCategoryId: match.subCategoryId,
               confidence: match.confidence,
-              reasoning: match.confidence > 0.8 
-                ? 'Very strong confidence match from transaction description'
-                : 'Moderate confidence match from transaction description'
+              reasoning: match.reasoning + `, with description match confidence: ${match.confidence.toFixed(2)}`
           };
       }
 

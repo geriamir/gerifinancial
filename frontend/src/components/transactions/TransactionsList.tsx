@@ -21,6 +21,7 @@ interface ManagedTransactionsListProps<T extends Transaction> extends BaseTransa
 interface FilteredTransactionsListProps extends BaseTransactionsListProps<Transaction> {
   filters: Partial<TransactionFilters>;
   transactions?: never;
+  refreshTrigger?: number;
 }
 
 type TransactionsListProps<T extends Transaction> = ManagedTransactionsListProps<T> | FilteredTransactionsListProps;
@@ -40,6 +41,7 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
   // Use ref to store stable filters and track changes
   const filtersRef = useRef<Partial<TransactionFilters> | null>(null);
   const filtersStringRef = useRef<string>('');
+  const refreshTriggerRef = useRef<number | undefined>(undefined);
   
   // Load more transactions function
   const loadMoreTransactions = useCallback(async () => {
@@ -151,6 +153,65 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
 
     loadTransactions();
   }, [hasFilters, propsFilters]);
+
+  // Extract refreshTrigger to satisfy exhaustive-deps
+  const refreshTrigger = hasFilters && 'refreshTrigger' in props 
+    ? (props as FilteredTransactionsListProps).refreshTrigger 
+    : undefined;
+  
+  // Handle refresh trigger - refresh all currently loaded pages
+  useEffect(() => {
+    if (!hasFilters || !refreshTrigger) {
+      return;
+    }
+
+    const currentRefreshTrigger = refreshTrigger;
+    
+    // If refreshTrigger hasn't changed, don't refresh
+    if (refreshTriggerRef.current === currentRefreshTrigger) {
+      return;
+    }
+    
+    // Update the ref
+    refreshTriggerRef.current = currentRefreshTrigger;
+    
+    // Skip initial load (when ref is undefined)
+    if (currentRefreshTrigger === undefined) {
+      return;
+    }
+
+    // Refresh all currently displayed pages while preserving pagination
+    const refreshCurrentPages = async () => {
+      if (!propsFilters) return;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Calculate how many items to load to maintain current pagination
+        const itemsToLoad = (currentPage + 1) * PAGE_SIZE;
+        
+        const response = await transactionsApi.getTransactions({
+          ...propsFilters,
+          limit: itemsToLoad,
+          skip: 0
+        });
+        
+        if (response) {
+          setFetchedTransactions(response.transactions);
+          setHasMore(response.hasMore);
+          // Don't reset currentPage - keep user's current position
+        }
+      } catch (err) {
+        setError('Failed to refresh transactions');
+        console.error('Error refreshing transactions:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    refreshCurrentPages();
+  }, [hasFilters, refreshTrigger, propsFilters, currentPage]);
 
   const transactions = ('transactions' in props) ? props.transactions as T[] : (fetchedTransactions as T[]);
 
