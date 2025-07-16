@@ -198,9 +198,6 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                     bgcolor: 'rgba(0, 0, 0, 0.04)',
                     borderRadius: 1
                   },
-                  p: 1,
-                  ml: -1,
-                  mr: -1
                 }}
                 onClick={handleCategoryEdit}
               >
