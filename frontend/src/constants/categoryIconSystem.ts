@@ -110,6 +110,11 @@ export const categoryIconConfigs: Record<string, CategoryIconConfig> = {
     theme: getCategoryTheme('Cars'),
     aliases: ['cars', 'vehicle', 'automobile', 'transportation', 'transport'],
   },
+  'Cars and Transportation': {
+    iconPath: '/icons/categories/cars.png',
+    theme: getCategoryTheme('Cars'),
+    aliases: ['cars and transportation', 'transportation', 'transport'],
+  },
   'Eating Out': {
     iconPath: '/icons/categories/eatingout.png',
     theme: getCategoryTheme('Eating Out'),
@@ -268,7 +273,7 @@ const findMatchingConfig = (name: string): CategoryIconConfig | null => {
   }
   
   // Check aliases
-  for (const [configName, config] of Object.entries(categoryIconConfigs)) {
+  for (const [, config] of Object.entries(categoryIconConfigs)) {
     if (config.aliases) {
       for (const alias of config.aliases) {
         if (normalizeName(alias) === normalizedName) {

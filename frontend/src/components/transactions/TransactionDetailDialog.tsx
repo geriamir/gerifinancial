@@ -26,8 +26,6 @@ import { formatCurrencyDisplay } from '../../utils/formatters';
 import { EnhancedCategorizationDialog } from './EnhancedCategorizationDialog';
 import { transactionsApi } from '../../services/api/transactions';
 import { useCategories } from '../../hooks/useCategories';
-import CategoryIcon from '../common/CategoryIcon';
-import { getCategoryIconTheme } from '../../constants/categoryIconSystem';
 
 interface TransactionDetailDialogProps {
   open: boolean;

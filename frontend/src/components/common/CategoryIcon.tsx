@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Box, Skeleton, Tooltip } from '@mui/material';
+import { Box, Tooltip } from '@mui/material';
 import { getCategoryIconConfig, getSubcategoryIconConfig, CategoryIconConfig } from '../../constants/categoryIconSystem';
 import { CategoryTheme } from '../../constants/categoryThemes';
 
@@ -73,9 +73,7 @@ const CategoryIcon: React.FC<CategoryIconProps> = ({
   customTheme,
   'data-testid': dataTestId,
 }) => {
-  const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   // Get icon configuration
   const iconConfig: CategoryIconConfig = subcategoryName 
@@ -88,16 +86,12 @@ const CategoryIcon: React.FC<CategoryIconProps> = ({
 
   // Handle image load success
   const handleImageLoad = useCallback(() => {
-    setImageLoaded(true);
-    setIsLoading(false);
     setImageError(false);
   }, []);
 
   // Handle image load error
   const handleImageError = useCallback(() => {
     setImageError(true);
-    setIsLoading(false);
-    setImageLoaded(false);
   }, []);
 
   // Generate styles based on variant and state
@@ -173,18 +167,6 @@ const CategoryIcon: React.FC<CategoryIconProps> = ({
 
   // Render the icon content
   const renderIconContent = () => {
-    if (isLoading) {
-      return (
-        <Skeleton
-          variant="rectangular"
-          width={width}
-          height={height}
-          sx={{ borderRadius: '4px' }}
-          data-testid={`${dataTestId}-skeleton`}
-        />
-      );
-    }
-
     if (imageError) {
       // Fallback to a simple colored square with first letter
       const fallbackText = (subcategoryName || categoryName || 'M')[0].toUpperCase();
@@ -220,6 +202,7 @@ const CategoryIcon: React.FC<CategoryIconProps> = ({
         style={{
           objectFit: 'contain',
           borderRadius: '4px',
+          display: 'block',
         }}
         data-testid={`${dataTestId}-image`}
       />
