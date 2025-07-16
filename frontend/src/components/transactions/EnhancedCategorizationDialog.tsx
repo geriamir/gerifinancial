@@ -202,7 +202,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
         </IconButton>
       </Box>
 
-      <DialogContent sx={{ p: 3 }}>
+      <DialogContent sx={{ p: 2 }}>
         {/* Step 1: Combined Type and Category Selection */}
         {currentStep === 'category' && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -292,10 +292,12 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
               <Box 
                 sx={{ 
                   display: 'grid', 
-                  gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
+                  gridTemplateColumns: 'repeat(3, 135px)', // Fixed 3 columns of 135px each
                   gap: 2,
                   minHeight: '280px', // Fixed height to prevent jumping
-                  flex: 1,
+                  width: '435px', // Fixed width: 3 * 135px + 2 * 16px gap = 435px
+                  justifyContent: 'center',
+                  margin: '0 auto', // Center the grid
                 }}
               >
                 {currentCategories.map((category) => {
@@ -309,7 +311,8 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                         borderColor: 'grey.200',
                         transition: 'all 0.2s ease-in-out',
                         backgroundColor: 'transparent',
-                        height: '120px', // Fixed height for consistent sizing
+                        height: '140px', // Fixed height for consistent sizing
+                        width: '135px', // Fixed width for consistent sizing
                         '&:hover': {
                           borderColor: theme.primary,
                           transform: 'translateY(-2px)',
