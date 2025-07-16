@@ -49,7 +49,7 @@ interface CategoryIconProps {
  * Size mapping for different icon sizes
  */
 const sizeMap: Record<IconSize, { width: number; height: number; padding: number }> = {
-  small: { width: 20, height: 20, padding: 4 },
+  small: { width: 20, height: 20, padding: 0 },
   medium: { width: 32, height: 32, padding: 8 },
   large: { width: 48, height: 48, padding: 12 },
   xlarge: { width: 64, height: 64, padding: 16 },
