@@ -4,9 +4,10 @@ import {
   Paper,
   Typography,
 } from '@mui/material';
-import { Category as CategoryIcon } from '@mui/icons-material';
 import type { Transaction } from '../../services/api/types/transactions';
 import { formatCurrencyDisplay } from '../../utils/formatters';
+import CategoryIcon from '../common/CategoryIcon';
+import { getCategoryIconTheme } from '../../constants/categoryIconSystem';
 
 interface TransactionRowProps {
   transaction: Transaction;
@@ -20,6 +21,11 @@ const TransactionRow: React.FC<TransactionRowProps> = ({
   onClick 
 }) => {
   const baseTestId = testId || `transaction-${transaction._id}`;
+  
+  // Get category theme for text color
+  const categoryTheme = transaction.category 
+    ? getCategoryIconTheme(transaction.category.name)
+    : null;
   
   return (
     <Paper
@@ -39,7 +45,11 @@ const TransactionRow: React.FC<TransactionRowProps> = ({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
         {transaction.category && (
           <CategoryIcon 
-            sx={{ color: 'primary.main' }}
+            categoryName={transaction.category.name}
+            subcategoryName={transaction.subCategory?.name}
+            size="small"
+            variant="plain"
+            showTooltip={false}
             data-testid={`${baseTestId}-category-icon`}
           />
         )}
@@ -48,9 +58,15 @@ const TransactionRow: React.FC<TransactionRowProps> = ({
           {transaction.category && (
             <Typography 
               variant="caption" 
-              color="primary"
               data-testid={`${baseTestId}-category`}
-              sx={{ mb: 0.25, display: 'block', fontSize: '0.75rem', lineHeight: 1.2, fontWeight: 'bold' }}
+              sx={{ 
+                mb: 0.25, 
+                display: 'block', 
+                fontSize: '0.75rem', 
+                lineHeight: 1.2, 
+                fontWeight: 'bold',
+                color: categoryTheme?.primary || 'primary.main'
+              }}
             >
               {transaction.category.type === 'Expense' && transaction.subCategory 
                 ? transaction.subCategory.name 

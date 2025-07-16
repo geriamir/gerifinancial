@@ -15,7 +15,6 @@ import {
 } from '@mui/material';
 import {
   Close as CloseIcon,
-  Category as CategoryIcon,
   AccountBalance as MoneyIcon,
   CalendarToday as CalendarIcon,
   Description as DescriptionIcon,
@@ -26,6 +25,7 @@ import { formatCurrencyDisplay } from '../../utils/formatters';
 import { EnhancedCategorizationDialog } from './EnhancedCategorizationDialog';
 import { transactionsApi } from '../../services/api/transactions';
 import { useCategories } from '../../hooks/useCategories';
+import CategoryIcon from '../common/CategoryIcon';
 
 interface TransactionDetailDialogProps {
   open: boolean;
@@ -173,7 +173,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 </Box>
               </Box>
               
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 1 }}>
                 <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
                 <Box>
                   <Typography variant="caption" color="text.secondary" display="block">
@@ -190,20 +190,23 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 sx={{ 
                   display: 'flex', 
                   alignItems: 'flex-start', 
-                  gap: 1, 
+                  gap: 2, 
                   mb: 1,
                   cursor: 'pointer',
                   '&:hover': {
                     bgcolor: 'rgba(0, 0, 0, 0.04)',
                     borderRadius: 1
                   },
-                  p: 1,
-                  ml: -1,
-                  mr: -1
                 }}
                 onClick={handleCategoryEdit}
               >
-                <CategoryIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
+                <CategoryIcon 
+                  categoryName={transaction.category?.name}
+                  subcategoryName={transaction.subCategory?.name}
+                  size="small"
+                  variant="plain"
+                  showTooltip={false}
+                />
                 <Box sx={{ flex: 1 }}>
                   {transaction.category ? (
                     <>
@@ -267,7 +270,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 </Box>
               </Box>
               
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
                 <CalendarIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
                 <Box>
                   <Typography variant="caption" color="text.secondary" display="block">
@@ -280,7 +283,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
               </Box>
               
               {(transaction.memo || transaction.rawData?.memo) && (
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mt: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mt: 1 }}>
                   <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
                   <Box>
                     <Typography variant="caption" color="text.secondary" display="block">

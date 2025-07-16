@@ -18,6 +18,8 @@ import { ArrowBack, Close, ChevronLeft, ChevronRight } from '@mui/icons-material
 import { Transaction } from '../../services/api/types/transactions';
 import { Category, SubCategory } from '../../services/api/types/categories';
 import { formatCurrencyDisplay } from '../../utils/formatters';
+import CategoryIcon from '../common/CategoryIcon';
+import { getCategoryIconTheme } from '../../constants/categoryIconSystem';
 import ManualCategorizationDialog from './ManualCategorizationDialog';
 
 interface EnhancedCategorizationDialogProps {
@@ -200,7 +202,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
         </IconButton>
       </Box>
 
-      <DialogContent sx={{ p: 3 }}>
+      <DialogContent sx={{ p: 2 }}>
         {/* Step 1: Combined Type and Category Selection */}
         {currentStep === 'category' && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -290,31 +292,17 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
               <Box 
                 sx={{ 
                   display: 'grid', 
-                  gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
+                  gridTemplateColumns: 'repeat(3, 135px)', // Fixed 3 columns of 135px each
                   gap: 2,
                   minHeight: '280px', // Fixed height to prevent jumping
-                  flex: 1,
+                  width: '435px', // Fixed width: 3 * 135px + 2 * 16px gap = 435px
+                  justifyContent: 'center',
+                  margin: '0 auto', // Center the grid
                 }}
               >
                 {currentCategories.map((category) => {
-                  // Simple emoji mapping for category icons
-                  const getCategoryEmoji = (categoryName: string) => {
-                    const name = categoryName.toLowerCase();
-                    if (name.includes('food') || name.includes('eating')) return '🍽️';
-                    if (name.includes('transport') || name.includes('car')) return '🚗';
-                    if (name.includes('shop') || name.includes('groceries')) return '🛍️';
-                    if (name.includes('entertainment') || name.includes('movie')) return '🎬';
-                    if (name.includes('health') || name.includes('medical')) return '🏥';
-                    if (name.includes('utilities') || name.includes('electric')) return '⚡';
-                    if (name.includes('education') || name.includes('school')) return '📚';
-                    if (name.includes('travel') || name.includes('flight')) return '✈️';
-                    if (name.includes('salary') || name.includes('income')) return '💰';
-                    if (name.includes('investment') || name.includes('savings')) return '📈';
-                    if (name.includes('household') || name.includes('home')) return '🏠';
-                    if (name.includes('family') || name.includes('kids')) return '👨‍👩‍👧‍👦';
-                    return '📁';
-                  };
-
+                  const theme = getCategoryIconTheme(category.name);
+                  
                   return (
                     <Card
                       key={category._id}
@@ -322,26 +310,48 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                         border: 1,
                         borderColor: 'grey.200',
                         transition: 'all 0.2s ease-in-out',
+                        backgroundColor: 'transparent',
+                        height: '140px', // Fixed height for consistent sizing
+                        width: '135px', // Fixed width for consistent sizing
                         '&:hover': {
-                          borderColor: 'primary.main',
-                          bgcolor: 'primary.50',
+                          borderColor: theme.primary,
                           transform: 'translateY(-2px)',
                           boxShadow: 2,
                         },
                       }}
                     >
-                      <CardActionArea onClick={() => handleCategorySelect(category)} sx={{ p: 2 }}>
+                      <CardActionArea 
+                        onClick={() => handleCategorySelect(category)} 
+                        sx={{ 
+                          p: 2, 
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="h4" component="div">
-                            {getCategoryEmoji(category.name)}
-                          </Typography>
+                          <CategoryIcon
+                            categoryName={category.name}
+                            size="large"
+                            variant="plain"
+                            showBackground={false}
+                            showTooltip={false}
+                            onClick={() => handleCategorySelect(category)}
+                            data-testid={`category-icon-${category._id}`}
+                          />
                           <Typography 
                             variant="body2" 
                             fontWeight="medium" 
                             textAlign="center"
                             sx={{ 
                               color: 'text.primary',
-                              '&:hover': { color: 'primary.main' },
+                              lineHeight: 1.2,
+                              maxHeight: '2.4em', // Max 2 lines
+                              overflow: 'hidden',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
                             }}
                           >
                             {category.name}

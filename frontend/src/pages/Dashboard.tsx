@@ -28,7 +28,7 @@ const Dashboard: React.FC = () => {
           Welcome to GeriFinancial! Your financial overview and quick actions.
         </Typography>
         
-        <Box sx={{ 
+        <Box sx={{
           display: 'flex', 
           flexDirection: { xs: 'column', md: 'row' }, 
           gap: 3, 
