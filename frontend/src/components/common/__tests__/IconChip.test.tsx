@@ -2,15 +2,6 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import IconChip from '../IconChip';
 import type { SubCategory } from '../../../services/api/types';
-import { Home } from '@mui/icons-material';
-import * as categoryIconsModule from '../../../constants/categoryIcons';
-
-// Mock the getIconForSubcategory function
-jest.mock('../../../constants/categoryIcons', () => ({
-  getIconForSubcategory: jest.fn()
-}));
-
-const { getIconForSubcategory } = categoryIconsModule;
 
 describe('IconChip', () => {
   const mockSubCategory: SubCategory = {
@@ -35,20 +26,10 @@ describe('IconChip', () => {
     updatedAt: '2025-07-09T10:00:00Z'
   };
 
-  beforeEach(() => {
-    // Reset all mocks before each test
-    jest.clearAllMocks();
-    // Default mock implementation
-    (getIconForSubcategory as jest.Mock).mockReturnValue({
-      icon: Home,
-      tooltip: 'Mortgage'
-    });
-  });
-
   it('renders with basic content', () => {
     render(<IconChip subCategory={mockSubCategory} data-testid="test-chip" />);
     
-    const chip = screen.getByTestId('test-chip-text');
+    const chip = screen.getByTestId('themed-chip-text');
     expect(chip).toBeInTheDocument();
     expect(chip).toHaveTextContent('Mortgage');
   });
@@ -56,21 +37,21 @@ describe('IconChip', () => {
   it('renders with icon for mapped subcategory', () => {
     render(<IconChip subCategory={mockSubCategory} data-testid="test-chip" />);
 
-    const icon = screen.getByTestId('test-chip-icon');
+    const icon = screen.getByTestId('themed-chip-icon');
     expect(icon).toBeInTheDocument();
-    expect(icon).toHaveAttribute('role', 'button');
-    expect(icon).toHaveAttribute('aria-label', 'Mortgage');
+    // The icon should have an image inside it
+    const image = screen.getByTestId('themed-chip-icon-image');
+    expect(image).toBeInTheDocument();
+    expect(image).toHaveAttribute('alt', 'Mortgage');
   });
 
   it('renders text only for unmapped subcategory', () => {
-    // Mock no icon mapping found
-    (getIconForSubcategory as jest.Mock).mockReturnValueOnce(null);
-
     render(<IconChip subCategory={mockCustomSubCategory} data-testid="test-chip" />);
 
-    // Check that only text is rendered
-    expect(screen.getByTestId('test-chip-text')).toHaveTextContent('Custom Category');
-    expect(screen.queryByTestId('test-chip-icon')).not.toBeInTheDocument();
+    // Check that text is rendered
+    expect(screen.getByTestId('themed-chip-text')).toHaveTextContent('Custom Category');
+    // Icon should still be present (fallback system)
+    expect(screen.getByTestId('themed-chip-icon')).toBeInTheDocument();
   });
 
   it('handles special characters in subcategory name', () => {
@@ -86,13 +67,16 @@ describe('IconChip', () => {
     };
 
     render(<IconChip subCategory={specialCharSubCategory} data-testid="test-chip" />);
-    expect(screen.getByTestId('test-chip-text')).toHaveTextContent('Special & Category');
+    expect(screen.getByTestId('themed-chip-text')).toHaveTextContent('Special & Category');
   });
 
   it('applies proper styling', () => {
     render(<IconChip subCategory={mockSubCategory} data-testid="test-chip" />);
 
-    const iconContainer = screen.getByTestId('test-chip-icon');
-    expect(iconContainer).toHaveClass('MuiIconButton-root', 'MuiIconButton-sizeSmall');
+    const chip = screen.getByTestId('test-chip');
+    expect(chip).toHaveClass('MuiChip-root');
+    
+    const iconContainer = screen.getByTestId('themed-chip-icon');
+    expect(iconContainer).toBeInTheDocument();
   });
 });
