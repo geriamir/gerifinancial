@@ -18,6 +18,8 @@ import { ArrowBack, Close, ChevronLeft, ChevronRight } from '@mui/icons-material
 import { Transaction } from '../../services/api/types/transactions';
 import { Category, SubCategory } from '../../services/api/types/categories';
 import { formatCurrencyDisplay } from '../../utils/formatters';
+import CategoryIcon from '../common/CategoryIcon';
+import { getCategoryIconTheme } from '../../constants/categoryIconSystem';
 import ManualCategorizationDialog from './ManualCategorizationDialog';
 
 interface EnhancedCategorizationDialogProps {
@@ -297,51 +299,41 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                 }}
               >
                 {currentCategories.map((category) => {
-                  // Simple emoji mapping for category icons
-                  const getCategoryEmoji = (categoryName: string) => {
-                    const name = categoryName.toLowerCase();
-                    if (name.includes('food') || name.includes('eating')) return '🍽️';
-                    if (name.includes('transport') || name.includes('car')) return '🚗';
-                    if (name.includes('shop') || name.includes('groceries')) return '🛍️';
-                    if (name.includes('entertainment') || name.includes('movie')) return '🎬';
-                    if (name.includes('health') || name.includes('medical')) return '🏥';
-                    if (name.includes('utilities') || name.includes('electric')) return '⚡';
-                    if (name.includes('education') || name.includes('school')) return '📚';
-                    if (name.includes('travel') || name.includes('flight')) return '✈️';
-                    if (name.includes('salary') || name.includes('income')) return '💰';
-                    if (name.includes('investment') || name.includes('savings')) return '📈';
-                    if (name.includes('household') || name.includes('home')) return '🏠';
-                    if (name.includes('family') || name.includes('kids')) return '👨‍👩‍👧‍👦';
-                    return '📁';
-                  };
-
+                  const theme = getCategoryIconTheme(category.name);
+                  
                   return (
                     <Card
                       key={category._id}
                       sx={{
                         border: 1,
-                        borderColor: 'grey.200',
+                        borderColor: theme.border,
                         transition: 'all 0.2s ease-in-out',
+                        backgroundColor: theme.background,
                         '&:hover': {
-                          borderColor: 'primary.main',
-                          bgcolor: 'primary.50',
+                          borderColor: theme.primary,
+                          bgcolor: theme.hover,
                           transform: 'translateY(-2px)',
-                          boxShadow: 2,
+                          boxShadow: `0 4px 8px ${theme.primary}20`,
                         },
                       }}
                     >
                       <CardActionArea onClick={() => handleCategorySelect(category)} sx={{ p: 2 }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="h4" component="div">
-                            {getCategoryEmoji(category.name)}
-                          </Typography>
+                          <CategoryIcon
+                            categoryName={category.name}
+                            size="large"
+                            variant="filled"
+                            showBackground={false}
+                            showTooltip={false}
+                            data-testid={`category-icon-${category._id}`}
+                          />
                           <Typography 
                             variant="body2" 
                             fontWeight="medium" 
                             textAlign="center"
                             sx={{ 
-                              color: 'text.primary',
-                              '&:hover': { color: 'primary.main' },
+                              color: theme.text,
+                              '&:hover': { color: theme.primary },
                             }}
                           >
                             {category.name}

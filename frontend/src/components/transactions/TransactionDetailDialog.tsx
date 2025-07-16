@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import {
   Close as CloseIcon,
-  Category as CategoryIcon,
+  Category as CategoryIconMui,
   AccountBalance as MoneyIcon,
   CalendarToday as CalendarIcon,
   Description as DescriptionIcon,
@@ -26,6 +26,8 @@ import { formatCurrencyDisplay } from '../../utils/formatters';
 import { EnhancedCategorizationDialog } from './EnhancedCategorizationDialog';
 import { transactionsApi } from '../../services/api/transactions';
 import { useCategories } from '../../hooks/useCategories';
+import CategoryIcon from '../common/CategoryIcon';
+import { getCategoryIconTheme } from '../../constants/categoryIconSystem';
 
 interface TransactionDetailDialogProps {
   open: boolean;
@@ -203,7 +205,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 }}
                 onClick={handleCategoryEdit}
               >
-                <CategoryIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
+                <CategoryIconMui sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
                 <Box sx={{ flex: 1 }}>
                   {transaction.category ? (
                     <>
