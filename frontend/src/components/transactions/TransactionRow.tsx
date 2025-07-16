@@ -4,9 +4,9 @@ import {
   Paper,
   Typography,
 } from '@mui/material';
-import { Category as CategoryIcon } from '@mui/icons-material';
 import type { Transaction } from '../../services/api/types/transactions';
 import { formatCurrencyDisplay } from '../../utils/formatters';
+import CategoryIcon from '../common/CategoryIcon';
 
 interface TransactionRowProps {
   transaction: Transaction;
@@ -39,7 +39,11 @@ const TransactionRow: React.FC<TransactionRowProps> = ({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
         {transaction.category && (
           <CategoryIcon 
-            sx={{ color: 'primary.main' }}
+            categoryName={transaction.category.name}
+            subcategoryName={transaction.subCategory?.name}
+            size="small"
+            variant="plain"
+            showTooltip={false}
             data-testid={`${baseTestId}-category-icon`}
           />
         )}

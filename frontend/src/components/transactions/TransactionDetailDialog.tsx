@@ -26,6 +26,7 @@ import { formatCurrencyDisplay } from '../../utils/formatters';
 import { EnhancedCategorizationDialog } from './EnhancedCategorizationDialog';
 import { transactionsApi } from '../../services/api/transactions';
 import { useCategories } from '../../hooks/useCategories';
+import CategoryIcon from '../common/CategoryIcon';
 
 interface TransactionDetailDialogProps {
   open: boolean;
@@ -203,7 +204,13 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 }}
                 onClick={handleCategoryEdit}
               >
-                <CategoryIconMui sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
+                <CategoryIcon 
+                  categoryName={transaction.category?.name}
+                  subcategoryName={transaction.subCategory?.name}
+                  size="small"
+                  variant="plain"
+                  showTooltip={false}
+                />
                 <Box sx={{ flex: 1 }}>
                   {transaction.category ? (
                     <>
