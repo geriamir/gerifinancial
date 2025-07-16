@@ -201,15 +201,13 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 }}
                 onClick={handleCategoryEdit}
               >
-                <Box sx={{ mt: 0.25 }}>
-                  <CategoryIcon 
-                    categoryName={transaction.category?.name}
-                    subcategoryName={transaction.subCategory?.name}
-                    size="small"
-                    variant="plain"
-                    showTooltip={false}
-                  />
-                </Box>
+                <CategoryIcon 
+                  categoryName={transaction.category?.name}
+                  subcategoryName={transaction.subCategory?.name}
+                  size="small"
+                  variant="plain"
+                  showTooltip={false}
+                />
                 <Box sx={{ flex: 1 }}>
                   {transaction.category ? (
                     <>
