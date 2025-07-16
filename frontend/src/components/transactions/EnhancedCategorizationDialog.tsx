@@ -309,6 +309,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                         borderColor: 'grey.200',
                         transition: 'all 0.2s ease-in-out',
                         backgroundColor: 'transparent',
+                        height: '120px', // Fixed height for consistent sizing
                         '&:hover': {
                           borderColor: theme.primary,
                           transform: 'translateY(-2px)',
@@ -316,7 +317,16 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                         },
                       }}
                     >
-                      <CardActionArea onClick={() => handleCategorySelect(category)} sx={{ p: 2 }}>
+                      <CardActionArea 
+                        onClick={() => handleCategorySelect(category)} 
+                        sx={{ 
+                          p: 2, 
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                           <CategoryIcon
                             categoryName={category.name}
@@ -333,6 +343,12 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                             textAlign="center"
                             sx={{ 
                               color: 'text.primary',
+                              lineHeight: 1.2,
+                              maxHeight: '2.4em', // Max 2 lines
+                              overflow: 'hidden',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
                             }}
                           >
                             {category.name}
