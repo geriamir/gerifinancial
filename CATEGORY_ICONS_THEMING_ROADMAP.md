@@ -71,8 +71,8 @@ Transform the current emoji/Material-UI icon system to use custom PNG icons with
 - [x] Add loading states for icon rendering
 
 #### 3.2 Transaction Components
-- [ ] **TransactionRow.tsx**: Add category color indicators
-- [x] **TransactionDetailDialog.tsx**: Enhanced visual category display
+- [x] **TransactionRow.tsx**: Added PNG category icons with proper theming
+- [x] **TransactionDetailDialog.tsx**: Enhanced visual category display with PNG icons
 - [ ] **CategorySelectionDialog.tsx**: Full PNG icon integration
 - [ ] **FilterPanel.tsx**: Category filter chips with icons and colors
 
