@@ -154,13 +154,18 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
     loadTransactions();
   }, [hasFilters, propsFilters]);
 
+  // Extract refreshTrigger to satisfy exhaustive-deps
+  const refreshTrigger = hasFilters && 'refreshTrigger' in props 
+    ? (props as FilteredTransactionsListProps).refreshTrigger 
+    : undefined;
+  
   // Handle refresh trigger - refresh all currently loaded pages
   useEffect(() => {
-    if (!hasFilters || !('refreshTrigger' in props)) {
+    if (!hasFilters || !refreshTrigger) {
       return;
     }
 
-    const currentRefreshTrigger = (props as FilteredTransactionsListProps).refreshTrigger;
+    const currentRefreshTrigger = refreshTrigger;
     
     // If refreshTrigger hasn't changed, don't refresh
     if (refreshTriggerRef.current === currentRefreshTrigger) {
@@ -206,7 +211,7 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
     };
 
     refreshCurrentPages();
-  }, [hasFilters, (props as FilteredTransactionsListProps).refreshTrigger, propsFilters, currentPage]);
+  }, [hasFilters, refreshTrigger, propsFilters, currentPage]);
 
   const transactions = ('transactions' in props) ? props.transactions as T[] : (fetchedTransactions as T[]);
 

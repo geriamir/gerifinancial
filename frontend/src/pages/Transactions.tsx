@@ -30,7 +30,6 @@ const TransactionsPage: React.FC = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [preservePagination, setPreservePagination] = useState(false);
 
   // Sync filters with URL parameters
   useEffect(() => {
