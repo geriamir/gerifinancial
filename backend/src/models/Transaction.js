@@ -46,9 +46,22 @@ const transactionSchema = new mongoose.Schema({
     },
     index: true
   },
-  processedDate: {
+  // When we pulled/synced the transaction data from the bank
+  syncedDate: {
     type: Date,
     default: null,
+  },
+  // When the money actually moved (effective date for budget allocation)
+  processedDate: {
+    type: Date,
+    required: true,
+    validate: {
+      validator: function(v) {
+        return v instanceof Date && !isNaN(v);
+      },
+      message: props => `${props.value} is not a valid processed date!`
+    },
+    index: true
   },
   type: {
     type: String,
@@ -98,6 +111,12 @@ const transactionSchema = new mongoose.Schema({
     enum: Object.values(TransactionStatus),
     default: TransactionStatus.VERIFIED, // All transactions in main storage are verified
   },
+  // User-defined tags for organization and project tracking
+  // References to Tag model for efficient querying and analytics
+  tags: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tag'
+  }],
   rawData: {
     type: mongoose.Schema.Types.Mixed,
     required: true,
@@ -122,6 +141,11 @@ transactionSchema.index({
 transactionSchema.index({ accountId: 1, date: -1 });
 transactionSchema.index({ category: 1, date: -1 });
 
+// New indexes for budget functionality
+transactionSchema.index({ processedDate: 1 }); // For budget allocation by processed date
+transactionSchema.index({ tags: 1 }); // For project and tag-based queries
+transactionSchema.index({ userId: 1, processedDate: -1 }); // For user budget calculations
+
 // Helper method to categorize a transaction
 transactionSchema.methods.categorize = async function(categoryId, subCategoryId, method = CategorizationMethod.MANUAL, reasoning = null) {
   this.category = categoryId;
@@ -130,6 +154,72 @@ transactionSchema.methods.categorize = async function(categoryId, subCategoryId,
   this.categorizationReasoning = reasoning;
   this.processedDate = new Date();
   await this.save();
+};
+
+// Helper methods for tagging functionality
+transactionSchema.methods.addTags = async function(tagIds) {
+  const Tag = require('./Tag');
+  const newTagIds = Array.isArray(tagIds) ? tagIds : [tagIds];
+  const uniqueTagIds = [...new Set([...this.tags.map(t => t.toString()), ...newTagIds.map(t => t.toString())])];
+  this.tags = uniqueTagIds;
+  
+  // Update tag usage statistics
+  await Tag.updateMany(
+    { _id: { $in: newTagIds } },
+    { 
+      $inc: { usageCount: 1 },
+      $set: { lastUsed: new Date() }
+    }
+  );
+  
+  await this.save();
+  return this;
+};
+
+transactionSchema.methods.removeTags = async function(tagIds) {
+  const tagsToRemove = Array.isArray(tagIds) ? tagIds : [tagIds];
+  this.tags = this.tags.filter(tagId => !tagsToRemove.map(t => t.toString()).includes(tagId.toString()));
+  await this.save();
+  return this;
+};
+
+transactionSchema.methods.hasTag = function(tagId) {
+  return this.tags.some(tag => tag.toString() === tagId.toString());
+};
+
+// Static method to find transactions by tag
+transactionSchema.statics.findByTag = async function(tagId, userId) {
+  if (!userId) throw new Error('userId is required');
+  return this.find({
+    userId,
+    tags: tagId
+  })
+  .sort({ processedDate: -1 })
+  .populate('category')
+  .populate('subCategory')
+  .populate('tags');
+};
+
+// Static method to get spending summary by tag
+transactionSchema.statics.getSpendingSummaryByTag = async function(tagId, startDate, endDate) {
+  return this.aggregate([
+    {
+      $match: {
+        tags: new mongoose.Types.ObjectId(tagId),
+        processedDate: { $gte: startDate, $lte: endDate }
+      }
+    },
+    {
+      $group: {
+        _id: {
+          type: '$type',
+          currency: '$currency'
+        },
+        total: { $sum: '$amount' },
+        count: { $sum: 1 }
+      }
+    }
+  ]);
 };
 
 // Static method to find transactions within a date range
