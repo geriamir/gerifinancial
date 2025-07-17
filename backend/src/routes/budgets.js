@@ -37,7 +37,7 @@ router.get('/monthly/:year/:month',
   async (req, res) => {
     try {
       const { year, month } = req.params;
-      const budget = await budgetService.getMonthlyBudget(req.user.id, parseInt(year), parseInt(month));
+      const budget = await budgetService.getMonthlyBudget(req.user._id, parseInt(year), parseInt(month));
       
       res.json({
         success: true,
@@ -73,7 +73,7 @@ router.post('/monthly',
   async (req, res) => {
     try {
       const { year, month, ...budgetData } = req.body;
-      const budget = await budgetService.createMonthlyBudget(req.user.id, year, month, budgetData);
+      const budget = await budgetService.createMonthlyBudget(req.user._id, year, month, budgetData);
       
       res.status(201).json({
         success: true,
@@ -158,7 +158,7 @@ router.post('/monthly/calculate',
     try {
       const { year, month, monthsToAnalyze = 6 } = req.body;
       const budget = await budgetService.calculateMonthlyBudgetFromHistory(
-        req.user.id, 
+        req.user._id, 
         year, 
         month, 
         monthsToAnalyze
@@ -194,7 +194,7 @@ router.get('/monthly/:year/:month/actual',
   async (req, res) => {
     try {
       const { year, month } = req.params;
-      const analysis = await budgetService.getBudgetVsActual(req.user.id, 'monthly', {
+      const analysis = await budgetService.getBudgetVsActual(req.user._id, 'monthly', {
         year: parseInt(year),
         month: parseInt(month)
       });
@@ -230,7 +230,7 @@ router.get('/yearly/:year',
   handleValidationErrors,
   async (req, res) => {
     try {
-      const budget = await budgetService.getYearlyBudget(req.user.id, parseInt(req.params.year));
+      const budget = await budgetService.getYearlyBudget(req.user._id, parseInt(req.params.year));
       
       res.json({
         success: true,
@@ -266,7 +266,7 @@ router.post('/yearly',
   async (req, res) => {
     try {
       const { year, ...budgetData } = req.body;
-      const budget = await budgetService.createYearlyBudget(req.user.id, year, budgetData);
+      const budget = await budgetService.createYearlyBudget(req.user._id, year, budgetData);
       
       res.status(201).json({
         success: true,
@@ -358,7 +358,7 @@ router.get('/projects',
       const { status, year, limit = 20, offset = 0 } = req.query;
       
       // Build query based on filters
-      let query = { userId: req.user.id };
+      let query = { userId: req.user._id };
       
       if (status) {
         query.status = status;
@@ -437,7 +437,7 @@ router.post('/projects',
         });
       }
       
-      const project = await budgetService.createProjectBudget(req.user.id, req.body);
+      const project = await budgetService.createProjectBudget(req.user._id, req.body);
       
       res.status(201).json({
         success: true,
@@ -478,7 +478,7 @@ router.get('/projects/:id',
       const project = await budgetService.getProjectBudget(req.params.id);
       
       // Check if user owns this project
-      if (project.userId.toString() !== req.user.id) {
+      if (project.userId.toString() !== req.user._id) {
         return res.status(403).json({
           success: false,
           message: 'Access denied'
@@ -649,7 +649,7 @@ router.get('/summary',
       const year = req.query.year ? parseInt(req.query.year) : currentDate.getFullYear();
       const month = req.query.month ? parseInt(req.query.month) : currentDate.getMonth() + 1;
       
-      const summary = await budgetService.getBudgetSummary(req.user.id, year, month);
+      const summary = await budgetService.getBudgetSummary(req.user._id, year, month);
       
       res.json({
         success: true,
@@ -674,7 +674,7 @@ router.get('/dashboard',
   auth,
   async (req, res) => {
     try {
-      const overview = await budgetService.getDashboardOverview(req.user.id);
+      const overview = await budgetService.getDashboardOverview(req.user._id);
       
       res.json({
         success: true,
