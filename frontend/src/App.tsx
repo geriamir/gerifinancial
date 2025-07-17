@@ -6,6 +6,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { he } from 'date-fns/locale';
 import { AuthProvider } from './contexts/AuthContext';
+import { BudgetProvider } from './contexts/BudgetContext';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import AuthLayout from './components/layout/AuthLayout';
@@ -13,6 +14,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import Banks from './pages/Banks';
 import TransactionsPage from './pages/Transactions';
+import BudgetsPage from './pages/Budgets';
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
@@ -53,7 +55,9 @@ const App: React.FC = () => {
               path="/"
               element={
                 <ProtectedRoute>
-                  <AuthLayout />
+                  <BudgetProvider>
+                    <AuthLayout />
+                  </BudgetProvider>
                 </ProtectedRoute>
               }
             >
@@ -61,6 +65,7 @@ const App: React.FC = () => {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="banks" element={<Banks />} />
               <Route path="transactions" element={<TransactionsPage />} />
+              <Route path="budgets" element={<BudgetsPage />} />
               <Route path="profile" element={<Profile />} />
             </Route>
           </Routes>
