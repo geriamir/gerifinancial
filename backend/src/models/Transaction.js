@@ -54,10 +54,13 @@ const transactionSchema = new mongoose.Schema({
   // When the money actually moved (effective date for budget allocation)
   processedDate: {
     type: Date,
-    required: true,
+    required: false,
+    default: function() {
+      return this.date || new Date();
+    },
     validate: {
       validator: function(v) {
-        return v instanceof Date && !isNaN(v);
+        return !v || (v instanceof Date && !isNaN(v));
       },
       message: props => `${props.value} is not a valid processed date!`
     },
@@ -142,7 +145,6 @@ transactionSchema.index({ accountId: 1, date: -1 });
 transactionSchema.index({ category: 1, date: -1 });
 
 // New indexes for budget functionality
-transactionSchema.index({ processedDate: 1 }); // For budget allocation by processed date
 transactionSchema.index({ tags: 1 }); // For project and tag-based queries
 transactionSchema.index({ userId: 1, processedDate: -1 }); // For user budget calculations
 

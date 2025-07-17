@@ -14,10 +14,15 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Clean up tags and test user
-  if (testUser) {
-    await Tag.deleteMany({ userId: testUser._id });
-    await User.deleteOne({ _id: testUser._id });
+  // Clean up tags and test user - use try-catch in case connection is closed
+  try {
+    if (testUser) {
+      await Tag.deleteMany({ userId: testUser._id });
+      await User.deleteOne({ _id: testUser._id });
+    }
+  } catch (error) {
+    // Ignore cleanup errors - likely due to connection being closed
+    console.log('Cleanup error (ignored):', error.message);
   }
 });
 
