@@ -1,8 +1,8 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
+const { createTestUser } = require('../../test/testUtils');
 const app = require('../../app');
 const { User, Category, SubCategory, Transaction, MonthlyBudget, ProjectBudget, Tag } = require('../../models');
-const jwt = require('jsonwebtoken');
 
 let testUser;
 let authToken;
@@ -10,20 +10,13 @@ let testCategory;
 let testSubCategory;
 
 beforeAll(async () => {
-  // Create test user
-  testUser = new User({
+  // Create test user using testUtils
+  const testData = await createTestUser(User, {
     email: 'budget-test@example.com',
-    name: 'Budget Test User',
-    password: 'password123'
+    name: 'Budget Test User'
   });
-  await testUser.save();
-  
-  // Generate auth token
-  authToken = jwt.sign(
-    { userId: testUser._id, email: testUser.email },
-    process.env.JWT_SECRET || 'test-secret',
-    { expiresIn: '1h' }
-  );
+  testUser = testData.user;
+  authToken = testData.token;
   
   // Create test category and subcategory
   testCategory = new Category({
