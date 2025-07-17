@@ -84,7 +84,7 @@ class CategoryMappingService {
         transaction.rawData?.description,
         transaction.rawData?.memo,
         transaction.rawData?.category
-      ].filter(Boolean);
+      ].filter(Boolean).filter(term => term && term.trim()); // Filter out empty/whitespace terms
 
       // Try matching categories with keywords (Income/Transfer)
       const categoriesWithKeywords = await Category.find({
@@ -147,7 +147,14 @@ class CategoryMappingService {
       }
 
       // Try matching subcategories (for Expenses)
-      const allMatchingSubCategories = await SubCategory.findMatchingSubCategories(searchTerms);
+      let allMatchingSubCategories = [];
+      try {
+        allMatchingSubCategories = await SubCategory.findMatchingSubCategories(searchTerms);
+      } catch (error) {
+        logger.warn('Error in SubCategory.findMatchingSubCategories:', error);
+        allMatchingSubCategories = []; // Continue with empty array if matching fails
+      }
+      
       const matchingSubCategories = await Promise.all(
         allMatchingSubCategories.map(async subCat => {
           await subCat.populate('parentCategory');

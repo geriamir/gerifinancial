@@ -37,20 +37,38 @@ subCategorySchema.index({ name: 1, parentCategory: 1, userId: 1 }, { unique: tru
 // Add method to find matching subcategories based on search terms
 subCategorySchema.statics.findMatchingSubCategories = async function(searchTerms) {
   const normalizedTerms = searchTerms
-    .map(term => term.toLowerCase())
-    .flatMap(term => term.split(' '));
+    .filter(term => term && term.trim()) // Filter out empty terms
+    .map(term => term.toLowerCase().trim())
+    .flatMap(term => term.split(' '))
+    .filter(term => term.length > 0); // Filter out empty strings from split
   
-  // Escape special regex characters to prevent regex errors
-  const escapeRegex = (string) => {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  };
+  if (normalizedTerms.length === 0) {
+    return []; // Return empty array if no valid terms
+  }
   
-  // Find subcategories where any keyword matches any of the search terms
-  return this.find({
-    keywords: {
-      $in: normalizedTerms.map(term => new RegExp(escapeRegex(term), 'i'))
+  // Get all subcategories and filter in-memory to avoid regex issues
+  const allSubCategories = await this.find({}).populate('parentCategory');
+  
+  // Filter subcategories that have keywords matching any of the search terms
+  const matchingSubCategories = allSubCategories.filter(subCategory => {
+    if (!subCategory.keywords || subCategory.keywords.length === 0) {
+      return false;
     }
-  }).populate('parentCategory');
+    
+    // Check if any keyword matches any search term using simple string inclusion
+    return subCategory.keywords.some(keyword => {
+      if (!keyword || !keyword.trim()) {
+        return false;
+      }
+      
+      const normalizedKeyword = keyword.toLowerCase().trim();
+      return normalizedTerms.some(term => 
+        term.includes(normalizedKeyword) || normalizedKeyword.includes(term)
+      );
+    });
+  });
+  
+  return matchingSubCategories;
 };
 
 // Add method to find or create a subcategory
