@@ -106,7 +106,11 @@ class BankScraperService {
     const tempAccount = { 
       bankId, 
       _id: 'validation',
-      getScraperOptions: () => ({ credentials: { username: credentials.username, password: credentials.password } })
+      lastScraped: null,
+      getScraperOptions: () => ({ 
+        credentials: { username: credentials.username, password: credentials.password },
+        startDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) // 6 months back for validation
+      })
     };
     
     try {
