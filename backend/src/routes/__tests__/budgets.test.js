@@ -9,8 +9,8 @@ let authToken;
 let testCategory;
 let testSubCategory;
 
-beforeAll(async () => {
-  // Create test user using testUtils
+beforeEach(async () => {
+  // Create test user using testUtils (in beforeEach because beforeEach clears DB)
   const testData = await createTestUser(User, {
     email: 'budget-test@example.com',
     name: 'Budget Test User'
@@ -52,13 +52,6 @@ afterAll(async () => {
   }
 });
 
-beforeEach(async () => {
-  // Clean up test data before each test
-  await MonthlyBudget.deleteMany({ userId: testUser._id });
-  await ProjectBudget.deleteMany({ userId: testUser._id });
-  await Tag.deleteMany({ userId: testUser._id });
-  await Transaction.deleteMany({ userId: testUser._id });
-});
 
 describe('Budget API Endpoints', () => {
   
