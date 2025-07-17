@@ -5,6 +5,9 @@ const User = require('./User');
 const BankAccount = require('./BankAccount');
 const Tag = require('./Tag');
 const CreditCard = require('./CreditCard');
+const MonthlyBudget = require('./MonthlyBudget');
+const YearlyBudget = require('./YearlyBudget');
+const ProjectBudget = require('./ProjectBudget');
 
 module.exports = {
   Category,
@@ -13,5 +16,8 @@ module.exports = {
   User,
   BankAccount,
   Tag,
-  CreditCard
+  CreditCard,
+  MonthlyBudget,
+  YearlyBudget,
+  ProjectBudget
 };
