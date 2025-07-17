@@ -178,10 +178,15 @@ class BudgetService {
       if (budget) {
         // Update existing budget
         Object.assign(budget, budgetData);
+        budget.isAutoCalculated = true;
+        budget.lastCalculated = new Date();
         await budget.save();
       } else {
         // Create new budget
         budget = await this.createMonthlyBudget(userId, year, month, budgetData);
+        budget.isAutoCalculated = true;
+        budget.lastCalculated = new Date();
+        await budget.save();
       }
 
       logger.info(`Auto-calculated monthly budget: Salary: ${avgSalaryBudget}, Expenses: ${expenseBudgets.length} categories`);
