@@ -13,12 +13,19 @@ class BankScraperService {
   }
 
   createScraper(bankAccount, options = {}) {
+    // Get smart start date from bank account (uses lastScraped if available, otherwise 6 months back)
+    const scraperOptions = bankAccount.getScraperOptions();
+    
     const {
-      startDate = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000), // Last 6 months by default
+      startDate = scraperOptions.startDate, // Use smart start date from bank account
       showBrowser = false,
       verbose = false,
       timeout = this.DEFAULT_TIMEOUT
     } = options;
+
+    // Log the scraping strategy being used
+    const isIncrementalScraping = bankAccount.lastScraped;
+    logger.info(`Creating scraper for bank account ${bankAccount._id} with ${isIncrementalScraping ? 'incremental' : 'initial'} scraping from ${startDate.toISOString()}`);
 
     const scraper = createScraper({
       companyId: bankAccount.bankId,
