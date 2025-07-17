@@ -84,7 +84,7 @@ class CategoryMappingService {
         transaction.rawData?.description,
         transaction.rawData?.memo,
         transaction.rawData?.category
-      ].filter(Boolean).filter(term => term && term.trim()); // Filter out empty/whitespace terms
+      ].filter(term => term && term.trim()); // Filter out falsy values and empty/whitespace terms
 
       // Try matching categories with keywords (Income/Transfer)
       const categoriesWithKeywords = await Category.find({
