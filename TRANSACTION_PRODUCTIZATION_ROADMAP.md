@@ -349,13 +349,30 @@ EnhancedCategorization/
 - ✅ **Subsequent Scrapes**: Uses `lastScraped` date for incremental scraping
 - ✅ **Automatic Tracking**: Updates `lastScraped` timestamp on successful scraping
 - ✅ **Simple Implementation**: Uses existing `lastScraped` field without additional complexity
+- ✅ **Bug Fix (January 2025)**: Fixed BankScraperService to actually use smart start dates
+
+### Issue Discovered & Fixed
+**Problem**: The BankScraperService was not using the smart start date logic from `BankAccount.getScraperOptions()`, causing all scrapes to default to 6 months back instead of incremental scraping.
+
+**Root Cause**: The `createScraper()` method was using a hardcoded 6-month default instead of calling `bankAccount.getScraperOptions().startDate`.
+
+**Solution**: Updated BankScraperService to properly use the smart start date logic:
+```javascript
+// Before (Bug): Always used 6 months back
+startDate = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000)
+
+// After (Fixed): Uses smart logic from BankAccount
+const scraperOptions = bankAccount.getScraperOptions();
+startDate = scraperOptions.startDate; // Uses lastScraped or 6 months back
+```
 
 ### Key Benefits Delivered
-- **Efficient Data Transfer**: Reduced bandwidth by scraping only new transactions
+- **Efficient Data Transfer**: Reduced bandwidth by scraping only new transactions (now actually working!)
 - **Faster Scraping**: Shorter time ranges for subsequent scrapes
 - **Reliable Tracking**: Automatic timestamp updates ensure continuity
 - **Backward Compatible**: First scrape behavior unchanged (6 months back)
 - **Error Resilient**: Failed scrapes don't update timestamp, ensuring no data loss
+- **Logging Added**: Shows "incremental" vs "initial" scraping strategy for debugging
 
 ### Technical Implementation
 ```javascript
@@ -367,7 +384,19 @@ if (this.lastScraped) {
   startDate = new Date();
   startDate.setMonth(startDate.getMonth() - 6); // First scrape: 6 months back
 }
+
+// Fixed BankScraperService to use this logic
+createScraper(bankAccount, options = {}) {
+  const scraperOptions = bankAccount.getScraperOptions();
+  const startDate = scraperOptions.startDate; // Now actually uses smart logic!
+  // ... rest of implementation
+}
 ```
+
+### Additional Fixes Applied
+- **Test Compatibility**: Updated all test mocks to include proper `getScraperOptions()` structure
+- **Credential Validation**: Fixed `validateCredentials()` method for bank account creation
+- **Error Prevention**: Enhanced regex error handling in auto-categorization system
 
 ---
 

@@ -12,11 +12,13 @@ describe('BankScraperService', () => {
       username: 'testuser',
       password: 'bankpass123'
     },
+    lastScraped: null, // Simulate first scrape
     getScraperOptions: () => ({
       credentials: {
         username: 'testuser',
         password: 'bankpass123'
-      }
+      },
+      startDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) // 6 months back for first scrape
     })
   };
 
@@ -37,7 +39,8 @@ describe('BankScraperService', () => {
           credentials: {
             username: 'retry-test',
             password: 'pass'
-          }
+          },
+          startDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000)
         })
       };
 
@@ -57,7 +60,8 @@ describe('BankScraperService', () => {
           credentials: {
             username: 'invalid',
             password: 'invalid'
-          }
+          },
+          startDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000)
         })
       };
 
@@ -119,7 +123,8 @@ describe('BankScraperService', () => {
           credentials: {
             username: 'invalid',
             password: 'invalid'
-          }
+          },
+          startDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000)
         })
       };
 
