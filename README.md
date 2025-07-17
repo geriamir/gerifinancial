@@ -308,9 +308,44 @@ For detailed information about test improvements and roadmap, see TESTING_ROADMA
 
 See FEATURES_ROADMAP.md for detailed feature implementation plans.
 
-### Phase 4: Advanced Financial Analysis
+### Phase 4: Budget Management System (In Planning)
+- **Comprehensive Budget Management**: Monthly, yearly, and project budgets
+- **Smart Transaction Association**: Flexible timing allocation for credit cards and income
+- **Transaction Tagging System**: Multi-tag support for projects and custom organization
+- **Auto-calculated Budgets**: Generate budgets from historical transaction patterns
+- **Project Budget Tracking**: Multi-source funding with progress monitoring
+- **Budget Analytics**: Visual insights and variance analysis
+
+#### Planned Budget Features
+1. **Monthly Budgets**:
+   - Sub-category level budget allocation for expenses
+   - Salary budget tracking for income
+   - Flexible timing for credit card payments (10-15 day grace periods)
+   - Auto-calculation from historical transaction patterns
+
+2. **Yearly Budgets**:
+   - Annual overview with one-time events (renovations, bonuses)
+   - Integration with monthly budget aggregations
+   - Long-term financial planning capabilities
+
+3. **Project Budgets**:
+   - Multi-source funding (loans, bonuses, savings, ongoing funds)
+   - Timeline-based project tracking
+   - Impact analysis on other budgets
+   - Progress monitoring and alerts
+
+4. **Smart Features**:
+   - Credit card timing configuration per card
+   - Income timing flexibility per category
+   - Transaction tagging system for custom organization
+   - Automatic project tag generation
+   - Budget vs actual variance analysis
+
+See `BUDGET_FEATURE_ROADMAP.md` for complete implementation details.
+
+### Phase 5: Advanced Financial Analysis (Future)
 - Data visualization and reporting
-- Budgeting and financial insights
+- Advanced budgeting insights
 - Spending pattern analysis
 - Performance optimizations
 - Export functionality
