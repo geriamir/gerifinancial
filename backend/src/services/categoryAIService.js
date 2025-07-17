@@ -271,8 +271,6 @@ class CategoryAIService {
           };
       }
 
-      logger.warn(`No suitable category match found for description ${description}, rawCategory ${rawCategory}, memo ${memo}. Match confidence: ${match?.confidence || 0}`);
-
       return noMatch;
     } catch (error) {
       logger.error('Error in category suggestion:', error);
