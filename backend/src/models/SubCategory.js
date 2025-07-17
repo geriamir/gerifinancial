@@ -49,19 +49,29 @@ subCategorySchema.statics.findMatchingSubCategories = async function(searchTerms
   // Get all subcategories and filter in-memory to avoid regex issues
   const allSubCategories = await this.find({}).populate('parentCategory');
   
+  // Create Set for O(1) lookup performance instead of O(n) array search
+  const normalizedTermsSet = new Set(normalizedTerms);
+  
   // Filter subcategories that have keywords matching any of the search terms
   const matchingSubCategories = allSubCategories.filter(subCategory => {
     if (!subCategory.keywords || subCategory.keywords.length === 0) {
       return false;
     }
     
-    // Check if any keyword matches any search term using simple string inclusion
+    // Check if any keyword matches any search term using efficient Set lookup
     return subCategory.keywords.some(keyword => {
       if (!keyword || !keyword.trim()) {
         return false;
       }
       
       const normalizedKeyword = keyword.toLowerCase().trim();
+      
+      // Fast Set lookup for exact matches
+      if (normalizedTermsSet.has(normalizedKeyword)) {
+        return true;
+      }
+      
+      // Only do substring search if no exact match found
       return normalizedTerms.some(term => 
         term.includes(normalizedKeyword) || normalizedKeyword.includes(term)
       );
