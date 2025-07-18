@@ -151,6 +151,15 @@ const BudgetsPage: React.FC = () => {
     );
   }
 
+  // Debug info - temporary
+  console.log('Budget Page Debug:', {
+    currentMonthlyBudget,
+    loading,
+    error,
+    currentYear,
+    currentMonth
+  });
+
   // Show simplified empty state when no budget exists
   if (!currentMonthlyBudget) {
     return (

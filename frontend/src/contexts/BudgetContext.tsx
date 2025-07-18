@@ -81,7 +81,17 @@ export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
     try {
       clearError();
       setLoading(true);
-      const budget = await budgetsApi.getMonthlyBudget(year, month);
+      const response = await budgetsApi.getMonthlyBudget(year, month);
+      
+      // Handle API response format {success: true, data: budget}
+      const budget = (response as any)?.data || response;
+      
+      // If budget data is null, set to null
+      if (!budget || budget === null) {
+        setCurrentMonthlyBudget(null);
+        return null;
+      }
+      
       setCurrentMonthlyBudget(budget);
       return budget;
     } catch (error: any) {
