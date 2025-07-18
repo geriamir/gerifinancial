@@ -140,6 +140,36 @@ const BudgetsPage: React.FC = () => {
     );
   }
 
+  // Show simplified empty state when no budget exists
+  if (!currentMonthlyBudget && !loading) {
+    return (
+      <Container maxWidth="sm" sx={{ mt: 8, mb: 4 }}>
+        <Box textAlign="center" py={8}>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Budget Management
+          </Typography>
+          <Typography variant="h6" color="text.secondary" mb={1}>
+            {MONTH_NAMES[currentMonth - 1]} {currentYear}
+          </Typography>
+          <Typography variant="body1" color="text.secondary" mb={4}>
+            Create your first budget to start tracking your income and expenses
+          </Typography>
+          
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={<AddIcon />}
+            onClick={handleCreateBudget}
+            disabled={loading}
+            sx={{ py: 1.5, px: 4 }}
+          >
+            Create Budget
+          </Button>
+        </Box>
+      </Container>
+    );
+  }
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       {/* Header */}
@@ -273,31 +303,7 @@ const BudgetsPage: React.FC = () => {
                     </Typography>
                   </Box>
                 </Box>
-              ) : (
-                <Box textAlign="center" py={4}>
-                  <Typography variant="body1" color="text.secondary" mb={2}>
-                    No budget found for {MONTH_NAMES[currentMonth - 1]} {currentYear}
-                  </Typography>
-                  <Stack direction="row" spacing={2} justifyContent="center">
-                    <Button
-                      variant="outlined"
-                      startIcon={<AddIcon />}
-                      onClick={handleCreateBudget}
-                      disabled={loading}
-                    >
-                      Create Budget
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      startIcon={<CalculatorIcon />}
-                      onClick={handleAutoCalculate}
-                      disabled={loading}
-                    >
-                      Auto-Calculate
-                    </Button>
-                  </Stack>
-                </Box>
-              )}
+              ) : null}
             </CardContent>
           </Card>
         </Box>
@@ -371,27 +377,21 @@ const BudgetsPage: React.FC = () => {
       </Box>
 
       {/* Project Budgets Section */}
-      <Card sx={{ mt: 4 }}>
-        <CardContent>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6">Active Projects</Typography>
-            <Button
-              variant="outlined"
-              startIcon={<AddIcon />}
-              size="small"
-              disabled={loading}
-            >
-              New Project
-            </Button>
-          </Box>
-
-          {loading && (!projectBudgets || projectBudgets.length === 0) ? (
-            <Box>
-              {Array.from({ length: 3 }).map((_, index) => (
-                <Skeleton key={index} variant="rectangular" height={60} sx={{ mb: 1 }} />
-              ))}
+      {projectBudgets && projectBudgets.length > 0 && (
+        <Card sx={{ mt: 4 }}>
+          <CardContent>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">Active Projects</Typography>
+              <Button
+                variant="outlined"
+                startIcon={<AddIcon />}
+                size="small"
+                disabled={loading}
+              >
+                New Project
+              </Button>
             </Box>
-          ) : projectBudgets && projectBudgets.length > 0 ? (
+
             <Box>
               {projectBudgets.slice(0, 5).map((project) => (
                 <Box
@@ -433,28 +433,15 @@ const BudgetsPage: React.FC = () => {
                   </Box>
                 </Box>
               ))}
-              {projectBudgets && projectBudgets.length > 5 && (
+              {projectBudgets.length > 5 && (
                 <Button variant="text" fullWidth sx={{ mt: 1 }}>
                   View All Projects ({projectBudgets.length})
                 </Button>
               )}
             </Box>
-          ) : (
-            <Box textAlign="center" py={4}>
-              <Typography variant="body1" color="text.secondary" mb={2}>
-                No active projects
-              </Typography>
-              <Button
-                variant="outlined"
-                startIcon={<AddIcon />}
-                disabled={loading}
-              >
-                Create Your First Project
-              </Button>
-            </Box>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Context Menu */}
       <Menu
