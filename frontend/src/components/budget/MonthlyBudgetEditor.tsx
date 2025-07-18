@@ -131,16 +131,10 @@ const MonthlyBudgetEditor: React.FC<MonthlyBudgetEditorProps> = ({
         status: budget.status || 'draft'
       });
     } else {
-      // Reset for new budget
-      setBudgetData({
-        salaryBudget: 0,
-        otherIncomeBudgets: [],
-        expenseBudgets: [],
-        notes: '',
-        status: 'draft'
-      });
+      // For new budgets, auto-calculate suggestions
+      handleAutoCalculate();
     }
-  }, [budget]);
+  }, [budget, year, month]);
 
   const steps = ['Income Setup', 'Expense Budgets', 'Review & Save'];
 
@@ -281,23 +275,38 @@ const MonthlyBudgetEditor: React.FC<MonthlyBudgetEditorProps> = ({
         Set up your income for {MONTH_NAMES[month - 1]} {year}
       </Typography>
 
-      {/* Auto-calculate option */}
-      <Alert severity="info" sx={{ mb: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="body2">
-            Want to save time? Auto-calculate from your transaction history.
+      {/* Smart suggestions alert */}
+      {!budget && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          <Typography variant="body2" mb={1}>
+            <strong>Smart Budget Suggestions</strong>
           </Typography>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<CalculatorIcon />}
-            onClick={handleAutoCalculate}
-            disabled={isAutoCalculating}
-          >
-            {isAutoCalculating ? 'Calculating...' : 'Auto-Calculate'}
-          </Button>
-        </Box>
-      </Alert>
+          <Typography variant="body2">
+            We've pre-filled this budget with suggestions based on your transaction history. 
+            Feel free to adjust any amounts to match your preferences.
+          </Typography>
+        </Alert>
+      )}
+
+      {/* Manual auto-calculate option for existing budgets */}
+      {budget && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="body2">
+              Want to recalculate? Auto-calculate from your transaction history.
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<CalculatorIcon />}
+              onClick={handleAutoCalculate}
+              disabled={isAutoCalculating}
+            >
+              {isAutoCalculating ? 'Calculating...' : 'Recalculate'}
+            </Button>
+          </Box>
+        </Alert>
+      )}
 
       {/* Salary Budget */}
       <Card sx={{ mb: 3 }}>
