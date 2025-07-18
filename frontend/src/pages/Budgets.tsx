@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import { useBudget } from '../contexts/BudgetContext';
 import { formatCurrency } from '../utils/formatters';
+import MonthlyBudgetEditor from '../components/budget/MonthlyBudgetEditor';
 
 // Month names for display
 const MONTH_NAMES = [
@@ -50,6 +51,7 @@ const BudgetsPage: React.FC = () => {
 
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
+  const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
 
   // Handle period navigation
   const handlePrevMonth = () => {
@@ -76,6 +78,8 @@ const BudgetsPage: React.FC = () => {
         month: currentMonth,
         status: 'draft'
       });
+      // Open editor after creation
+      setBudgetEditorOpen(true);
     } catch (error) {
       console.error('Failed to create budget:', error);
     }
@@ -98,6 +102,17 @@ const BudgetsPage: React.FC = () => {
   const handleMenuClose = () => {
     setMenuAnchor(null);
     setSelectedBudgetId(null);
+  };
+
+  // Budget editor handlers
+  const handleEditBudget = () => {
+    setBudgetEditorOpen(true);
+    handleMenuClose();
+  };
+
+  const handleBudgetSaved = () => {
+    // Context will automatically refresh
+    setBudgetEditorOpen(false);
   };
 
   // Calculate progress percentage for budget vs actual
@@ -447,7 +462,7 @@ const BudgetsPage: React.FC = () => {
         open={Boolean(menuAnchor)}
         onClose={handleMenuClose}
       >
-        <MenuItem onClick={handleMenuClose}>
+        <MenuItem onClick={handleEditBudget}>
           <EditIcon sx={{ mr: 1 }} fontSize="small" />
           Edit Budget
         </MenuItem>
@@ -460,6 +475,16 @@ const BudgetsPage: React.FC = () => {
           Recalculate
         </MenuItem>
       </Menu>
+
+      {/* Monthly Budget Editor Dialog */}
+      <MonthlyBudgetEditor
+        open={budgetEditorOpen}
+        budget={currentMonthlyBudget}
+        year={currentYear}
+        month={currentMonth}
+        onClose={() => setBudgetEditorOpen(false)}
+        onSave={handleBudgetSaved}
+      />
     </Container>
   );
 };
