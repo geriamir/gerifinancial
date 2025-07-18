@@ -49,6 +49,11 @@ const defaultCategories = [
     type: "Transfer",
     keywords: ["מזומן", "משיכה", "כספומט"]
   },
+  {
+    name: "Internal Transfers - Miscellaneous",
+    type: "Transfer",
+    keywords: ["internal", "transfer", "misc", "העברה פנימית", "העברה", "פנימי"]
+  },
   // Expense categories (unchanged - keep category → subcategory structure)
   {
     name: "Household",

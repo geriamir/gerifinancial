@@ -1,4 +1,4 @@
-const { MonthlyBudget, YearlyBudget, ProjectBudget, Transaction, Category, SubCategory, Tag } = require('../models');
+const { MonthlyBudget, YearlyBudget, ProjectBudget, CategoryBudget, Transaction, Category, SubCategory, Tag } = require('../models');
 const logger = require('../utils/logger');
 
 class BudgetService {
@@ -40,16 +40,71 @@ class BudgetService {
   }
 
   /**
-   * Get monthly budget for a specific month
+   * Get monthly budget for a specific month using CategoryBudget system
    */
   async getMonthlyBudget(userId, year, month) {
     try {
-      const budget = await MonthlyBudget.findOne({ userId, year, month })
-        .populate('expenseBudgets.categoryId', 'name type')
-        .populate('expenseBudgets.subCategoryId', 'name keywords')
-        .populate('otherIncomeBudgets.categoryId', 'name type');
-
-      return budget;
+      // Get income budgets for the month
+      const incomeBudgets = await CategoryBudget.getIncomeBudgets(userId, month);
+      
+      // Get expense budgets for the month
+      const expenseBudgets = await CategoryBudget.getExpenseBudgets(userId, month);
+      
+      // Check if any budgets exist - if not, return null like the old system
+      if (incomeBudgets.length === 0 && expenseBudgets.length === 0) {
+        logger.info(`No category budgets found for user ${userId} for month ${month}`);
+        return null;
+      }
+      
+      // Only calculate actual amounts if we have budgets
+      const actualAmounts = await this.getActualAmountsForMonth(userId, year, month);
+      
+      // Find salary budget
+      const salaryBudget = incomeBudgets.find(budget => 
+        budget.categoryId && budget.categoryId.name === 'Salary'
+      );
+      
+      // Filter other income budgets (excluding salary)
+      const otherIncomeBudgets = incomeBudgets.filter(budget => 
+        budget.categoryId && budget.categoryId.name !== 'Salary'
+      ).map(budget => ({
+        categoryId: budget.categoryId,
+        amount: budget.amountForMonth
+      }));
+      
+      // Format expense budgets to match old structure
+      const formattedExpenseBudgets = expenseBudgets.map(budget => ({
+        categoryId: budget.categoryId,
+        subCategoryId: budget.subCategoryId,
+        budgetedAmount: budget.amountForMonth,
+        actualAmount: actualAmounts.expensesBySubCategory[`${budget.categoryId._id}_${budget.subCategoryId._id}`] || 0
+      }));
+      
+      // Calculate totals
+      const totalBudgetedIncome = (salaryBudget ? salaryBudget.amountForMonth : 0) + 
+        otherIncomeBudgets.reduce((sum, budget) => sum + budget.amount, 0);
+      const totalBudgetedExpenses = expenseBudgets.reduce((sum, budget) => sum + budget.amountForMonth, 0);
+      const totalActualExpenses = formattedExpenseBudgets.reduce((sum, budget) => sum + budget.actualAmount, 0);
+      
+      // Return budget structure compatible with existing frontend
+      return {
+        _id: `generated_${userId}_${year}_${month}`, // Generate a fake ID for compatibility
+        userId,
+        year,
+        month,
+        currency: 'ILS',
+        salaryBudget: salaryBudget ? salaryBudget.amountForMonth : 0,
+        otherIncomeBudgets,
+        expenseBudgets: formattedExpenseBudgets,
+        totalBudgetedIncome,
+        totalBudgetedExpenses,
+        totalActualIncome: actualAmounts.totalActualIncome,
+        totalActualExpenses,
+        budgetBalance: totalBudgetedIncome - totalBudgetedExpenses,
+        actualBalance: actualAmounts.totalActualIncome - totalActualExpenses,
+        status: 'active',
+        isAutoCalculated: false
+      };
     } catch (error) {
       logger.error('Error fetching monthly budget:', error);
       throw error;
@@ -57,27 +112,82 @@ class BudgetService {
   }
 
   /**
-   * Update an existing monthly budget
+   * Update monthly budget using CategoryBudget system
    */
   async updateMonthlyBudget(budgetId, updates) {
     try {
-      const budget = await MonthlyBudget.findById(budgetId);
-      if (!budget) {
-        throw new Error('Monthly budget not found');
-      }
-
-      // Update allowed fields
-      const allowedUpdates = ['salaryBudget', 'otherIncomeBudgets', 'expenseBudgets', 'notes', 'status'];
-      allowedUpdates.forEach(field => {
-        if (updates[field] !== undefined) {
-          budget[field] = updates[field];
+      // Extract year, month, userId from the generated ID
+      if (budgetId.startsWith('generated_')) {
+        const [, userId, year, month] = budgetId.split('_');
+        
+        // Handle salary budget update
+        if (updates.salaryBudget !== undefined) {
+          const salaryCategory = await Category.findOne({ userId, name: 'Salary', type: 'Income' });
+          if (salaryCategory) {
+            let salaryBudget = await CategoryBudget.findOne({ userId, categoryId: salaryCategory._id, subCategoryId: null });
+            if (!salaryBudget) {
+              salaryBudget = await CategoryBudget.findOrCreate(userId, salaryCategory._id, null);
+            }
+            salaryBudget.setAmountForMonth(parseInt(month), updates.salaryBudget);
+            await salaryBudget.save();
+          }
         }
-      });
+        
+        // Handle other income budgets update
+        if (updates.otherIncomeBudgets) {
+          for (const income of updates.otherIncomeBudgets) {
+            let budget = await CategoryBudget.findOne({ 
+              userId, 
+              categoryId: income.categoryId, 
+              subCategoryId: null 
+            });
+            if (!budget) {
+              budget = await CategoryBudget.findOrCreate(userId, income.categoryId, null);
+            }
+            budget.setAmountForMonth(parseInt(month), income.amount);
+            await budget.save();
+          }
+        }
+        
+        // Handle expense budgets update
+        if (updates.expenseBudgets) {
+          for (const expense of updates.expenseBudgets) {
+            let budget = await CategoryBudget.findOne({ 
+              userId, 
+              categoryId: expense.categoryId, 
+              subCategoryId: expense.subCategoryId 
+            });
+            if (!budget) {
+              budget = await CategoryBudget.findOrCreate(userId, expense.categoryId, expense.subCategoryId);
+            }
+            budget.setAmountForMonth(parseInt(month), expense.budgetedAmount);
+            await budget.save();
+          }
+        }
+        
+        logger.info(`Updated monthly budget via CategoryBudget for user ${userId}: ${month}/${year}`);
+        
+        // Return updated budget
+        return await this.getMonthlyBudget(userId, parseInt(year), parseInt(month));
+      } else {
+        // Fallback to old MonthlyBudget system if real ID is provided
+        const budget = await MonthlyBudget.findById(budgetId);
+        if (!budget) {
+          throw new Error('Monthly budget not found');
+        }
 
-      await budget.save();
-      logger.info(`Updated monthly budget: ${budgetId}`);
-      
-      return budget;
+        const allowedUpdates = ['salaryBudget', 'otherIncomeBudgets', 'expenseBudgets', 'notes', 'status'];
+        allowedUpdates.forEach(field => {
+          if (updates[field] !== undefined) {
+            budget[field] = updates[field];
+          }
+        });
+
+        await budget.save();
+        logger.info(`Updated monthly budget: ${budgetId}`);
+        
+        return budget;
+      }
     } catch (error) {
       logger.error('Error updating monthly budget:', error);
       throw error;
@@ -85,7 +195,7 @@ class BudgetService {
   }
 
   /**
-   * Calculate monthly budget from historical transaction data
+   * Calculate monthly budget from historical transaction data using CategoryBudget system
    */
   async calculateMonthlyBudgetFromHistory(userId, year, month, monthsToAnalyze = 6) {
     try {
@@ -108,18 +218,16 @@ class BudgetService {
       logger.info(`Found ${transactions.length} transactions for analysis`);
 
       // Group transactions by type and calculate averages
-      const expensesByCategory = {};
+      const expensesBySubCategory = {};
       const incomeByCategory = {};
-      let totalSalary = 0;
-      let salaryCount = 0;
 
       for (const transaction of transactions) {
         const amount = Math.abs(transaction.amount);
         
         if (transaction.category.type === 'Expense' && transaction.subCategory) {
           const key = `${transaction.category._id}_${transaction.subCategory._id}`;
-          if (!expensesByCategory[key]) {
-            expensesByCategory[key] = {
+          if (!expensesBySubCategory[key]) {
+            expensesBySubCategory[key] = {
               categoryId: transaction.category._id,
               subCategoryId: transaction.subCategory._id,
               categoryName: transaction.category.name,
@@ -128,71 +236,66 @@ class BudgetService {
               count: 0
             };
           }
-          expensesByCategory[key].total += amount;
-          expensesByCategory[key].count += 1;
+          expensesBySubCategory[key].total += amount;
+          expensesBySubCategory[key].count += 1;
         } else if (transaction.category.type === 'Income') {
-          // Check if this is salary (you might need to adjust this logic based on your category structure)
-          if (transaction.category.name.toLowerCase().includes('salary')) {
-            totalSalary += amount;
-            salaryCount += 1;
-          } else {
-            const key = transaction.category._id.toString();
-            if (!incomeByCategory[key]) {
-              incomeByCategory[key] = {
-                categoryId: transaction.category._id,
-                categoryName: transaction.category.name,
-                total: 0,
-                count: 0
-              };
-            }
-            incomeByCategory[key].total += amount;
-            incomeByCategory[key].count += 1;
+          const key = transaction.category._id.toString();
+          if (!incomeByCategory[key]) {
+            incomeByCategory[key] = {
+              categoryId: transaction.category._id,
+              categoryName: transaction.category.name,
+              total: 0,
+              count: 0
+            };
           }
+          incomeByCategory[key].total += amount;
+          incomeByCategory[key].count += 1;
         }
       }
 
-      // Calculate monthly averages
-      const avgSalaryBudget = salaryCount > 0 ? totalSalary / monthsToAnalyze : 0;
-      
-      const expenseBudgets = Object.values(expensesByCategory).map(expense => ({
-        categoryId: expense.categoryId,
-        subCategoryId: expense.subCategoryId,
-        budgetedAmount: Math.round(expense.total / monthsToAnalyze),
-        actualAmount: 0
-      }));
+      // Update CategoryBudgets with calculated amounts
+      let updatedBudgets = 0;
 
-      const otherIncomeBudgets = Object.values(incomeByCategory).map(income => ({
-        categoryId: income.categoryId,
-        amount: Math.round(income.total / monthsToAnalyze)
-      }));
-
-      // Create or update the monthly budget
-      const budgetData = {
-        salaryBudget: Math.round(avgSalaryBudget),
-        expenseBudgets,
-        otherIncomeBudgets,
-        currency: 'ILS',
-        isAutoCalculated: true,
-        lastCalculated: new Date()
-      };
-
-      let budget = await MonthlyBudget.findOne({ userId, year, month });
-      if (budget) {
-        // Update existing budget
-        Object.assign(budget, budgetData);
-        budget.isAutoCalculated = true;
-        budget.lastCalculated = new Date();
+      // Update income budgets
+      for (const income of Object.values(incomeByCategory)) {
+        const avgAmount = Math.round(income.total / monthsToAnalyze);
+        let budget = await CategoryBudget.findOne({ 
+          userId, 
+          categoryId: income.categoryId, 
+          subCategoryId: null 
+        });
+        
+        if (!budget) {
+          budget = await CategoryBudget.findOrCreate(userId, income.categoryId, null);
+        }
+        
+        budget.setAmountForMonth(month, avgAmount);
         await budget.save();
-      } else {
-        // Create new budget
-        budget = await this.createMonthlyBudget(userId, year, month, budgetData);
-        budget.isAutoCalculated = true;
-        budget.lastCalculated = new Date();
-        await budget.save();
+        updatedBudgets++;
       }
 
-      logger.info(`Auto-calculated monthly budget: Salary: ${avgSalaryBudget}, Expenses: ${expenseBudgets.length} categories`);
-      return budget;
+      // Update expense budgets
+      for (const expense of Object.values(expensesBySubCategory)) {
+        const avgAmount = Math.round(expense.total / monthsToAnalyze);
+        let budget = await CategoryBudget.findOne({ 
+          userId, 
+          categoryId: expense.categoryId, 
+          subCategoryId: expense.subCategoryId 
+        });
+        
+        if (!budget) {
+          budget = await CategoryBudget.findOrCreate(userId, expense.categoryId, expense.subCategoryId);
+        }
+        
+        budget.setAmountForMonth(month, avgAmount);
+        await budget.save();
+        updatedBudgets++;
+      }
+
+      logger.info(`Auto-calculated monthly budget: Updated ${updatedBudgets} category budgets for month ${month}`);
+      
+      // Return the updated budget using the new system
+      return await this.getMonthlyBudget(userId, year, month);
     } catch (error) {
       logger.error('Error calculating monthly budget from history:', error);
       throw error;
@@ -451,10 +554,8 @@ class BudgetService {
       const yearlyBudget = await this.getYearlyBudget(userId, year);
       const activeProjects = await ProjectBudget.findActive(userId);
 
-      // Update actual amounts
-      if (monthlyBudget) {
-        await monthlyBudget.updateActualAmounts();
-      }
+      // Monthly budget already has actual amounts calculated in getMonthlyBudget()
+      // No need to call updateActualAmounts() since it's a plain object
 
       for (const project of activeProjects) {
         await project.updateActualAmounts();
@@ -500,6 +601,47 @@ class BudgetService {
       return project.getProjectOverview();
     } catch (error) {
       logger.error('Error getting project progress:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get actual amounts from transactions for a specific month
+   */
+  async getActualAmountsForMonth(userId, year, month) {
+    try {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59);
+
+      const transactions = await Transaction.find({
+        userId,
+        processedDate: { $gte: startDate, $lte: endDate },
+        category: { $ne: null }
+      }).populate('category', 'type').populate('subCategory', 'name');
+
+      let totalActualIncome = 0;
+      let totalActualExpenses = 0;
+      const expensesBySubCategory = {};
+
+      transactions.forEach(transaction => {
+        const amount = Math.abs(transaction.amount);
+        
+        if (transaction.category && transaction.category.type === 'Income') {
+          totalActualIncome += amount;
+        } else if (transaction.category && transaction.category.type === 'Expense' && transaction.subCategory) {
+          totalActualExpenses += amount;
+          const key = `${transaction.category._id}_${transaction.subCategory._id}`;
+          expensesBySubCategory[key] = (expensesBySubCategory[key] || 0) + amount;
+        }
+      });
+
+      return { 
+        totalActualIncome, 
+        totalActualExpenses,
+        expensesBySubCategory
+      };
+    } catch (error) {
+      logger.error('Error getting actual amounts for month:', error);
       throw error;
     }
   }
