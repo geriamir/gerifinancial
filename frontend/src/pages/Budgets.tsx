@@ -151,18 +151,6 @@ const BudgetsPage: React.FC = () => {
     );
   }
 
-  // Debug info - temporary  
-  console.log('Budget Page Debug:', {
-    currentMonthlyBudget,
-    loading,
-    error,
-    currentYear,
-    currentMonth,
-    type: typeof currentMonthlyBudget,
-    hasData: currentMonthlyBudget && 'data' in currentMonthlyBudget,
-    dataValue: currentMonthlyBudget && 'data' in currentMonthlyBudget ? (currentMonthlyBudget as any).data : 'no data property'
-  });
-
   // Show simplified empty state when no budget exists
   // Handle API response format {success: true, data: null}
   const hasBudget = currentMonthlyBudget && (currentMonthlyBudget._id || (currentMonthlyBudget as any).data);
