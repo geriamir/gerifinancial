@@ -140,8 +140,19 @@ const BudgetsPage: React.FC = () => {
     );
   }
 
+  // Show loading state
+  if (loading) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4 }}>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <Typography>Loading...</Typography>
+        </Box>
+      </Container>
+    );
+  }
+
   // Show simplified empty state when no budget exists
-  if (!currentMonthlyBudget && !loading) {
+  if (!currentMonthlyBudget) {
     return (
       <Container maxWidth="sm" sx={{ mt: 8, mb: 4 }}>
         <Box textAlign="center" py={8}>
