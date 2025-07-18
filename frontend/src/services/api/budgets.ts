@@ -24,6 +24,7 @@ export interface MonthlyBudget {
   status: 'draft' | 'active' | 'completed';
   totalBudgetedIncome: number;
   totalBudgetedExpenses: number;
+  totalActualIncome: number;
   totalActualExpenses: number;
   budgetBalance: number;
   actualBalance: number;

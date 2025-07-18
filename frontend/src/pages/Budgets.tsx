@@ -13,7 +13,12 @@ import {
   MenuItem,
   Alert,
   Skeleton,
-  Stack
+  Stack,
+  Collapse,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemButton
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -23,7 +28,9 @@ import {
   Calculate as CalculatorIcon,
   MoreVert as MoreVertIcon,
   Edit as EditIcon,
-  AutoGraph as AutoGraphIcon
+  AutoGraph as AutoGraphIcon,
+  ExpandLess,
+  ExpandMore
 } from '@mui/icons-material';
 import { useBudget } from '../contexts/BudgetContext';
 import { formatCurrency } from '../utils/formatters';
@@ -34,6 +41,72 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
+
+// Helper component for expandable category
+const CategoryItem: React.FC<{
+  category: string;
+  subcategories: Array<{
+    name: string;
+    budgeted: number;
+    actual: number;
+  }>;
+  totalBudgeted: number;
+  totalActual: number;
+  color: string;
+}> = ({ category, subcategories, totalBudgeted, totalActual, color }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const handleToggle = () => {
+    setExpanded(!expanded);
+  };
+
+  return (
+    <Box>
+      <ListItemButton onClick={handleToggle} sx={{ border: 1, borderColor: 'grey.200', borderRadius: 1, mb: 1 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
+          <Box display="flex" alignItems="center">
+            {subcategories.length > 0 ? (expanded ? <ExpandLess /> : <ExpandMore />) : null}
+            <Typography variant="body1" sx={{ ml: 1 }}>
+              {category}
+            </Typography>
+          </Box>
+          <Box display="flex" gap={2} alignItems="center">
+            <Typography variant="body2" color={`${color}.main`}>
+              {formatCurrency(totalBudgeted)}
+            </Typography>
+            <Typography variant="body2">
+              {formatCurrency(totalActual)}
+            </Typography>
+          </Box>
+        </Box>
+      </ListItemButton>
+      
+      {subcategories.length > 0 && (
+        <Collapse in={expanded} timeout="auto" unmountOnExit>
+          <Box ml={4}>
+            {subcategories.map((sub, index) => (
+              <Box key={index} p={1.5} mb={0.5} border={1} borderColor="grey.100" borderRadius={1} bgcolor="grey.50">
+                <Box display="flex" justifyContent="space-between" alignItems="center">
+                  <Typography variant="body2" color="text.secondary">
+                    {sub.name}
+                  </Typography>
+                  <Box display="flex" gap={2} alignItems="center">
+                    <Typography variant="body2" color={`${color}.main`}>
+                      {formatCurrency(sub.budgeted)}
+                    </Typography>
+                    <Typography variant="body2">
+                      {formatCurrency(sub.actual)}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        </Collapse>
+      )}
+    </Box>
+  );
+};
 
 const BudgetsPage: React.FC = () => {
   const {
@@ -220,174 +293,290 @@ const BudgetsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Main Content */}
+      {/* Budget Status */}
+      {currentMonthlyBudget && (
+        <Box display="flex" alignItems="center" gap={2} mb={3}>
+          <Chip
+            label={currentMonthlyBudget.status}
+            color={getStatusColor(currentMonthlyBudget.status) as any}
+            size="small"
+          />
+          {currentMonthlyBudget.isAutoCalculated && (
+            <Chip
+              label="Auto-calculated"
+              color="info"
+              size="small"
+              icon={<AutoGraphIcon />}
+            />
+          )}
+          <Box ml="auto" display="flex" gap={1}>
+            <IconButton
+              size="small"
+              onClick={(e) => handleMenuOpen(e, currentMonthlyBudget._id)}
+            >
+              <MoreVertIcon />
+            </IconButton>
+          </Box>
+        </Box>
+      )}
+
+      {/* Main Content - Two Column Layout */}
       <Box sx={{
         display: 'flex', 
-        flexDirection: { xs: 'column', lg: 'row' }, 
+        flexDirection: { xs: 'column', md: 'row' }, 
         gap: 3 
       }}>
-        {/* Monthly Budget Section */}
-        <Box sx={{ flex: 2 }}>
-          <Card sx={{ mb: 3 }}>
+        {/* Income Column */}
+        <Box sx={{ flex: 1 }}>
+          <Card>
             <CardContent>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">Monthly Budget</Typography>
-                {currentMonthlyBudget && (
-                  <Box display="flex" gap={1}>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleMenuOpen(e, currentMonthlyBudget._id)}
-                    >
-                      <MoreVertIcon />
-                    </IconButton>
-                  </Box>
-                )}
+              <Typography variant="h6" color="success.main" gutterBottom>
+                Income
+              </Typography>
+              
+              {/* Income Summary */}
+              <Box p={2} bgcolor="success.50" borderRadius={1} mb={3}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="body2" color="text.secondary">
+                    Budget vs Actual
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {currentMonthlyBudget ? 
+                      `${((currentMonthlyBudget.totalActualIncome || 0) / currentMonthlyBudget.totalBudgetedIncome * 100).toFixed(1)}%`
+                      : '0%'
+                    }
+                  </Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="h6" color="success.dark">
+                    {formatCurrency(currentMonthlyBudget?.totalBudgetedIncome || 0)}
+                  </Typography>
+                  <Typography variant="body1" color="success.dark">
+                    {formatCurrency(currentMonthlyBudget?.totalActualIncome || 0)}
+                  </Typography>
+                </Box>
+                <LinearProgress
+                  variant="determinate"
+                  value={currentMonthlyBudget ? 
+                    Math.min(((currentMonthlyBudget.totalActualIncome || 0) / currentMonthlyBudget.totalBudgetedIncome) * 100, 100)
+                    : 0
+                  }
+                  sx={{ 
+                    height: 6, 
+                    borderRadius: 3,
+                    backgroundColor: 'success.100',
+                    '& .MuiLinearProgress-bar': {
+                      backgroundColor: 'success.main'
+                    }
+                  }}
+                />
+                <Box display="flex" justifyContent="space-between" mt={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    Budget
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Actual
+                  </Typography>
+                </Box>
               </Box>
 
-              {loading && !currentMonthlyBudget ? (
-                <Box>
-                  <Skeleton variant="text" width="60%" />
-                  <Skeleton variant="rectangular" height={60} sx={{ mt: 1 }} />
+              {/* Column Headers */}
+              <Box display="flex" justifyContent="space-between" alignItems="center" px={2} py={1} bgcolor="grey.100" borderRadius={1} mb={2}>
+                <Typography variant="body2" fontWeight="bold" color="text.secondary">
+                  Category
+                </Typography>
+                <Box display="flex" gap={2}>
+                  <Typography variant="body2" fontWeight="bold" color="text.secondary" width="80px" textAlign="center">
+                    Budget
+                  </Typography>
+                  <Typography variant="body2" fontWeight="bold" color="text.secondary" width="80px" textAlign="center">
+                    Actual
+                  </Typography>
                 </Box>
-              ) : currentMonthlyBudget ? (
-                <Box>
-                  {/* Budget Status */}
-                  <Box display="flex" alignItems="center" gap={2} mb={2}>
-                    <Chip
-                      label={currentMonthlyBudget.status}
-                      color={getStatusColor(currentMonthlyBudget.status) as any}
-                      size="small"
-                    />
-                    {currentMonthlyBudget.isAutoCalculated && (
-                      <Chip
-                        label="Auto-calculated"
-                        color="info"
-                        size="small"
-                        icon={<AutoGraphIcon />}
-                      />
-                    )}
-                  </Box>
+              </Box>
 
-                  {/* Income vs Expenses */}
-                  <Box sx={{
-                    display: 'flex', 
-                    flexDirection: { xs: 'column', md: 'row' },
-                    gap: 2,
-                    mb: 2
-                  }}>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Total Income
+              {/* Income Categories */}
+              <Box>
+                {/* Salary */}
+                <Box p={2} mb={1} border={1} borderColor="grey.200" borderRadius={1}>
+                  <Box display="flex" justifyContent="space-between" alignItems="center">
+                    <Typography variant="body1">Salary</Typography>
+                    <Box display="flex" gap={2} alignItems="center">
+                      <Typography variant="body2" color="success.main">
+                        {formatCurrency(currentMonthlyBudget?.salaryBudget || 0)}
                       </Typography>
-                      <Typography variant="h6" color="success.main">
-                        {formatCurrency(currentMonthlyBudget.totalBudgetedIncome)}
+                      <Typography variant="body2">
+                        {formatCurrency(0)} {/* TODO: Get actual salary from transactions */}
                       </Typography>
                     </Box>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Total Expenses
+                  </Box>
+                </Box>
+
+                {/* Other Income Categories */}
+                {currentMonthlyBudget?.otherIncomeBudgets?.map((income, index) => (
+                  <Box key={index} p={2} mb={1} border={1} borderColor="grey.200" borderRadius={1}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Typography variant="body1">
+                        {income.categoryId || 'Other Income'}
                       </Typography>
-                      <Typography variant="h6" color="error.main">
-                        {formatCurrency(currentMonthlyBudget.totalBudgetedExpenses)}
-                      </Typography>
-                      <Box mt={1}>
-                        <LinearProgress
-                          variant="determinate"
-                          value={calculateProgress(
-                            currentMonthlyBudget.totalActualExpenses,
-                            currentMonthlyBudget.totalBudgetedExpenses
-                          )}
-                          sx={{ height: 6, borderRadius: 3 }}
-                        />
-                        <Typography variant="caption" color="text.secondary">
-                          {formatCurrency(currentMonthlyBudget.totalActualExpenses)} spent
+                      <Box display="flex" gap={2} alignItems="center">
+                        <Typography variant="body2" color="success.main">
+                          {formatCurrency(income.amount)}
+                        </Typography>
+                        <Typography variant="body2">
+                          {formatCurrency(0)} {/* TODO: Get actual from transactions */}
                         </Typography>
                       </Box>
                     </Box>
                   </Box>
-
-                  {/* Budget Balance */}
-                  <Box mt={2} p={2} bgcolor="grey.50" borderRadius={1}>
-                    <Typography variant="body2" color="text.secondary">
-                      Budget Balance
-                    </Typography>
-                    <Typography variant="h6" color={currentMonthlyBudget.budgetBalance >= 0 ? 'success.main' : 'error.main'}>
-                      {formatCurrency(currentMonthlyBudget.budgetBalance)}
+                )) || (
+                  <Box p={2} textAlign="center" color="text.secondary">
+                    <Typography variant="body2">
+                      No additional income sources
                     </Typography>
                   </Box>
-                </Box>
-              ) : null}
+                )}
+              </Box>
             </CardContent>
           </Card>
         </Box>
 
-        {/* Quick Actions & Summary */}
-        <Box sx={{ flex: 1, minWidth: { lg: 300 } }}>
-          <Card sx={{ mb: 3 }}>
+        {/* Expenses Column */}
+        <Box sx={{ flex: 1 }}>
+          <Card>
             <CardContent>
-              <Typography variant="h6" mb={2}>Quick Actions</Typography>
-              <Stack spacing={1}>
-                <Button
-                  variant="outlined"
-                  startIcon={<TrendingUpIcon />}
-                  fullWidth
-                  disabled={loading}
-                >
-                  View Analytics
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<ProjectIcon />}
-                  fullWidth
-                  disabled={loading}
-                >
-                  Manage Projects
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<EditIcon />}
-                  fullWidth
-                  disabled={loading}
-                >
-                  Edit Categories
-                </Button>
-              </Stack>
-            </CardContent>
-          </Card>
+              <Typography variant="h6" color="error.main" gutterBottom>
+                Expenses
+              </Typography>
+              
+              {/* Expenses Summary */}
+              <Box p={2} bgcolor="error.50" borderRadius={1} mb={3}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="body2" color="text.secondary">
+                    Budget vs Actual
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {currentMonthlyBudget ? 
+                      `${((currentMonthlyBudget.totalActualExpenses || 0) / currentMonthlyBudget.totalBudgetedExpenses * 100).toFixed(1)}%`
+                      : '0%'
+                    }
+                  </Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                  <Typography variant="h6" color="error.dark">
+                    {formatCurrency(currentMonthlyBudget?.totalBudgetedExpenses || 0)}
+                  </Typography>
+                  <Typography variant="body1" color="error.dark">
+                    {formatCurrency(currentMonthlyBudget?.totalActualExpenses || 0)}
+                  </Typography>
+                </Box>
+                <LinearProgress
+                  variant="determinate"
+                  value={currentMonthlyBudget ? 
+                    Math.min(((currentMonthlyBudget.totalActualExpenses || 0) / currentMonthlyBudget.totalBudgetedExpenses) * 100, 100)
+                    : 0
+                  }
+                  sx={{ 
+                    height: 6, 
+                    borderRadius: 3,
+                    backgroundColor: 'error.100',
+                    '& .MuiLinearProgress-bar': {
+                      backgroundColor: 'error.main'
+                    }
+                  }}
+                />
+                <Box display="flex" justifyContent="space-between" mt={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    Budget
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Actual
+                  </Typography>
+                </Box>
+              </Box>
 
-          {/* Summary Card */}
-          {budgetSummary && (
-            <Card>
-              <CardContent>
-                <Typography variant="h6" mb={2}>Summary</Typography>
-                <Stack spacing={2}>
-                  <Box>
-                    <Typography variant="body2" color="text.secondary">
-                      Active Projects
-                    </Typography>
-                    <Typography variant="h6">
-                      {budgetSummary.activeProjects?.length || 0}
+              {/* Column Headers */}
+              <Box display="flex" justifyContent="space-between" alignItems="center" px={2} py={1} bgcolor="grey.100" borderRadius={1} mb={2}>
+                <Typography variant="body2" fontWeight="bold" color="text.secondary">
+                  Category
+                </Typography>
+                <Box display="flex" gap={2}>
+                  <Typography variant="body2" fontWeight="bold" color="text.secondary" width="80px" textAlign="center">
+                    Budget
+                  </Typography>
+                  <Typography variant="body2" fontWeight="bold" color="text.secondary" width="80px" textAlign="center">
+                    Actual
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* Expense Categories */}
+              <Box>
+                {currentMonthlyBudget?.expenseBudgets?.length ? (
+                  (() => {
+                    // Group expenses by category
+                    const groupedExpenses = currentMonthlyBudget.expenseBudgets.reduce((acc, expense) => {
+                      const categoryName = expense.categoryId || 'Uncategorized';
+                      if (!acc[categoryName]) {
+                        acc[categoryName] = [];
+                      }
+                      acc[categoryName].push(expense);
+                      return acc;
+                    }, {} as Record<string, typeof currentMonthlyBudget.expenseBudgets>);
+
+                    return Object.entries(groupedExpenses).map(([categoryName, expenses]) => {
+                      const totalBudgeted = expenses.reduce((sum, exp) => sum + exp.budgetedAmount, 0);
+                      const totalActual = expenses.reduce((sum, exp) => sum + (exp.actualAmount || 0), 0);
+                      
+                      const subcategories = expenses.map(exp => ({
+                        name: exp.subCategoryId || 'General',
+                        budgeted: exp.budgetedAmount,
+                        actual: exp.actualAmount || 0
+                      }));
+
+                      return (
+                        <CategoryItem
+                          key={categoryName}
+                          category={categoryName}
+                          subcategories={subcategories}
+                          totalBudgeted={totalBudgeted}
+                          totalActual={totalActual}
+                          color="error"
+                        />
+                      );
+                    });
+                  })()
+                ) : (
+                  <Box p={2} textAlign="center" color="text.secondary">
+                    <Typography variant="body2">
+                      No expense budgets set
                     </Typography>
                   </Box>
-                  {budgetSummary.monthly && (
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        This Month Balance
-                      </Typography>
-                      <Typography
-                        variant="h6"
-                        color={budgetSummary.monthly.actualBalance >= 0 ? 'success.main' : 'error.main'}
-                      >
-                        {formatCurrency(budgetSummary.monthly.actualBalance)}
-                      </Typography>
-                    </Box>
-                  )}
-                </Stack>
-              </CardContent>
-            </Card>
-          )}
+                )}
+              </Box>
+            </CardContent>
+          </Card>
         </Box>
       </Box>
+
+      {/* Budget Balance Summary */}
+      {currentMonthlyBudget && (
+        <Card sx={{ mt: 3 }}>
+          <CardContent>
+            <Box display="flex" justifyContent="space-between" alignItems="center">
+              <Typography variant="h6">
+                Budget Balance
+              </Typography>
+              <Typography 
+                variant="h5" 
+                color={currentMonthlyBudget.budgetBalance >= 0 ? 'success.main' : 'error.main'}
+              >
+                {formatCurrency(currentMonthlyBudget.budgetBalance)}
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Project Budgets Section */}
       {projectBudgets && projectBudgets.length > 0 && (
