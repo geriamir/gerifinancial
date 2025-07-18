@@ -35,17 +35,24 @@ async function migrateDateFields() {
       
       for (const transaction of transactions) {
         try {
-          const updates = {};
           let needsUpdate = false;
           
-          // 1. Rename processedDate to syncedDate
+          // Check if this transaction has already been migrated
+          if (transaction.syncedDate) {
+            // Already migrated, skip
+            skippedCount++;
+            continue;
+          }
+          
+          const setUpdates = {};
+          
+          // 1. Move current processedDate to syncedDate (when we pulled the data)
           if (transaction.processedDate) {
-            updates.syncedDate = transaction.processedDate;
-            updates.$unset = { processedDate: 1 }; // Remove old field
+            setUpdates.syncedDate = transaction.processedDate;
             needsUpdate = true;
           }
           
-          // 2. Extract processedDate from rawData
+          // 2. Extract actual processedDate from rawData (when money moved)
           let newProcessedDate = null;
           
           if (transaction.rawData) {
@@ -64,12 +71,12 @@ async function migrateDateFields() {
             newProcessedDate = transaction.date;
           }
           
-          updates.processedDate = newProcessedDate;
+          setUpdates.processedDate = newProcessedDate;
           needsUpdate = true;
           
           // 3. Initialize empty tags array if it doesn't exist
           if (!transaction.tags) {
-            updates.tags = [];
+            setUpdates.tags = [];
             needsUpdate = true;
           }
           
@@ -77,7 +84,7 @@ async function migrateDateFields() {
             bulkOps.push({
               updateOne: {
                 filter: { _id: transaction._id },
-                update: updates
+                update: { $set: setUpdates }
               }
             });
           } else {
@@ -151,7 +158,9 @@ async function rollbackDateFields() {
 if (require.main === module) {
   const command = process.argv[2];
   
-  mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27777/gerifinancial', {
+  const mongodbUri = process.env.MONGODB_URI || 'mongodb://localhost:27777/gerifinancia22';
+  console.log(`Connecting to MongoDB at: ${mongodbUri}`);
+  mongoose.connect(mongodbUri, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   }).then(async () => {

@@ -105,6 +105,8 @@ class BudgetService {
       .populate('category', 'name type')
       .populate('subCategory', 'name');
 
+      logger.info(`Found ${transactions.length} transactions for analysis`);
+
       // Group transactions by type and calculate averages
       const expensesByCategory = {};
       const incomeByCategory = {};
