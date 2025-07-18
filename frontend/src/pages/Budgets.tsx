@@ -417,7 +417,7 @@ const BudgetsPage: React.FC = () => {
                   <Box key={index} p={2} mb={1} border={1} borderColor="grey.200" borderRadius={1}>
                     <Box display="flex" justifyContent="space-between" alignItems="center">
                       <Typography variant="body1">
-                        {income.categoryId || 'Other Income'}
+                        {typeof income.categoryId === 'object' ? (income.categoryId as any)?.name || 'Other Income' : income.categoryId || 'Other Income'}
                       </Typography>
                       <Box display="flex" gap={2} alignItems="center">
                         <Typography variant="body2" color="success.main">
@@ -516,7 +516,9 @@ const BudgetsPage: React.FC = () => {
                   (() => {
                     // Group expenses by category
                     const groupedExpenses = currentMonthlyBudget.expenseBudgets.reduce((acc, expense) => {
-                      const categoryName = expense.categoryId || 'Uncategorized';
+                      const categoryName = typeof expense.categoryId === 'object' 
+                        ? (expense.categoryId as any)?.name || 'Uncategorized'
+                        : expense.categoryId || 'Uncategorized';
                       if (!acc[categoryName]) {
                         acc[categoryName] = [];
                       }
