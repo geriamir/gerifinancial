@@ -33,8 +33,11 @@ import {
   ExpandMore
 } from '@mui/icons-material';
 import { useBudget } from '../contexts/BudgetContext';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrencyDisplay } from '../utils/formatters';
+import { getCategoryIconTheme } from '../constants/categoryIconSystem';
 import MonthlyBudgetEditor from '../components/budget/MonthlyBudgetEditor';
+import InlineBudgetEditor from '../components/budget/InlineBudgetEditor';
+import CategoryIcon from '../components/common/CategoryIcon';
 
 // Month names for display
 const MONTH_NAMES = [
@@ -42,13 +45,15 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-// Helper component for expandable category
-const CategoryItem: React.FC<{
+// Reusable component for both income and expense categories
+const BudgetCategoryItem: React.FC<{
   category: string;
   subcategories: Array<{
     name: string;
     budgeted: number;
     actual: number;
+    categoryId?: string;
+    subCategoryId?: string;
   }>;
   totalBudgeted: number;
   totalActual: number;
@@ -60,24 +65,50 @@ const CategoryItem: React.FC<{
     setExpanded(!expanded);
   };
 
+  // Get category theme for consistent styling
+  const categoryTheme = getCategoryIconTheme(category);
+
   return (
     <Box>
-      <ListItemButton onClick={handleToggle} sx={{ border: 1, borderColor: 'grey.200', borderRadius: 1, mb: 1 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" width="100%">
-          <Box display="flex" alignItems="center">
-            {subcategories.length > 0 ? (expanded ? <ExpandLess /> : <ExpandMore />) : null}
-            <Typography variant="body1" sx={{ ml: 1 }}>
+      <ListItemButton onClick={handleToggle} sx={{ border: 1, borderColor: 'grey.200', borderRadius: 1, mb: 1, p: 2 }}>
+        <Box display="flex" alignItems="center" gap={2} width="100%">
+          {/* Category Icon */}
+          <CategoryIcon 
+            categoryName={category}
+            size="small"
+            variant="plain"
+            showTooltip={false}
+          />
+          
+          {/* Category Name and Budget/Actual */}
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography 
+              variant="caption" 
+              sx={{ 
+                mb: 0.25, 
+                display: 'block', 
+                fontSize: '0.75rem', 
+                lineHeight: 1.2, 
+                fontWeight: 'bold',
+                color: categoryTheme?.primary || `${color}.main`
+              }}
+            >
               {category}
             </Typography>
-          </Box>
-          <Box display="flex" gap={2} alignItems="center">
-            <Typography variant="body2" color={`${color}.main`}>
-              {formatCurrency(totalBudgeted)}
-            </Typography>
-            <Typography variant="body2">
-              {formatCurrency(totalActual)}
+            <Typography 
+              variant="body2" 
+              color={color === 'error' && totalActual > totalBudgeted ? 'error.main' : 'text.secondary'}
+            >
+              {formatCurrencyDisplay(totalActual)}/{formatCurrencyDisplay(totalBudgeted)}
             </Typography>
           </Box>
+          
+          {/* Collapse Button */}
+          {subcategories.length > 0 && (
+            <Box sx={{ ml: 'auto' }}>
+              {expanded ? <ExpandLess /> : <ExpandMore />}
+            </Box>
+          )}
         </Box>
       </ListItemButton>
       
@@ -85,17 +116,37 @@ const CategoryItem: React.FC<{
         <Collapse in={expanded} timeout="auto" unmountOnExit>
           <Box ml={4}>
             {subcategories.map((sub, index) => (
-              <Box key={index} p={1.5} mb={0.5} border={1} borderColor="grey.100" borderRadius={1} bgcolor="grey.50">
-                <Box display="flex" justifyContent="space-between" alignItems="center">
-                  <Typography variant="body2" color="text.secondary">
-                    {sub.name}
-                  </Typography>
-                  <Box display="flex" gap={2} alignItems="center">
-                    <Typography variant="body2" color={`${color}.main`}>
-                      {formatCurrency(sub.budgeted)}
+              <Box key={index} p={2} mb={0.5} border={1} borderColor="grey.100" borderRadius={1} bgcolor="grey.50">
+                <Box display="flex" alignItems="center" gap={2} width="100%">
+                  {/* Subcategory Icon */}
+                  <CategoryIcon 
+                    categoryName={category}
+                    subcategoryName={sub.name}
+                    size="small"
+                    variant="plain"
+                    showTooltip={false}
+                  />
+                  
+                  {/* Subcategory Name and Budget/Actual */}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        mb: 0.25, 
+                        display: 'block', 
+                        fontSize: '0.75rem', 
+                        lineHeight: 1.2, 
+                        fontWeight: 'bold',
+                        color: categoryTheme?.primary || `${color}.main`
+                      }}
+                    >
+                      {sub.name}
                     </Typography>
-                    <Typography variant="body2">
-                      {formatCurrency(sub.actual)}
+                    <Typography 
+                      variant="body2" 
+                      color={color === 'error' && sub.actual > sub.budgeted ? 'error.main' : 'text.secondary'}
+                    >
+                      {formatCurrencyDisplay(sub.actual)}/{formatCurrencyDisplay(sub.budgeted)}
                     </Typography>
                   </Box>
                 </Box>
@@ -119,7 +170,9 @@ const BudgetsPage: React.FC = () => {
     currentMonth,
     setCurrentPeriod,
     createMonthlyBudget,
-    calculateMonthlyBudget
+    calculateMonthlyBudget,
+    updateMonthlyBudget,
+    refreshBudgets
   } = useBudget();
 
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
@@ -143,24 +196,12 @@ const BudgetsPage: React.FC = () => {
     }
   };
 
-  // Handle budget creation
-  const handleCreateBudget = async () => {
-    try {
-      await createMonthlyBudget({
-        year: currentYear,
-        month: currentMonth,
-        status: 'draft'
-      });
-      // Open editor after creation
-      setBudgetEditorOpen(true);
-    } catch (error) {
-      console.error('Failed to create budget:', error);
-    }
-  };
-
+  // Handle automated budget creation
   const handleAutoCalculate = async () => {
     try {
       await calculateMonthlyBudget(currentYear, currentMonth, 3);
+      // Force refresh to ensure we see the updated budget immediately
+      await refreshBudgets();
     } catch (error) {
       console.error('Failed to auto-calculate budget:', error);
     }
@@ -186,6 +227,48 @@ const BudgetsPage: React.FC = () => {
   const handleBudgetSaved = () => {
     // Context will automatically refresh
     setBudgetEditorOpen(false);
+  };
+
+  // Inline budget update handlers
+  const handleUpdateSalaryBudget = async (newAmount: number) => {
+    if (!currentMonthlyBudget) return;
+    
+    await updateMonthlyBudget(currentMonthlyBudget._id, {
+      salaryBudget: newAmount
+    });
+  };
+
+  const handleUpdateOtherIncomeBudget = async (index: number, newAmount: number) => {
+    if (!currentMonthlyBudget?.otherIncomeBudgets) return;
+    
+    const updatedOtherIncome = [...currentMonthlyBudget.otherIncomeBudgets];
+    updatedOtherIncome[index] = { ...updatedOtherIncome[index], amount: newAmount };
+    
+    await updateMonthlyBudget(currentMonthlyBudget._id, {
+      otherIncomeBudgets: updatedOtherIncome
+    });
+  };
+
+  const handleUpdateExpenseBudget = async (categoryId: string, subCategoryId: string, newAmount: number) => {
+    if (!currentMonthlyBudget?.expenseBudgets) return;
+    
+    const updatedExpenses = currentMonthlyBudget.expenseBudgets.map(expense => {
+      const expenseCategoryId = typeof expense.categoryId === 'object' 
+        ? (expense.categoryId as any)?._id 
+        : expense.categoryId;
+      const expenseSubCategoryId = typeof expense.subCategoryId === 'object'
+        ? (expense.subCategoryId as any)?._id
+        : expense.subCategoryId;
+        
+      if (expenseCategoryId === categoryId && expenseSubCategoryId === subCategoryId) {
+        return { ...expense, budgetedAmount: newAmount };
+      }
+      return expense;
+    });
+    
+    await updateMonthlyBudget(currentMonthlyBudget._id, {
+      expenseBudgets: updatedExpenses
+    });
   };
 
   // Calculate progress percentage for budget vs actual
@@ -244,12 +327,12 @@ const BudgetsPage: React.FC = () => {
           <Button
             variant="contained"
             size="large"
-            startIcon={<AddIcon />}
-            onClick={handleCreateBudget}
+            startIcon={<CalculatorIcon />}
+            onClick={handleAutoCalculate}
             disabled={loading}
             sx={{ py: 1.5, px: 4 }}
           >
-            Create Budget
+            Auto-Calculate Budget
           </Button>
         </Box>
       </Container>
@@ -265,11 +348,11 @@ const BudgetsPage: React.FC = () => {
         </Typography>
         <Button
           variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleCreateBudget}
+          startIcon={<CalculatorIcon />}
+          onClick={handleAutoCalculate}
           disabled={loading}
         >
-          Create Budget
+          Auto-Calculate Budget
         </Button>
       </Box>
 
@@ -349,10 +432,10 @@ const BudgetsPage: React.FC = () => {
                 </Box>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                   <Typography variant="h6" color="success.dark">
-                    {formatCurrency(currentMonthlyBudget?.totalBudgetedIncome || 0)}
+                    {formatCurrencyDisplay(currentMonthlyBudget?.totalBudgetedIncome || 0)}
                   </Typography>
                   <Typography variant="body1" color="success.dark">
-                    {formatCurrency(currentMonthlyBudget?.totalActualIncome || 0)}
+                    {formatCurrencyDisplay(currentMonthlyBudget?.totalActualIncome || 0)}
                   </Typography>
                 </Box>
                 <LinearProgress
@@ -385,51 +468,32 @@ const BudgetsPage: React.FC = () => {
                 <Typography variant="body2" fontWeight="bold" color="text.secondary">
                   Category
                 </Typography>
-                <Box display="flex" gap={2}>
-                  <Typography variant="body2" fontWeight="bold" color="text.secondary" width="80px" textAlign="center">
-                    Budget
-                  </Typography>
-                  <Typography variant="body2" fontWeight="bold" color="text.secondary" width="80px" textAlign="center">
-                    Actual
-                  </Typography>
-                </Box>
               </Box>
 
               {/* Income Categories */}
               <Box>
                 {/* Salary */}
-                <Box p={2} mb={1} border={1} borderColor="grey.200" borderRadius={1}>
-                  <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Typography variant="body1">Salary</Typography>
-                    <Box display="flex" gap={2} alignItems="center">
-                      <Typography variant="body2" color="success.main">
-                        {formatCurrency(currentMonthlyBudget?.salaryBudget || 0)}
-                      </Typography>
-                      <Typography variant="body2">
-                        {formatCurrency(0)} {/* TODO: Get actual salary from transactions */}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Box>
+                <BudgetCategoryItem
+                  category="Salary"
+                  subcategories={[]}
+                  totalBudgeted={currentMonthlyBudget?.salaryBudget || 0}
+                  totalActual={0} // TODO: Get actual salary from transactions
+                  color="success"
+                />
 
                 {/* Other Income Categories */}
                 {currentMonthlyBudget?.otherIncomeBudgets?.map((income, index) => (
-                  <Box key={index} p={2} mb={1} border={1} borderColor="grey.200" borderRadius={1}>
-                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                      <Typography variant="body1">
-                        {typeof income.categoryId === 'object' ? (income.categoryId as any)?.name || 'Other Income' : income.categoryId || 'Other Income'}
-                      </Typography>
-                      <Box display="flex" gap={2} alignItems="center">
-                        <Typography variant="body2" color="success.main">
-                          {formatCurrency(income.amount)}
-                        </Typography>
-                        <Typography variant="body2">
-                          {formatCurrency(0)} {/* TODO: Get actual from transactions */}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Box>
-                )) || (
+                  <BudgetCategoryItem
+                    key={index}
+                    category={typeof income.categoryId === 'object' ? (income.categoryId as any)?.name || 'Other Income' : income.categoryId || 'Other Income'}
+                    subcategories={[]}
+                    totalBudgeted={income.amount}
+                    totalActual={0} // TODO: Get actual from transactions
+                    color="success"
+                  />
+                ))}
+                
+                {(!currentMonthlyBudget?.otherIncomeBudgets || currentMonthlyBudget.otherIncomeBudgets.length === 0) && (
                   <Box p={2} textAlign="center" color="text.secondary">
                     <Typography variant="body2">
                       No additional income sources
@@ -464,10 +528,10 @@ const BudgetsPage: React.FC = () => {
                 </Box>
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                   <Typography variant="h6" color="error.dark">
-                    {formatCurrency(currentMonthlyBudget?.totalBudgetedExpenses || 0)}
+                    {formatCurrencyDisplay(currentMonthlyBudget?.totalBudgetedExpenses || 0)}
                   </Typography>
                   <Typography variant="body1" color="error.dark">
-                    {formatCurrency(currentMonthlyBudget?.totalActualExpenses || 0)}
+                    {formatCurrencyDisplay(currentMonthlyBudget?.totalActualExpenses || 0)}
                   </Typography>
                 </Box>
                 <LinearProgress
@@ -500,14 +564,6 @@ const BudgetsPage: React.FC = () => {
                 <Typography variant="body2" fontWeight="bold" color="text.secondary">
                   Category
                 </Typography>
-                <Box display="flex" gap={2}>
-                  <Typography variant="body2" fontWeight="bold" color="text.secondary" width="80px" textAlign="center">
-                    Budget
-                  </Typography>
-                  <Typography variant="body2" fontWeight="bold" color="text.secondary" width="80px" textAlign="center">
-                    Actual
-                  </Typography>
-                </Box>
               </Box>
 
               {/* Expense Categories */}
@@ -531,13 +587,21 @@ const BudgetsPage: React.FC = () => {
                       const totalActual = expenses.reduce((sum, exp) => sum + (exp.actualAmount || 0), 0);
                       
                       const subcategories = expenses.map(exp => ({
-                        name: exp.subCategoryId || 'General',
+                        name: typeof exp.subCategoryId === 'object' 
+                          ? (exp.subCategoryId as any)?.name || 'General'
+                          : exp.subCategoryId || 'General',
                         budgeted: exp.budgetedAmount,
-                        actual: exp.actualAmount || 0
+                        actual: exp.actualAmount || 0,
+                        categoryId: typeof exp.categoryId === 'object' 
+                          ? (exp.categoryId as any)?._id 
+                          : exp.categoryId,
+                        subCategoryId: typeof exp.subCategoryId === 'object'
+                          ? (exp.subCategoryId as any)?._id
+                          : exp.subCategoryId
                       }));
 
                       return (
-                        <CategoryItem
+                        <BudgetCategoryItem
                           key={categoryName}
                           category={categoryName}
                           subcategories={subcategories}
@@ -573,7 +637,7 @@ const BudgetsPage: React.FC = () => {
                 variant="h5" 
                 color={currentMonthlyBudget.budgetBalance >= 0 ? 'success.main' : 'error.main'}
               >
-                {formatCurrency(currentMonthlyBudget.budgetBalance)}
+                {formatCurrencyDisplay(currentMonthlyBudget.budgetBalance)}
               </Typography>
             </Box>
           </CardContent>
@@ -632,7 +696,7 @@ const BudgetsPage: React.FC = () => {
                       sx={{ width: 100, mt: 0.5 }}
                     />
                     <Typography variant="caption" color="text.secondary">
-                      {formatCurrency(project.remainingBudget)} remaining
+                      {formatCurrencyDisplay(project.remainingBudget)} remaining
                     </Typography>
                   </Box>
                 </Box>

@@ -10,7 +10,10 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "cross-env NODE_ENV=test jest --runInBand --detectOpenHandles",
-    "test:watch": "cross-env NODE_ENV=test jest --watch --runInBand --detectOpenHandles"
+    "test:watch": "cross-env NODE_ENV=test jest --watch --runInBand --detectOpenHandles",
+    "migrate:add-internal-transfers": "node src/scripts/addInternalTransfersCategory.js",
+    "migrate:add-internal-transfers:dry-run": "node src/scripts/addInternalTransfersCategory.js --dry-run",
+    "migrate:add-internal-transfers:rollback": "node src/scripts/addInternalTransfersCategory.js --rollback"
   },
   "jest": {
     "testEnvironment": "node",

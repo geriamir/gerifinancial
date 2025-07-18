@@ -8,6 +8,7 @@ const CreditCard = require('./CreditCard');
 const MonthlyBudget = require('./MonthlyBudget');
 const YearlyBudget = require('./YearlyBudget');
 const ProjectBudget = require('./ProjectBudget');
+const CategoryBudget = require('./CategoryBudget');
 
 module.exports = {
   Category,
@@ -19,5 +20,6 @@ module.exports = {
   CreditCard,
   MonthlyBudget,
   YearlyBudget,
-  ProjectBudget
+  ProjectBudget,
+  CategoryBudget
 };
