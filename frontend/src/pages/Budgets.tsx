@@ -196,6 +196,7 @@ const BudgetsPage: React.FC = () => {
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
   const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
+  const [patternRefreshTrigger, setPatternRefreshTrigger] = useState(0);
 
   // Handle period navigation
   const handlePrevMonth = () => {
@@ -233,8 +234,8 @@ const BudgetsPage: React.FC = () => {
         console.log('New patterns detected:', smartResult.detectedPatterns);
         // Force refresh to show the new patterns in the dashboard
         await refreshBudgets();
-        // Also trigger a page reload to ensure PatternDetectionDashboard refreshes
-        window.location.reload();
+        // Trigger pattern dashboard refresh
+        setPatternRefreshTrigger(prev => prev + 1);
         return;
       }
       
@@ -429,7 +430,7 @@ const BudgetsPage: React.FC = () => {
       </Card>
 
       {/* Pattern Detection Dashboard */}
-      <PatternDetectionDashboard sx={{ mb: 4 }} />
+      <PatternDetectionDashboard sx={{ mb: 4 }} refreshTrigger={patternRefreshTrigger} />
 
       {/* Budget Status */}
       {currentMonthlyBudget && (
