@@ -106,7 +106,7 @@ const defaultCategories = [
     subCategories: [
       { name: "Car Services", keywords: ["car services", "mechanic", "מוסך"] },
       { name: "Public Transportation", keywords: ["public transportation", "bus", "train", "תחבורה ציבורית"] },
-      { name: "Fuel", keywords: ["fuel", "gas", "דלק"] },
+      { name: "Fuel", keywords: ["fuel", "gas", "דלק", "סונול"] },
       { name: "Toll Roads", keywords: ["toll roads", "כביש אגרה"] },
       { name: "Parking", keywords: ["parking", "חניה", "חניון"] },
       { name: "Car Insurance", keywords: ["car insurance", "ביטוח רכב"] },

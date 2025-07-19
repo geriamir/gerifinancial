@@ -1,6 +1,7 @@
 const ManualCategorized = require('../models/ManualCategorized');
 const { SubCategory, Category, Transaction } = require('../models');
 const categoryAIService = require('./categoryAIService');
+const { enhancedKeywordMatcher } = require('./enhanced-keyword-matching');
 const { CategorizationMethod, TransactionType } = require('../constants/enums');
 const logger = require('../utils/logger');
 
@@ -86,7 +87,7 @@ class CategoryMappingService {
         transaction.rawData?.category
       ].filter(term => term && term.trim()); // Filter out falsy values and empty/whitespace terms
 
-      // Try matching categories with keywords (Income/Transfer)
+      // Try enhanced keyword matching for categories (Income/Transfer)
       const categoriesWithKeywords = await Category.find({
         userId: transaction.userId,
         type: { $in: categoryTypes },
@@ -97,36 +98,43 @@ class CategoryMappingService {
       let categoryMatchDetails = null;
 
       for (const category of categoriesWithKeywords) {
-        const matchedKeywords = category.keywords.filter(keyword => 
-          keyword && keyword.trim() && 
-          searchTerms.some(term => term && term.trim() && term.toLowerCase().includes(keyword.toLowerCase()))
-        );
-        
-        if (matchedKeywords.length > 0) {
-          const matchingFields = [];
-          if (transaction.description && transaction.description.trim() && matchedKeywords.some(keyword => 
-            keyword && keyword.trim() && transaction.description.toLowerCase().includes(keyword.toLowerCase()))) {
-            matchingFields.push('description');
-          }
-          if ((transaction.memo || transaction.rawData?.memo) && (transaction.memo || transaction.rawData?.memo).trim() && matchedKeywords.some(keyword => 
-            keyword && keyword.trim() && (transaction.memo || transaction.rawData?.memo).toLowerCase().includes(keyword.toLowerCase()))) {
-            matchingFields.push('memo');
-          }
-          if (transaction.rawData?.category && transaction.rawData.category.trim() && matchedKeywords.some(keyword => 
-            keyword && keyword.trim() && transaction.rawData.category.toLowerCase().includes(keyword.toLowerCase()))) {
-            matchingFields.push('rawData.category');
-          }
+        // Try enhanced keyword matching for each search term
+        for (const searchTerm of searchTerms) {
+          if (!searchTerm || !searchTerm.trim()) continue;
           
-          if (matchingFields.length > 0) {
-            categoryMatch = category;
-            categoryMatchDetails = { matchedKeywords, matchingFields };
-            break; // Use first match
+          try {
+            const keywordResult = await enhancedKeywordMatcher.matchKeywords(
+              searchTerm,
+              searchTerm, // Use same text for both original and translated
+              category.keywords
+            );
+
+            if (keywordResult.hasMatches && keywordResult.confidence > 0.5) {
+              // Determine which field matched
+              let matchingField = 'unknown';
+              if (searchTerm === transaction.description) matchingField = 'description';
+              else if (searchTerm === (transaction.memo || transaction.rawData?.memo)) matchingField = 'memo';
+              else if (searchTerm === transaction.rawData?.category) matchingField = 'rawData.category';
+
+              categoryMatch = category;
+              categoryMatchDetails = { 
+                reasoning: keywordResult.reasoning, 
+                matchingField,
+                confidence: keywordResult.confidence
+              };
+              break;
+            }
+          } catch (error) {
+            logger.warn(`Enhanced keyword matching failed for category ${category.name}:`, error);
+            // Continue to next category
           }
         }
+        
+        if (categoryMatch) break; // Stop at first successful match
       }
 
       if (categoryMatch) {
-        const reasoning = `Keyword match: Found "${categoryMatchDetails.matchedKeywords.join(', ')}" in ${categoryMatchDetails.matchingFields.join(', ')}. Matched category: "${categoryMatch.name}"`;
+        const reasoning = `Enhanced keyword match: ${categoryMatchDetails.reasoning} in ${categoryMatchDetails.matchingField}. Matched category: "${categoryMatch.name}" (confidence: ${categoryMatchDetails.confidence.toFixed(2)})`;
         
         await transaction.categorize(
           categoryMatch._id,
@@ -146,71 +154,74 @@ class CategoryMappingService {
           .populate('subCategory');
       }
 
-      // Try matching subcategories (for Expenses)
-      let allMatchingSubCategories = [];
-      try {
-        allMatchingSubCategories = await SubCategory.findMatchingSubCategories(searchTerms);
-      } catch (error) {
-        logger.warn('Error in SubCategory.findMatchingSubCategories:', error);
-        allMatchingSubCategories = []; // Continue with empty array if matching fails
-      }
+      // Try enhanced keyword matching for subcategories (for Expenses)
+      const allSubCategories = await SubCategory.find({}).populate('parentCategory');
       
-      const matchingSubCategories = await Promise.all(
-        allMatchingSubCategories.map(async subCat => {
-          await subCat.populate('parentCategory');
-          return categoryTypes.includes(subCat.parentCategory.type) ? subCat : null;
-        })
+      // Filter subcategories to match valid category types
+      const eligibleSubCategories = allSubCategories.filter(subCat => 
+        categoryTypes.includes(subCat.parentCategory.type) && 
+        subCat.keywords && 
+        subCat.keywords.length > 0
       );
 
-      const filteredSubCategories = matchingSubCategories.filter(Boolean);
+      let subCategoryMatch = null;
+      let subCategoryMatchDetails = null;
 
-      if (filteredSubCategories.length === 1) {
-        const subCategory = filteredSubCategories[0];
+      for (const subCategory of eligibleSubCategories) {
+        // Try enhanced keyword matching for each search term
+        for (const searchTerm of searchTerms) {
+          if (!searchTerm || !searchTerm.trim()) continue;
+          
+          try {
+            const keywordResult = await enhancedKeywordMatcher.matchKeywords(
+              searchTerm,
+              searchTerm, // Use same text for both original and translated
+              subCategory.keywords
+            );
+
+            if (keywordResult.hasMatches && keywordResult.confidence > 0.5) {
+              // Determine which field matched
+              let matchingField = 'unknown';
+              if (searchTerm === transaction.description) matchingField = 'description';
+              else if (searchTerm === (transaction.memo || transaction.rawData?.memo)) matchingField = 'memo';
+              else if (searchTerm === transaction.rawData?.category) matchingField = 'rawData.category';
+
+              subCategoryMatch = subCategory;
+              subCategoryMatchDetails = { 
+                reasoning: keywordResult.reasoning, 
+                matchingField,
+                confidence: keywordResult.confidence
+              };
+              break;
+            }
+          } catch (error) {
+            logger.warn(`Enhanced keyword matching failed for subcategory ${subCategory.name}:`, error);
+            // Continue to next subcategory
+          }
+        }
         
-        // Find which keywords matched for reasoning - ensure keywords and terms are not empty
-        const matchedKeywords = subCategory.keywords.filter(keyword => 
-          keyword && keyword.trim() && // Ensure keyword is not empty
-          searchTerms.some(term => term && term.trim() && term.toLowerCase().includes(keyword.toLowerCase()))
+        if (subCategoryMatch) break; // Stop at first successful match
+      }
+
+      if (subCategoryMatch) {
+        const reasoning = `Enhanced keyword match: ${subCategoryMatchDetails.reasoning} in ${subCategoryMatchDetails.matchingField}. Matched subcategory: "${subCategoryMatch.name}" (confidence: ${subCategoryMatchDetails.confidence.toFixed(2)})`;
+        
+        await transaction.categorize(
+          subCategoryMatch.parentCategory._id,
+          subCategoryMatch._id,
+          CategorizationMethod.PREVIOUS_DATA,
+          reasoning
         );
         
-        const matchingFields = [];
-        if (transaction.description && transaction.description.trim() && matchedKeywords.some(keyword => 
-          keyword && keyword.trim() && transaction.description.toLowerCase().includes(keyword.toLowerCase()))) {
-          matchingFields.push('description');
-        }
-        if ((transaction.memo || transaction.rawData?.memo) && (transaction.memo || transaction.rawData?.memo).trim() && matchedKeywords.some(keyword => 
-          keyword && keyword.trim() && (transaction.memo || transaction.rawData?.memo).toLowerCase().includes(keyword.toLowerCase()))) {
-          matchingFields.push('memo');
-        }
-        if (transaction.rawData?.category && transaction.rawData.category.trim() && matchedKeywords.some(keyword => 
-          keyword && keyword.trim() && transaction.rawData.category.toLowerCase().includes(keyword.toLowerCase()))) {
-          matchingFields.push('rawData.category');
+        // Set transaction type based on the category type
+        if (!transaction.type) {
+          transaction.type = subCategoryMatch.parentCategory.type;
+          await transaction.save();
         }
         
-        // Only proceed if we have actual keywords and fields matched
-        if (matchedKeywords.length > 0 && matchingFields.length > 0) {
-          const reasoning = `Keyword match: Found "${matchedKeywords.join(', ')}" in ${matchingFields.join(', ')}. Matched subcategory: "${subCategory.name}"`;
-          
-          await transaction.categorize(
-            subCategory.parentCategory._id,
-            subCategory._id,
-            CategorizationMethod.PREVIOUS_DATA,
-            reasoning
-          );
-          
-          // Set transaction type based on the category type
-          if (!transaction.type) {
-            transaction.type = subCategory.parentCategory.type;
-            await transaction.save();
-          }
-          
-          return await Transaction.findById(transaction._id)
-            .populate('category')
-            .populate('subCategory');
-        } else {
-          // Log this case for debugging - should not happen if SubCategory.findMatchingSubCategories works correctly
-          logger.warn(`Transaction ${transaction._id}: Keyword match found subcategory "${subCategory.name}" but no actual keywords or fields matched. This suggests an issue with keyword matching logic.`);
-        }
+        return await Transaction.findById(transaction._id)
+          .populate('category')
+          .populate('subCategory');
       }
 
       // Try AI categorization as last resort
