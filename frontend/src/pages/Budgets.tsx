@@ -197,6 +197,7 @@ const BudgetsPage: React.FC = () => {
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
   const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
   const [patternRefreshTrigger, setPatternRefreshTrigger] = useState(0);
+  const [budgetStage, setBudgetStage] = useState<'initial' | 'patterns-detected' | 'budget-created'>('initial');
 
   // Handle period navigation
   const handlePrevMonth = () => {
@@ -218,12 +219,16 @@ const BudgetsPage: React.FC = () => {
   // Handle automated budget creation with smart workflow
   const handleAutoCalculate = async () => {
     try {
+      console.log('🚀 BudgetsPage: Starting auto-calculate workflow');
+      
       // Try smart budget calculation first
       const smartResult = await budgetsApi.smartCalculateMonthlyBudget(currentYear, currentMonth, 6);
       
+      console.log('🔍 BudgetsPage: Smart budget result:', smartResult);
+      
       if (smartResult.step === 'pattern-approval-required') {
         // User needs to approve existing pending patterns first
-        console.log('Pattern approval required - user should approve patterns first');
+        console.log('⏸️ BudgetsPage: Pattern approval required - user should approve patterns first');
         // Force refresh to show any new patterns in the dashboard
         await refreshBudgets();
         return;
@@ -231,31 +236,45 @@ const BudgetsPage: React.FC = () => {
       
       if (smartResult.step === 'pattern-detection-complete') {
         // New patterns were detected - show them to user
-        console.log('New patterns detected:', smartResult.detectedPatterns);
+        console.log('🎯 BudgetsPage: New patterns detected:', smartResult.detectedPatterns?.length || 0);
+        console.log('🎯 BudgetsPage: Pattern details:', smartResult.detectedPatterns);
+        
+        // Set stage to patterns detected
+        setBudgetStage('patterns-detected');
+        
         // Force refresh to show the new patterns in the dashboard
         await refreshBudgets();
+        
         // Trigger pattern dashboard refresh
+        console.log('🔄 BudgetsPage: Setting refresh trigger from', patternRefreshTrigger, 'to', patternRefreshTrigger + 1);
         setPatternRefreshTrigger(prev => prev + 1);
         return;
       }
       
       if (smartResult.step === 'budget-calculated') {
         // Budget was calculated successfully
-        console.log('Smart budget calculated with pattern awareness:', smartResult.calculation);
+        console.log('✅ BudgetsPage: Smart budget calculated with pattern awareness:', smartResult.calculation);
+        
+        // Set stage to budget created
+        setBudgetStage('budget-created');
+        
         // Force refresh to see the new budget
         await refreshBudgets();
         return;
       }
       
+      console.log('❓ BudgetsPage: Unexpected smart result step:', smartResult.step);
+      
     } catch (error) {
-      console.error('Smart budget calculation failed, falling back to regular calculation:', error);
+      console.error('❌ BudgetsPage: Smart budget calculation failed:', error);
       
       // Fallback to regular calculation if smart calculation fails
       try {
+        console.log('🔄 BudgetsPage: Falling back to regular budget calculation');
         await calculateMonthlyBudget(currentYear, currentMonth, 6);
         await refreshBudgets();
       } catch (fallbackError) {
-        console.error('Failed to auto-calculate budget:', fallbackError);
+        console.error('❌ BudgetsPage: Failed to auto-calculate budget:', fallbackError);
       }
     }
   };
@@ -360,34 +379,77 @@ const BudgetsPage: React.FC = () => {
     );
   }
 
-  // Show simplified empty state when no budget exists
+  // Show different content based on budget stage
   // Handle API response format {success: true, data: null}
   const hasBudget = currentMonthlyBudget && (currentMonthlyBudget._id || (currentMonthlyBudget as any).data);
   if (!hasBudget) {
     return (
-      <Container maxWidth="sm" sx={{ mt: 8, mb: 4 }}>
-        <Box textAlign="center" py={8}>
-          <Typography variant="h4" component="h1" gutterBottom>
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        {/* Header */}
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+          <Typography variant="h4" component="h1">
             Budget Management
           </Typography>
-          <Typography variant="h6" color="text.secondary" mb={1}>
-            {MONTH_NAMES[currentMonth - 1]} {currentYear}
-          </Typography>
-          <Typography variant="body1" color="text.secondary" mb={4}>
-            Create your first budget to start tracking your income and expenses
-          </Typography>
-          
-          <Button
-            variant="contained"
-            size="large"
-            startIcon={<CalculatorIcon />}
-            onClick={handleAutoCalculate}
-            disabled={loading}
-            sx={{ py: 1.5, px: 4 }}
-          >
-            Auto-Calculate Budget
-          </Button>
+          {budgetStage === 'patterns-detected' && (
+            <Button
+              variant="contained"
+              size="large"
+              startIcon={<CalculatorIcon />}
+              onClick={handleAutoCalculate}
+              disabled={loading}
+              sx={{ py: 1.5, px: 4 }}
+            >
+              Create Smart Budget
+            </Button>
+          )}
         </Box>
+
+
+        {/* Stage 1: Initial - Show only Auto-Calculate button */}
+        {budgetStage === 'initial' && (
+          <Card>
+            <CardContent>
+              <Box textAlign="center" py={8}>
+                <Typography variant="body1" color="text.secondary" mb={4}>
+                  Create your first budget to start tracking your income and expenses
+                </Typography>
+                
+                <Button
+                  variant="contained"
+                  size="large"
+                  startIcon={<CalculatorIcon />}
+                  onClick={handleAutoCalculate}
+                  disabled={loading}
+                  sx={{ py: 1.5, px: 4 }}
+                >
+                  Auto-Calculate Budget
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Stage 2: Patterns Detected - Show pattern approval dashboard */}
+        {budgetStage === 'patterns-detected' && (
+          <>
+            {/* Guidance text above patterns */}
+            <Card sx={{ mb: 4 }}>
+              <CardContent>
+                <Box textAlign="center" py={4}>
+                  <Typography variant="h6" color="primary" mb={2}>
+                    Patterns Detected!
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    Please review and approve the spending patterns below, then click "Create Smart Budget" in the header to proceed.
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+            
+            {/* Pattern Dashboard */}
+            <PatternDetectionDashboard sx={{ mb: 4 }} refreshTrigger={patternRefreshTrigger} />
+          </>
+        )}
       </Container>
     );
   }
