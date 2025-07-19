@@ -216,7 +216,7 @@ const BudgetsPage: React.FC = () => {
   // Handle automated budget creation
   const handleAutoCalculate = async () => {
     try {
-      await calculateMonthlyBudget(currentYear, currentMonth, 3);
+      await calculateMonthlyBudget(currentYear, currentMonth, 6);
       // Force refresh to ensure we see the updated budget immediately
       await refreshBudgets();
     } catch (error) {
