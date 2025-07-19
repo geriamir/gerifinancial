@@ -221,7 +221,29 @@ const BudgetsPage: React.FC = () => {
     try {
       console.log('🚀 BudgetsPage: Starting auto-calculate workflow');
       
-      // Try smart budget calculation first
+      // If we're in the patterns-detected stage, use the reject-remaining-and-proceed endpoint
+      if (budgetStage === 'patterns-detected') {
+        console.log('🔄 BudgetsPage: User wants to proceed - rejecting remaining patterns and calculating budget');
+        
+        const proceedResult = await budgetsApi.rejectRemainingPatternsAndProceed(currentYear, currentMonth, 6);
+        
+        if (proceedResult.success && proceedResult.step === 'budget-calculated') {
+          console.log('✅ BudgetsPage: Successfully rejected remaining patterns and calculated budget');
+          console.log(`📊 BudgetsPage: Auto-rejected ${proceedResult.autoRejectedPatterns || 0} patterns`);
+          
+          // Set stage to budget created
+          setBudgetStage('budget-created');
+          
+          // Force refresh to see the new budget
+          await refreshBudgets();
+          return;
+        } else {
+          console.error('❌ BudgetsPage: Failed to proceed with budget calculation:', proceedResult);
+        }
+        return;
+      }
+      
+      // Otherwise, try normal smart budget calculation first
       const smartResult = await budgetsApi.smartCalculateMonthlyBudget(currentYear, currentMonth, 6);
       
       console.log('🔍 BudgetsPage: Smart budget result:', smartResult);
@@ -439,8 +461,11 @@ const BudgetsPage: React.FC = () => {
                   <Typography variant="h6" color="primary" mb={2}>
                     Patterns Detected!
                   </Typography>
-                  <Typography variant="body1" color="text.secondary">
-                    Please review and approve the spending patterns below, then click "Create Smart Budget" in the header to proceed.
+                  <Typography variant="body1" color="text.secondary" mb={2}>
+                    Review and approve the spending patterns below, or click "Create Smart Budget" to proceed.
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                    Any unapproved patterns will be automatically rejected when you create the budget.
                   </Typography>
                 </Box>
               </CardContent>
@@ -491,8 +516,6 @@ const BudgetsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Pattern Detection Dashboard */}
-      <PatternDetectionDashboard sx={{ mb: 4 }} refreshTrigger={patternRefreshTrigger} />
 
       {/* Budget Status */}
       {currentMonthlyBudget && (
