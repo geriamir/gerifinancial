@@ -143,6 +143,11 @@ export const budgetsApi = {
     api.post<MonthlyBudget>('/budgets/monthly/calculate', { year, month, monthsToAnalyze })
       .then((res: AxiosResponse<MonthlyBudget>) => res.data),
 
+  // Smart budget calculation with pattern awareness
+  smartCalculateMonthlyBudget: (year: number, month: number, monthsToAnalyze?: number): Promise<any> =>
+    api.post('/budgets/monthly/smart-calculate', { year, month, monthsToAnalyze })
+      .then((res: AxiosResponse) => res.data),
+
   getMonthlyBudgetActual: (year: number, month: number) =>
     api.get(`/budgets/monthly/${year}/${month}/actual`)
       .then((res: AxiosResponse) => res.data),
