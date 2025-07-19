@@ -38,6 +38,7 @@ import { getCategoryIconTheme } from '../constants/categoryIconSystem';
 import MonthlyBudgetEditor from '../components/budget/MonthlyBudgetEditor';
 import InlineBudgetEditor from '../components/budget/InlineBudgetEditor';
 import CategoryIcon from '../components/common/CategoryIcon';
+import PatternDetectionDashboard from '../components/budget/PatternDetection/PatternDetectionDashboard';
 import { useNavigate } from 'react-router-dom';
 
 // Month names for display
@@ -391,6 +392,9 @@ const BudgetsPage: React.FC = () => {
           </Box>
         </CardContent>
       </Card>
+
+      {/* Pattern Detection Dashboard */}
+      <PatternDetectionDashboard sx={{ mb: 4 }} />
 
       {/* Budget Status */}
       {currentMonthlyBudget && (
