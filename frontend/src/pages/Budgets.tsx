@@ -231,7 +231,6 @@ const BudgetsPage: React.FC = () => {
       if (smartResult.step === 'pattern-detection-complete') {
         // New patterns were detected - show them to user
         console.log('New patterns detected:', smartResult.detectedPatterns);
-        alert(`✨ Great! We detected ${smartResult.detectedPatterns?.length || 0} spending patterns in your transactions.\n\nPlease review them in the Pattern Detection section above and approve the ones that look correct.\n\nAfter you approve/reject the patterns, click Auto-Calculate again to create your budget with pattern-aware calculations.`);
         // Force refresh to show the new patterns in the dashboard
         await refreshBudgets();
         // IMPORTANT: Return here without fallback - user must approve patterns first
