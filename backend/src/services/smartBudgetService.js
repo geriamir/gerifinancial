@@ -17,14 +17,29 @@ class SmartBudgetService {
     
     try {
       // Use existing recurrence detection service
-      const detectedPatterns = await recurrenceDetectionService.detectRecurrencePatterns(userId, analysisMonths);
+      const detectedPatterns = await recurrenceDetectionService.detectPatterns(userId, analysisMonths);
       
       console.log(`Detected ${detectedPatterns.length} potential patterns for user ${userId}`);
+      
+      // Store detected patterns in database if any were found
+      if (detectedPatterns.length > 0) {
+        console.log(`Storing ${detectedPatterns.length} detected patterns in database...`);
+        const storedPatterns = await recurrenceDetectionService.storeDetectedPatterns(detectedPatterns);
+        console.log(`Successfully stored ${storedPatterns.length} patterns`);
+        
+        return {
+          success: true,
+          patterns: storedPatterns,
+          totalDetected: storedPatterns.length,
+          requiresUserApproval: storedPatterns.length > 0
+        };
+      }
+      
       return {
         success: true,
-        patterns: detectedPatterns,
-        totalDetected: detectedPatterns.length,
-        requiresUserApproval: detectedPatterns.length > 0
+        patterns: [],
+        totalDetected: 0,
+        requiresUserApproval: false
       };
     } catch (error) {
       console.error('Error detecting patterns:', error);
