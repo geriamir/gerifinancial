@@ -27,11 +27,13 @@ import { useAuth } from '../../../hooks/useAuth';
 interface PatternDetectionDashboardProps {
   className?: string;
   sx?: any;
+  refreshTrigger?: number; // Add trigger to force refresh
 }
 
 const PatternDetectionDashboard: React.FC<PatternDetectionDashboardProps> = ({ 
   className = '',
-  sx
+  sx,
+  refreshTrigger
 }) => {
   const { user } = useAuth();
   const [patterns, setPatterns] = useState<DetectedPattern[]>([]);
@@ -46,6 +48,13 @@ const PatternDetectionDashboard: React.FC<PatternDetectionDashboardProps> = ({
     
     loadPendingPatterns();
   }, [user?.id]);
+
+  // Trigger refresh when refreshTrigger changes
+  useEffect(() => {
+    if (!user?.id || refreshTrigger === undefined) return;
+    
+    loadPendingPatterns();
+  }, [refreshTrigger]);
 
   const loadPendingPatterns = async () => {
     if (!user?.id) return;
