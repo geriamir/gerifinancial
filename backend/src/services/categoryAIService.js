@@ -1,6 +1,7 @@
 const logger = require('../utils/logger');
 const natural = require('natural');
 const translationService = require('./translationService');
+const { enhancedKeywordMatcher } = require('./enhanced-keyword-matching');
 const WordTokenizer = natural.WordTokenizer;
 const PorterStemmer = natural.PorterStemmer;
 
@@ -81,48 +82,68 @@ class CategoryAIService {
       const translatedText = await translationService.translate(text, { from: 'he', to: 'en' });
       const processedText = this.processText(translatedText.toLowerCase());
 
-      // Exact keyword match check first
+      // Enhanced keyword match check first - prevents false positives
       for (const category of availableCategories) {
         // Check category-level keywords (for Income/Transfer)
         if (category.keywords && category.keywords.length > 0) {
-          const exactMatch = category.keywords.some(
-            kw => text.toLowerCase().includes(kw.toLowerCase()) || 
-                 translatedText.toLowerCase().includes(kw.toLowerCase())
-          );
+          try {
+            const keywordResult = await enhancedKeywordMatcher.matchKeywords(
+              text, 
+              translatedText, 
+              category.keywords
+            );
 
-          if (exactMatch) {
-            // Higher confidence for exact keyword matches
-            const confidence = isRawCategory ? 0.95 : 0.85;
-            return {
-              categoryId: category.id,
-              subCategoryId: null, // No subcategory for Income/Transfer
-              confidence,
-              reasoning: confidence > 0.9 
-                ? `Very strong confidence match for ${category.name} from transaction description based on keywords` 
-                : `Moderate confidence match for ${category.name} from transaction description based on keywords`
-            };
+            if (keywordResult.hasMatches) {
+              // Use enhanced matching confidence with boost for raw category
+              const confidence = isRawCategory ? 
+                Math.min(keywordResult.confidence * 1.1, 0.95) : 
+                keywordResult.confidence;
+              
+              logger.info(`Enhanced keyword match for category ${category.name}: ${keywordResult.reasoning}`);
+              
+              return {
+                categoryId: category.id,
+                subCategoryId: null, // No subcategory for Income/Transfer
+                confidence,
+                reasoning: `Enhanced keyword matching: ${keywordResult.reasoning}. Final confidence: ${confidence.toFixed(2)}`
+              };
+            }
+          } catch (error) {
+            logger.warn(`Enhanced keyword matching failed for category ${category.name}:`, error);
+            // Fallback to original logic would go here if needed
           }
         }
 
         // Check subcategory-level keywords (for Expenses)
         if (category.subCategories && category.subCategories.length > 0) {
           for (const subCategory of category.subCategories) {
-            const exactMatch = subCategory.keywords?.some(
-              kw => text.toLowerCase().includes(kw.toLowerCase()) || 
-                   translatedText.toLowerCase().includes(kw.toLowerCase())
-            );
+            if (subCategory.keywords && subCategory.keywords.length > 0) {
+              try {
+                const keywordResult = await enhancedKeywordMatcher.matchKeywords(
+                  text, 
+                  translatedText, 
+                  subCategory.keywords
+                );
 
-            if (exactMatch) {
-              // Higher confidence for exact keyword matches
-              const confidence = isRawCategory ? 0.95 : 0.85;
-              return {
-                categoryId: category.id,
-                subCategoryId: subCategory.id,
-                confidence,
-                reasoning: confidence > 0.9 
-                  ? 'Very strong confidence match from transaction description based on keywords' 
-                  : 'Moderate confidence match from transaction description based on keywords'
-              };
+                if (keywordResult.hasMatches) {
+                  // Use enhanced matching confidence with boost for raw category
+                  const confidence = isRawCategory ? 
+                    Math.min(keywordResult.confidence * 1.1, 0.95) : 
+                    keywordResult.confidence;
+                  
+                  logger.debug(`Enhanced keyword match for subcategory ${subCategory.name}: ${keywordResult.reasoning}`);
+                  
+                  return {
+                    categoryId: category.id,
+                    subCategoryId: subCategory.id,
+                    confidence,
+                    reasoning: `Enhanced keyword matching: ${keywordResult.reasoning}. Final confidence: ${confidence.toFixed(2)}`
+                  };
+                }
+              } catch (error) {
+                logger.warn(`Enhanced keyword matching failed for subcategory ${subCategory.name}:`, error);
+                // Fallback to original logic would go here if needed
+              }
             }
           }
         }
