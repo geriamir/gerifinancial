@@ -9,6 +9,7 @@ const MonthlyBudget = require('./MonthlyBudget');
 const YearlyBudget = require('./YearlyBudget');
 const ProjectBudget = require('./ProjectBudget');
 const CategoryBudget = require('./CategoryBudget');
+const TransactionPattern = require('./TransactionPattern');
 
 module.exports = {
   Category,
@@ -21,5 +22,6 @@ module.exports = {
   MonthlyBudget,
   YearlyBudget,
   ProjectBudget,
-  CategoryBudget
+  CategoryBudget,
+  TransactionPattern
 };

@@ -310,73 +310,99 @@ See FEATURES_ROADMAP.md for detailed feature implementation plans.
 
 ### Phase 4: Budget Management System ✅ (Completed)
 
+#### CategoryBudget Foundation System
+The budget system is built on a sophisticated **CategoryBudget** foundation that provides flexible, template-based budget management across years:
+
+1. **Core Budget Types**:
+   - **Fixed Budgets**: Single amount that repeats every month (e.g., rent, salary)
+   - **Variable Budgets**: Different amounts per month (e.g., utilities, seasonal expenses)
+   - **Income Budgets**: Category-level budgets for income sources
+   - **Expense Budgets**: Subcategory-level budgets for precise expense tracking
+
+2. **Budget Architecture**:
+   - **CategoryBudget Model**: Core budget storage with `backend/src/models/CategoryBudget.js`
+   - **MonthlyBudget Compatibility**: Legacy compatibility layer for existing frontend
+   - **Service Integration**: Primary budget system used by `budgetService.js`
+   - **Database Efficiency**: Unique constraints and optimized indexes for performance
+
 #### Comprehensive Budget Management System
-1. **Complete Budget Implementation**:
-   - Monthly budget management with sub-category level allocation
-   - Project budget tracking with multi-source funding
-   - Yearly budget planning with one-time events
-   - Auto-calculation from historical transaction patterns
-   - Real-time budget vs actual tracking
+1. **Monthly Budget Management**:
+   - Auto-calculation from 1-24 months of historical transaction data
+   - Sub-category level expense budgeting with real-time actual tracking
+   - Salary and income budget management with flexible configuration
+   - Budget vs actual variance analysis with color-coded progress indicators
+   - Month-by-month navigation with period-based filtering
 
-2. **Transaction Tagging System**:
+2. **Project Budget System**:
+   - Multi-source funding support (salary, bonus, loan, savings, other)
+   - Automatic project tag creation and transaction association
+   - Timeline tracking with days remaining calculation
+   - Progress percentage based on actual spending vs budget
+   - Category-based budget allocation with detailed breakdowns
+
+3. **Transaction Tagging System**:
    - Multi-tag support for flexible transaction organization
-   - Project-based tag creation and management
-   - Tag usage analytics and insights
-   - Bulk tagging operations
-   - Advanced filtering by tags
+   - Project-based tag creation with automatic management
+   - Tag usage analytics and insights for spending patterns
+   - Bulk tagging operations for efficient transaction management
+   - Advanced filtering by tags with real-time search
 
-3. **Smart Budget Features**:
-   - Auto-calculated monthly budgets from 1-24 months of history
-   - Budget variance analysis and progress tracking
-   - Project timeline management with completion status
+4. **Smart Budget Features**:
+   - Historical transaction analysis for intelligent budget suggestions
+   - Budget variance analysis with over/under spending indicators
+   - Project timeline management with completion status tracking
    - Budget status management (draft/active/completed)
    - Multi-currency support with flexible configuration
 
-4. **Advanced Analytics Dashboard**:
-   - Real-time budget vs actual visualization
-   - Project progress tracking with timeline indicators
-   - Budget balance monitoring with color-coded alerts
-   - Active project overview with remaining budget display
-   - Monthly navigation with period-based filtering
+#### Technical Implementation
+1. **Backend Architecture**:
+   - **15 REST API Endpoints**: Complete CRUD operations for all budget types
+   - **6 Database Models**: CategoryBudget, MonthlyBudget, ProjectBudget, Tag, and more
+   - **Budget Service Layer**: Comprehensive business logic with analytics
+   - **Advanced Indexes**: Optimized database queries for performance
 
-#### Budget System Architecture
-- **15+ REST API Endpoints**: Complete CRUD operations for all budget types
-- **3 Database Models**: MonthlyBudget, YearlyBudget, ProjectBudget with virtual fields
-- **Budget Service Layer**: Comprehensive business logic with analytics
-- **Frontend Dashboard**: React-based responsive UI with Material-UI
-- **State Management**: BudgetContext with optimistic updates
-- **100% Test Coverage**: 142/142 tests passing across entire backend
+2. **Frontend Architecture**:
+   - **React-based Dashboard**: Responsive UI with Material-UI components
+   - **BudgetContext**: Centralized state management with optimistic updates
+   - **Two-column Layout**: Separate income and expense visualization
+   - **Progress Tracking**: Real-time budget vs actual with linear progress bars
+   - **Mobile-responsive**: Touch-friendly interface for all screen sizes
 
-#### Key Budget Features Delivered
+3. **Key Components**:
+   - **Budget Dashboard** (`/budgets`): Main budget overview with month navigation
+   - **Monthly Budget Editor**: Sub-category budget allocation interface
+   - **Project Budget Manager**: Multi-source funding and timeline management
+   - **Transaction Tagging**: Enhanced transaction detail with tag management
+
+#### Budget System Features
 1. **Monthly Budgets**:
-   - Sub-category level expense budgeting
-   - Salary and other income budget tracking
-   - Virtual fields for calculated totals and balances
-   - Auto-calculation from historical transaction analysis
-   - Budget vs actual progress monitoring
+   - CategoryBudget-based flexible budget allocation
+   - Real-time actual amount calculation from transactions
+   - Budget vs actual progress monitoring with color indicators
+   - Auto-calculation from historical transaction patterns
+   - Income and expense budget separation with visual distinction
 
 2. **Project Budgets**:
-   - Multi-source funding (salary, bonus, loan, savings, other)
-   - Automatic project tag creation and management
-   - Timeline tracking with days remaining calculation
-   - Progress percentage based on actual spending
-   - Category-based budget allocation
+   - Multi-source funding with detailed funding source tracking
+   - Automatic project tag creation for transaction association
+   - Timeline tracking with start/end dates and days remaining
+   - Progress percentage calculation based on actual spending
+   - Category-based budget allocation with subcategory precision
 
 3. **Budget Dashboard**:
-   - Month-by-month navigation interface
-   - Real-time progress visualization with linear progress bars
-   - Quick action buttons for budget creation and management
-   - Project overview cards with status indicators
-   - Budget summary with balance tracking
-   - Mobile-responsive design for all screen sizes
+   - Month-by-month navigation with previous/next controls
+   - Real-time budget vs actual visualization with progress bars
+   - Quick action buttons for budget creation and auto-calculation
+   - Project overview cards with status indicators and progress
+   - Budget balance summary with surplus/deficit tracking
 
 4. **Enhanced Transaction Integration**:
-   - Tag-based transaction organization
-   - Project allocation through transaction tagging
-   - Automatic budget allocation tracking
-   - Enhanced transaction service with budget integration
+   - Tag-based transaction organization with ObjectId references
+   - Project allocation through transaction tagging system
+   - Automatic budget allocation tracking with real-time updates
+   - Enhanced transaction service with budget integration methods
 
-See `BUDGET_FEATURE_ROADMAP.md` for complete implementation details.
+See `BUDGET_FEATURE_ROADMAP.md` for complete implementation details and technical specifications.
 
 ### Phase 5: Advanced Financial Analysis (Future)
 - Data visualization and reporting

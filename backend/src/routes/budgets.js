@@ -2,6 +2,7 @@ const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const auth = require('../middleware/auth');
 const budgetService = require('../services/budgetService');
+const { TransactionPattern } = require('../models');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -622,6 +623,312 @@ router.get('/projects/:id/progress',
       res.status(500).json({
         success: false,
         message: 'Failed to fetch project progress',
+        error: error.message
+      });
+    }
+  }
+);
+
+// ============================================
+// TRANSACTION PATTERN ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/budgets/patterns/detected/:userId
+ * Get detected patterns for user (pending approval)
+ */
+router.get('/patterns/detected/:userId',
+  auth,
+  [
+    param('userId').isMongoId().withMessage('Invalid user ID')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      // Ensure user can only access their own patterns
+      if (req.params.userId !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      const patterns = await TransactionPattern.getPendingPatterns(req.user._id);
+      
+      res.json({
+        success: true,
+        data: {
+          patterns: patterns.map(pattern => ({
+            id: pattern._id,
+            patternId: pattern.patternId,
+            description: pattern.transactionIdentifier.description,
+            amount: pattern.averageAmount,
+            category: pattern.transactionIdentifier.categoryId?.name || 'Unknown',
+            subcategory: pattern.transactionIdentifier.subCategoryId?.name || 'General',
+            patternType: pattern.recurrencePattern,
+            confidence: pattern.detectionData.confidence,
+            scheduledMonths: pattern.scheduledMonths,
+            sampleTransactions: pattern.detectionData.sampleTransactions,
+            detectedAt: pattern.detectionData.lastDetected,
+            displayName: pattern.displayName
+          })),
+          totalCount: patterns.length
+        }
+      });
+    } catch (error) {
+      logger.error('Error fetching detected patterns:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch detected patterns',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/budgets/patterns/approve
+ * Approve a detected pattern
+ */
+router.post('/patterns/approve',
+  auth,
+  [
+    body('patternId').isMongoId().withMessage('Invalid pattern ID')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const pattern = await TransactionPattern.findById(req.body.patternId);
+      
+      if (!pattern) {
+        return res.status(404).json({
+          success: false,
+          message: 'Pattern not found'
+        });
+      }
+
+      // Ensure user owns this pattern
+      if (pattern.userId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      // Approve the pattern
+      pattern.approve();
+      await pattern.save();
+
+      logger.info(`Pattern approved: ${pattern.displayName} for user ${req.user._id}`);
+      
+      res.json({
+        success: true,
+        data: {
+          pattern: {
+            id: pattern._id,
+            patternId: pattern.patternId,
+            description: pattern.transactionIdentifier.description,
+            amount: pattern.averageAmount,
+            patternType: pattern.recurrencePattern,
+            scheduledMonths: pattern.scheduledMonths,
+            approvalStatus: pattern.approvalStatus,
+            isActive: pattern.isActive
+          }
+        },
+        message: 'Pattern approved successfully'
+      });
+    } catch (error) {
+      logger.error('Error approving pattern:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to approve pattern',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/budgets/patterns/reject
+ * Reject a detected pattern
+ */
+router.post('/patterns/reject',
+  auth,
+  [
+    body('patternId').isMongoId().withMessage('Invalid pattern ID'),
+    body('reason').optional().isString().isLength({ max: 500 }).withMessage('Reason must be under 500 characters')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const pattern = await TransactionPattern.findById(req.body.patternId);
+      
+      if (!pattern) {
+        return res.status(404).json({
+          success: false,
+          message: 'Pattern not found'
+        });
+      }
+
+      // Ensure user owns this pattern
+      if (pattern.userId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+
+      // Reject the pattern
+      pattern.reject();
+      if (req.body.reason) {
+        pattern.notes = req.body.reason;
+      }
+      await pattern.save();
+
+      logger.info(`Pattern rejected: ${pattern.displayName} for user ${req.user._id}`);
+      
+      res.json({
+        success: true,
+        data: {
+          pattern: {
+            id: pattern._id,
+            patternId: pattern.patternId,
+            description: pattern.transactionIdentifier.description,
+            approvalStatus: pattern.approvalStatus,
+            isActive: pattern.isActive
+          }
+        },
+        message: 'Pattern rejected successfully'
+      });
+    } catch (error) {
+      logger.error('Error rejecting pattern:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to reject pattern',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * PUT /api/budgets/patterns/bulk-approve
+ * Bulk approve multiple patterns
+ */
+router.put('/patterns/bulk-approve',
+  auth,
+  [
+    body('patternIds').isArray({ min: 1 }).withMessage('Pattern IDs must be a non-empty array'),
+    body('patternIds.*').isMongoId().withMessage('Each pattern ID must be valid')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { patternIds } = req.body;
+      
+      // Find all patterns
+      const patterns = await TransactionPattern.find({
+        _id: { $in: patternIds },
+        userId: req.user._id,
+        approvalStatus: 'pending'
+      });
+
+      if (patterns.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No valid pending patterns found'
+        });
+      }
+
+      // Approve all patterns
+      const approvedPatterns = [];
+      for (const pattern of patterns) {
+        pattern.approve();
+        await pattern.save();
+        approvedPatterns.push({
+          id: pattern._id,
+          patternId: pattern.patternId,
+          description: pattern.transactionIdentifier.description,
+          patternType: pattern.recurrencePattern
+        });
+      }
+
+      logger.info(`Bulk approved ${approvedPatterns.length} patterns for user ${req.user._id}`);
+      
+      res.json({
+        success: true,
+        data: {
+          approvedPatterns,
+          totalApproved: approvedPatterns.length
+        },
+        message: `Successfully approved ${approvedPatterns.length} patterns`
+      });
+    } catch (error) {
+      logger.error('Error bulk approving patterns:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to bulk approve patterns',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/budgets/patterns/preview/:year/:month
+ * Preview how patterns will affect budget for a specific month
+ */
+router.get('/patterns/preview/:year/:month',
+  auth,
+  [
+    param('year').isInt({ min: 2020, max: 2050 }).withMessage('Year must be between 2020 and 2050'),
+    param('month').isInt({ min: 1, max: 12 }).withMessage('Month must be between 1 and 12')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { year, month } = req.params;
+      const yearNum = parseInt(year);
+      const monthNum = parseInt(month);
+
+      // Get active patterns for this month
+      const patternsForMonth = await TransactionPattern.getPatternsForMonth(req.user._id, monthNum);
+      
+      // Calculate total impact
+      let totalPatternAmount = 0;
+      const patternBreakdown = patternsForMonth.map(pattern => {
+        const amount = pattern.getAmountForMonth(monthNum);
+        totalPatternAmount += amount;
+        
+        return {
+          id: pattern._id,
+          description: pattern.transactionIdentifier.description,
+          category: pattern.transactionIdentifier.categoryId?.name || 'Unknown',
+          subcategory: pattern.transactionIdentifier.subCategoryId?.name || 'General',
+          patternType: pattern.recurrencePattern,
+          amount,
+          scheduledMonths: pattern.scheduledMonths,
+          displayName: pattern.displayName
+        };
+      });
+
+      res.json({
+        success: true,
+        data: {
+          month: monthNum,
+          year: yearNum,
+          monthName: new Date(yearNum, monthNum - 1).toLocaleString('default', { month: 'long' }),
+          patterns: patternBreakdown,
+          totalPatternAmount,
+          patternCount: patternsForMonth.length,
+          hasPatterns: patternsForMonth.length > 0
+        }
+      });
+    } catch (error) {
+      logger.error('Error getting pattern preview:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get pattern preview',
         error: error.message
       });
     }

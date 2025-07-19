@@ -1,5 +1,6 @@
-const { MonthlyBudget, YearlyBudget, ProjectBudget, CategoryBudget, Transaction, Category, SubCategory, Tag } = require('../models');
+const { MonthlyBudget, YearlyBudget, ProjectBudget, CategoryBudget, Transaction, Category, SubCategory, Tag, TransactionPattern } = require('../models');
 const logger = require('../utils/logger');
+const recurrenceDetectionService = require('./recurrenceDetectionService');
 
 class BudgetService {
   // ============================================
@@ -40,7 +41,7 @@ class BudgetService {
   }
 
   /**
-   * Get monthly budget for a specific month using CategoryBudget system
+   * Get monthly budget for a specific month using CategoryBudget system with MonthlyBudget fallback
    */
   async getMonthlyBudget(userId, year, month) {
     try {
@@ -50,9 +51,38 @@ class BudgetService {
       // Get expense budgets for the month
       const expenseBudgets = await CategoryBudget.getExpenseBudgets(userId, month);
       
-      // Check if any budgets exist - if not, return null like the old system
+      // Check if any CategoryBudgets exist - if not, fall back to old MonthlyBudget system
       if (incomeBudgets.length === 0 && expenseBudgets.length === 0) {
-        logger.info(`No category budgets found for user ${userId} for month ${month}`);
+        logger.info(`No category budgets found for user ${userId} for month ${month}, checking MonthlyBudget`);
+        
+        // Fallback to old MonthlyBudget system for compatibility
+        const oldBudget = await MonthlyBudget.findOne({ userId, year, month })
+          .populate('expenseBudgets.categoryId', 'name type')
+          .populate('expenseBudgets.subCategoryId', 'name')
+          .populate('otherIncomeBudgets.categoryId', 'name type');
+        
+        if (oldBudget) {
+          // Calculate actual amounts
+          const actualAmounts = await this.getActualAmountsForMonth(userId, year, month);
+          
+          // Update actual amounts in expense budgets
+          const updatedExpenseBudgets = oldBudget.expenseBudgets.map(budget => ({
+            ...budget.toObject(),
+            actualAmount: actualAmounts.expensesBySubCategory[`${budget.categoryId._id}_${budget.subCategoryId._id}`] || 0
+          }));
+          
+          // Calculate totals
+          const totalActualExpenses = updatedExpenseBudgets.reduce((sum, budget) => sum + budget.actualAmount, 0);
+          
+          return {
+            ...oldBudget.toObject(),
+            expenseBudgets: updatedExpenseBudgets,
+            totalActualIncome: actualAmounts.totalActualIncome,
+            totalActualExpenses,
+            actualBalance: actualAmounts.totalActualIncome - totalActualExpenses
+          };
+        }
+        
         return null;
       }
       
@@ -195,13 +225,22 @@ class BudgetService {
   }
 
   /**
-   * Calculate monthly budget from historical transaction data using CategoryBudget system
+   * Calculate monthly budget from historical transaction data using CategoryBudget system with pattern detection
    */
   async calculateMonthlyBudgetFromHistory(userId, year, month, monthsToAnalyze = 6) {
     try {
-      logger.info(`Calculating monthly budget for ${month}/${year} using ${monthsToAnalyze} months of history`);
+      logger.info(`Calculating monthly budget for ${month}/${year} using ${monthsToAnalyze} months of history with pattern detection`);
 
-      // Calculate date range for analysis
+      // STEP 1: DETECT RECURRENCE PATTERNS
+      logger.info('Step 1: Detecting recurrence patterns...');
+      const detectedPatterns = await recurrenceDetectionService.detectPatterns(userId, monthsToAnalyze);
+      
+      // Store detected patterns in database
+      const savedPatterns = await recurrenceDetectionService.storeDetectedPatterns(detectedPatterns);
+      logger.info(`Detected and stored ${savedPatterns.length} transaction patterns`);
+
+      // STEP 2: GET TRANSACTION DATA
+      logger.info('Step 2: Analyzing remaining transactions...');
       const endDate = new Date(year, month - 1, 0); // Last day of previous month
       const startDate = new Date(endDate);
       startDate.setMonth(startDate.getMonth() - monthsToAnalyze);
@@ -217,14 +256,37 @@ class BudgetService {
 
       logger.info(`Found ${transactions.length} transactions for analysis`);
 
-      // Group transactions by type and calculate averages
+      // STEP 3: SEPARATE PATTERNED AND NON-PATTERNED TRANSACTIONS
+      const patternedTransactionIds = new Set();
+      const nonPatternedTransactions = [];
+
+      // Mark transactions that match detected patterns
+      for (const transaction of transactions) {
+        let isPatternedTransaction = false;
+        
+        for (const pattern of savedPatterns) {
+          if (pattern.matchesTransaction(transaction)) {
+            patternedTransactionIds.add(transaction._id.toString());
+            isPatternedTransaction = true;
+            break;
+          }
+        }
+        
+        if (!isPatternedTransaction) {
+          nonPatternedTransactions.push(transaction);
+        }
+      }
+
+      logger.info(`Found ${patternedTransactionIds.size} patterned transactions, ${nonPatternedTransactions.length} non-patterned transactions`);
+
+      // STEP 4: CALCULATE AVERAGES FOR NON-PATTERNED TRANSACTIONS
       const expensesBySubCategory = {};
       const incomeByCategory = {};
 
-      for (const transaction of transactions) {
+      for (const transaction of nonPatternedTransactions) {
         const amount = Math.abs(transaction.amount);
         
-        if (transaction.category.type === 'Expense' && transaction.subCategory) {
+        if (transaction.category?.type === 'Expense' && transaction.subCategory) {
           const key = `${transaction.category._id}_${transaction.subCategory._id}`;
           if (!expensesBySubCategory[key]) {
             expensesBySubCategory[key] = {
@@ -238,7 +300,7 @@ class BudgetService {
           }
           expensesBySubCategory[key].total += amount;
           expensesBySubCategory[key].count += 1;
-        } else if (transaction.category.type === 'Income') {
+        } else if (transaction.category?.type === 'Income') {
           const key = transaction.category._id.toString();
           if (!incomeByCategory[key]) {
             incomeByCategory[key] = {
@@ -253,10 +315,10 @@ class BudgetService {
         }
       }
 
-      // Update CategoryBudgets with calculated amounts
+      // STEP 5: UPDATE BUDGETS WITH PATTERN-AWARE AMOUNTS
       let updatedBudgets = 0;
 
-      // Update income budgets
+      // Update income budgets (regular averaging for non-patterned)
       for (const income of Object.values(incomeByCategory)) {
         const avgAmount = Math.round(income.total / monthsToAnalyze);
         let budget = await CategoryBudget.findOne({ 
@@ -274,7 +336,7 @@ class BudgetService {
         updatedBudgets++;
       }
 
-      // Update expense budgets
+      // Update expense budgets for non-patterned transactions
       for (const expense of Object.values(expensesBySubCategory)) {
         const avgAmount = Math.round(expense.total / monthsToAnalyze);
         let budget = await CategoryBudget.findOne({ 
@@ -292,10 +354,67 @@ class BudgetService {
         updatedBudgets++;
       }
 
+      // STEP 6: ADD PATTERN-BASED BUDGETS TO EXISTING AMOUNTS
+      const patternsForMonth = await TransactionPattern.getPatternsForMonth(userId, month);
+      logger.info(`Found ${patternsForMonth.length} patterns that apply to month ${month}`);
+
+      for (const pattern of patternsForMonth) {
+        const patternAmount = pattern.getAmountForMonth(month);
+        
+        if (patternAmount > 0) {
+          let budget = await CategoryBudget.findOne({ 
+            userId, 
+            categoryId: pattern.transactionIdentifier.categoryId, 
+            subCategoryId: pattern.transactionIdentifier.subCategoryId 
+          });
+          
+          if (!budget) {
+            budget = await CategoryBudget.findOrCreate(
+              userId, 
+              pattern.transactionIdentifier.categoryId, 
+              pattern.transactionIdentifier.subCategoryId
+            );
+          }
+          
+          // Get existing amount for this month and ADD the pattern amount
+          const existingAmount = budget.getAmountForMonth(month);
+          const totalAmount = existingAmount + patternAmount;
+          
+          budget.setAmountForMonth(month, totalAmount);
+          await budget.save();
+          updatedBudgets++;
+          
+          logger.info(`Added pattern-based budget for ${pattern.displayName}: ₪${existingAmount} + ₪${patternAmount} = ₪${totalAmount} for month ${month}`);
+        }
+      }
+
       logger.info(`Auto-calculated monthly budget: Updated ${updatedBudgets} category budgets for month ${month}`);
+      logger.info(`Pattern detection summary: ${savedPatterns.length} patterns detected, ${patternsForMonth.length} apply to month ${month}`);
       
-      // Return the updated budget using the new system
-      return await this.getMonthlyBudget(userId, year, month);
+      // Return enhanced budget structure with pattern information
+      const budget = await this.getMonthlyBudget(userId, year, month);
+      
+      return {
+        ...budget,
+        isAutoCalculated: true,
+        patternDetection: {
+          totalPatternsDetected: savedPatterns.length,
+          patternsForThisMonth: patternsForMonth.length,
+          requiresApproval: savedPatterns.filter(p => p.approvalStatus === 'pending').length > 0,
+          pendingPatterns: savedPatterns.filter(p => p.approvalStatus === 'pending').map(p => ({
+            id: p._id,
+            patternId: p.patternId,
+            description: p.transactionIdentifier.description,
+            amount: p.averageAmount,
+            category: p.transactionIdentifier.categoryId?.name || 'Unknown',
+            subcategory: p.transactionIdentifier.subCategoryId?.name || 'General',
+            patternType: p.recurrencePattern,
+            confidence: p.detectionData.confidence,
+            scheduledMonths: p.scheduledMonths,
+            sampleTransactions: p.detectionData.sampleTransactions
+          }))
+        }
+      };
     } catch (error) {
       logger.error('Error calculating monthly budget from history:', error);
       throw error;

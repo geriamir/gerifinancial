@@ -15,6 +15,7 @@ import Dashboard from './pages/Dashboard';
 import Banks from './pages/Banks';
 import TransactionsPage from './pages/Transactions';
 import BudgetsPage from './pages/Budgets';
+import BudgetSubcategoryDetail from './pages/BudgetSubcategoryDetail';
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
@@ -66,6 +67,7 @@ const App: React.FC = () => {
               <Route path="banks" element={<Banks />} />
               <Route path="transactions" element={<TransactionsPage />} />
               <Route path="budgets" element={<BudgetsPage />} />
+              <Route path="budgets/subcategory/:year/:month/:categoryId/:subcategoryId" element={<BudgetSubcategoryDetail />} />
               <Route path="profile" element={<Profile />} />
             </Route>
           </Routes>

@@ -311,11 +311,13 @@ class TransactionService {
     endDate,
     type,
     category,
+    subCategory,
     search,
     limit = 20,
     skip = 0,
     accountId,
-    userId
+    userId,
+    useProcessedDate = false
   }) {
     if (!userId) {
       throw new Error('userId is required');
@@ -330,16 +332,18 @@ class TransactionService {
     }
 
     if (startDate || endDate) {
-      query.date = {};
+      // Use processedDate for budget views, regular date for transaction views
+      const dateField = useProcessedDate ? 'processedDate' : 'date';
+      query[dateField] = {};
       if (startDate) {
         const start = new Date(startDate);
         start.setUTCHours(0, 0, 0, 0);
-        query.date.$gte = start;
+        query[dateField].$gte = start;
       }
       if (endDate) {
         const end = new Date(endDate);
         end.setUTCHours(23, 59, 59, 999);
-        query.date.$lte = end;
+        query[dateField].$lte = end;
       }
     }
     if (type) {
@@ -356,13 +360,21 @@ class TransactionService {
         query.category = convertToObjectId(category);
       }
     }
+    if (subCategory) {
+      if (subCategory === 'uncategorized') {
+        query.subCategory = null; // Filter for transactions without subcategory
+      } else {
+        query.subCategory = convertToObjectId(subCategory);
+      }
+    }
     if (search) {
       query.description = { $regex: search, $options: 'i' };
     }
 
     const total = await Transaction.countDocuments(query);
+    const sortField = useProcessedDate ? 'processedDate' : 'date';
     const transactions = await Transaction.find(query)
-      .sort({ date: -1 })
+      .sort({ [sortField]: -1 })
       .skip(skip)
       .limit(limit)
       .populate('category subCategory');
