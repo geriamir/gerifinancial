@@ -388,19 +388,29 @@ class SmartBudgetService {
         };
       }
 
-      // Step 2: If no pending patterns, detect new ones
-      console.log('No pending patterns found, detecting new patterns...');
-      const detectionResult = await this.detectPatternsForUser(userId, analysisMonths);
+      // Step 2: If no pending patterns, check if we should detect new ones
+      console.log('No pending patterns found, checking if new detection is needed...');
       
-      if (detectionResult.requiresUserApproval && detectionResult.patterns.length > 0) {
-        // New patterns detected - user needs to approve them first
-        return {
-          step: 'pattern-detection-complete',
-          success: false,
-          message: `Detected ${detectionResult.totalDetected} new spending patterns. Please review and approve them to continue with budget calculation.`,
-          detectedPatterns: detectionResult.patterns,
-          nextAction: 'approve-patterns'
-        };
+      // Check if we already have patterns for this user (approved or rejected)
+      const existingPatterns = await TransactionPattern.find({ userId });
+      
+      if (existingPatterns.length === 0) {
+        // No patterns exist at all - do initial detection
+        console.log('No patterns exist, performing initial pattern detection...');
+        const detectionResult = await this.detectPatternsForUser(userId, analysisMonths);
+        
+        if (detectionResult.requiresUserApproval && detectionResult.patterns.length > 0) {
+          // New patterns detected - user needs to approve them first
+          return {
+            step: 'pattern-detection-complete',
+            success: false,
+            message: `Detected ${detectionResult.totalDetected} new spending patterns. Please review and approve them to continue with budget calculation.`,
+            detectedPatterns: detectionResult.patterns,
+            nextAction: 'approve-patterns'
+          };
+        }
+      } else {
+        console.log(`Found ${existingPatterns.length} existing patterns - skipping detection`);
       }
 
       // Step 3: No patterns detected or all patterns already handled, calculate budget
