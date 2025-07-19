@@ -233,7 +233,8 @@ const BudgetsPage: React.FC = () => {
         console.log('New patterns detected:', smartResult.detectedPatterns);
         // Force refresh to show the new patterns in the dashboard
         await refreshBudgets();
-        // IMPORTANT: Return here without fallback - user must approve patterns first
+        // Also trigger a page reload to ensure PatternDetectionDashboard refreshes
+        window.location.reload();
         return;
       }
       
