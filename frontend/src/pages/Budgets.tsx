@@ -221,9 +221,18 @@ const BudgetsPage: React.FC = () => {
       const smartResult = await budgetsApi.smartCalculateMonthlyBudget(currentYear, currentMonth, 6);
       
       if (smartResult.step === 'pattern-approval-required') {
-        // User needs to approve patterns first - the PatternDetectionDashboard will handle this
+        // User needs to approve existing pending patterns first
         console.log('Pattern approval required - user should approve patterns first');
         // Force refresh to show any new patterns in the dashboard
+        await refreshBudgets();
+        return;
+      }
+      
+      if (smartResult.step === 'pattern-detection-complete') {
+        // New patterns were detected - show them to user
+        console.log('New patterns detected:', smartResult.detectedPatterns);
+        alert(`✨ Great! We detected ${smartResult.detectedPatterns?.length || 0} spending patterns in your transactions.\n\nPlease review them in the Pattern Detection section above and approve the ones that look correct.\n\nAfter you approve/reject the patterns, click Auto-Calculate again to create your budget with pattern-aware calculations.`);
+        // Force refresh to show the new patterns in the dashboard
         await refreshBudgets();
         return;
       }
