@@ -407,11 +407,18 @@ class SmartBudgetService {
       console.log('No new patterns detected, proceeding with budget calculation...');
       const budgetResult = await this.calculateSmartBudget(userId, year, month, analysisMonths);
 
+      // Actually create and save the budget to database
+      console.log('Saving smart budget to database...');
+      const savedBudget = await budgetService.createMonthlyBudget(userId, year, month, budgetResult.budget);
+      console.log('Smart budget saved successfully');
+
       return {
         step: 'budget-calculated',
         success: true,
-        message: 'Smart budget calculated successfully with pattern-aware logic',
-        ...budgetResult
+        message: 'Smart budget calculated and saved successfully with pattern-aware logic',
+        budget: savedBudget,
+        calculation: budgetResult.calculation,
+        patterns: budgetResult.patterns
       };
 
     } catch (error) {
