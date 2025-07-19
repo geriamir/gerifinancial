@@ -42,6 +42,9 @@ const PatternDetectionDashboard: React.FC<PatternDetectionDashboardProps> = ({
   const [selectedPatterns, setSelectedPatterns] = useState<string[]>([]);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
+  // Debug log to check if component receives prop changes
+  console.log('🔍 PatternDetectionDashboard: Component render - refreshTrigger:', refreshTrigger, 'user.id:', user?.id);
+
   // Load pending patterns
   useEffect(() => {
     if (!user?.id) return;
@@ -51,10 +54,12 @@ const PatternDetectionDashboard: React.FC<PatternDetectionDashboardProps> = ({
 
   // Trigger refresh when refreshTrigger changes
   useEffect(() => {
-    if (!user?.id || refreshTrigger === undefined) return;
+    if (!user?.id) return;
+    if (refreshTrigger === undefined || refreshTrigger === 0) return;
     
+    console.log('🔄 PatternDetectionDashboard: refreshTrigger useEffect fired with value:', refreshTrigger);
     loadPendingPatterns();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, user?.id]);
 
   const loadPendingPatterns = async () => {
     if (!user?.id) return;
@@ -63,17 +68,23 @@ const PatternDetectionDashboard: React.FC<PatternDetectionDashboardProps> = ({
       setLoading(true);
       setError(null);
       
-      console.log('Loading pending patterns for user:', user.id);
+      console.log('🔍 PatternDetectionDashboard: Loading pending patterns for user:', user.id);
+      console.log('🔍 PatternDetectionDashboard: refreshTrigger value:', refreshTrigger);
+      
       const response = await patternsApi.getPendingPatterns(user.id);
+      
+      console.log('🔍 PatternDetectionDashboard: API response:', response);
       
       if (response.success) {
         setPatterns(response.data.patterns);
-        console.log('Loaded patterns:', response.data.patterns.length);
+        console.log('✅ PatternDetectionDashboard: Loaded patterns:', response.data.patterns.length);
+        console.log('✅ PatternDetectionDashboard: Pattern details:', response.data.patterns);
       } else {
+        console.error('❌ PatternDetectionDashboard: API returned success=false');
         throw new Error('Failed to load patterns');
       }
     } catch (err) {
-      console.error('Error loading patterns:', err);
+      console.error('❌ PatternDetectionDashboard: Error loading patterns:', err);
       setError('Failed to load pattern data. Please try again.');
     } finally {
       setLoading(false);

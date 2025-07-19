@@ -945,6 +945,141 @@ router.put('/patterns/bulk-approve',
 );
 
 /**
+ * PUT /api/budgets/patterns/bulk-reject
+ * Bulk reject multiple patterns
+ */
+router.put('/patterns/bulk-reject',
+  auth,
+  [
+    body('patternIds').isArray({ min: 1 }).withMessage('Pattern IDs must be a non-empty array'),
+    body('patternIds.*').isMongoId().withMessage('Each pattern ID must be valid'),
+    body('reason').optional().isString().isLength({ max: 500 }).withMessage('Reason must be under 500 characters')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { patternIds, reason } = req.body;
+      
+      // Find all patterns
+      const patterns = await TransactionPattern.find({
+        _id: { $in: patternIds },
+        userId: req.user._id,
+        approvalStatus: 'pending'
+      });
+
+      if (patterns.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No valid pending patterns found'
+        });
+      }
+
+      // Reject all patterns
+      const rejectedPatterns = [];
+      for (const pattern of patterns) {
+        pattern.reject();
+        if (reason) {
+          pattern.notes = reason;
+        }
+        await pattern.save();
+        rejectedPatterns.push({
+          id: pattern._id,
+          patternId: pattern.patternId,
+          description: pattern.transactionIdentifier.description,
+          patternType: pattern.recurrencePattern
+        });
+      }
+
+      logger.info(`Bulk rejected ${rejectedPatterns.length} patterns for user ${req.user._id}`);
+      
+      res.json({
+        success: true,
+        data: {
+          rejectedPatterns,
+          totalRejected: rejectedPatterns.length
+        },
+        message: `Successfully rejected ${rejectedPatterns.length} patterns`
+      });
+    } catch (error) {
+      logger.error('Error bulk rejecting patterns:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to bulk reject patterns',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/budgets/patterns/reject-remaining-and-proceed
+ * Reject all remaining pending patterns and proceed with budget calculation
+ */
+router.post('/patterns/reject-remaining-and-proceed',
+  auth,
+  [
+    body('year').isInt({ min: 2020, max: 2050 }).withMessage('Year must be between 2020 and 2050'),
+    body('month').isInt({ min: 1, max: 12 }).withMessage('Month must be between 1 and 12'),
+    body('monthsToAnalyze').optional().isInt({ min: 6, max: 24 }).withMessage('Months to analyze must be between 6 and 24')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { year, month, monthsToAnalyze = 6 } = req.body;
+      
+      // Get all pending patterns for the user
+      const pendingPatterns = await TransactionPattern.getPendingPatterns(req.user._id);
+      
+      if (pendingPatterns.length > 0) {
+        // Reject all pending patterns
+        for (const pattern of pendingPatterns) {
+          pattern.reject();
+          pattern.notes = 'Auto-rejected to proceed with budget creation';
+          await pattern.save();
+        }
+        
+        logger.info(`Auto-rejected ${pendingPatterns.length} remaining patterns for user ${req.user._id} to proceed with budget`);
+      }
+      
+      // Now proceed with smart budget calculation
+      const result = await smartBudgetService.executeSmartBudgetWorkflow(
+        req.user._id, 
+        year, 
+        month, 
+        monthsToAnalyze
+      );
+      
+      if (result.step === 'budget-calculated') {
+        res.json({
+          success: true,
+          step: result.step,
+          data: result.budget,
+          calculation: result.calculation,
+          patterns: result.patterns,
+          message: `${pendingPatterns.length > 0 ? `Rejected ${pendingPatterns.length} remaining patterns and c` : 'C'}alculated smart budget successfully`,
+          autoRejectedPatterns: pendingPatterns.length
+        });
+      } else {
+        // This shouldn't happen since we just rejected all pending patterns
+        res.status(500).json({
+          success: false,
+          message: 'Unexpected error in budget calculation after rejecting patterns',
+          step: result.step
+        });
+      }
+      
+    } catch (error) {
+      logger.error('Error in reject-remaining-and-proceed:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to reject patterns and calculate budget',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
  * GET /api/budgets/patterns/preview/:year/:month
  * Preview how patterns will affect budget for a specific month
  */

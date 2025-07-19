@@ -6,7 +6,8 @@ const mongoose = require('mongoose');
 
 // Mock dependencies
 jest.mock('../recurrenceDetectionService', () => ({
-  detectRecurrencePatterns: jest.fn()
+  detectPatterns: jest.fn(),
+  storeDetectedPatterns: jest.fn()
 }));
 jest.mock('../../models/TransactionPattern');
 jest.mock('../../models/Transaction');
@@ -27,22 +28,26 @@ describe('SmartBudgetService', () => {
         { id: '2', description: 'Insurance payment', patternType: 'quarterly' }
       ];
 
-      recurrenceDetectionService.detectRecurrencePatterns.mockResolvedValue(mockPatterns);
+      const mockStoredPatterns = mockPatterns.map(p => ({ ...p, _id: p.id }));
+
+      recurrenceDetectionService.detectPatterns.mockResolvedValue(mockPatterns);
+      recurrenceDetectionService.storeDetectedPatterns.mockResolvedValue(mockStoredPatterns);
 
       const result = await smartBudgetService.detectPatternsForUser(mockUserId, 6);
 
       expect(result).toEqual({
         success: true,
-        patterns: mockPatterns,
+        patterns: mockStoredPatterns,
         totalDetected: 2,
         requiresUserApproval: true
       });
 
-      expect(recurrenceDetectionService.detectRecurrencePatterns).toHaveBeenCalledWith(mockUserId, 6);
+      expect(recurrenceDetectionService.detectPatterns).toHaveBeenCalledWith(mockUserId, 6);
+      expect(recurrenceDetectionService.storeDetectedPatterns).toHaveBeenCalledWith(mockPatterns);
     });
 
     it('should handle no patterns detected', async () => {
-      recurrenceDetectionService.detectRecurrencePatterns.mockResolvedValue([]);
+      recurrenceDetectionService.detectPatterns.mockResolvedValue([]);
 
       const result = await smartBudgetService.detectPatternsForUser(mockUserId, 6);
 
@@ -56,7 +61,7 @@ describe('SmartBudgetService', () => {
 
     it('should handle detection errors', async () => {
       const error = new Error('Detection failed');
-      recurrenceDetectionService.detectRecurrencePatterns.mockRejectedValue(error);
+      recurrenceDetectionService.detectPatterns.mockRejectedValue(error);
 
       await expect(smartBudgetService.detectPatternsForUser(mockUserId, 6))
         .rejects.toThrow('Detection failed');
@@ -271,9 +276,14 @@ describe('SmartBudgetService', () => {
       // Mock no pending patterns
       TransactionPattern.getPendingPatterns = jest.fn().mockResolvedValue([]);
       TransactionPattern.getActivePatterns = jest.fn().mockResolvedValue([]);
+      TransactionPattern.find = jest.fn().mockResolvedValue([]); // Fix this mock
       Transaction.find = jest.fn().mockReturnValue({
         populate: jest.fn().mockResolvedValue([])
       });
+      
+      // Mock the detection service calls for the workflow
+      recurrenceDetectionService.detectPatterns.mockResolvedValue([]);
+      recurrenceDetectionService.storeDetectedPatterns.mockResolvedValue([]);
 
       const result = await smartBudgetService.executeSmartBudgetWorkflow(mockUserId, mockYear, mockMonth, 6);
 

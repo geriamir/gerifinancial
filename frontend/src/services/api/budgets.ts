@@ -148,6 +148,11 @@ export const budgetsApi = {
     api.post('/budgets/monthly/smart-calculate', { year, month, monthsToAnalyze })
       .then((res: AxiosResponse) => res.data),
 
+  // Reject remaining patterns and proceed with budget calculation
+  rejectRemainingPatternsAndProceed: (year: number, month: number, monthsToAnalyze?: number): Promise<any> =>
+    api.post('/budgets/patterns/reject-remaining-and-proceed', { year, month, monthsToAnalyze })
+      .then((res: AxiosResponse) => res.data),
+
   getMonthlyBudgetActual: (year: number, month: number) =>
     api.get(`/budgets/monthly/${year}/${month}/actual`)
       .then((res: AxiosResponse) => res.data),

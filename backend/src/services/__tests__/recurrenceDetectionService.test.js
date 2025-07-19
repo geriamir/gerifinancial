@@ -17,7 +17,8 @@ jest.mock('../../models', () => ({
 // Mock logger
 jest.mock('../../utils/logger', () => ({
   info: jest.fn(),
-  error: jest.fn()
+  error: jest.fn(),
+  debug: jest.fn() // Add debug mock for the new validation functions
 }));
 
 // Mock uuid
@@ -64,7 +65,7 @@ describe('RecurrenceDetectionService', () => {
       expect(groups[0].averageAmount).toBe(450);
     });
 
-    test('should handle amount tolerance correctly', () => {
+    test('should group transactions regardless of amount differences', () => {
       const transactions = [
         {
           _id: '1',
@@ -76,14 +77,14 @@ describe('RecurrenceDetectionService', () => {
         {
           _id: '2',
           description: 'Internet Bill',
-          amount: -105, // 5% difference - should be grouped
+          amount: -150, // 50% difference - should still be grouped
           category: { _id: 'cat1', name: 'Utilities' },
           subCategory: { _id: 'sub1', name: 'Internet' }
         },
         {
           _id: '3',
           description: 'Internet Bill',
-          amount: -120, // 20% difference - should NOT be grouped
+          amount: -200, // 100% difference - should still be grouped
           category: { _id: 'cat1', name: 'Utilities' },
           subCategory: { _id: 'sub1', name: 'Internet' }
         }
@@ -92,7 +93,10 @@ describe('RecurrenceDetectionService', () => {
       const groups = recurrenceDetectionService.groupSimilarTransactions(transactions);
       
       expect(groups).toHaveLength(1);
-      expect(groups[0].transactions).toHaveLength(2); // Only first two should be grouped
+      expect(groups[0].transactions).toHaveLength(3); // All three should be grouped despite amount differences
+      expect(groups[0].averageAmount).toBe(150); // Average of 100, 150, 200
+      expect(groups[0].minAmount).toBe(100);
+      expect(groups[0].maxAmount).toBe(200);
     });
   });
 
@@ -230,6 +234,83 @@ describe('RecurrenceDetectionService', () => {
     });
   });
 
+  describe('validateSingleTransactionPerPeriod', () => {
+    test('should accept transactions with single occurrence per month', () => {
+      const transactions = [
+        { processedDate: new Date(2024, 0, 15) }, // Jan 2024
+        { processedDate: new Date(2024, 2, 15) }, // Mar 2024
+        { processedDate: new Date(2024, 4, 15) }  // May 2024
+      ];
+      
+      const result = recurrenceDetectionService.validateSingleTransactionPerPeriod(transactions);
+      expect(result).toBe(true);
+    });
+
+    test('should reject transactions with multiple occurrences in same month', () => {
+      const transactions = [
+        { processedDate: new Date(2024, 0, 15) }, // Jan 15, 2024
+        { processedDate: new Date(2024, 0, 25) }, // Jan 25, 2024 - same month!
+        { processedDate: new Date(2024, 2, 15) }  // Mar 2024
+      ];
+      
+      const result = recurrenceDetectionService.validateSingleTransactionPerPeriod(transactions);
+      expect(result).toBe(false);
+    });
+
+    test('should reject pattern with insufficient transactions', () => {
+      const transactions = [
+        { processedDate: new Date(2024, 0, 15) } // Only one transaction
+      ];
+      
+      const result = recurrenceDetectionService.validateSingleTransactionPerPeriod(transactions);
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('validateSpacingConsistency', () => {
+    test('should accept consistent bi-monthly spacing', () => {
+      const monthYears = ['2024-1', '2024-3', '2024-5']; // Jan, Mar, May (2-month gaps)
+      
+      const result = recurrenceDetectionService.validateSpacingConsistency(monthYears);
+      expect(result).toBe(true);
+    });
+
+    test('should accept consistent quarterly spacing', () => {
+      const monthYears = ['2024-1', '2024-4', '2024-7']; // Jan, Apr, Jul (3-month gaps)
+      
+      const result = recurrenceDetectionService.validateSpacingConsistency(monthYears);
+      expect(result).toBe(true);
+    });
+
+    test('should accept consistent yearly spacing', () => {
+      const monthYears = ['2023-1', '2024-1', '2025-1']; // Jan each year (12-month gaps)
+      
+      const result = recurrenceDetectionService.validateSpacingConsistency(monthYears);
+      expect(result).toBe(true);
+    });
+
+    test('should reject inconsistent spacing', () => {
+      const monthYears = ['2024-1', '2024-2', '2024-5']; // 1-month then 3-month gap
+      
+      const result = recurrenceDetectionService.validateSpacingConsistency(monthYears);
+      expect(result).toBe(false);
+    });
+
+    test('should reject invalid gap patterns', () => {
+      const monthYears = ['2024-1', '2024-6', '2024-11']; // 5-month gaps (not standard)
+      
+      const result = recurrenceDetectionService.validateSpacingConsistency(monthYears);
+      expect(result).toBe(false);
+    });
+
+    test('should allow 1-month tolerance for edge cases', () => {
+      const monthYears = ['2024-1', '2024-3', '2024-6']; // 2-month then 3-month gap (within tolerance)
+      
+      const result = recurrenceDetectionService.validateSpacingConsistency(monthYears);
+      expect(result).toBe(true); // Should pass with 1-month tolerance
+    });
+  });
+
   describe('calculatePatternConfidence', () => {
     test('should calculate high confidence for perfect match', () => {
       const confidence = recurrenceDetectionService.calculatePatternConfidence(3, 3, true);
@@ -310,6 +391,87 @@ describe('RecurrenceDetectionService', () => {
       const patterns = await recurrenceDetectionService.detectPatterns('user123', 6);
       
       expect(patterns).toHaveLength(0);
+    });
+
+    test('should reject patterns with multiple transactions in same month', async () => {
+      // Mock transaction data with multiple transactions in January
+      Transaction.find.mockReturnValue({
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockResolvedValue([
+          {
+            _id: '1',
+            description: 'Electric Bill',
+            amount: -150,
+            processedDate: new Date(2024, 0, 10), // Jan 10
+            category: { _id: 'cat1', name: 'Utilities', type: 'Expense' },
+            subCategory: { _id: 'sub1', name: 'Electric' }
+          },
+          {
+            _id: '2',
+            description: 'Electric Bill',
+            amount: -160,
+            processedDate: new Date(2024, 0, 25), // Jan 25 - same month!
+            category: { _id: 'cat1', name: 'Utilities', type: 'Expense' },
+            subCategory: { _id: 'sub1', name: 'Electric' }
+          },
+          {
+            _id: '3',
+            description: 'Electric Bill',
+            amount: -155,
+            processedDate: new Date(2024, 2, 15), // Mar 15
+            category: { _id: 'cat1', name: 'Utilities', type: 'Expense' },
+            subCategory: { _id: 'sub1', name: 'Electric' }
+          }
+        ])
+      });
+
+      const patterns = await recurrenceDetectionService.detectPatterns('user123', 6);
+      
+      // Should return no patterns because of multiple transactions in January
+      expect(patterns).toHaveLength(0);
+    });
+
+    test('should detect patterns with varying amounts but consistent timing', async () => {
+      // Mock transaction data with different amounts but consistent bi-monthly timing
+      Transaction.find.mockReturnValue({
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockResolvedValue([
+          {
+            _id: '1',
+            description: 'Water Bill',
+            amount: -80, // Varying amounts
+            processedDate: new Date(2024, 0, 15), // Jan
+            category: { _id: 'cat1', name: 'Utilities', type: 'Expense' },
+            subCategory: { _id: 'sub1', name: 'Water' }
+          },
+          {
+            _id: '2',
+            description: 'Water Bill',
+            amount: -120, // Different amount
+            processedDate: new Date(2024, 2, 15), // Mar
+            category: { _id: 'cat1', name: 'Utilities', type: 'Expense' },
+            subCategory: { _id: 'sub1', name: 'Water' }
+          },
+          {
+            _id: '3',
+            description: 'Water Bill',
+            amount: -95, // Different amount again
+            processedDate: new Date(2024, 4, 15), // May
+            category: { _id: 'cat1', name: 'Utilities', type: 'Expense' },
+            subCategory: { _id: 'sub1', name: 'Water' }
+          }
+        ])
+      });
+
+      const patterns = await recurrenceDetectionService.detectPatterns('user123', 6);
+      
+      // Should detect the pattern despite amount variations
+      expect(patterns).toHaveLength(1);
+      expect(patterns[0].recurrencePattern).toBe('bi-monthly');
+      expect(patterns[0].transactionIdentifier.description).toBe('water bill');
+      expect(patterns[0].averageAmount).toBe(98); // Average of 80, 120, 95
+      expect(patterns[0].transactionIdentifier.amountRange.min).toBe(80);
+      expect(patterns[0].transactionIdentifier.amountRange.max).toBe(120);
     });
   });
 

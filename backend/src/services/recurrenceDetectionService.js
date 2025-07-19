@@ -115,12 +115,8 @@ class RecurrenceDetectionService {
           return false;
         }
         
-        // Check amount similarity (within 10% tolerance)
-        const amountTolerance = 0.1;
-        const amountDiff = Math.abs(amount - group.averageAmount) / group.averageAmount;
-        if (amountDiff > amountTolerance) {
-          return false;
-        }
+        // Remove amount similarity check - amounts can vary greatly for recurring transactions
+        // (e.g., utility bills, credit card payments with different balances)
         
         // Check description similarity
         return this.isDescriptionSimilar(description, group.commonDescription);
@@ -194,6 +190,11 @@ class RecurrenceDetectionService {
   analyzeTransactionPattern(group, analysisMonths) {
     const { transactions } = group;
     
+    // Apply single-transaction-per-period constraint
+    if (!this.validateSingleTransactionPerPeriod(transactions)) {
+      return null; // Reject if multiple transactions in same period
+    }
+    
     // Get month occurrences
     const monthOccurrences = this.getMonthOccurrences(transactions);
     
@@ -216,6 +217,89 @@ class RecurrenceDetectionService {
     }
     
     return null;
+  }
+
+  /**
+   * Validate that there's only one transaction per occurrence period
+   * This reduces false positives by ensuring true recurring patterns
+   * @param {Array} transactions - Array of transactions
+   * @returns {boolean} True if constraint is satisfied
+   */
+  validateSingleTransactionPerPeriod(transactions) {
+    if (transactions.length < 2) return false;
+    
+    // Group transactions by month-year to check for multiple transactions in same month
+    const monthlyGroups = {};
+    
+    for (const transaction of transactions) {
+      const date = transaction.processedDate;
+      const monthYear = `${date.getFullYear()}-${date.getMonth() + 1}`;
+      
+      if (!monthlyGroups[monthYear]) {
+        monthlyGroups[monthYear] = [];
+      }
+      monthlyGroups[monthYear].push(transaction);
+    }
+    
+    // Check that each month has exactly 1 transaction
+    for (const [monthYear, monthTransactions] of Object.entries(monthlyGroups)) {
+      if (monthTransactions.length > 1) {
+        logger.debug(`Rejecting pattern: Multiple transactions (${monthTransactions.length}) found in ${monthYear}`);
+        return false; // Multiple transactions in same month = not truly recurring
+      }
+    }
+    
+    // Additional validation: check spacing consistency
+    const monthYears = Object.keys(monthlyGroups).sort();
+    
+    if (monthYears.length >= 3) {
+      // For 3+ occurrences, check if spacing is consistent
+      return this.validateSpacingConsistency(monthYears);
+    }
+    
+    return true; // Passed single-transaction-per-month constraint
+  }
+
+  /**
+   * Validate spacing consistency between occurrences
+   * @param {Array} monthYears - Sorted array of month-year strings
+   * @returns {boolean} True if spacing is consistent
+   */
+  validateSpacingConsistency(monthYears) {
+    const monthNumbers = monthYears.map(my => {
+      const [year, month] = my.split('-').map(Number);
+      return year * 12 + month; // Convert to absolute month number
+    });
+    
+    // Calculate gaps between consecutive occurrences
+    const gaps = [];
+    for (let i = 1; i < monthNumbers.length; i++) {
+      gaps.push(monthNumbers[i] - monthNumbers[i - 1]);
+    }
+    
+    // Check if gaps are consistent (all same or within tolerance)
+    const firstGap = gaps[0];
+    const tolerance = 1; // Allow 1 month variance for edge cases
+    
+    for (const gap of gaps) {
+      if (Math.abs(gap - firstGap) > tolerance) {
+        logger.debug(`Rejecting pattern: Inconsistent spacing. Gaps: ${gaps.join(', ')}`);
+        return false;
+      }
+    }
+    
+    // Validate gap makes sense for common patterns
+    const isValidGap = firstGap === 2 || // Bi-monthly
+                       firstGap === 3 || // Quarterly  
+                       firstGap === 6 || // Semi-annually
+                       firstGap === 12;  // Yearly
+                       
+    if (!isValidGap) {
+      logger.debug(`Rejecting pattern: Invalid gap pattern ${firstGap} months`);
+      return false;
+    }
+    
+    return true;
   }
 
   /**
