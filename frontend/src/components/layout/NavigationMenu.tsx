@@ -9,7 +9,8 @@ import {
 import {
   Home as HomeIcon,
   AccountBalance as AccountIcon,
-  Receipt as TransactionsIcon
+  Receipt as TransactionsIcon,
+  AccountBalanceWallet as BudgetIcon
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -22,7 +23,8 @@ interface NavigationItem {
 const navigationItems: NavigationItem[] = [
   { title: 'Dashboard', path: '/', icon: <HomeIcon /> },
   { title: 'Bank Accounts', path: '/banks', icon: <AccountIcon /> },
-  { title: 'Transactions', path: '/transactions', icon: <TransactionsIcon /> }
+  { title: 'Transactions', path: '/transactions', icon: <TransactionsIcon /> },
+  { title: 'Budgets', path: '/budgets', icon: <BudgetIcon /> }
 ];
 
 export const NavigationMenu: React.FC = () => {

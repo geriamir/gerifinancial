@@ -13,10 +13,12 @@ router.get('/', auth, async (req, res) => {
       endDate,
       type,
       category,
+      subCategory,
       search,
       limit = '20',
       skip = '0',
-      accountId
+      accountId,
+      useProcessedDate = 'false'
     } = req.query;
 
     const validTypes = ['Expense', 'Income', 'Transfer'];
@@ -25,11 +27,13 @@ router.get('/', auth, async (req, res) => {
       endDate: endDate ? new Date(endDate) : undefined,
       type: validTypes.includes(type) ? type : undefined,
       category,
+      subCategory,
       search,
       limit: parseInt(limit),
       skip: parseInt(skip),
       accountId,
       userId: req.user._id, // User ID from auth middleware
+      useProcessedDate: useProcessedDate === 'true', // Convert string to boolean
     };
     
     const result = await transactionService.getTransactions(query);
