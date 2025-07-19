@@ -219,6 +219,17 @@ router.post('/monthly/smart-calculate',
         });
       }
       
+      if (result.step === 'pattern-detection-complete') {
+        // New patterns detected - need user approval
+        return res.status(202).json({
+          success: false,
+          step: result.step,
+          message: result.message,
+          detectedPatterns: result.detectedPatterns,
+          nextAction: result.nextAction
+        });
+      }
+      
       // Budget calculated successfully
       res.json({
         success: true,
