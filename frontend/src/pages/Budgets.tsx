@@ -39,6 +39,7 @@ import MonthlyBudgetEditor from '../components/budget/MonthlyBudgetEditor';
 import InlineBudgetEditor from '../components/budget/InlineBudgetEditor';
 import CategoryIcon from '../components/common/CategoryIcon';
 import PatternDetectionDashboard from '../components/budget/PatternDetection/PatternDetectionDashboard';
+import { budgetsApi } from '../services/api/budgets';
 import { useNavigate } from 'react-router-dom';
 
 // Month names for display
@@ -213,14 +214,38 @@ const BudgetsPage: React.FC = () => {
     }
   };
 
-  // Handle automated budget creation
+  // Handle automated budget creation with smart workflow
   const handleAutoCalculate = async () => {
     try {
-      await calculateMonthlyBudget(currentYear, currentMonth, 6);
-      // Force refresh to ensure we see the updated budget immediately
-      await refreshBudgets();
+      // Try smart budget calculation first
+      const smartResult = await budgetsApi.smartCalculateMonthlyBudget(currentYear, currentMonth, 6);
+      
+      if (smartResult.step === 'pattern-approval-required') {
+        // User needs to approve patterns first - the PatternDetectionDashboard will handle this
+        console.log('Pattern approval required - user should approve patterns first');
+        // Force refresh to show any new patterns in the dashboard
+        await refreshBudgets();
+        return;
+      }
+      
+      if (smartResult.step === 'budget-calculated') {
+        // Budget was calculated successfully
+        console.log('Smart budget calculated with pattern awareness:', smartResult.calculation);
+        // Force refresh to see the new budget
+        await refreshBudgets();
+        return;
+      }
+      
     } catch (error) {
-      console.error('Failed to auto-calculate budget:', error);
+      console.error('Smart budget calculation failed, falling back to regular calculation:', error);
+      
+      // Fallback to regular calculation if smart calculation fails
+      try {
+        await calculateMonthlyBudget(currentYear, currentMonth, 6);
+        await refreshBudgets();
+      } catch (fallbackError) {
+        console.error('Failed to auto-calculate budget:', fallbackError);
+      }
     }
   };
 

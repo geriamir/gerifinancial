@@ -2,6 +2,7 @@ const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const auth = require('../middleware/auth');
 const budgetService = require('../services/budgetService');
+const smartBudgetService = require('../services/smartBudgetService');
 const { TransactionPattern } = require('../models');
 const logger = require('../utils/logger');
 
@@ -175,6 +176,64 @@ router.post('/monthly/calculate',
       res.status(500).json({
         success: false,
         message: 'Failed to calculate monthly budget',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/budgets/monthly/smart-calculate
+ * Smart budget calculation with pattern-aware workflow
+ */
+router.post('/monthly/smart-calculate',
+  auth,
+  [
+    body('year').isInt({ min: 2020, max: 2050 }).withMessage('Year must be between 2020 and 2050'),
+    body('month').isInt({ min: 1, max: 12 }).withMessage('Month must be between 1 and 12'),
+    body('monthsToAnalyze').optional().isInt({ min: 6, max: 24 }).withMessage('Months to analyze must be between 6 and 24')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { year, month, monthsToAnalyze = 6 } = req.body;
+      
+      // Execute smart budget workflow
+      const result = await smartBudgetService.executeSmartBudgetWorkflow(
+        req.user._id, 
+        year, 
+        month, 
+        monthsToAnalyze
+      );
+      
+      if (result.step === 'pattern-approval-required') {
+        // User needs to approve patterns first
+        return res.status(202).json({
+          success: false,
+          step: result.step,
+          message: result.message,
+          data: {
+            pendingPatterns: result.pendingPatterns,
+            nextAction: result.nextAction
+          }
+        });
+      }
+      
+      // Budget calculated successfully
+      res.json({
+        success: true,
+        step: result.step,
+        data: result.budget,
+        calculation: result.calculation,
+        patterns: result.patterns,
+        message: result.message
+      });
+      
+    } catch (error) {
+      logger.error('Error in smart budget calculation:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to calculate smart budget',
         error: error.message
       });
     }
