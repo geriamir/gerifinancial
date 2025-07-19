@@ -72,8 +72,10 @@ export interface TransactionFilters {
   endDate?: Date;
   type?: string;
   category?: string;
+  subCategory?: string;
   search?: string;
   accountId?: string;
+  useProcessedDate?: boolean;
 }
 
 export interface UncategorizedStats {

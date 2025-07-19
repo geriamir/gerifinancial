@@ -3,6 +3,20 @@ jest.mock('../services/categoryAIService', () => require('./mocks/categoryAIServ
 
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
+const { User } = require('../models');
+
+// Global test helpers
+global.createTestUser = async (userData = {}) => {
+  const defaultData = {
+    email: `test-${Date.now()}@example.com`,
+    password: 'testpassword123',
+    name: 'Test User'
+  };
+  
+  const user = new User({ ...defaultData, ...userData });
+  await user.save();
+  return user;
+};
 
 // Create MongoDB Memory Server and expose it for tests
 let mongod = null;
@@ -24,14 +38,18 @@ beforeAll(async () => {
   await mongoose.connect(mongoUri);
   console.log('Successfully connected to MongoDB');
 
-// Initialize required services
-const scrapingSchedulerService = require('../services/scrapingSchedulerService');
-  
-  // Load models
+  // Load models to ensure they're registered
   const models = require('../models');
   
-  // Initialize scheduler for tests
-  await scrapingSchedulerService.initialize();
+  // Initialize required services after models are loaded
+  const scrapingSchedulerService = require('../services/scrapingSchedulerService');
+  
+  // Initialize scheduler for tests (will find 0 active accounts in test environment)
+  try {
+    await scrapingSchedulerService.initialize();
+  } catch (error) {
+    console.log('Scheduler initialization skipped in test environment:', error.message);
+  }
 });
 
 beforeEach(async () => {

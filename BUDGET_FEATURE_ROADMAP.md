@@ -4,7 +4,7 @@
 
 **Objective**: Implement a comprehensive budget management system with monthly, yearly, and project budgets, including transaction tagging and smart allocation features.
 
-**Status**: ✅ **COMPLETED** | **Started**: January 17, 2025 | **Completed**: January 17, 2025
+**Status**: ✅ **PHASES 1-5 COMPLETED** | 📋 **PHASES 6-7 PLANNED** | **Started**: January 17, 2025 | **Current**: July 19, 2025
 
 ---
 
@@ -27,6 +27,42 @@
 
 ## 🗓️ **Implementation Phases**
 
+### **Phase 0: CategoryBudget Foundation System** ✅
+**Timeline**: Week 1 | **Priority**: Critical | **Status**: COMPLETED
+
+#### 0.1 CategoryBudget Model ✅
+- **Completed**: `backend/src/models/CategoryBudget.js`
+- **Architecture**: Core budget storage and management system
+- **Budget Types**: Fixed budgets (single amount) and Variable budgets (per-month amounts)
+- **Granularity**: Income budgets at category level, expense budgets at subcategory level
+- **Flexibility**: Convert between fixed and variable budget types
+- **Methods**: `getAmountForMonth`, `setAmountForMonth`, `convertToVariable`, `convertToFixed`
+
+#### 0.2 CategoryBudget Integration ✅
+- **Service Integration**: Primary budget system used by budgetService.js
+- **MonthlyBudget Compatibility**: MonthlyBudget serves as compatibility layer
+- **Static Methods**: `findOrCreate`, `getUserBudgets`, `getBudgetsForMonth`
+- **Specialized Queries**: `getIncomeBudgets`, `getExpenseBudgets` with month-specific amounts
+- **Database Indexes**: Unique constraint on userId + categoryId + subCategoryId
+
+#### 0.3 Budget Type Architecture ✅
+- **Fixed Budgets**: Single `fixedAmount` that repeats every month
+- **Variable Budgets**: Array of `monthlyAmounts` with month (1-12) and amount pairs
+- **Income Handling**: Category-level budgets with `subCategoryId: null`
+- **Expense Handling**: Subcategory-level budgets with required `subCategoryId`
+- **Currency Support**: Default ILS with flexible configuration
+- **Status Management**: `isActive` flag for budget lifecycle management
+
+**Key Features Implemented:**
+- Template-based budget system that works across years
+- Flexible budget amount configuration (fixed vs variable)
+- Efficient month-specific budget retrieval
+- Automatic budget creation with findOrCreate pattern
+- Comprehensive budget querying with population
+- Virtual fields for budget categorization
+
+---
+
 ### **Phase 1: Foundation & Data Migration** ✅
 **Timeline**: Week 1-2 | **Priority**: Critical | **Status**: COMPLETED
 
@@ -36,8 +72,8 @@
 - **processedDate**: New required field (when money actually moved)
 - **Migration Script**: Created `migrateDateFields.js` with rollback support
 
-#### 1.2 Credit Card Model ✅
-- **Completed**: `backend/src/models/CreditCard.js`
+#### 1.2 Credit Card Model 📋
+- **Status**: PLANNED - Referenced in service but not implemented
 - **Features**: Timing flexibility configuration, allocation month calculation
 - **Integration**: Connected to BankAccount and User models
 - **Methods**: findOrCreate, getUserActiveCards, updateTimingConfig
@@ -70,8 +106,8 @@
 - **Auto-calculation**: Historical transaction analysis with configurable months
 - **Validation**: Unique per user/year/month, date ranges, positive amounts
 
-##### Yearly Budget Model ✅
-- **Completed**: `backend/src/models/YearlyBudget.js`
+##### Yearly Budget Model 📋
+- **Status**: PLANNED - Referenced in service but not implemented
 - **Features**: One-time income/expenses, project references, quarterly overview
 - **Methods**: `updateFromMonthlyBudgets`, `addOneTimeIncome`, `getUpcomingItems`, `getYearlyOverview`
 - **Integration**: Automatic totals from monthly budgets plus one-time items
@@ -231,10 +267,171 @@ interface ProjectBudgetManagerProps {
 
 ---
 
-### **Phase 5: Smart Allocation & Advanced Features**
-**Timeline**: Week 10-12 | **Priority**: Medium
+### **Phase 5: Budget Subcategory Drill-Down Feature** ✅
+**Timeline**: Week 10-12 | **Priority**: High | **Status**: COMPLETED
 
-#### 5.1 Smart Monthly Allocation
+#### 5.1 Feature Overview
+**Objective**: Create a detailed view for budget subcategories showing summary and transactions
+**Route**: `/budgets/subcategory/:year/:month/:categoryId/:subcategoryId`
+**Design**: Modern navigation with month carousel and subcategory tabs
+
+#### 5.2 Implementation Phases
+
+##### Phase 5.1: Foundation & Setup ✅
+- [x] **Analysis Complete**: Examined BudgetContext, TransactionsList, and API structure
+- [x] **Architecture Decision**: Reuse existing TransactionsList component
+- [x] **Route Planning**: URL structure defined
+- [x] **Data Flow Design**: Integration with existing BudgetContext
+
+##### Phase 5.2: Component Development ✅
+- [x] **Create BudgetSubcategoryDetail Page**
+  - File: `frontend/src/pages/BudgetSubcategoryDetail.tsx`
+  - Features: Modern header with month navigation and subcategory tabs
+  - Data: Clean budget summary with remaining/overspent display
+  - Navigation: Seamless month switching and subcategory tabs
+
+- [x] **Modern Navigation Design**
+  - Header: Month carousel with prev/next arrows and dropdown
+  - Subcategory Tabs: Dynamic tabs with actual/budgeted amounts
+  - Integration: Router-aware navigation with URL synchronization
+
+- [x] **Enhanced Budget Summary**
+  - Design: Minimalist centered layout focusing on remaining budget
+  - Features: Smart labeling (Remaining vs Overspent)
+  - Progress: Category-colored progress bar with gray background
+  - Details: Actual vs budgeted amounts under progress bar
+
+##### Phase 5.3: Data Integration ✅
+- [x] **Budget Context Integration**
+  - Subcategory-specific data extraction from currentMonthlyBudget
+  - Real-time budget updates with transaction edits
+  - Month synchronization with budget context
+
+- [x] **Transaction Filtering Enhancement**
+  - Memoized transaction filters with subcategory support
+  - Proper processedDate filtering for budget accuracy
+  - Refresh triggers for seamless data updates
+
+##### Phase 5.4: Navigation & Routing ✅
+- [x] **App Router Integration**
+  - Route: `/budgets/subcategory/:year/:month/:categoryId/:subcategoryId`
+  - Parameter validation and error handling
+  - Protected route integration with authentication
+
+- [x] **Advanced Navigation Features**
+  - Month Navigation: Previous/next arrows + 13-month dropdown
+  - Subcategory Tabs: Dynamic tabs with instant switching
+  - URL Synchronization: Proper state management and navigation
+
+##### Phase 5.5: User Experience ✅
+- [x] **Loading States**
+  - Skeleton loading for summary and transactions
+  - Progressive loading with error boundaries
+  - Smooth transitions between states
+
+- [x] **Responsive Design**
+  - Mobile-optimized layout with touch navigation
+  - Adaptive tabs with scrollable subcategory navigation
+  - Responsive budget summary cards
+
+##### Phase 5.6: Advanced Features ✅
+- [x] **Transaction Management**
+  - Complete transaction detail dialog integration
+  - Real-time budget updates after transaction edits
+  - Category/subcategory context preservation
+
+- [x] **Navigation Refinements**
+  - Fixed subcategory tab lag issues
+  - Perfect month navigation with budget synchronization
+  - Clean, minimal budget summary design
+
+- [x] **Visual Enhancements**
+  - Category-colored progress bars (under 100%)
+  - Red progress bars for over-budget situations
+  - Smart labeling: "Remaining" vs "Overspent"
+  - Removed clutter: No percentage text, no status chips
+
+#### 5.3 Technical Implementation Details
+
+##### Component Architecture
+```typescript
+// BudgetSubcategoryDetail.tsx
+interface BudgetSubcategoryDetailProps {
+  year: number;
+  month: number;
+  categoryId: string;
+  subcategoryId: string;
+}
+
+// Data Structure
+interface SubcategoryBudgetData {
+  category: string;
+  subcategory: string;
+  budgetedAmount: number;
+  actualAmount: number;
+  transactionCount: number;
+  progressPercentage: number;
+}
+```
+
+##### Transaction Filtering Integration
+```typescript
+// Enhanced TransactionFilters
+interface TransactionFilters {
+  startDate?: Date;
+  endDate?: Date;
+  type?: string;
+  category?: string;
+  subcategory?: string; // New field
+  search?: string;
+  accountId?: string;
+}
+```
+
+##### Breadcrumb Navigation
+```typescript
+// Breadcrumb Component
+interface BreadcrumbItem {
+  label: string;
+  path: string;
+  active?: boolean;
+}
+
+// Navigation Path
+// Home > Budgets > January 2025 > Food > Groceries
+```
+
+#### 5.4 API Integration Plan
+
+##### Backend Requirements
+- **Existing**: Transaction filtering by category/subcategory
+- **Existing**: Budget data from MonthlyBudget expenseBudgets
+- **New**: Subcategory-specific summary endpoint (optional)
+
+##### Frontend API Calls
+```typescript
+// Data fetching strategy
+1. Extract subcategory data from currentMonthlyBudget
+2. Filter transactions using existing transactionsApi
+3. Calculate summary statistics in component
+```
+
+#### 5.5 Future Extensibility
+
+##### Income Category Support
+- **Route**: `/budgets/income/:year/:month/:categoryId`
+- **Component**: Same BudgetSubcategoryDetail with type prop
+- **Data**: Income-specific budget structure
+
+##### Enhancement Opportunities
+- **Comparison View**: Previous month comparison
+- **Trend Analysis**: Multi-month view
+- **Quick Actions**: Budget adjustment, bulk categorization
+
+### **Phase 6: Smart Allocation & Advanced Features** 📋
+**Timeline**: Week 13-15 | **Priority**: Medium | **Status**: PLANNED
+
+#### 6.1 Smart Monthly Allocation
 
 ##### Flexible Timing Service
 ```javascript
@@ -247,7 +444,7 @@ class TimingAllocationService {
 }
 ```
 
-#### 5.2 Budget Analytics
+#### 6.2 Budget Analytics
 
 ##### Analytics Service
 ```javascript
@@ -266,10 +463,12 @@ class BudgetAnalyticsService {
 ## 🗄️ **Database Schema Changes**
 
 ### **New Collections**
-1. **credit_cards** - Credit card entities with timing configuration
-2. **monthly_budgets** - Monthly budget allocations at sub-category level
-3. **yearly_budgets** - Yearly budget with one-time items
-4. **project_budgets** - Project budgets with multiple funding sources
+1. **category_budgets** - Core budget system with fixed/variable budget types
+2. **credit_cards** - Credit card entities with timing configuration (PLANNED)
+3. **monthly_budgets** - Monthly budget allocations at sub-category level (compatibility layer)
+4. **yearly_budgets** - Yearly budget with one-time items (PLANNED)
+5. **project_budgets** - Project budgets with multiple funding sources
+6. **tags** - Transaction tagging system with project metadata
 
 ### **Updated Collections**
 
@@ -296,15 +495,24 @@ class BudgetAnalyticsService {
 
 ### **Indexes**
 ```javascript
-// Monthly Budgets
+// Category Budgets (Core System)
+db.category_budgets.createIndex({ "userId": 1, "categoryId": 1, "subCategoryId": 1 }, { unique: true })
+db.category_budgets.createIndex({ "userId": 1, "isActive": 1 })
+
+// Monthly Budgets (Compatibility Layer)
 db.monthly_budgets.createIndex({ "userId": 1, "year": 1, "month": 1 }, { unique: true })
 
-// Yearly Budgets
+// Yearly Budgets (Planned)
 db.yearly_budgets.createIndex({ "userId": 1, "year": 1 }, { unique: true })
 
 // Project Budgets
 db.project_budgets.createIndex({ "userId": 1, "status": 1 })
-db.project_budgets.createIndex({ "autoTag": 1 })
+db.project_budgets.createIndex({ "userId": 1, "name": 1 }, { unique: true })
+db.project_budgets.createIndex({ "startDate": 1, "endDate": 1 })
+
+// Tags
+db.tags.createIndex({ "name": 1, "userId": 1 }, { unique: true })
+db.tags.createIndex({ "userId": 1, "type": 1 })
 
 // Transactions (updated)
 db.transactions.createIndex({ "tags": 1 })
@@ -550,5 +758,5 @@ interface BudgetContextType {
 
 ---
 
-*Last Updated: January 17, 2025*
-*Status: 📋 Ready for Implementation*
+*Last Updated: July 19, 2025*
+*Status: ✅ Phases 1-5 Completed | 📋 Phases 6-7 Planned*

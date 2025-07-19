@@ -38,6 +38,7 @@ import { getCategoryIconTheme } from '../constants/categoryIconSystem';
 import MonthlyBudgetEditor from '../components/budget/MonthlyBudgetEditor';
 import InlineBudgetEditor from '../components/budget/InlineBudgetEditor';
 import CategoryIcon from '../components/common/CategoryIcon';
+import { useNavigate } from 'react-router-dom';
 
 // Month names for display
 const MONTH_NAMES = [
@@ -58,11 +59,21 @@ const BudgetCategoryItem: React.FC<{
   totalBudgeted: number;
   totalActual: number;
   color: string;
-}> = ({ category, subcategories, totalBudgeted, totalActual, color }) => {
+  year: number;
+  month: number;
+}> = ({ category, subcategories, totalBudgeted, totalActual, color, year, month }) => {
   const [expanded, setExpanded] = useState(false);
+  const navigate = useNavigate();
 
   const handleToggle = () => {
     setExpanded(!expanded);
+  };
+
+  const handleSubcategoryClick = (subcategory: any, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent expanding/collapsing the category
+    if (subcategory.categoryId && subcategory.subCategoryId) {
+      navigate(`/budgets/subcategory/${year}/${month}/${subcategory.categoryId}/${subcategory.subCategoryId}`);
+    }
   };
 
   // Get category theme for consistent styling
@@ -116,17 +127,23 @@ const BudgetCategoryItem: React.FC<{
         <Collapse in={expanded} timeout="auto" unmountOnExit>
           <Box ml={4}>
             {subcategories.map((sub, index) => (
-              <Box key={index} p={2} mb={0.5} border={1} borderColor="grey.100" borderRadius={1} bgcolor="grey.50">
+              <Box 
+                key={index} 
+                p={2} 
+                mb={0.5} 
+                border={1} 
+                borderColor="grey.100" 
+                borderRadius={1} 
+                bgcolor="grey.50"
+                sx={{ 
+                  cursor: 'pointer',
+                  '&:hover': {
+                    bgcolor: 'grey.100'
+                  }
+                }}
+                onClick={(e) => handleSubcategoryClick(sub, e)}
+              >
                 <Box display="flex" alignItems="center" gap={2} width="100%">
-                  {/* Subcategory Icon */}
-                  <CategoryIcon 
-                    categoryName={category}
-                    subcategoryName={sub.name}
-                    size="small"
-                    variant="plain"
-                    showTooltip={false}
-                  />
-                  
                   {/* Subcategory Name and Budget/Actual */}
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography 
@@ -136,8 +153,7 @@ const BudgetCategoryItem: React.FC<{
                         display: 'block', 
                         fontSize: '0.75rem', 
                         lineHeight: 1.2, 
-                        fontWeight: 'bold',
-                        color: categoryTheme?.primary || `${color}.main`
+                        fontWeight: 'bold'
                       }}
                     >
                       {sub.name}
@@ -479,6 +495,8 @@ const BudgetsPage: React.FC = () => {
                   totalBudgeted={currentMonthlyBudget?.salaryBudget || 0}
                   totalActual={0} // TODO: Get actual salary from transactions
                   color="success"
+                  year={currentYear}
+                  month={currentMonth}
                 />
 
                 {/* Other Income Categories */}
@@ -490,6 +508,8 @@ const BudgetsPage: React.FC = () => {
                     totalBudgeted={income.amount}
                     totalActual={0} // TODO: Get actual from transactions
                     color="success"
+                    year={currentYear}
+                    month={currentMonth}
                   />
                 ))}
                 
@@ -608,6 +628,8 @@ const BudgetsPage: React.FC = () => {
                           totalBudgeted={totalBudgeted}
                           totalActual={totalActual}
                           color="error"
+                          year={currentYear}
+                          month={currentMonth}
                         />
                       );
                     });
