@@ -187,8 +187,8 @@ class EnhancedKeywordMatcher {
     try {
       // Check if both text and keyword contain Hebrew characters
       // Hebrew Unicode range: U+0590-U+05FF
-      const hasHebrewText = /[\u0590-\u05FF]/.test(text);
-      const hasHebrewKeyword = /[\u0590-\u05FF]/.test(keyword);
+      const hasHebrewText = /[\u0590-\u05FF]+/.test(text);
+      const hasHebrewKeyword = /[\u0590-\u05FF]+/.test(keyword);
 
       if (!hasHebrewText || !hasHebrewKeyword) {
         return { found: false };
@@ -400,8 +400,8 @@ class EnhancedKeywordMatcher {
       const englishWords = text.match(/\b[a-zA-Z]+\b/g) || [];
       
       // Extract Hebrew words (enhanced to handle proper word boundaries)
-      // Hebrew Unicode range: \u0590-\u05FF
-      const hebrewWords = text.match(/[-]+/g) || [];
+      // Hebrew Unicode range: U+0590-U+05FF
+      const hebrewWords = text.match(/[\u0590-\u05FF]+/g) || [];
       
       return [...englishWords, ...hebrewWords];
     } catch (error) {
