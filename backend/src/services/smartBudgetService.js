@@ -359,11 +359,11 @@ class SmartBudgetService {
     console.log(`Executing smart budget workflow for user ${userId}`);
 
     try {
-      // Step 1: Check for pending patterns
+      // Step 1: Check for pending patterns first
       const pendingCheck = await this.checkPendingPatterns(userId);
       
       if (pendingCheck.hasPending) {
-        // Return patterns for user approval
+        // Return existing pending patterns for user approval
         return {
           step: 'pattern-approval-required',
           success: false,
@@ -373,7 +373,23 @@ class SmartBudgetService {
         };
       }
 
-      // Step 2: Calculate smart budget
+      // Step 2: If no pending patterns, detect new ones
+      console.log('No pending patterns found, detecting new patterns...');
+      const detectionResult = await this.detectPatternsForUser(userId, analysisMonths);
+      
+      if (detectionResult.requiresUserApproval && detectionResult.patterns.length > 0) {
+        // New patterns detected - user needs to approve them first
+        return {
+          step: 'pattern-detection-complete',
+          success: false,
+          message: `Detected ${detectionResult.totalDetected} new spending patterns. Please review and approve them to continue with budget calculation.`,
+          detectedPatterns: detectionResult.patterns,
+          nextAction: 'approve-patterns'
+        };
+      }
+
+      // Step 3: No patterns detected or all patterns already handled, calculate budget
+      console.log('No new patterns detected, proceeding with budget calculation...');
       const budgetResult = await this.calculateSmartBudget(userId, year, month, analysisMonths);
 
       return {
