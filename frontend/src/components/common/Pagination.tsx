@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Box,
-  Button,
   IconButton,
   Stack,
   Select,
@@ -9,7 +8,6 @@ import {
   FormControl,
   InputLabel,
   Typography,
-  useTheme,
   SelectChangeEvent,
   Tooltip
 } from '@mui/material';
@@ -19,7 +17,6 @@ import {
   NavigateNext,
   NavigateBefore
 } from '@mui/icons-material';
-import type { PaginationParams } from '../../services/api/types/verification';
 
 interface PaginationProps {
   currentPage: number;
@@ -48,7 +45,6 @@ export const Pagination: React.FC<PaginationProps> = ({
   className,
   'aria-label': ariaLabel = 'Pagination navigation'
 }) => {
-  const theme = useTheme();
   // Sanitize inputs
   const sanitizedTotal = Math.max(0, Number.isFinite(total) ? total : 0);
   const sanitizedPageSize = Math.min(
