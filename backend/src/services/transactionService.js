@@ -785,7 +785,7 @@ class TransactionService {
    */
   async applyManualCategorizationToHistoricalTransactions(userId, matchingData, categoryId, subCategoryId, excludeTransactionId = null) {
     try {
-      console.log(`Applying manual categorization rule to historical transactions for user ${userId}, with matching data: ${JSON.stringify(matchingData)}`);
+      logger.info(`Applying manual categorization rule to historical transactions for user ${userId}, with matching data: ${JSON.stringify(matchingData)}`);
       
       // Build query to find matching transactions
       const query = {
@@ -799,25 +799,33 @@ class TransactionService {
         query._id = { $ne: convertToObjectId(excludeTransactionId) };
       }
 
+      // Helper function to escape special regex characters for MongoDB regex queries
+      const escapeRegExp = (string) => {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      };
+
       // Add description matching if provided
       if (matchingData.description) {
-        query.description = new RegExp(matchingData.description, 'i');
+        const escapedDescription = escapeRegExp(matchingData.description);
+        query.description = new RegExp(escapedDescription, 'i');
       }
 
       // Add memo matching if provided
       if (matchingData.memo) {
+        const escapedMemo = escapeRegExp(matchingData.memo);
         query.$or = [
-          { memo: new RegExp(matchingData.memo, 'i') },
-          { 'rawData.memo': new RegExp(matchingData.memo, 'i') }
+          { memo: new RegExp(escapedMemo, 'i') },
+          { 'rawData.memo': new RegExp(escapedMemo, 'i') }
         ];
       }
 
       // Add rawCategory matching if provided
       if (matchingData.rawCategory) {
+        const escapedRawCategory = escapeRegExp(matchingData.rawCategory);
         if (query.$or) {
-          query.$or.push({ 'rawData.category': new RegExp(matchingData.rawCategory, 'i') });
+          query.$or.push({ 'rawData.category': new RegExp(escapedRawCategory, 'i') });
         } else {
-          query['rawData.category'] = new RegExp(matchingData.rawCategory, 'i');
+          query['rawData.category'] = new RegExp(escapedRawCategory, 'i');
         }
       }
 

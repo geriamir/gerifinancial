@@ -1,6 +1,7 @@
 const { MonthlyBudget, YearlyBudget, ProjectBudget, CategoryBudget, Transaction, Category, SubCategory, Tag, TransactionPattern } = require('../models');
 const logger = require('../utils/logger');
 const recurrenceDetectionService = require('./recurrenceDetectionService');
+const averagingDenominatorService = require('./averagingDenominatorService');
 
 class BudgetService {
   // ============================================
@@ -260,15 +261,29 @@ class BudgetService {
       const patternedTransactionIds = new Set();
       const nonPatternedTransactions = [];
 
-      // Mark transactions that match detected patterns
+      // Mark transactions that match detected patterns (both saved and newly detected)
       for (const transaction of transactions) {
         let isPatternedTransaction = false;
         
+        // Check against saved patterns (with proper DB methods)
         for (const pattern of savedPatterns) {
-          if (pattern.matchesTransaction(transaction)) {
+          if (pattern.matchesTransaction && pattern.matchesTransaction(transaction)) {
             patternedTransactionIds.add(transaction._id.toString());
             isPatternedTransaction = true;
+            logger.info(`Transaction ${transaction._id} matches saved pattern ${pattern.patternId}`);
             break;
+          }
+        }
+        
+        // Also check against newly detected patterns (using simple matching logic)
+        if (!isPatternedTransaction) {
+          for (const detectedPattern of detectedPatterns) {
+            if (this.matchesDetectedPattern(transaction, detectedPattern)) {
+              patternedTransactionIds.add(transaction._id.toString());
+              isPatternedTransaction = true;
+              logger.info(`Transaction ${transaction._id} matches newly detected pattern ${detectedPattern.patternId}`);
+              break;
+            }
           }
         }
         
@@ -279,12 +294,17 @@ class BudgetService {
 
       logger.info(`Found ${patternedTransactionIds.size} patterned transactions, ${nonPatternedTransactions.length} non-patterned transactions`);
 
-      // STEP 4: CALCULATE AVERAGES FOR NON-PATTERNED TRANSACTIONS
+      // STEP 4: CALCULATE SMART AVERAGES FOR NON-PATTERNED TRANSACTIONS
       const expensesBySubCategory = {};
       const incomeByCategory = {};
 
+      // Track which months have any transaction data
+      const monthsWithData = new Set();
+
       for (const transaction of nonPatternedTransactions) {
         const amount = Math.abs(transaction.amount);
+        const transactionMonth = transaction.processedDate.getMonth() + 1;
+        monthsWithData.add(transactionMonth);
         
         if (transaction.category?.type === 'Expense' && transaction.subCategory) {
           const key = `${transaction.category._id}_${transaction.subCategory._id}`;
@@ -295,11 +315,13 @@ class BudgetService {
               categoryName: transaction.category.name,
               subCategoryName: transaction.subCategory.name,
               total: 0,
-              count: 0
+              count: 0,
+              monthsPresent: new Set()
             };
           }
           expensesBySubCategory[key].total += amount;
           expensesBySubCategory[key].count += 1;
+          expensesBySubCategory[key].monthsPresent.add(transactionMonth);
         } else if (transaction.category?.type === 'Income') {
           const key = transaction.category._id.toString();
           if (!incomeByCategory[key]) {
@@ -307,20 +329,35 @@ class BudgetService {
               categoryId: transaction.category._id,
               categoryName: transaction.category.name,
               total: 0,
-              count: 0
+              count: 0,
+              monthsPresent: new Set()
             };
           }
           incomeByCategory[key].total += amount;
           incomeByCategory[key].count += 1;
+          incomeByCategory[key].monthsPresent.add(transactionMonth);
         }
       }
 
-      // STEP 5: UPDATE BUDGETS WITH PATTERN-AWARE AMOUNTS
+      // Calculate effective months for averaging
+      const totalMonthsWithAnyData = monthsWithData.size;
+      logger.info(`Found transaction data in ${totalMonthsWithAnyData} out of ${monthsToAnalyze} analysis months`);
+
+      // STEP 5: UPDATE BUDGETS WITH SMART PATTERN-AWARE AVERAGING
       let updatedBudgets = 0;
 
-      // Update income budgets (regular averaging for non-patterned)
+      // Update income budgets with smart averaging using AveragingDenominatorService
       for (const income of Object.values(incomeByCategory)) {
-        const avgAmount = Math.round(income.total / monthsToAnalyze);
+        const strategy = averagingDenominatorService.getAveragingStrategy(
+          income.monthsPresent, 
+          monthsWithData, 
+          monthsToAnalyze
+        );
+        const avgAmount = Math.round(income.total / strategy.denominator);
+        
+        logger.info(`Income smart averaging for ${income.categoryName}: ₪${income.total} total / ${strategy.denominator} months = ₪${avgAmount}`);
+        logger.info(`Strategy: ${strategy.reasoning}`);
+        
         let budget = await CategoryBudget.findOne({ 
           userId, 
           categoryId: income.categoryId, 
@@ -336,9 +373,21 @@ class BudgetService {
         updatedBudgets++;
       }
 
-      // Update expense budgets for non-patterned transactions
+      // Update expense budgets with smart averaging using AveragingDenominatorService
       for (const expense of Object.values(expensesBySubCategory)) {
-        const avgAmount = Math.round(expense.total / monthsToAnalyze);
+        const strategy = averagingDenominatorService.getAveragingStrategy(
+          expense.monthsPresent, 
+          monthsWithData, 
+          monthsToAnalyze
+        );
+        const avgAmount = Math.round(expense.total / strategy.denominator);
+        
+        logger.info(`Expense smart averaging for ${expense.categoryName}→${expense.subCategoryName}: ₪${expense.total} total / ${strategy.denominator} months = ₪${avgAmount}`);
+        logger.info(`  Category months present: [${Array.from(expense.monthsPresent).sort((a,b) => a-b).join(', ')}]`);
+        logger.info(`  All data months: [${Array.from(monthsWithData).sort((a,b) => a-b).join(', ')}]`);
+        logger.info(`  Requested analysis months: ${monthsToAnalyze}`);
+        logger.info(`Strategy: ${strategy.reasoning}`);
+        
         let budget = await CategoryBudget.findOne({ 
           userId, 
           categoryId: expense.categoryId, 
@@ -355,11 +404,16 @@ class BudgetService {
       }
 
       // STEP 6: ADD PATTERN-BASED BUDGETS TO EXISTING AMOUNTS
-      const patternsForMonth = await TransactionPattern.getPatternsForMonth(userId, month);
-      logger.info(`Found ${patternsForMonth.length} patterns that apply to month ${month}`);
+      // Get all approved patterns and check if they apply to this month using smart logic
+      const allApprovedPatterns = await TransactionPattern.getActivePatterns(userId);
+      const patternsForMonth = allApprovedPatterns.filter(pattern => 
+        this.shouldPatternOccurInMonth(pattern, month)
+      );
+      
+      logger.info(`Found ${patternsForMonth.length} patterns that apply to month ${month} using smart logic`);
 
       for (const pattern of patternsForMonth) {
-        const patternAmount = pattern.getAmountForMonth(month);
+        const patternAmount = pattern.averageAmount;
         
         if (patternAmount > 0) {
           let budget = await CategoryBudget.findOne({ 
@@ -822,6 +876,143 @@ class BudgetService {
       logger.error('Error getting dashboard overview:', error);
       throw error;
     }
+  }
+
+  // ============================================
+  // PATTERN MATCHING METHODS (shared with SmartBudgetService)
+  // ============================================
+
+  /**
+   * Determine if a pattern should occur in a specific month with future projections
+   */
+  shouldPatternOccurInMonth(pattern, targetMonth) {
+    const { recurrencePattern, scheduledMonths } = pattern;
+
+    // Always check if explicitly scheduled for this month first
+    if (scheduledMonths && scheduledMonths.includes(targetMonth)) {
+      logger.info(`Pattern ${pattern.patternId} explicitly scheduled for month ${targetMonth}`);
+      return true;
+    }
+
+    // For patterns without explicit scheduling or future projections, 
+    // calculate expected months based on pattern type
+    return this.calculateFutureOccurrences(pattern, targetMonth);
+  }
+
+  /**
+   * Calculate future occurrences based on pattern type with improved logic
+   */
+  calculateFutureOccurrences(pattern, targetMonth) {
+    const { recurrencePattern, scheduledMonths } = pattern;
+    
+    if (!scheduledMonths || scheduledMonths.length === 0) {
+      logger.info(`Pattern ${pattern.patternId} has no scheduled months, skipping`);
+      return false;
+    }
+
+    // Sort scheduled months to find the pattern
+    const sortedMonths = [...scheduledMonths].sort((a, b) => a - b);
+    
+    logger.info(`Checking pattern ${pattern.patternId} (${recurrencePattern}) for month ${targetMonth}, scheduled months: [${sortedMonths.join(', ')}]`);
+    
+    switch (recurrencePattern) {
+      case 'monthly':
+        // Every month - monthly patterns should occur in every month
+        logger.info(`Monthly pattern ${pattern.patternId}: occurs every month, including month ${targetMonth}`);
+        return true;
+        
+      case 'bi-monthly':
+        // Every 2 months - check if targetMonth fits the bi-monthly cycle
+        return this.isBiMonthlyMatch(sortedMonths, targetMonth);
+        
+      case 'quarterly':
+        // Every 3 months - check if targetMonth fits the quarterly cycle
+        return this.isQuarterlyMatch(sortedMonths, targetMonth);
+        
+      case 'yearly':
+        // For yearly patterns, check if targetMonth matches any of the scheduled months
+        // (accounting for multiple occurrences within a year)
+        const matches = sortedMonths.includes(targetMonth);
+        logger.info(`Yearly pattern ${pattern.patternId}: month ${targetMonth} ${matches ? 'matches' : 'does not match'} scheduled months`);
+        return matches;
+        
+      default:
+        logger.info(`Unknown recurrence pattern: ${recurrencePattern}`);
+        return false;
+    }
+  }
+
+  /**
+   * Check if target month matches bi-monthly pattern (improved logic)
+   */
+  isBiMonthlyMatch(scheduledMonths, targetMonth) {
+    // For bi-monthly patterns, check if the target month follows the pattern
+    // from any of the scheduled base months
+    for (const baseMonth of scheduledMonths) {
+      // Check if targetMonth is baseMonth + 0, 2, 4, 6, 8, 10 months
+      const monthDiff = (targetMonth - baseMonth + 12) % 12;
+      if (monthDiff % 2 === 0) {
+        logger.info(`Bi-monthly pattern match: month ${targetMonth} is ${monthDiff} months from base month ${baseMonth}`);
+        return true;
+      }
+    }
+    
+    logger.info(`No bi-monthly pattern match for month ${targetMonth} from scheduled months [${scheduledMonths.join(', ')}]`);
+    return false;
+  }
+
+  /**
+   * Check if target month matches quarterly pattern (improved logic)
+   */
+  isQuarterlyMatch(scheduledMonths, targetMonth) {
+    // For quarterly patterns, check if the target month follows the pattern
+    // from any of the scheduled base months
+    for (const baseMonth of scheduledMonths) {
+      // Check if targetMonth is baseMonth + 0, 3, 6, 9 months
+      const monthDiff = (targetMonth - baseMonth + 12) % 12;
+      if (monthDiff % 3 === 0) {
+        logger.info(`Quarterly pattern match: month ${targetMonth} is ${monthDiff} months from base month ${baseMonth}`);
+        return true;
+      }
+    }
+    
+    logger.info(`No quarterly pattern match for month ${targetMonth} from scheduled months [${scheduledMonths.join(', ')}]`);
+    return false;
+  }
+
+  /**
+   * Check if a transaction matches a newly detected pattern (before it's saved to DB)
+   * @param {Object} transaction - Transaction to check
+   * @param {Object} detectedPattern - Newly detected pattern object
+   * @returns {boolean} True if transaction matches the pattern
+   */
+  matchesDetectedPattern(transaction, detectedPattern) {
+    // Check amount range
+    const amount = Math.abs(transaction.amount);
+    const { amountRange } = detectedPattern.transactionIdentifier;
+    if (amount < amountRange.min || amount > amountRange.max) {
+      return false;
+    }
+    
+    // Check category/subcategory IDs
+    const transactionCategoryId = transaction.category?._id?.toString() || transaction.category?.toString();
+    const transactionSubCatId = transaction.subCategory?._id?.toString() || transaction.subCategory?.toString();
+    
+    if (transactionCategoryId !== detectedPattern.transactionIdentifier.categoryId?.toString()) {
+      return false;
+    }
+    
+    if (detectedPattern.transactionIdentifier.subCategoryId && 
+        transactionSubCatId !== detectedPattern.transactionIdentifier.subCategoryId?.toString()) {
+      return false;
+    }
+    
+    // Check description similarity (basic contains check)
+    const normalizedTransactionDesc = transaction.description?.toLowerCase().trim() || '';
+    const normalizedPatternDesc = detectedPattern.transactionIdentifier.description.toLowerCase().trim();
+    
+    return normalizedTransactionDesc.includes(normalizedPatternDesc) || 
+           normalizedPatternDesc.includes(normalizedTransactionDesc);
   }
 }
 

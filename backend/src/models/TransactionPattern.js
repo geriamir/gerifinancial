@@ -48,7 +48,7 @@ const transactionPatternSchema = new mongoose.Schema({
   // Pattern details
   recurrencePattern: {
     type: String,
-    enum: ['bi-monthly', 'quarterly', 'yearly'],
+    enum: ['monthly', 'bi-monthly', 'quarterly', 'yearly'],
     required: true
   },
   

@@ -47,8 +47,11 @@ class RecurrenceDetectionService {
         if (group.transactions.length < 2) continue; // Need at least 2 occurrences
         
         const pattern = this.analyzeTransactionPattern(group, monthsToAnalyze);
-        
-        if (pattern && pattern.confidence >= 0.7) { // Minimum confidence threshold
+        if (!pattern) {
+          continue; // No valid pattern found
+        }
+
+        if (pattern.confidence >= 0.7) { // Minimum confidence threshold
           detectedPatterns.push({
             patternId: uuidv4(),
             userId,
@@ -191,12 +194,18 @@ class RecurrenceDetectionService {
     const { transactions } = group;
     
     // Apply single-transaction-per-period constraint
-    if (!this.validateSingleTransactionPerPeriod(transactions)) {
+    if (!this.validateSingleTransactionPerPeriod(transactions, group.commonDescription.includes('גז'))) {
       return null; // Reject if multiple transactions in same period
     }
-    
+
     // Get month occurrences
     const monthOccurrences = this.getMonthOccurrences(transactions);
+    
+    // Check for monthly pattern (every month) - check this first as it's most common
+    const monthlyPattern = this.checkMonthlyPattern(monthOccurrences, analysisMonths);
+    if (monthlyPattern) {
+      return monthlyPattern;
+    }
     
     // Check for bi-monthly pattern (every 2 months)
     const biMonthlyPattern = this.checkBiMonthlyPattern(monthOccurrences, analysisMonths);
@@ -226,8 +235,10 @@ class RecurrenceDetectionService {
    * @returns {boolean} True if constraint is satisfied
    */
   validateSingleTransactionPerPeriod(transactions) {
-    if (transactions.length < 2) return false;
-    
+    if (transactions.length < 2) {
+      return false;
+    }
+
     // Group transactions by month-year to check for multiple transactions in same month
     const monthlyGroups = {};
     
@@ -289,7 +300,8 @@ class RecurrenceDetectionService {
     }
     
     // Validate gap makes sense for common patterns
-    const isValidGap = firstGap === 2 || // Bi-monthly
+    const isValidGap = firstGap === 1 || // Monthly
+                       firstGap === 2 || // Bi-monthly
                        firstGap === 3 || // Quarterly  
                        firstGap === 6 || // Semi-annually
                        firstGap === 12;  // Yearly
@@ -309,6 +321,92 @@ class RecurrenceDetectionService {
    */
   getMonthOccurrences(transactions) {
     return transactions.map(t => t.processedDate.getMonth() + 1);
+  }
+
+  /**
+   * Check for monthly pattern (every month)
+   * @param {Array} monthOccurrences - Array of month numbers
+   * @param {number} analysisMonths - Number of months analyzed
+   * @returns {Object|null} Pattern details or null
+   */
+  checkMonthlyPattern(monthOccurrences, analysisMonths) {
+    if (monthOccurrences.length < 3) return null; // Need at least 3 occurrences for monthly pattern
+    
+    const expectedOccurrences = analysisMonths;
+    const actualOccurrences = monthOccurrences.length;
+    
+    // For monthly patterns, we expect close to full coverage but allow for some missing months
+    // due to data limitations (like the mortgage scenario where data starts mid-period)
+    const coverageRatio = actualOccurrences / expectedOccurrences;
+    
+    // Allow 60-100% coverage for monthly patterns (to handle scenarios like mortgage starting mid-period)
+    if (coverageRatio < 0.6) {
+      return null;
+    }
+    
+    // Check if months are consecutive or mostly consecutive
+    const sortedMonths = [...monthOccurrences].sort((a, b) => a - b);
+    const isConsecutive = this.checkConsecutivePattern(sortedMonths, analysisMonths);
+    
+    if (!isConsecutive) {
+      return null; // Not a monthly pattern if months are scattered
+    }
+    
+    // Generate scheduled months for all 12 months of the year
+    // This represents that this should occur every month
+    const scheduledMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    
+    // Calculate confidence based on coverage and consistency
+    let confidence = 0.7 + (coverageRatio * 0.25); // Base 70% + up to 25% for coverage
+    
+    // Boost confidence for more occurrences (mortgage-like scenarios)
+    if (actualOccurrences >= 4) {
+      confidence += 0.05; // Reduced from 0.1 to prevent exceeding 1.0
+    }
+    
+    // Ensure confidence never exceeds 1.0
+    confidence = Math.min(0.95, confidence);
+    
+    return {
+      type: 'monthly',
+      scheduledMonths,
+      confidence
+    };
+  }
+
+  /**
+   * Check if months form a consecutive or mostly consecutive pattern
+   * @param {Array} sortedMonths - Sorted array of month numbers
+   * @param {number} analysisMonths - Number of months analyzed
+   * @returns {boolean} True if pattern is consecutive enough
+   */
+  checkConsecutivePattern(sortedMonths, analysisMonths) {
+    if (sortedMonths.length < 3) return false;
+    
+    // Check for consecutive months with minimal gaps
+    let consecutiveCount = 1;
+    let maxConsecutiveRun = 1;
+    
+    for (let i = 1; i < sortedMonths.length; i++) {
+      const gap = sortedMonths[i] - sortedMonths[i - 1];
+      
+      if (gap === 1) {
+        // Perfect consecutive month
+        consecutiveCount++;
+        maxConsecutiveRun = Math.max(maxConsecutiveRun, consecutiveCount);
+      } else if (gap === 2) {
+        // One month gap - still acceptable for monthly pattern
+        consecutiveCount = 1; // Reset but don't penalize too much
+      } else {
+        // Larger gap - reset consecutive count
+        consecutiveCount = 1;
+      }
+    }
+    
+    // Require at least 3 consecutive months or most months to be consecutive
+    const consecutiveRatio = maxConsecutiveRun / sortedMonths.length;
+    
+    return maxConsecutiveRun >= 3 || consecutiveRatio >= 0.7;
   }
 
   /**

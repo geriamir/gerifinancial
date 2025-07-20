@@ -258,25 +258,32 @@ class SmartBudgetService {
   shouldPatternOccurInMonth(pattern, targetMonth) {
     const { recurrencePattern, scheduledMonths } = pattern;
 
-    // If explicitly scheduled for this month
-    if (scheduledMonths.includes(targetMonth)) {
+    // Always check if explicitly scheduled for this month first
+    if (scheduledMonths && scheduledMonths.includes(targetMonth)) {
+      console.log(`Pattern ${pattern.patternId} explicitly scheduled for month ${targetMonth}`);
       return true;
     }
 
-    // For future projections, calculate expected months based on pattern type
+    // For patterns without explicit scheduling or future projections, 
+    // calculate expected months based on pattern type
     return this.calculateFutureOccurrences(pattern, targetMonth);
   }
 
   /**
-   * Calculate future occurrences based on pattern type
+   * Calculate future occurrences based on pattern type with improved logic
    */
   calculateFutureOccurrences(pattern, targetMonth) {
     const { recurrencePattern, scheduledMonths } = pattern;
     
-    if (!scheduledMonths || scheduledMonths.length === 0) return false;
+    if (!scheduledMonths || scheduledMonths.length === 0) {
+      console.log(`Pattern ${pattern.patternId} has no scheduled months, skipping`);
+      return false;
+    }
 
     // Sort scheduled months to find the pattern
     const sortedMonths = [...scheduledMonths].sort((a, b) => a - b);
+    
+    console.log(`Checking pattern ${pattern.patternId} (${recurrencePattern}) for month ${targetMonth}, scheduled months: [${sortedMonths.join(', ')}]`);
     
     switch (recurrencePattern) {
       case 'bi-monthly':
@@ -288,32 +295,54 @@ class SmartBudgetService {
         return this.isQuarterlyMatch(sortedMonths, targetMonth);
         
       case 'yearly':
-        // Same month each year - check if it's the same month
-        return sortedMonths.includes(targetMonth);
+        // For yearly patterns, check if targetMonth matches any of the scheduled months
+        // (accounting for multiple occurrences within a year)
+        const matches = sortedMonths.includes(targetMonth);
+        console.log(`Yearly pattern ${pattern.patternId}: month ${targetMonth} ${matches ? 'matches' : 'does not match'} scheduled months`);
+        return matches;
         
       default:
+        console.log(`Unknown recurrence pattern: ${recurrencePattern}`);
         return false;
     }
   }
 
   /**
-   * Check if target month matches bi-monthly pattern
+   * Check if target month matches bi-monthly pattern (improved logic)
    */
   isBiMonthlyMatch(scheduledMonths, targetMonth) {
-    // For bi-monthly, find the base month and check if target is +2, +4, +6, etc.
-    const baseMonth = scheduledMonths[0];
-    const monthDiff = (targetMonth - baseMonth + 12) % 12;
-    return monthDiff % 2 === 0;
+    // For bi-monthly patterns, check if the target month follows the pattern
+    // from any of the scheduled base months
+    for (const baseMonth of scheduledMonths) {
+      // Check if targetMonth is baseMonth + 0, 2, 4, 6, 8, 10 months
+      const monthDiff = (targetMonth - baseMonth + 12) % 12;
+      if (monthDiff % 2 === 0) {
+        console.log(`Bi-monthly pattern match: month ${targetMonth} is ${monthDiff} months from base month ${baseMonth}`);
+        return true;
+      }
+    }
+    
+    console.log(`No bi-monthly pattern match for month ${targetMonth} from scheduled months [${scheduledMonths.join(', ')}]`);
+    return false;
   }
 
   /**
-   * Check if target month matches quarterly pattern
+   * Check if target month matches quarterly pattern (improved logic)
    */
   isQuarterlyMatch(scheduledMonths, targetMonth) {
-    // For quarterly, find the base month and check if target is +3, +6, +9, etc.
-    const baseMonth = scheduledMonths[0];
-    const monthDiff = (targetMonth - baseMonth + 12) % 12;
-    return monthDiff % 3 === 0;
+    // For quarterly patterns, check if the target month follows the pattern
+    // from any of the scheduled base months
+    for (const baseMonth of scheduledMonths) {
+      // Check if targetMonth is baseMonth + 0, 3, 6, 9 months
+      const monthDiff = (targetMonth - baseMonth + 12) % 12;
+      if (monthDiff % 3 === 0) {
+        console.log(`Quarterly pattern match: month ${targetMonth} is ${monthDiff} months from base month ${baseMonth}`);
+        return true;
+      }
+    }
+    
+    console.log(`No quarterly pattern match for month ${targetMonth} from scheduled months [${scheduledMonths.join(', ')}]`);
+    return false;
   }
 
   /**
