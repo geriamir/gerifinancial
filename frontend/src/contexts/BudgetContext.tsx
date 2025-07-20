@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { budgetsApi, MonthlyBudget, ProjectBudget, BudgetSummary, CreateMonthlyBudgetData, CreateProjectBudgetData } from '../services/api/budgets';
 
 interface BudgetContextType {
@@ -228,18 +228,18 @@ export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
   };
 
   // Refresh all budgets
-  const refreshBudgets = async (): Promise<void> => {
+  const refreshBudgets = useCallback(async (): Promise<void> => {
     await Promise.all([
       loadMonthlyBudget(currentYear, currentMonth),
       loadProjectBudgets({ status: 'active' }),
       loadBudgetSummary(currentYear, currentMonth)
     ]);
-  };
+  }, [currentYear, currentMonth]);
 
   // Load initial data when context mounts or period changes
   useEffect(() => {
     refreshBudgets();
-  }, [currentYear, currentMonth]);
+  }, [refreshBudgets]);
 
   const value: BudgetContextType = {
     // State
