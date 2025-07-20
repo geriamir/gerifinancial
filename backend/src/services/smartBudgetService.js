@@ -435,8 +435,7 @@ class SmartBudgetService {
 
       // Actually create and save the budget to database
       console.log('Saving smart budget to database...');
-      const budgetService = new BudgetService();
-      const savedBudget = await budgetService.createMonthlyBudget(userId, year, month, budgetResult.budget);
+      const savedBudget = await BudgetService.createMonthlyBudget(userId, year, month, budgetResult.budget);
       console.log('Smart budget saved successfully');
 
       return {

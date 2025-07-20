@@ -9,7 +9,6 @@ import {
   Button,
   LinearProgress,
   Alert,
-  Chip,
   Skeleton,
   Divider,
   Tabs,
@@ -21,7 +20,6 @@ import {
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
-  TrendingUp as TrendingUpIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   CalendarMonth as CalendarMonthIcon

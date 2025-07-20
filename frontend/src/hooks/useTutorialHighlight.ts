@@ -58,7 +58,6 @@ export const useTutorialHighlight = (options: HighlightOptions) => {
       if (!overlayRef.current || !targetElement) return;
 
       const rect = targetElement.getBoundingClientRect();
-      const radius = '4px';
 
       overlayRef.current.style.background = `
         ${backdropColor}
