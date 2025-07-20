@@ -1,7 +1,8 @@
 const recurrenceDetectionService = require('./recurrenceDetectionService');
 const TransactionPattern = require('../models/TransactionPattern');
-const budgetService = require('./budgetService');
+const BudgetService = require('./budgetService');
 const Transaction = require('../models/Transaction');
+const PatternMatchingUtils = require('../utils/patternMatching');
 
 /**
  * Smart Budget Service - Enhanced budget calculation with pattern awareness
@@ -308,41 +309,27 @@ class SmartBudgetService {
   }
 
   /**
-   * Check if target month matches bi-monthly pattern (improved logic)
+   * Check if target month matches bi-monthly pattern using robust pattern matching utility
    */
   isBiMonthlyMatch(scheduledMonths, targetMonth) {
-    // For bi-monthly patterns, check if the target month follows the pattern
-    // from any of the scheduled base months
-    for (const baseMonth of scheduledMonths) {
-      // Check if targetMonth is baseMonth + 0, 2, 4, 6, 8, 10 months
-      const monthDiff = (targetMonth - baseMonth + 12) % 12;
-      if (monthDiff % 2 === 0) {
-        console.log(`Bi-monthly pattern match: month ${targetMonth} is ${monthDiff} months from base month ${baseMonth}`);
-        return true;
-      }
-    }
+    const result = PatternMatchingUtils.isBiMonthlyMatch(scheduledMonths, targetMonth);
     
-    console.log(`No bi-monthly pattern match for month ${targetMonth} from scheduled months [${scheduledMonths.join(', ')}]`);
-    return false;
+    // Log the detailed reasoning for debugging
+    console.log(`Bi-monthly pattern check: ${result.reasoning}`);
+    
+    return result.matches;
   }
 
   /**
-   * Check if target month matches quarterly pattern (improved logic)
+   * Check if target month matches quarterly pattern using robust pattern matching utility
    */
   isQuarterlyMatch(scheduledMonths, targetMonth) {
-    // For quarterly patterns, check if the target month follows the pattern
-    // from any of the scheduled base months
-    for (const baseMonth of scheduledMonths) {
-      // Check if targetMonth is baseMonth + 0, 3, 6, 9 months
-      const monthDiff = (targetMonth - baseMonth + 12) % 12;
-      if (monthDiff % 3 === 0) {
-        console.log(`Quarterly pattern match: month ${targetMonth} is ${monthDiff} months from base month ${baseMonth}`);
-        return true;
-      }
-    }
+    const result = PatternMatchingUtils.isQuarterlyMatch(scheduledMonths, targetMonth);
     
-    console.log(`No quarterly pattern match for month ${targetMonth} from scheduled months [${scheduledMonths.join(', ')}]`);
-    return false;
+    // Log the detailed reasoning for debugging
+    console.log(`Quarterly pattern check: ${result.reasoning}`);
+    
+    return result.matches;
   }
 
   /**
@@ -448,6 +435,7 @@ class SmartBudgetService {
 
       // Actually create and save the budget to database
       console.log('Saving smart budget to database...');
+      const budgetService = new BudgetService();
       const savedBudget = await budgetService.createMonthlyBudget(userId, year, month, budgetResult.budget);
       console.log('Smart budget saved successfully');
 
@@ -467,4 +455,4 @@ class SmartBudgetService {
   }
 }
 
-module.exports = new SmartBudgetService();
+module.exports = SmartBudgetService;

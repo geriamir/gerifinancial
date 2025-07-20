@@ -41,6 +41,7 @@ import CategoryIcon from '../components/common/CategoryIcon';
 import PatternDetectionDashboard from '../components/budget/PatternDetection/PatternDetectionDashboard';
 import { budgetsApi } from '../services/api/budgets';
 import { useNavigate } from 'react-router-dom';
+import { BUDGET_STAGES, BUDGET_STAGE_ACTIONS, type BudgetStage } from '../constants/budgetStages';
 
 // Month names for display
 const MONTH_NAMES = [
@@ -197,7 +198,7 @@ const BudgetsPage: React.FC = () => {
   const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
   const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
   const [patternRefreshTrigger, setPatternRefreshTrigger] = useState(0);
-  const [budgetStage, setBudgetStage] = useState<'initial' | 'patterns-detected' | 'budget-created'>('initial');
+  const [budgetStage, setBudgetStage] = useState<BudgetStage>(BUDGET_STAGES.INITIAL);
 
   // Handle period navigation
   const handlePrevMonth = () => {
@@ -222,7 +223,7 @@ const BudgetsPage: React.FC = () => {
       console.log('🚀 BudgetsPage: Starting auto-calculate workflow');
       
       // If we're in the patterns-detected stage, use the reject-remaining-and-proceed endpoint
-      if (budgetStage === 'patterns-detected') {
+      if (budgetStage === BUDGET_STAGES.PATTERNS_DETECTED) {
         console.log('🔄 BudgetsPage: User wants to proceed - rejecting remaining patterns and calculating budget');
         
         const proceedResult = await budgetsApi.rejectRemainingPatternsAndProceed(currentYear, currentMonth, 6);
@@ -232,7 +233,7 @@ const BudgetsPage: React.FC = () => {
           console.log(`📊 BudgetsPage: Auto-rejected ${proceedResult.autoRejectedPatterns || 0} patterns`);
           
           // Set stage to budget created
-          setBudgetStage('budget-created');
+          setBudgetStage(BUDGET_STAGES.BUDGET_CREATED);
           
           // Force refresh to see the new budget
           await refreshBudgets();
@@ -262,7 +263,7 @@ const BudgetsPage: React.FC = () => {
         console.log('🎯 BudgetsPage: Pattern details:', smartResult.detectedPatterns);
         
         // Set stage to patterns detected
-        setBudgetStage('patterns-detected');
+        setBudgetStage(BUDGET_STAGES.PATTERNS_DETECTED);
         
         // Force refresh to show the new patterns in the dashboard
         await refreshBudgets();
@@ -278,7 +279,7 @@ const BudgetsPage: React.FC = () => {
         console.log('✅ BudgetsPage: Smart budget calculated with pattern awareness:', smartResult.calculation);
         
         // Set stage to budget created
-        setBudgetStage('budget-created');
+        setBudgetStage(BUDGET_STAGES.BUDGET_CREATED);
         
         // Force refresh to see the new budget
         await refreshBudgets();
@@ -412,7 +413,7 @@ const BudgetsPage: React.FC = () => {
           <Typography variant="h4" component="h1">
             Budget Management
           </Typography>
-          {budgetStage === 'patterns-detected' && (
+          {budgetStage === BUDGET_STAGES.PATTERNS_DETECTED && (
             <Button
               variant="contained"
               size="large"
@@ -428,7 +429,7 @@ const BudgetsPage: React.FC = () => {
 
 
         {/* Stage 1: Initial - Show only Auto-Calculate button */}
-        {budgetStage === 'initial' && (
+        {budgetStage === BUDGET_STAGES.INITIAL && (
           <Card>
             <CardContent>
               <Box textAlign="center" py={8}>
@@ -452,7 +453,7 @@ const BudgetsPage: React.FC = () => {
         )}
 
         {/* Stage 2: Patterns Detected - Show pattern approval dashboard */}
-        {budgetStage === 'patterns-detected' && (
+        {budgetStage === BUDGET_STAGES.PATTERNS_DETECTED && (
           <>
             {/* Guidance text above patterns */}
             <Card sx={{ mb: 4 }}>
