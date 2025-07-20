@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const recurrenceDetectionService = require('./recurrenceDetectionService');
 const averagingDenominatorService = require('./averagingDenominatorService');
 const { PATTERN_TYPES } = require('../constants/patternTypes');
+const { BUDGET_STATUS, APPROVAL_STATUS } = require('../constants/statusTypes');
 
 class BudgetService {
   // ============================================
@@ -29,7 +30,7 @@ class BudgetService {
         otherIncomeBudgets: budgetData.otherIncomeBudgets || [],
         expenseBudgets: budgetData.expenseBudgets || [],
         notes: budgetData.notes || '',
-        status: budgetData.status || 'active'
+        status: budgetData.status || BUDGET_STATUS.ACTIVE
       });
 
       await budget.save();
@@ -134,7 +135,7 @@ class BudgetService {
         totalActualExpenses,
         budgetBalance: totalBudgetedIncome - totalBudgetedExpenses,
         actualBalance: actualAmounts.totalActualIncome - totalActualExpenses,
-        status: 'active',
+        status: BUDGET_STATUS.ACTIVE,
         isAutoCalculated: false
       };
     } catch (error) {
@@ -455,8 +456,8 @@ class BudgetService {
         patternDetection: {
           totalPatternsDetected: savedPatterns.length,
           patternsForThisMonth: patternsForMonth.length,
-          requiresApproval: savedPatterns.filter(p => p.approvalStatus === 'pending').length > 0,
-          pendingPatterns: savedPatterns.filter(p => p.approvalStatus === 'pending').map(p => ({
+          requiresApproval: savedPatterns.filter(p => p.approvalStatus === APPROVAL_STATUS.PENDING).length > 0,
+          pendingPatterns: savedPatterns.filter(p => p.approvalStatus === APPROVAL_STATUS.PENDING).map(p => ({
             id: p._id,
             patternId: p.patternId,
             description: p.transactionIdentifier.description,
@@ -500,7 +501,7 @@ class BudgetService {
         oneTimeExpenses: budgetData.oneTimeExpenses || [],
         projectBudgets: budgetData.projectBudgets || [],
         notes: budgetData.notes || '',
-        status: budgetData.status || 'active'
+        status: budgetData.status || BUDGET_STATUS.ACTIVE
       });
 
       await budget.save();

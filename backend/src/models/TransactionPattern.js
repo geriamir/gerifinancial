@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { ALL_PATTERN_TYPES } = require('../constants/patternTypes');
+const { ALL_APPROVAL_STATUSES, APPROVAL_STATUS } = require('../constants/statusTypes');
 
 const transactionPatternSchema = new mongoose.Schema({
   userId: {
@@ -100,8 +101,8 @@ const transactionPatternSchema = new mongoose.Schema({
   // User approval status
   approvalStatus: {
     type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
+    enum: ALL_APPROVAL_STATUSES,
+    default: APPROVAL_STATUS.PENDING
   },
   
   // When user made approval decision
@@ -133,7 +134,7 @@ transactionPatternSchema.index({ userId: 1, recurrencePattern: 1 });
 
 // Method to check if pattern is active for a specific month
 transactionPatternSchema.methods.isActiveForMonth = function(month) {
-  if (!this.isActive || this.approvalStatus !== 'approved') {
+  if (!this.isActive || this.approvalStatus !== APPROVAL_STATUS.APPROVED) {
     return false;
   }
   
@@ -147,7 +148,7 @@ transactionPatternSchema.methods.getAmountForMonth = function(month) {
 
 // Method to approve pattern
 transactionPatternSchema.methods.approve = function() {
-  this.approvalStatus = 'approved';
+  this.approvalStatus = APPROVAL_STATUS.APPROVED;
   this.isActive = true;
   this.approvedAt = new Date();
   return this;
@@ -155,7 +156,7 @@ transactionPatternSchema.methods.approve = function() {
 
 // Method to reject pattern
 transactionPatternSchema.methods.reject = function() {
-  this.approvalStatus = 'rejected';
+  this.approvalStatus = APPROVAL_STATUS.REJECTED;
   this.isActive = false;
   this.approvedAt = new Date();
   return this;
@@ -201,14 +202,14 @@ transactionPatternSchema.statics.getUserPatterns = async function(userId, filter
 transactionPatternSchema.statics.getActivePatterns = async function(userId) {
   return this.getUserPatterns(userId, { 
     isActive: true, 
-    approvalStatus: 'approved' 
+    approvalStatus: APPROVAL_STATUS.APPROVED 
   });
 };
 
 // Static method to get pending patterns for user
 transactionPatternSchema.statics.getPendingPatterns = async function(userId) {
   return this.getUserPatterns(userId, { 
-    approvalStatus: 'pending' 
+    approvalStatus: APPROVAL_STATUS.PENDING 
   });
 };
 
