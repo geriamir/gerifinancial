@@ -77,7 +77,7 @@ export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
   };
 
   // Load monthly budget
-  const loadMonthlyBudget = async (year: number, month: number): Promise<MonthlyBudget | null> => {
+  const loadMonthlyBudget = useCallback(async (year: number, month: number): Promise<MonthlyBudget | null> => {
     try {
       clearError();
       setLoading(true);
@@ -105,7 +105,7 @@ export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Create monthly budget
   const createMonthlyBudget = async (data: CreateMonthlyBudgetData): Promise<MonthlyBudget> => {
@@ -228,18 +228,19 @@ export const BudgetProvider: React.FC<BudgetProviderProps> = ({ children }) => {
   };
 
   // Refresh all budgets
-  const refreshBudgets = useCallback(async (): Promise<void> => {
+  const refreshBudgets = async (): Promise<void> => {
     await Promise.all([
       loadMonthlyBudget(currentYear, currentMonth),
       loadProjectBudgets({ status: 'active' }),
       loadBudgetSummary(currentYear, currentMonth)
     ]);
-  }, [currentYear, currentMonth]);
+  };
 
   // Load initial data when context mounts or period changes
   useEffect(() => {
     refreshBudgets();
-  }, [refreshBudgets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentYear, currentMonth]);
 
   const value: BudgetContextType = {
     // State
