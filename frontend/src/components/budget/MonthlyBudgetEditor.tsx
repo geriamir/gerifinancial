@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -13,10 +13,7 @@ import {
   StepLabel,
   Card,
   CardContent,
-  Grid,
-  Divider,
   Alert,
-  Chip,
   IconButton,
   InputAdornment,
   FormControl,
@@ -25,8 +22,7 @@ import {
   MenuItem,
   Accordion,
   AccordionSummary,
-  AccordionDetails,
-  Stack
+  AccordionDetails
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -36,7 +32,7 @@ import {
   Save as SaveIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
-import { MonthlyBudget, CreateMonthlyBudgetData } from '../../services/api/budgets';
+import { MonthlyBudget } from '../../services/api/budgets';
 import { formatCurrency } from '../../utils/formatters';
 import { useBudget } from '../../contexts/BudgetContext';
 
@@ -120,6 +116,29 @@ const MonthlyBudgetEditor: React.FC<MonthlyBudgetEditorProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isAutoCalculating, setIsAutoCalculating] = useState(false);
 
+  // Auto-calculate budget from history
+  const handleAutoCalculate = useCallback(async () => {
+    try {
+      setIsAutoCalculating(true);
+      setError(null);
+      
+      const calculatedBudget = await calculateMonthlyBudget(year, month, 6); // Use 6 months history
+      
+      setBudgetData({
+        salaryBudget: calculatedBudget.salaryBudget || 0,
+        otherIncomeBudgets: calculatedBudget.otherIncomeBudgets || [],
+        expenseBudgets: calculatedBudget.expenseBudgets || [],
+        notes: calculatedBudget.notes || 'Auto-calculated from 6 months of transaction history',
+        status: 'draft'
+      });
+      
+    } catch (error: any) {
+      setError(error.message || 'Failed to auto-calculate budget');
+    } finally {
+      setIsAutoCalculating(false);
+    }
+  }, [calculateMonthlyBudget, year, month]);
+
   // Initialize budget data when budget prop changes
   useEffect(() => {
     if (budget) {
@@ -134,7 +153,7 @@ const MonthlyBudgetEditor: React.FC<MonthlyBudgetEditorProps> = ({
       // For new budgets, auto-calculate suggestions
       handleAutoCalculate();
     }
-  }, [budget, year, month]);
+  }, [budget, year, month, handleAutoCalculate]);
 
   const steps = ['Income Setup', 'Expense Budgets', 'Review & Save'];
 
@@ -208,28 +227,6 @@ const MonthlyBudgetEditor: React.FC<MonthlyBudgetEditorProps> = ({
     }));
   };
 
-  // Auto-calculate budget from history
-  const handleAutoCalculate = async () => {
-    try {
-      setIsAutoCalculating(true);
-      setError(null);
-      
-      const calculatedBudget = await calculateMonthlyBudget(year, month, 6); // Use 6 months history
-      
-      setBudgetData({
-        salaryBudget: calculatedBudget.salaryBudget || 0,
-        otherIncomeBudgets: calculatedBudget.otherIncomeBudgets || [],
-        expenseBudgets: calculatedBudget.expenseBudgets || [],
-        notes: calculatedBudget.notes || 'Auto-calculated from 6 months of transaction history',
-        status: 'draft'
-      });
-      
-    } catch (error: any) {
-      setError(error.message || 'Failed to auto-calculate budget');
-    } finally {
-      setIsAutoCalculating(false);
-    }
-  };
 
   // Save budget
   const handleSave = async () => {
