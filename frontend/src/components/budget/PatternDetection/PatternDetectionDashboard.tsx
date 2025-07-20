@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -45,23 +45,7 @@ const PatternDetectionDashboard: React.FC<PatternDetectionDashboardProps> = ({
   // Debug log to check if component receives prop changes
   console.log('🔍 PatternDetectionDashboard: Component render - refreshTrigger:', refreshTrigger, 'user.id:', user?.id);
 
-  // Load pending patterns
-  useEffect(() => {
-    if (!user?.id) return;
-    
-    loadPendingPatterns();
-  }, [user?.id]);
-
-  // Trigger refresh when refreshTrigger changes
-  useEffect(() => {
-    if (!user?.id) return;
-    if (refreshTrigger === undefined || refreshTrigger === 0) return;
-    
-    console.log('🔄 PatternDetectionDashboard: refreshTrigger useEffect fired with value:', refreshTrigger);
-    loadPendingPatterns();
-  }, [refreshTrigger, user?.id]);
-
-  const loadPendingPatterns = async () => {
+  const loadPendingPatterns = useCallback(async () => {
     if (!user?.id) return;
     
     try {
@@ -89,7 +73,23 @@ const PatternDetectionDashboard: React.FC<PatternDetectionDashboardProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, refreshTrigger]);
+
+  // Load pending patterns
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    loadPendingPatterns();
+  }, [user?.id, loadPendingPatterns]);
+
+  // Trigger refresh when refreshTrigger changes
+  useEffect(() => {
+    if (!user?.id) return;
+    if (refreshTrigger === undefined || refreshTrigger === 0) return;
+    
+    console.log('🔄 PatternDetectionDashboard: refreshTrigger useEffect fired with value:', refreshTrigger);
+    loadPendingPatterns();
+  }, [refreshTrigger, user?.id, loadPendingPatterns]);
 
   const handlePatternAction = async (patternId: string, action: 'approve' | 'reject', reason?: string) => {
     try {
