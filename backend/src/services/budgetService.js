@@ -2,6 +2,7 @@ const { MonthlyBudget, YearlyBudget, ProjectBudget, CategoryBudget, Transaction,
 const logger = require('../utils/logger');
 const recurrenceDetectionService = require('./recurrenceDetectionService');
 const averagingDenominatorService = require('./averagingDenominatorService');
+const { PATTERN_TYPES } = require('../constants/patternTypes');
 
 class BudgetService {
   // ============================================
@@ -916,20 +917,20 @@ class BudgetService {
     logger.info(`Checking pattern ${pattern.patternId} (${recurrencePattern}) for month ${targetMonth}, scheduled months: [${sortedMonths.join(', ')}]`);
     
     switch (recurrencePattern) {
-      case 'monthly':
+      case PATTERN_TYPES.MONTHLY:
         // Every month - monthly patterns should occur in every month
         logger.info(`Monthly pattern ${pattern.patternId}: occurs every month, including month ${targetMonth}`);
         return true;
         
-      case 'bi-monthly':
+      case PATTERN_TYPES.BI_MONTHLY:
         // Every 2 months - check if targetMonth fits the bi-monthly cycle
         return this.isBiMonthlyMatch(sortedMonths, targetMonth);
         
-      case 'quarterly':
+      case PATTERN_TYPES.QUARTERLY:
         // Every 3 months - check if targetMonth fits the quarterly cycle
         return this.isQuarterlyMatch(sortedMonths, targetMonth);
         
-      case 'yearly':
+      case PATTERN_TYPES.YEARLY:
         // For yearly patterns, check if targetMonth matches any of the scheduled months
         // (accounting for multiple occurrences within a year)
         const matches = sortedMonths.includes(targetMonth);

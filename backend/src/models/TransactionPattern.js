@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { ALL_PATTERN_TYPES } = require('../constants/patternTypes');
 
 const transactionPatternSchema = new mongoose.Schema({
   userId: {
@@ -48,7 +49,7 @@ const transactionPatternSchema = new mongoose.Schema({
   // Pattern details
   recurrencePattern: {
     type: String,
-    enum: ['monthly', 'bi-monthly', 'quarterly', 'yearly'],
+    enum: ALL_PATTERN_TYPES,
     required: true
   },
   

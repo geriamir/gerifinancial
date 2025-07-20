@@ -1,6 +1,7 @@
 const { Transaction, TransactionPattern } = require('../models');
 const logger = require('../utils/logger');
 const { v4: uuidv4 } = require('uuid');
+const { PATTERN_TYPES } = require('../constants/patternTypes');
 
 class RecurrenceDetectionService {
   /**
@@ -368,7 +369,7 @@ class RecurrenceDetectionService {
     confidence = Math.min(0.95, confidence);
     
     return {
-      type: 'monthly',
+      type: PATTERN_TYPES.MONTHLY,
       scheduledMonths,
       confidence
     };
@@ -461,7 +462,7 @@ class RecurrenceDetectionService {
     const confidence = this.calculatePatternConfidence(actualOccurrences, expectedOccurrences, isConsistent);
     
     return {
-      type: 'bi-monthly',
+      type: PATTERN_TYPES.BI_MONTHLY,
       scheduledMonths,
       confidence
     };
@@ -513,7 +514,7 @@ class RecurrenceDetectionService {
     const confidence = Math.min(0.95, this.calculatePatternConfidence(actualOccurrences, expectedOccurrences, isConsistent) + 0.1);
     
     return {
-      type: 'quarterly',
+      type: PATTERN_TYPES.QUARTERLY,
       scheduledMonths,
       confidence
     };
@@ -580,7 +581,7 @@ class RecurrenceDetectionService {
     confidence = Math.min(0.95, confidence);
     
     return {
-      type: 'yearly',
+      type: PATTERN_TYPES.YEARLY,
       scheduledMonths: [primaryMonth],
       confidence
     };
