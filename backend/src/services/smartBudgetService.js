@@ -455,4 +455,4 @@ class SmartBudgetService {
   }
 }
 
-module.exports = SmartBudgetService;
+module.exports = new SmartBudgetService();

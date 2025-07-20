@@ -1005,4 +1005,4 @@ class BudgetService {
   }
 }
 
-module.exports = BudgetService;
+module.exports = new BudgetService();
