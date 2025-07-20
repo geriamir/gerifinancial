@@ -12,19 +12,13 @@ import {
   Menu,
   MenuItem,
   Alert,
-  Skeleton,
-  Stack,
   Collapse,
-  List,
-  ListItem,
-  ListItemText,
   ListItemButton
 } from '@mui/material';
 import {
   Add as AddIcon,
   DateRange as DateRangeIcon,
   TrendingUp as TrendingUpIcon,
-  Assignment as ProjectIcon,
   Calculate as CalculatorIcon,
   MoreVert as MoreVertIcon,
   Edit as EditIcon,
@@ -36,12 +30,11 @@ import { useBudget } from '../contexts/BudgetContext';
 import { formatCurrencyDisplay } from '../utils/formatters';
 import { getCategoryIconTheme } from '../constants/categoryIconSystem';
 import MonthlyBudgetEditor from '../components/budget/MonthlyBudgetEditor';
-import InlineBudgetEditor from '../components/budget/InlineBudgetEditor';
 import CategoryIcon from '../components/common/CategoryIcon';
 import PatternDetectionDashboard from '../components/budget/PatternDetection/PatternDetectionDashboard';
 import { budgetsApi } from '../services/api/budgets';
 import { useNavigate } from 'react-router-dom';
-import { BUDGET_STAGES, BUDGET_STAGE_ACTIONS, type BudgetStage } from '../constants/budgetStages';
+import { BUDGET_STAGES, type BudgetStage } from '../constants/budgetStages';
 
 // Month names for display
 const MONTH_NAMES = [
@@ -182,20 +175,16 @@ const BudgetsPage: React.FC = () => {
   const {
     currentMonthlyBudget,
     projectBudgets,
-    budgetSummary,
     loading,
     error,
     currentYear,
     currentMonth,
     setCurrentPeriod,
-    createMonthlyBudget,
     calculateMonthlyBudget,
-    updateMonthlyBudget,
     refreshBudgets
   } = useBudget();
 
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
-  const [selectedBudgetId, setSelectedBudgetId] = useState<string | null>(null);
   const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
   const [patternRefreshTrigger, setPatternRefreshTrigger] = useState(0);
   const [budgetStage, setBudgetStage] = useState<BudgetStage>(BUDGET_STAGES.INITIAL);
@@ -303,14 +292,12 @@ const BudgetsPage: React.FC = () => {
   };
 
   // Menu handlers
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, budgetId: string) => {
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setMenuAnchor(event.currentTarget);
-    setSelectedBudgetId(budgetId);
   };
 
   const handleMenuClose = () => {
     setMenuAnchor(null);
-    setSelectedBudgetId(null);
   };
 
   // Budget editor handlers
@@ -324,53 +311,6 @@ const BudgetsPage: React.FC = () => {
     setBudgetEditorOpen(false);
   };
 
-  // Inline budget update handlers
-  const handleUpdateSalaryBudget = async (newAmount: number) => {
-    if (!currentMonthlyBudget) return;
-    
-    await updateMonthlyBudget(currentMonthlyBudget._id, {
-      salaryBudget: newAmount
-    });
-  };
-
-  const handleUpdateOtherIncomeBudget = async (index: number, newAmount: number) => {
-    if (!currentMonthlyBudget?.otherIncomeBudgets) return;
-    
-    const updatedOtherIncome = [...currentMonthlyBudget.otherIncomeBudgets];
-    updatedOtherIncome[index] = { ...updatedOtherIncome[index], amount: newAmount };
-    
-    await updateMonthlyBudget(currentMonthlyBudget._id, {
-      otherIncomeBudgets: updatedOtherIncome
-    });
-  };
-
-  const handleUpdateExpenseBudget = async (categoryId: string, subCategoryId: string, newAmount: number) => {
-    if (!currentMonthlyBudget?.expenseBudgets) return;
-    
-    const updatedExpenses = currentMonthlyBudget.expenseBudgets.map(expense => {
-      const expenseCategoryId = typeof expense.categoryId === 'object' 
-        ? (expense.categoryId as any)?._id 
-        : expense.categoryId;
-      const expenseSubCategoryId = typeof expense.subCategoryId === 'object'
-        ? (expense.subCategoryId as any)?._id
-        : expense.subCategoryId;
-        
-      if (expenseCategoryId === categoryId && expenseSubCategoryId === subCategoryId) {
-        return { ...expense, budgetedAmount: newAmount };
-      }
-      return expense;
-    });
-    
-    await updateMonthlyBudget(currentMonthlyBudget._id, {
-      expenseBudgets: updatedExpenses
-    });
-  };
-
-  // Calculate progress percentage for budget vs actual
-  const calculateProgress = (actual: number, budgeted: number) => {
-    if (budgeted === 0) return 0;
-    return Math.min((actual / budgeted) * 100, 100);
-  };
 
   // Get status color
   const getStatusColor = (status: string) => {
@@ -537,7 +477,7 @@ const BudgetsPage: React.FC = () => {
           <Box ml="auto" display="flex" gap={1}>
             <IconButton
               size="small"
-              onClick={(e) => handleMenuOpen(e, currentMonthlyBudget._id)}
+              onClick={handleMenuOpen}
             >
               <MoreVertIcon />
             </IconButton>
