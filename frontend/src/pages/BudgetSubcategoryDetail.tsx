@@ -199,19 +199,20 @@ const BudgetSubcategoryDetail: React.FC = () => {
     }
   }, [currentMonthlyBudget, categoryId]);
 
-  // Calculate date range for the month
-  const startDate = new Date(yearNum, monthNum - 1, 1);
-  const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
-
   // Transaction filters for this subcategory
-  const transactionFilters = React.useMemo(() => ({
-    startDate,
-    endDate,
-    category: categoryId,
-    subCategory: subcategoryId,
-    type: 'Expense',
-    useProcessedDate: true // Use processedDate for budget views to match budget calculations
-  }), [startDate, endDate, categoryId, subcategoryId]);
+  const transactionFilters = React.useMemo(() => {
+    const startDate = new Date(yearNum, monthNum - 1, 1);
+    const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
+    
+    return {
+      startDate,
+      endDate,
+      category: categoryId,
+      subCategory: subcategoryId,
+      type: 'Expense',
+      useProcessedDate: true // Use processedDate for budget views to match budget calculations
+    };
+  }, [yearNum, monthNum, categoryId, subcategoryId]);
 
   // Navigation handlers
   const handleBack = () => {
