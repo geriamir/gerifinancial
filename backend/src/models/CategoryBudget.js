@@ -69,7 +69,48 @@ const categoryBudgetSchema = new mongoose.Schema({
     type: String,
     trim: true,
     maxlength: 500
-  }
+  },
+  
+  // Manual editing tracking
+  isManuallyEdited: {
+    type: Boolean,
+    default: false
+  },
+  
+  lastEditedAt: {
+    type: Date,
+    default: null
+  },
+  
+  editHistory: [{
+    date: {
+      type: Date,
+      default: Date.now
+    },
+    previousAmount: {
+      type: Number,
+      min: 0
+    },
+    newAmount: {
+      type: Number,
+      min: 0
+    },
+    month: {
+      type: Number,
+      min: 1,
+      max: 12,
+      default: null // null for fixed budget edits
+    },
+    reason: {
+      type: String,
+      maxlength: 200
+    },
+    editType: {
+      type: String,
+      enum: ['manual', 'recalculation', 'bulk_edit'],
+      default: 'manual'
+    }
+  }]
 }, {
   timestamps: true
 });
@@ -133,6 +174,7 @@ categoryBudgetSchema.methods.convertToVariable = function() {
 
 // Method to convert from variable to fixed budget
 categoryBudgetSchema.methods.convertToFixed = function(amount = null) {
+  // Check if converting from variable to fixed
   if (this.budgetType === 'variable') {
     this.budgetType = 'fixed';
     
@@ -145,6 +187,11 @@ categoryBudgetSchema.methods.convertToFixed = function(amount = null) {
     }
     
     this.monthlyAmounts = [];
+  } else {
+    // Already fixed budget - just update the amount if provided
+    if (amount !== null) {
+      this.fixedAmount = amount;
+    }
   }
   return this;
 };
@@ -158,6 +205,101 @@ categoryBudgetSchema.methods.populateAllMonths = function(amount) {
     }
   }
   return this;
+};
+
+// Method to update budget with manual edit tracking
+categoryBudgetSchema.methods.updateWithEditTracking = function(newAmount, month = null, reason = '') {
+  const previousAmount = month ? this.getAmountForMonth(month) : 
+    (this.budgetType === 'fixed' ? this.fixedAmount : 0);
+  
+  // Update the amount
+  if (month) {
+    this.setAmountForMonth(month, newAmount);
+  } else {
+    // Fixed budget update
+    this.fixedAmount = newAmount;
+  }
+  
+  // Mark as manually edited
+  this.isManuallyEdited = true;
+  this.lastEditedAt = new Date();
+  
+  // Add to edit history
+  this.editHistory.push({
+    date: new Date(),
+    previousAmount,
+    newAmount,
+    month,
+    reason,
+    editType: 'manual'
+  });
+  
+  return this;
+};
+
+// Method to update multiple months at once (for variable budgets)
+categoryBudgetSchema.methods.updateMultipleMonths = function(monthlyUpdates, reason = '') {
+  if (this.budgetType !== 'variable') {
+    throw new Error('Cannot update multiple months on fixed budget');
+  }
+  
+  const editEntries = [];
+  
+  monthlyUpdates.forEach(({ month, amount }) => {
+    const previousAmount = this.getAmountForMonth(month);
+    this.setAmountForMonth(month, amount);
+    
+    editEntries.push({
+      date: new Date(),
+      previousAmount,
+      newAmount: amount,
+      month,
+      reason,
+      editType: 'manual'
+    });
+  });
+  
+  // Mark as manually edited
+  this.isManuallyEdited = true;
+  this.lastEditedAt = new Date();
+  
+  // Add all edits to history
+  this.editHistory.push(...editEntries);
+  
+  return this;
+};
+
+// Method to check if budget amounts are the same across all months (for smart UI detection)
+categoryBudgetSchema.methods.isUniformAcrossMonths = function() {
+  if (this.budgetType === 'fixed') {
+    return true;
+  }
+  
+  if (this.monthlyAmounts.length === 0) {
+    return true;
+  }
+  
+  // Check if all 12 months are defined and have the same amount
+  if (this.monthlyAmounts.length !== 12) {
+    return false;
+  }
+  
+  const firstAmount = this.monthlyAmounts[0].amount;
+  return this.monthlyAmounts.every(ma => ma.amount === firstAmount);
+};
+
+// Method to get all 12 months with amounts (useful for variable budget editing)
+categoryBudgetSchema.methods.getAllMonthsData = function() {
+  const monthsData = [];
+  
+  for (let month = 1; month <= 12; month++) {
+    monthsData.push({
+      month,
+      amount: this.getAmountForMonth(month)
+    });
+  }
+  
+  return monthsData;
 };
 
 // Static method to find or create category budget
