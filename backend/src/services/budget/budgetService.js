@@ -92,17 +92,11 @@ class BudgetService {
       // Only calculate actual amounts if we have budgets
       const actualAmounts = await this.getActualAmountsForMonth(userId, year, month);
       
-      // Find salary budget
-      const salaryBudget = incomeBudgets.find(budget => 
-        budget.categoryId && budget.categoryId.name === 'Salary'
-      );
-      
-      // Filter other income budgets (excluding salary)
-      const otherIncomeBudgets = incomeBudgets.filter(budget => 
-        budget.categoryId && budget.categoryId.name !== 'Salary'
-      ).map(budget => ({
+      // Format ALL income budgets consistently (including salary) with actual amounts
+      const allIncomeBudgets = incomeBudgets.map(budget => ({
         categoryId: budget.categoryId,
-        amount: budget.amountForMonth
+        amount: budget.amountForMonth,
+        actualAmount: actualAmounts.incomeByCategory[budget.categoryId._id.toString()] || 0
       }));
       
       // Format expense budgets to match old structure
@@ -114,11 +108,10 @@ class BudgetService {
       }));
       
       // Calculate totals
-      const totalBudgetedIncome = (salaryBudget ? salaryBudget.amountForMonth : 0) + 
-        otherIncomeBudgets.reduce((sum, budget) => sum + budget.amount, 0);
+      const totalBudgetedIncome = allIncomeBudgets.reduce((sum, budget) => sum + budget.amount, 0);
       const totalBudgetedExpenses = expenseBudgets.reduce((sum, budget) => sum + budget.amountForMonth, 0);
       const totalActualExpenses = formattedExpenseBudgets.reduce((sum, budget) => sum + budget.actualAmount, 0);
-      
+
       // Return budget structure compatible with existing frontend
       return {
         _id: `generated_${userId}_${year}_${month}`, // Generate a fake ID for compatibility
@@ -126,8 +119,9 @@ class BudgetService {
         year,
         month,
         currency: 'ILS',
-        salaryBudget: salaryBudget ? salaryBudget.amountForMonth : 0,
-        otherIncomeBudgets,
+        salaryBudget: 0, // Deprecated - now all income is in otherIncomeBudgets
+        salaryActual: 0, // Deprecated - now all income is in otherIncomeBudgets  
+        otherIncomeBudgets: allIncomeBudgets,
         expenseBudgets: formattedExpenseBudgets,
         totalBudgetedIncome,
         totalBudgetedExpenses,
@@ -407,12 +401,15 @@ class BudgetService {
       let totalActualIncome = 0;
       let totalActualExpenses = 0;
       const expensesBySubCategory = {};
+      const incomeByCategory = {};
 
       transactions.forEach(transaction => {
         const amount = Math.abs(transaction.amount);
         
         if (transaction.category && transaction.category.type === 'Income') {
           totalActualIncome += amount;
+          const categoryKey = transaction.category._id.toString();
+          incomeByCategory[categoryKey] = (incomeByCategory[categoryKey] || 0) + amount;
         } else if (transaction.category && transaction.category.type === 'Expense' && transaction.subCategory) {
           totalActualExpenses += amount;
           const key = `${transaction.category._id}_${transaction.subCategory._id}`;
@@ -423,7 +420,8 @@ class BudgetService {
       return { 
         totalActualIncome, 
         totalActualExpenses,
-        expensesBySubCategory
+        expensesBySubCategory,
+        incomeByCategory
       };
     } catch (error) {
       logger.error('Error getting actual amounts for month:', error);

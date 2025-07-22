@@ -68,6 +68,7 @@ const App: React.FC = () => {
               <Route path="transactions" element={<TransactionsPage />} />
               <Route path="budgets" element={<BudgetsPage />} />
               <Route path="budgets/subcategory/:year/:month/:categoryId/:subcategoryId" element={<BudgetSubcategoryDetail />} />
+              <Route path="budgets/income/:year/:month/:categoryId" element={<BudgetSubcategoryDetail />} />
               <Route path="profile" element={<Profile />} />
             </Route>
           </Routes>

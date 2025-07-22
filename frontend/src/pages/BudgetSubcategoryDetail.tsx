@@ -54,7 +54,7 @@ const BudgetSubcategoryDetail: React.FC = () => {
     year: string;
     month: string;
     categoryId: string;
-    subcategoryId: string;
+    subcategoryId?: string;
   }>();
   
   const navigate = useNavigate();
@@ -72,10 +72,13 @@ const BudgetSubcategoryDetail: React.FC = () => {
   // Convert params to numbers
   const yearNum = parseInt(year || '0');
   const monthNum = parseInt(month || '0');
+  
+  // Determine if this is an income category view (no subcategoryId) or expense subcategory view
+  const isIncomeView = !subcategoryId;
 
   // Validate parameters
   useEffect(() => {
-    if (!year || !month || !categoryId || !subcategoryId) {
+    if (!year || !month || !categoryId || (!subcategoryId && !isIncomeView)) {
       setError('Missing required parameters');
       setLoading(false);
       return;
@@ -86,7 +89,7 @@ const BudgetSubcategoryDetail: React.FC = () => {
       setLoading(false);
       return;
     }
-  }, [year, month, categoryId, subcategoryId, yearNum, monthNum]);
+  }, [year, month, categoryId, subcategoryId, yearNum, monthNum, isIncomeView]);
 
   // Sync budget context with URL parameters
   useEffect(() => {
@@ -102,42 +105,70 @@ const BudgetSubcategoryDetail: React.FC = () => {
     }
   }, [subcategoryId]);
 
-  // Extract subcategory data from budget
+  // Extract category/subcategory data from budget
   useEffect(() => {
-    if (!currentMonthlyBudget || !categoryId || !subcategoryId) {
+    if (!currentMonthlyBudget || !categoryId) {
       return;
     }
 
     try {
-      // Find the expense budget for this category/subcategory
-      const expenseBudget = currentMonthlyBudget.expenseBudgets?.find(expense => {
-        const expenseCategoryId = typeof expense.categoryId === 'object' 
-          ? (expense.categoryId as any)?._id 
-          : expense.categoryId;
-        const expenseSubCategoryId = typeof expense.subCategoryId === 'object'
-          ? (expense.subCategoryId as any)?._id
-          : expense.subCategoryId;
-        
-        return expenseCategoryId === categoryId && expenseSubCategoryId === subcategoryId;
-      });
+      let budgetedAmount = 0;
+      let actualAmount = 0;
+      let categoryName = '';
+      let subcategoryName = '';
 
-      if (!expenseBudget) {
-        setError('Budget not found for this category/subcategory');
-        setLoading(false);
-        return;
+      if (isIncomeView) {
+        // Handle income category (all income categories treated the same)
+        const incomeCategory = currentMonthlyBudget.otherIncomeBudgets?.find(income => {
+          const incomeCategoryId = typeof income.categoryId === 'object' 
+            ? (income.categoryId as any)?._id 
+            : income.categoryId;
+          return incomeCategoryId === categoryId;
+        });
+
+        if (!incomeCategory) {
+          setError('Income category not found');
+          setLoading(false);
+          return;
+        }
+
+        categoryName = typeof incomeCategory.categoryId === 'object' 
+          ? (incomeCategory.categoryId as any)?.name || 'Unknown Income'
+          : incomeCategory.categoryId || 'Unknown Income';
+        subcategoryName = 'Income';
+        budgetedAmount = incomeCategory.amount || 0;
+        actualAmount = (incomeCategory as any).actualAmount || 0;
+      } else {
+        // Handle expense subcategory
+        const expenseBudget = currentMonthlyBudget.expenseBudgets?.find(expense => {
+          const expenseCategoryId = typeof expense.categoryId === 'object' 
+            ? (expense.categoryId as any)?._id 
+            : expense.categoryId;
+          const expenseSubCategoryId = typeof expense.subCategoryId === 'object'
+            ? (expense.subCategoryId as any)?._id
+            : expense.subCategoryId;
+          
+          return expenseCategoryId === categoryId && expenseSubCategoryId === subcategoryId;
+        });
+
+        if (!expenseBudget) {
+          setError('Budget not found for this category/subcategory');
+          setLoading(false);
+          return;
+        }
+
+        categoryName = typeof expenseBudget.categoryId === 'object' 
+          ? (expenseBudget.categoryId as any)?.name || 'Unknown Category'
+          : expenseBudget.categoryId || 'Unknown Category';
+        
+        subcategoryName = typeof expenseBudget.subCategoryId === 'object'
+          ? (expenseBudget.subCategoryId as any)?.name || 'Unknown Subcategory'
+          : expenseBudget.subCategoryId || 'Unknown Subcategory';
+
+        budgetedAmount = expenseBudget.budgetedAmount || 0;
+        actualAmount = expenseBudget.actualAmount || 0;
       }
 
-      // Extract category and subcategory names
-      const categoryName = typeof expenseBudget.categoryId === 'object' 
-        ? (expenseBudget.categoryId as any)?.name || 'Unknown Category'
-        : expenseBudget.categoryId || 'Unknown Category';
-      
-      const subcategoryName = typeof expenseBudget.subCategoryId === 'object'
-        ? (expenseBudget.subCategoryId as any)?.name || 'Unknown Subcategory'
-        : expenseBudget.subCategoryId || 'Unknown Subcategory';
-
-      const budgetedAmount = expenseBudget.budgetedAmount || 0;
-      const actualAmount = expenseBudget.actualAmount || 0;
       const progressPercentage = budgetedAmount > 0 ? (actualAmount / budgetedAmount) * 100 : 0;
 
       setSubcategoryData({
@@ -151,11 +182,11 @@ const BudgetSubcategoryDetail: React.FC = () => {
 
       setLoading(false);
     } catch (err) {
-      console.error('Error extracting subcategory data:', err);
-      setError('Failed to load subcategory data');
+      console.error('Error extracting category data:', err);
+      setError('Failed to load category data');
       setLoading(false);
     }
-  }, [currentMonthlyBudget, categoryId, subcategoryId]);
+  }, [currentMonthlyBudget, categoryId, subcategoryId, isIncomeView]);
 
   // Extract subcategory tabs for the same category
   useEffect(() => {
@@ -194,7 +225,7 @@ const BudgetSubcategoryDetail: React.FC = () => {
     }
   }, [currentMonthlyBudget, categoryId]);
 
-  // Transaction filters for this subcategory
+  // Transaction filters for this category/subcategory
   const transactionFilters = React.useMemo(() => {
     const startDate = new Date(yearNum, monthNum - 1, 1);
     const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
@@ -203,11 +234,11 @@ const BudgetSubcategoryDetail: React.FC = () => {
       startDate,
       endDate,
       category: categoryId,
-      subCategory: subcategoryId,
-      type: 'Expense',
+      subCategory: isIncomeView ? undefined : subcategoryId,
+      type: isIncomeView ? 'Income' : 'Expense',
       useProcessedDate: true // Use processedDate for budget views to match budget calculations
     };
-  }, [yearNum, monthNum, categoryId, subcategoryId]);
+  }, [yearNum, monthNum, categoryId, subcategoryId, isIncomeView]);
 
   // Navigation handlers
   const handleBack = () => {
@@ -219,7 +250,11 @@ const BudgetSubcategoryDetail: React.FC = () => {
   };
 
   const handleMonthChange = (newYear: number, newMonth: number) => {
-    navigate(`/budgets/subcategory/${newYear}/${newMonth}/${categoryId}/${subcategoryId}`);
+    if (isIncomeView) {
+      navigate(`/budgets/income/${newYear}/${newMonth}/${categoryId}`);
+    } else {
+      navigate(`/budgets/subcategory/${newYear}/${newMonth}/${categoryId}/${subcategoryId}`);
+    }
     setMonthMenuAnchor(null);
   };
 
@@ -480,14 +515,20 @@ const BudgetSubcategoryDetail: React.FC = () => {
       <Card sx={{ mb: 4 }}>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-            {/* Remaining/Overspent Amount */}
+            {/* Remaining/Overspent/Exceeded Amount */}
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                {subcategoryData.budgetedAmount - subcategoryData.actualAmount >= 0 ? 'Remaining' : 'Overspent'}
+                {isIncomeView 
+                  ? (subcategoryData.actualAmount >= subcategoryData.budgetedAmount ? 'Exceeded Budget' : 'Below Budget')
+                  : (subcategoryData.budgetedAmount - subcategoryData.actualAmount >= 0 ? 'Remaining' : 'Overspent')
+                }
               </Typography>
               <Typography 
                 variant="h4" 
-                color={subcategoryData.budgetedAmount - subcategoryData.actualAmount >= 0 ? 'success.main' : 'error.main'}
+                color={isIncomeView
+                  ? (subcategoryData.actualAmount >= subcategoryData.budgetedAmount ? 'success.main' : 'warning.main')
+                  : (subcategoryData.budgetedAmount - subcategoryData.actualAmount >= 0 ? 'success.main' : 'error.main')
+                }
               >
                 {formatCurrencyDisplay(Math.abs(subcategoryData.budgetedAmount - subcategoryData.actualAmount))}
               </Typography>
@@ -504,7 +545,9 @@ const BudgetSubcategoryDetail: React.FC = () => {
                 borderRadius: 6,
                 backgroundColor: 'grey.200',
                 '& .MuiLinearProgress-bar': {
-                  backgroundColor: subcategoryData.progressPercentage > 100 ? 'error.main' : (categoryTheme?.primary || 'primary.main'),
+                  backgroundColor: isIncomeView
+                    ? (subcategoryData.progressPercentage > 100 ? 'success.main' : (categoryTheme?.primary || 'primary.main'))
+                    : (subcategoryData.progressPercentage > 100 ? 'error.main' : (categoryTheme?.primary || 'primary.main')),
                   borderRadius: 6
                 }
               }}

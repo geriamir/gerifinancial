@@ -35,35 +35,26 @@ const BudgetColumn: React.FC<BudgetColumnProps> = ({
 
     return (
       <>
-        {/* Salary */}
-        <BudgetCategoryItem
-          category="Salary"
-          subcategories={[]}
-          totalBudgeted={currentMonthlyBudget.salaryBudget || 0}
-          totalActual={0} // TODO: Get actual salary from transactions
-          color="success"
-          year={currentYear}
-          month={currentMonth}
-        />
-
-        {/* Other Income Categories */}
+        {/* All Income Categories (including Salary) */}
         {currentMonthlyBudget.otherIncomeBudgets?.map((income, index) => (
           <BudgetCategoryItem
             key={index}
-            category={typeof income.categoryId === 'object' ? (income.categoryId as any)?.name || 'Other Income' : income.categoryId || 'Other Income'}
+            category={typeof income.categoryId === 'object' ? (income.categoryId as any)?.name || 'Income' : income.categoryId || 'Income'}
             subcategories={[]}
             totalBudgeted={income.amount}
-            totalActual={0} // TODO: Get actual from transactions
+            totalActual={(income as any).actualAmount || 0}
             color="success"
             year={currentYear}
             month={currentMonth}
+            categoryId={typeof income.categoryId === 'object' ? (income.categoryId as any)?._id : income.categoryId}
+            isIncomeCategory={true}
           />
         ))}
         
         {(!currentMonthlyBudget.otherIncomeBudgets || currentMonthlyBudget.otherIncomeBudgets.length === 0) && (
           <Box p={2} textAlign="center" color="text.secondary">
             <Typography variant="body2">
-              No additional income sources
+              No income sources
             </Typography>
           </Box>
         )}

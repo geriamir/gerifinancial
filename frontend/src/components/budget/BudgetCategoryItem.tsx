@@ -30,6 +30,8 @@ interface BudgetCategoryItemProps {
   color: string;
   year: number;
   month: number;
+  categoryId?: string;
+  isIncomeCategory?: boolean;
 }
 
 const BudgetCategoryItem: React.FC<BudgetCategoryItemProps> = ({
@@ -39,12 +41,21 @@ const BudgetCategoryItem: React.FC<BudgetCategoryItemProps> = ({
   totalActual,
   color,
   year,
-  month
+  month,
+  categoryId,
+  isIncomeCategory
 }) => {
   const [expanded, setExpanded] = useState(false);
   const navigate = useNavigate();
 
   const handleToggle = () => {
+    // For income categories, navigate to detail view instead of expanding
+    if (isIncomeCategory && categoryId) {
+      navigate(`/budgets/income/${year}/${month}/${categoryId}`);
+      return;
+    }
+    
+    // For expense categories with subcategories, expand/collapse
     setExpanded(!expanded);
   };
 
