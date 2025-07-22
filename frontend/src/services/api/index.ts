@@ -4,3 +4,4 @@ export * from './bank';
 export * from './transactions';
 export * from './budgets';
 export * from './patterns';
+export * from './categories';

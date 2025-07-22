@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -7,6 +7,8 @@ import {
 } from '@mui/material';
 import BudgetSummaryCard from './BudgetSummaryCard';
 import BudgetCategoryItem from './BudgetCategoryItem';
+import { categoriesApi, type DefaultCategory } from '../../services/api/categories';
+import { sortGroupedCategoriesByDefaultOrder } from '../../utils/categoryOrdering';
 import type { MonthlyBudget } from '../../services/api/budgets';
 
 interface BudgetColumnProps {
@@ -30,28 +32,72 @@ const BudgetColumn: React.FC<BudgetColumnProps> = ({
   currentMonth,
   type
 }) => {
+  const [defaultCategories, setDefaultCategories] = useState<DefaultCategory[]>([]);
+
+  useEffect(() => {
+    const fetchDefaultCategories = async () => {
+      try {
+        const categoriesData = await categoriesApi.getDefaultOrder();
+        setDefaultCategories(categoriesData.categories);
+      } catch (error) {
+        console.error('Error fetching default categories:', error);
+        // Continue with default alphabetical sorting if API fails
+      }
+    };
+
+    fetchDefaultCategories();
+  }, []);
+
   const renderIncomeCategories = () => {
     if (!currentMonthlyBudget) return null;
 
+    // Get income categories and sort them by default order
+    const incomeBudgets = currentMonthlyBudget.otherIncomeBudgets || [];
+    
+    // Group by category name for sorting
+    const incomeGrouped = incomeBudgets.reduce((acc, income) => {
+      const categoryName = typeof income.categoryId === 'object' 
+        ? (income.categoryId as any)?.name || 'Income' 
+        : income.categoryId || 'Income';
+      
+      // Ensure we have a valid category name
+      if (categoryName && typeof categoryName === 'string') {
+        acc[categoryName] = income;
+      }
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Sort by default order (only if we have categories and defaultCategories loaded)
+    const sortedIncomeEntries = defaultCategories.length > 0
+      ? sortGroupedCategoriesByDefaultOrder(
+          Object.fromEntries(Object.entries(incomeGrouped).map(([name, income]) => [name, [income]])),
+          defaultCategories,
+          'Income'
+        )
+      : Object.entries(incomeGrouped).map(([name, income]) => [name, [income]]);
+
     return (
       <>
-        {/* All Income Categories (including Salary) */}
-        {currentMonthlyBudget.otherIncomeBudgets?.map((income, index) => (
-          <BudgetCategoryItem
-            key={index}
-            category={typeof income.categoryId === 'object' ? (income.categoryId as any)?.name || 'Income' : income.categoryId || 'Income'}
-            subcategories={[]}
-            totalBudgeted={income.amount}
-            totalActual={(income as any).actualAmount || 0}
-            color="success"
-            year={currentYear}
-            month={currentMonth}
-            categoryId={typeof income.categoryId === 'object' ? (income.categoryId as any)?._id : income.categoryId}
-            isIncomeCategory={true}
-          />
-        ))}
+        {sortedIncomeEntries.map((entry) => {
+          const [categoryName, incomes] = entry as [string, any[]];
+          const income = incomes[0];
+          return (
+            <BudgetCategoryItem
+              key={categoryName}
+              category={categoryName}
+              subcategories={[]}
+              totalBudgeted={income.amount}
+              totalActual={(income as any).actualAmount || 0}
+              color="success"
+              year={currentYear}
+              month={currentMonth}
+              categoryId={typeof income.categoryId === 'object' ? (income.categoryId as any)?._id : income.categoryId}
+              isIncomeCategory={true}
+            />
+          );
+        })}
         
-        {(!currentMonthlyBudget.otherIncomeBudgets || currentMonthlyBudget.otherIncomeBudgets.length === 0) && (
+        {sortedIncomeEntries.length === 0 && (
           <Box p={2} textAlign="center" color="text.secondary">
             <Typography variant="body2">
               No income sources
@@ -85,37 +131,53 @@ const BudgetColumn: React.FC<BudgetColumnProps> = ({
       return acc;
     }, {} as Record<string, typeof currentMonthlyBudget.expenseBudgets>);
 
-    return Object.entries(groupedExpenses).map(([categoryName, expenses]) => {
-      const totalBudgeted = expenses.reduce((sum, exp) => sum + exp.budgetedAmount, 0);
-      const totalActual = expenses.reduce((sum, exp) => sum + (exp.actualAmount || 0), 0);
-      
-      const subcategories = expenses.map(exp => ({
-        name: typeof exp.subCategoryId === 'object' 
-          ? (exp.subCategoryId as any)?.name || 'General'
-          : exp.subCategoryId || 'General',
-        budgeted: exp.budgetedAmount,
-        actual: exp.actualAmount || 0,
-        categoryId: typeof exp.categoryId === 'object' 
-          ? (exp.categoryId as any)?._id 
-          : exp.categoryId,
-        subCategoryId: typeof exp.subCategoryId === 'object'
-          ? (exp.subCategoryId as any)?._id
-          : exp.subCategoryId
-      }));
+    // Sort categories and their subcategories by default order (only if we have defaultCategories loaded)
+    const sortedExpenseEntries = defaultCategories.length > 0
+      ? sortGroupedCategoriesByDefaultOrder(
+          groupedExpenses,
+          defaultCategories,
+          'Expense'
+        )
+      : Object.entries(groupedExpenses);
 
-      return (
-        <BudgetCategoryItem
-          key={categoryName}
-          category={categoryName}
-          subcategories={subcategories}
-          totalBudgeted={totalBudgeted}
-          totalActual={totalActual}
-          color="error"
-          year={currentYear}
-          month={currentMonth}
-        />
-      );
-    });
+    return (
+      <>
+        {sortedExpenseEntries.map((entry) => {
+          const [categoryName, expenses] = entry as [string, any[]];
+          const totalBudgeted = expenses.reduce((sum, exp) => sum + exp.budgetedAmount, 0);
+          const totalActual = expenses.reduce((sum, exp) => sum + (exp.actualAmount || 0), 0);
+          
+          // The expenses array is already sorted by the sortGroupedCategoriesByDefaultOrder function
+          // Now create subcategories array maintaining the sorted order
+          const subcategories = expenses.map(exp => ({
+            name: typeof exp.subCategoryId === 'object' 
+              ? (exp.subCategoryId as any)?.name || 'General'
+              : exp.subCategoryId || 'General',
+            budgeted: exp.budgetedAmount,
+            actual: exp.actualAmount || 0,
+            categoryId: typeof exp.categoryId === 'object' 
+              ? (exp.categoryId as any)?._id 
+              : exp.categoryId,
+            subCategoryId: typeof exp.subCategoryId === 'object'
+              ? (exp.subCategoryId as any)?._id
+              : exp.subCategoryId
+          }));
+
+          return (
+            <BudgetCategoryItem
+              key={categoryName}
+              category={categoryName}
+              subcategories={subcategories}
+              totalBudgeted={totalBudgeted}
+              totalActual={totalActual}
+              color="error"
+              year={currentYear}
+              month={currentMonth}
+            />
+          );
+        })}
+      </>
+    );
   };
 
   return (

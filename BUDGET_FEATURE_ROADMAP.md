@@ -478,10 +478,90 @@ interface BreadcrumbItem {
 - **Trend Analysis**: Multi-month view
 - **Quick Actions**: Budget adjustment, bulk categorization
 
-### **Phase 6: Smart Allocation & Advanced Features** 📋
+### **Phase 6: Pattern Indicators Integration** 📋
 **Timeline**: Week 13-15 | **Priority**: Medium | **Status**: PLANNED
 
-#### 6.1 Smart Monthly Allocation
+#### 6.1 Budget Component Pattern Indicators
+
+##### Enhanced Budget Category Items
+```typescript
+// Update: frontend/src/components/budget/BudgetCategoryItem.tsx
+// Add pattern indicators:
+// - 🔁 Pattern icon for categories with active patterns
+// - Pattern confidence scores display
+// - Pattern type badges (bi-monthly, quarterly, yearly)
+// - Pattern vs base amount breakdown
+// - Hover tooltips showing pattern details
+```
+
+##### Budget Column Pattern Awareness
+```typescript
+// Update: frontend/src/components/budget/BudgetColumn.tsx
+// Add pattern-aware displays:
+// - Pattern-aware vs base budget amounts
+// - Visual distinction between patterned and base budgets
+// - Pattern contribution indicators
+// - Enhanced budget summaries with pattern breakdown
+```
+
+##### Budget Summary Enhancements
+```typescript
+// Update: frontend/src/components/budget/BudgetSummaryCard.tsx
+// Add pattern insights:
+// - Total patterns active this month
+// - Pattern contribution to budget
+// - Pattern accuracy metrics
+// - Smart budget vs manual budget indicators
+```
+
+#### 6.2 Transaction Pattern Integration
+
+##### Transaction List Pattern Indicators
+```typescript
+// Update: frontend/src/components/transactions/TransactionList.tsx
+// Add pattern awareness:
+// - 🔁 Pattern icons for transactions part of patterns
+// - Pattern name/type display in transaction cards
+// - Pattern confidence indicators
+// - Color coding for pattern vs non-pattern transactions
+```
+
+##### Transaction Detail Pattern Info
+```typescript
+// Update: frontend/src/components/transactions/TransactionDetailDialog.tsx
+// Add pattern section:
+// - Show if transaction is part of a pattern
+// - Pattern details and next occurrence
+// - Option to exclude from pattern
+// - Pattern impact on budget display
+```
+
+#### 6.3 Budget Calculation Flow Enhancements
+
+##### Pattern-Aware Budget Creation
+```typescript
+// Update: frontend/src/pages/Budgets.tsx
+// Enhance auto-calculate flow:
+// - Pattern detection progress indicators
+// - Pattern approval summary before budget creation
+// - Pattern vs base amount preview
+// - Enhanced pattern detection dashboard integration
+```
+
+##### Budget Editing Pattern Support
+```typescript
+// Update: frontend/src/components/budget/MonthlyBudgetEditor.tsx
+// Add pattern context:
+// - Show pattern contribution to budget amounts
+// - Option to override pattern-calculated amounts
+// - Pattern adjustment impact preview
+// - Smart suggestions based on pattern changes
+```
+
+### **Phase 7: Smart Allocation & Advanced Features** 📋
+**Timeline**: Week 16-18 | **Priority**: Low | **Status**: LONG-TERM
+
+#### 7.1 Smart Monthly Allocation
 
 ##### Flexible Timing Service
 ```javascript
@@ -494,7 +574,7 @@ class TimingAllocationService {
 }
 ```
 
-#### 6.2 Budget Analytics
+#### 7.2 Budget Analytics
 
 ##### Analytics Service
 ```javascript
@@ -773,13 +853,13 @@ interface BudgetContextType {
 
 ## 🚀 **Future Enhancements**
 
-### **Phase 6: Advanced Analytics (Future)**
+### **Phase 8: Advanced Analytics (Future)**
 - **Predictive Budgeting** - ML-based budget predictions
 - **Smart Notifications** - Proactive budget alerts and recommendations
 - **Goal Setting** - Financial goal tracking integrated with budgets
 - **Reporting Suite** - Advanced budget reports and exports
 
-### **Phase 7: Collaboration (Future)**
+### **Phase 9: Collaboration (Future)**
 - **Shared Budgets** - Family/household budget sharing
 - **Budget Templates** - Community-shared budget templates
 - **Financial Advisor Integration** - Professional budget review features
@@ -808,5 +888,5 @@ interface BudgetContextType {
 
 ---
 
-*Last Updated: July 19, 2025*
-*Status: ✅ Phases 1-5 Completed | 📋 Phases 6-7 Planned*
+*Last Updated: July 23, 2025*
+*Status: ✅ Phases 1-5 Completed | 📋 Phase 6 Pattern Indicators Added to Long-term Roadmap | 📋 Phases 7-9 Planned*

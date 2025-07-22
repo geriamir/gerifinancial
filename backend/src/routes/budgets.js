@@ -3,6 +3,7 @@ const { body, param, query, validationResult } = require('express-validator');
 const auth = require('../middleware/auth');
 const budgetService = require('../services/budget/budgetService');
 const smartBudgetService = require('../services/budget/smartBudgetService');
+const { defaultCategories } = require('../services/userCategoryService');
 const { TransactionPattern } = require('../models');
 const logger = require('../utils/logger');
 
@@ -1136,6 +1137,38 @@ router.get('/patterns/preview/:year/:month',
       res.status(500).json({
         success: false,
         message: 'Failed to get pattern preview',
+        error: error.message
+      });
+    }
+  }
+);
+
+// ============================================
+// CATEGORY CONFIGURATION ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/budgets/categories/default-order
+ * Get default category structure and ordering
+ */
+router.get('/categories/default-order',
+  auth,
+  async (req, res) => {
+    try {
+      res.json({
+        success: true,
+        data: {
+          categories: defaultCategories,
+          incomeCategories: defaultCategories.filter(cat => cat.type === 'Income'),
+          expenseCategories: defaultCategories.filter(cat => cat.type === 'Expense'),
+          transferCategories: defaultCategories.filter(cat => cat.type === 'Transfer')
+        }
+      });
+    } catch (error) {
+      logger.error('Error fetching default categories:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch default categories',
         error: error.message
       });
     }
