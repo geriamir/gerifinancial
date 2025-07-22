@@ -1,6 +1,6 @@
 const express = require('express');
 const auth = require('../middleware/auth');
-const categoryBudgetService = require('../services/categoryBudgetService');
+const categoryBudgetService = require('../services/budget/categoryBudgetService');
 const { body, param, query, validationResult } = require('express-validator');
 
 const router = express.Router();

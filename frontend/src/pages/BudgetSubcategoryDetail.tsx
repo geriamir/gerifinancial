@@ -27,16 +27,11 @@ import {
 import { useBudget } from '../contexts/BudgetContext';
 import { formatCurrencyDisplay } from '../utils/formatters';
 import { getCategoryIconTheme } from '../constants/categoryIconSystem';
+import { MONTH_NAMES } from '../constants/dateConstants';
 import TransactionsList from '../components/transactions/TransactionsList';
 import TransactionDetailDialog from '../components/transactions/TransactionDetailDialog';
 import CategoryIconComponent from '../components/common/CategoryIcon';
 import type { Transaction } from '../services/api/types/transactions';
-
-// Month names for display
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
 
 interface SubcategoryBudgetData {
   category: string;

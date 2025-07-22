@@ -120,6 +120,30 @@ const transactionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Tag'
   }],
+  
+  // Budget calculation exclusion
+  excludeFromBudgetCalculation: {
+    type: Boolean,
+    default: false
+  },
+  
+  exclusionReason: {
+    type: String,
+    trim: true,
+    maxlength: 200
+  },
+  
+  excludedAt: {
+    type: Date,
+    default: null
+  },
+  
+  excludedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  
   rawData: {
     type: mongoose.Schema.Types.Mixed,
     required: true,
@@ -187,6 +211,33 @@ transactionSchema.methods.removeTags = async function(tagIds) {
 
 transactionSchema.methods.hasTag = function(tagId) {
   return this.tags.some(tag => tag.toString() === tagId.toString());
+};
+
+// Helper methods for budget exclusion functionality
+transactionSchema.methods.excludeFromBudget = async function(reason, userId) {
+  this.excludeFromBudgetCalculation = true;
+  this.exclusionReason = reason;
+  this.excludedAt = new Date();
+  this.excludedBy = userId;
+  await this.save();
+  return this;
+};
+
+transactionSchema.methods.includeInBudget = async function() {
+  this.excludeFromBudgetCalculation = false;
+  this.exclusionReason = null;
+  this.excludedAt = null;
+  this.excludedBy = null;
+  await this.save();
+  return this;
+};
+
+transactionSchema.methods.toggleBudgetExclusion = async function(exclude, reason, userId) {
+  if (exclude) {
+    return this.excludeFromBudget(reason, userId);
+  } else {
+    return this.includeInBudget();
+  }
 };
 
 // Static method to find transactions by tag

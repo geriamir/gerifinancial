@@ -1,8 +1,8 @@
 const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const auth = require('../middleware/auth');
-const budgetService = require('../services/budgetService');
-const smartBudgetService = require('../services/smartBudgetService');
+const budgetService = require('../services/budget/budgetService');
+const smartBudgetService = require('../services/budget/smartBudgetService');
 const { TransactionPattern } = require('../models');
 const logger = require('../utils/logger');
 
@@ -728,20 +728,22 @@ router.get('/patterns/detected/:userId',
       res.json({
         success: true,
         data: {
-          patterns: patterns.map(pattern => ({
-            id: pattern._id,
-            patternId: pattern.patternId,
-            description: pattern.transactionIdentifier.description,
-            amount: pattern.averageAmount,
-            category: pattern.transactionIdentifier.categoryId?.name || 'Unknown',
-            subcategory: pattern.transactionIdentifier.subCategoryId?.name || 'General',
-            patternType: pattern.recurrencePattern,
-            confidence: pattern.detectionData.confidence,
-            scheduledMonths: pattern.scheduledMonths,
-            sampleTransactions: pattern.detectionData.sampleTransactions,
-            detectedAt: pattern.detectionData.lastDetected,
-            displayName: pattern.displayName
-          })),
+          patterns: patterns
+            .map(pattern => ({
+              id: pattern._id,
+              patternId: pattern.patternId,
+              description: pattern.transactionIdentifier.description,
+              amount: pattern.averageAmount,
+              category: pattern.transactionIdentifier.categoryId?.name || 'Unknown',
+              subcategory: pattern.transactionIdentifier.subCategoryId?.name || 'General',
+              patternType: pattern.recurrencePattern,
+              confidence: pattern.detectionData.confidence,
+              scheduledMonths: pattern.scheduledMonths,
+              sampleTransactions: pattern.detectionData.sampleTransactions,
+              detectedAt: pattern.detectionData.lastDetected,
+              displayName: pattern.displayName
+            }))
+            .sort((a, b) => b.confidence - a.confidence), // Sort by confidence DESC (highest first)
           totalCount: patterns.length
         }
       });
@@ -1197,6 +1199,337 @@ router.get('/dashboard',
       res.status(500).json({
         success: false,
         message: 'Failed to fetch dashboard overview',
+        error: error.message
+      });
+    }
+  }
+);
+
+// ============================================
+// BUDGET EDITING ENDPOINTS
+// ============================================
+
+/**
+ * GET /api/budgets/category/:categoryId/subcategory/:subCategoryId/edit
+ * Get budget details for editing
+ */
+router.get('/category/:categoryId/subcategory/:subCategoryId/edit',
+  auth,
+  [
+    param('categoryId').isMongoId().withMessage('Invalid category ID'),
+    param('subCategoryId').optional().isMongoId().withMessage('Invalid subcategory ID')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { categoryId, subCategoryId } = req.params;
+      const budget = await budgetService.getBudgetForEditing(
+        req.user._id, 
+        categoryId, 
+        subCategoryId === 'null' ? null : subCategoryId
+      );
+      
+      res.json({
+        success: true,
+        data: budget
+      });
+    } catch (error) {
+      logger.error('Error fetching budget for editing:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch budget for editing',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * PUT /api/budgets/category/:categoryId/subcategory/:subCategoryId
+ * Update category budget with manual edit tracking
+ */
+router.put('/category/:categoryId/subcategory/:subCategoryId',
+  auth,
+  [
+    param('categoryId').isMongoId().withMessage('Invalid category ID'),
+    param('subCategoryId').optional().isMongoId().withMessage('Invalid subcategory ID'),
+    body('budgetType').isIn(['fixed', 'variable']).withMessage('Budget type must be fixed or variable'),
+    body('fixedAmount').optional().isFloat({ min: 0 }).withMessage('Fixed amount must be non-negative'),
+    body('monthlyAmounts').optional().isArray().withMessage('Monthly amounts must be an array'),
+    body('monthlyAmounts.*.month').optional().isInt({ min: 1, max: 12 }).withMessage('Month must be between 1 and 12'),
+    body('monthlyAmounts.*.amount').optional().isFloat({ min: 0 }).withMessage('Amount must be non-negative'),
+    body('reason').optional().isString().isLength({ max: 200 }).withMessage('Reason must be under 200 characters')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { categoryId, subCategoryId } = req.params;
+      const budget = await budgetService.updateCategoryBudget(
+        req.user._id, 
+        categoryId, 
+        subCategoryId === 'null' ? null : subCategoryId,
+        req.body
+      );
+      
+      res.json({
+        success: true,
+        data: budget,
+        message: 'Budget updated successfully'
+      });
+    } catch (error) {
+      logger.error('Error updating category budget:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to update budget',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/budgets/category/:categoryId/subcategory/:subCategoryId/recalculate
+ * Recalculate budget with exclusions
+ */
+router.post('/category/:categoryId/subcategory/:subCategoryId/recalculate',
+  auth,
+  [
+    param('categoryId').isMongoId().withMessage('Invalid category ID'),
+    param('subCategoryId').optional().isMongoId().withMessage('Invalid subcategory ID'),
+    body('monthsToAnalyze').optional().isInt({ min: 1, max: 24 }).withMessage('Months to analyze must be between 1 and 24')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { categoryId, subCategoryId } = req.params;
+      const { monthsToAnalyze = 6 } = req.body;
+      
+      const result = await budgetService.recalculateBudgetWithExclusions(
+        req.user._id, 
+        categoryId, 
+        subCategoryId === 'null' ? null : subCategoryId,
+        monthsToAnalyze
+      );
+      
+      res.json({
+        success: true,
+        data: result,
+        message: 'Budget recalculated successfully'
+      });
+    } catch (error) {
+      logger.error('Error recalculating budget:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to recalculate budget',
+        error: error.message
+      });
+    }
+  }
+);
+
+// ============================================
+// TRANSACTION EXCLUSION ENDPOINTS
+// ============================================
+
+/**
+ * PUT /api/budgets/transactions/:transactionId/exclude
+ * Exclude transaction from budget calculation
+ */
+router.put('/transactions/:transactionId/exclude',
+  auth,
+  [
+    param('transactionId').isMongoId().withMessage('Invalid transaction ID'),
+    body('reason').isString().isLength({ min: 1, max: 200 }).withMessage('Reason must be 1-200 characters')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { transactionId } = req.params;
+      const { reason } = req.body;
+      
+      const result = await budgetService.excludeTransactionFromBudget(
+        req.user._id, 
+        transactionId, 
+        reason
+      );
+      
+      res.json({
+        success: true,
+        data: {
+          transactionId: result.transaction._id,
+          excluded: result.transaction.excludeFromBudgetCalculation,
+          reason: result.transaction.exclusionReason,
+          excludedAt: result.transaction.excludedAt,
+          budgetRecalculation: result.budgetRecalculation
+        },
+        message: 'Transaction excluded from budget calculation and budget recalculated'
+      });
+    } catch (error) {
+      logger.error('Error excluding transaction:', error);
+      
+      if (error.message.includes('not found') || error.message.includes('access denied')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to exclude transaction',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /api/budgets/transactions/:transactionId/exclude
+ * Include transaction back in budget calculation
+ */
+router.delete('/transactions/:transactionId/exclude',
+  auth,
+  [
+    param('transactionId').isMongoId().withMessage('Invalid transaction ID')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { transactionId } = req.params;
+      
+      const result = await budgetService.includeTransactionInBudget(
+        req.user._id, 
+        transactionId
+      );
+      
+      res.json({
+        success: true,
+        data: {
+          transactionId: result.transaction._id,
+          excluded: result.transaction.excludeFromBudgetCalculation,
+          budgetRecalculation: result.budgetRecalculation
+        },
+        message: 'Transaction included back in budget calculation and budget recalculated'
+      });
+    } catch (error) {
+      logger.error('Error including transaction:', error);
+      
+      if (error.message.includes('not found') || error.message.includes('access denied')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to include transaction',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/budgets/transactions/:transactionId/toggle-exclude
+ * Toggle transaction budget exclusion
+ */
+router.post('/transactions/:transactionId/toggle-exclude',
+  auth,
+  [
+    param('transactionId').isMongoId().withMessage('Invalid transaction ID'),
+    body('exclude').isBoolean().withMessage('Exclude must be a boolean'),
+    body('reason').optional().isString().isLength({ max: 200 }).withMessage('Reason must be under 200 characters')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { transactionId } = req.params;
+      const { exclude, reason } = req.body;
+      
+      const transaction = await budgetService.toggleTransactionBudgetExclusion(
+        req.user._id, 
+        transactionId, 
+        exclude,
+        reason
+      );
+      
+      res.json({
+        success: true,
+        data: {
+          transactionId: transaction._id,
+          excluded: transaction.excludeFromBudgetCalculation,
+          reason: transaction.exclusionReason,
+          excludedAt: transaction.excludedAt
+        },
+        message: `Transaction ${exclude ? 'excluded from' : 'included in'} budget calculation`
+      });
+    } catch (error) {
+      logger.error('Error toggling transaction exclusion:', error);
+      
+      if (error.message.includes('not found') || error.message.includes('access denied')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to toggle transaction exclusion',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/budgets/category/:categoryId/subcategory/:subCategoryId/exclusions
+ * Get exclusions for a category/subcategory
+ */
+router.get('/category/:categoryId/subcategory/:subCategoryId/exclusions',
+  auth,
+  [
+    param('categoryId').isMongoId().withMessage('Invalid category ID'),
+    param('subCategoryId').optional().isMongoId().withMessage('Invalid subcategory ID'),
+    query('startDate').optional().isISO8601().withMessage('Start date must be valid ISO8601 date'),
+    query('endDate').optional().isISO8601().withMessage('End date must be valid ISO8601 date')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { categoryId, subCategoryId } = req.params;
+      const { startDate, endDate } = req.query;
+      
+      const exclusions = await budgetService.getExclusionsForCategory(
+        req.user._id, 
+        categoryId, 
+        subCategoryId === 'null' ? null : subCategoryId,
+        startDate ? new Date(startDate) : null,
+        endDate ? new Date(endDate) : null
+      );
+      
+      res.json({
+        success: true,
+        data: {
+          exclusions: exclusions.map(exclusion => ({
+            id: exclusion._id,
+            transactionId: exclusion.transactionId,
+            reason: exclusion.reason,
+            excludedAt: exclusion.excludedAt,
+            transactionAmount: exclusion.transactionAmount,
+            transactionDate: exclusion.transactionDate,
+            transactionDescription: exclusion.transactionDescription,
+            isActive: exclusion.isActive
+          })),
+          totalCount: exclusions.length
+        }
+      });
+    } catch (error) {
+      logger.error('Error fetching exclusions:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch exclusions',
         error: error.message
       });
     }

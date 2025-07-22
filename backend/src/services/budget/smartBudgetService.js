@@ -1,8 +1,8 @@
 const recurrenceDetectionService = require('./recurrenceDetectionService');
-const TransactionPattern = require('../models/TransactionPattern');
+const TransactionPattern = require('../../models/TransactionPattern');
 const BudgetService = require('./budgetService');
-const Transaction = require('../models/Transaction');
-const PatternMatchingUtils = require('../utils/patternMatching');
+const Transaction = require('../../models/Transaction');
+const PatternMatchingUtils = require('../../utils/patternMatching');
 
 /**
  * Smart Budget Service - Enhanced budget calculation with pattern awareness
@@ -261,7 +261,6 @@ class SmartBudgetService {
 
     // Always check if explicitly scheduled for this month first
     if (scheduledMonths && scheduledMonths.includes(targetMonth)) {
-      console.log(`Pattern ${pattern.patternId} explicitly scheduled for month ${targetMonth}`);
       return true;
     }
 

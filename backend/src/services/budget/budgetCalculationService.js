@@ -321,7 +321,6 @@ class BudgetCalculationService {
         budget.setAmountForMonth(targetMonth, monthlyAmount);
       }
       
-      logger.info(`✅ Variable budget: ${categoryKey} (base ₪${categoryAverage} + patterns)`);
     } else {
       // Fixed budget: base average + any monthly patterns
       let fixedAmount = categoryAverage;
@@ -334,7 +333,6 @@ class BudgetCalculationService {
       }
       
       budget.convertToFixed(fixedAmount);
-      logger.info(`✅ Fixed budget: ${categoryKey} = ₪${fixedAmount}/month`);
     }
 
     await budget.save();

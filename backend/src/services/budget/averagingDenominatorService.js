@@ -1,4 +1,4 @@
-const logger = require('../utils/logger');
+const logger = require('../../utils/logger');
 
 /**
  * AveragingDenominatorService - Smart averaging logic for budget calculations
