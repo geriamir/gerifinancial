@@ -22,7 +22,8 @@ import {
   ArrowBack as ArrowBackIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
-  CalendarMonth as CalendarMonthIcon
+  CalendarMonth as CalendarMonthIcon,
+  Edit as EditIcon
 } from '@mui/icons-material';
 import { useBudget } from '../contexts/BudgetContext';
 import { formatCurrencyDisplay } from '../utils/formatters';
@@ -31,6 +32,9 @@ import { MONTH_NAMES } from '../constants/dateConstants';
 import TransactionsList from '../components/transactions/TransactionsList';
 import TransactionDetailDialog from '../components/transactions/TransactionDetailDialog';
 import CategoryIconComponent from '../components/common/CategoryIcon';
+import BudgetEditor from '../components/budget/BudgetEditor';
+import { categoriesApi, type DefaultCategory } from '../services/api/categories';
+import { transactionsApi } from '../services/api/transactions';
 import type { Transaction } from '../services/api/types/transactions';
 
 interface SubcategoryBudgetData {
@@ -68,6 +72,7 @@ const BudgetSubcategoryDetail: React.FC = () => {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [subcategoryTabs, setSubcategoryTabs] = useState<SubcategoryTab[]>([]);
   const [monthMenuAnchor, setMonthMenuAnchor] = useState<null | HTMLElement>(null);
+  const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
 
   // Convert params to numbers
   const yearNum = parseInt(year || '0');
@@ -111,119 +116,377 @@ const BudgetSubcategoryDetail: React.FC = () => {
       return;
     }
 
-    try {
-      let budgetedAmount = 0;
-      let actualAmount = 0;
-      let categoryName = '';
-      let subcategoryName = '';
+    const loadSubcategoryData = async () => {
+      try {
+        let budgetedAmount = 0;
+        let actualAmount = 0;
+        let categoryName = '';
+        let subcategoryName = '';
 
-      if (isIncomeView) {
-        // Handle income category (all income categories treated the same)
-        const incomeCategory = currentMonthlyBudget.otherIncomeBudgets?.find(income => {
-          const incomeCategoryId = typeof income.categoryId === 'object' 
-            ? (income.categoryId as any)?._id 
-            : income.categoryId;
-          return incomeCategoryId === categoryId;
-        });
+        if (isIncomeView) {
+          // Handle income category (all income categories treated the same)
+          const incomeCategory = currentMonthlyBudget.otherIncomeBudgets?.find(income => {
+            const incomeCategoryId = typeof income.categoryId === 'object' 
+              ? (income.categoryId as any)?._id 
+              : income.categoryId;
+            return incomeCategoryId === categoryId;
+          });
 
-        if (!incomeCategory) {
-          setError('Income category not found');
-          setLoading(false);
-          return;
+          if (incomeCategory) {
+            categoryName = typeof incomeCategory.categoryId === 'object' 
+              ? (incomeCategory.categoryId as any)?.name || 'Unknown Income'
+              : incomeCategory.categoryId || 'Unknown Income';
+            subcategoryName = 'Income';
+            budgetedAmount = incomeCategory.amount || 0;
+            // Income budgets don't store actualAmount, need to calculate from transactions
+            actualAmount = 0;
+          } else {
+            // No income budget exists, get category name from API
+            try {
+              const userCategories = await categoriesApi.getUserCategories();
+              const category = userCategories.find(cat => cat._id === categoryId);
+              
+              if (category) {
+                categoryName = category.name;
+                subcategoryName = 'Income';
+                budgetedAmount = 0;
+                actualAmount = 0;
+              } else {
+                setError('Income category not found');
+                setLoading(false);
+                return;
+              }
+            } catch (err) {
+              console.error('Error fetching income category data:', err);
+              setError('Failed to load income category information');
+              setLoading(false);
+              return;
+            }
+          }
+
+          // Always calculate actual amount from transactions for income categories
+          try {
+            const startDate = new Date(yearNum, monthNum - 1, 1);
+            const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
+            
+            const transactionsResult = await transactionsApi.getTransactions({
+              startDate,
+              endDate,
+              category: categoryId,
+              type: 'Income',
+              limit: 1000
+            });
+            
+            // Sum all transaction amounts for this income category
+            actualAmount = transactionsResult.transactions.reduce((sum, transaction) => {
+              return sum + Math.abs(transaction.amount || 0);
+            }, 0);
+          } catch (transactionError) {
+            console.error('Error fetching transactions for income actual amount:', transactionError);
+            // Keep actualAmount as 0 if transaction fetching fails
+          }
+        } else {
+          // Handle expense subcategory
+          const expenseBudget = currentMonthlyBudget.expenseBudgets?.find(expense => {
+            const expenseCategoryId = typeof expense.categoryId === 'object' 
+              ? (expense.categoryId as any)?._id 
+              : expense.categoryId;
+            const expenseSubCategoryId = typeof expense.subCategoryId === 'object'
+              ? (expense.subCategoryId as any)?._id
+              : expense.subCategoryId;
+            
+            return expenseCategoryId === categoryId && expenseSubCategoryId === subcategoryId;
+          });
+
+          if (!expenseBudget) {
+            // No budget exists yet - fetch category/subcategory names from API and create default structure
+            try {
+              const userCategories = await categoriesApi.getUserCategories();
+              const category = userCategories.find(cat => cat._id === categoryId);
+              const subcategory = category?.subCategories?.find(sub => sub._id === subcategoryId);
+              
+              if (category && subcategory) {
+                categoryName = category.name;
+                subcategoryName = subcategory.name;
+                budgetedAmount = 0;
+                
+                // Calculate actual amount from transactions for this month
+                try {
+                  const startDate = new Date(yearNum, monthNum - 1, 1);
+                  const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
+                  
+                  const transactionsResult = await transactionsApi.getTransactions({
+                    startDate,
+                    endDate,
+                    category: categoryId,
+                    type: 'Expense',
+                    limit: 1000 // Get all transactions for the month
+                  });
+                  
+                  // Filter transactions by subcategory on the client side
+                  const filteredTransactions = transactionsResult.transactions.filter(transaction => {
+                    const transactionSubCategoryId = typeof transaction.subCategory === 'object'
+                      ? (transaction.subCategory as any)?._id
+                      : transaction.subCategory;
+                    return transactionSubCategoryId === subcategoryId;
+                  });
+                  
+                  // Sum up filtered transaction amounts
+                  actualAmount = filteredTransactions.reduce((sum, transaction) => {
+                    return sum + Math.abs(transaction.amount || 0);
+                  }, 0);
+                } catch (transactionError) {
+                  console.error('Error fetching transactions for actual amount:', transactionError);
+                  actualAmount = 0;
+                }
+              } else {
+                setError('Category or subcategory not found');
+                setLoading(false);
+                return;
+              }
+            } catch (err) {
+              console.error('Error fetching category data:', err);
+              setError('Failed to load category information');
+              setLoading(false);
+              return;
+            }
+          } else {
+            // Existing budget found
+            categoryName = typeof expenseBudget.categoryId === 'object' 
+              ? (expenseBudget.categoryId as any)?.name || 'Unknown Category'
+              : expenseBudget.categoryId || 'Unknown Category';
+            
+            subcategoryName = typeof expenseBudget.subCategoryId === 'object'
+              ? (expenseBudget.subCategoryId as any)?.name || 'Unknown Subcategory'
+              : expenseBudget.subCategoryId || 'Unknown Subcategory';
+
+            budgetedAmount = expenseBudget.budgetedAmount || 0;
+            actualAmount = expenseBudget.actualAmount || 0;
+          }
         }
 
-        categoryName = typeof incomeCategory.categoryId === 'object' 
-          ? (incomeCategory.categoryId as any)?.name || 'Unknown Income'
-          : incomeCategory.categoryId || 'Unknown Income';
-        subcategoryName = 'Income';
-        budgetedAmount = incomeCategory.amount || 0;
-        actualAmount = (incomeCategory as any).actualAmount || 0;
-      } else {
-        // Handle expense subcategory
-        const expenseBudget = currentMonthlyBudget.expenseBudgets?.find(expense => {
-          const expenseCategoryId = typeof expense.categoryId === 'object' 
-            ? (expense.categoryId as any)?._id 
-            : expense.categoryId;
-          const expenseSubCategoryId = typeof expense.subCategoryId === 'object'
-            ? (expense.subCategoryId as any)?._id
-            : expense.subCategoryId;
-          
-          return expenseCategoryId === categoryId && expenseSubCategoryId === subcategoryId;
+        const progressPercentage = budgetedAmount > 0 ? (actualAmount / budgetedAmount) * 100 : 0;
+
+        setSubcategoryData({
+          category: categoryName,
+          subcategory: subcategoryName,
+          budgetedAmount,
+          actualAmount,
+          transactionCount: 0, // Will be updated when transactions load
+          progressPercentage
         });
 
-        if (!expenseBudget) {
-          setError('Budget not found for this category/subcategory');
-          setLoading(false);
-          return;
-        }
-
-        categoryName = typeof expenseBudget.categoryId === 'object' 
-          ? (expenseBudget.categoryId as any)?.name || 'Unknown Category'
-          : expenseBudget.categoryId || 'Unknown Category';
-        
-        subcategoryName = typeof expenseBudget.subCategoryId === 'object'
-          ? (expenseBudget.subCategoryId as any)?.name || 'Unknown Subcategory'
-          : expenseBudget.subCategoryId || 'Unknown Subcategory';
-
-        budgetedAmount = expenseBudget.budgetedAmount || 0;
-        actualAmount = expenseBudget.actualAmount || 0;
+        setLoading(false);
+      } catch (err) {
+        console.error('Error extracting category data:', err);
+        setError('Failed to load category data');
+        setLoading(false);
       }
+    };
 
-      const progressPercentage = budgetedAmount > 0 ? (actualAmount / budgetedAmount) * 100 : 0;
-
-      setSubcategoryData({
-        category: categoryName,
-        subcategory: subcategoryName,
-        budgetedAmount,
-        actualAmount,
-        transactionCount: 0, // Will be updated when transactions load
-        progressPercentage
-      });
-
-      setLoading(false);
-    } catch (err) {
-      console.error('Error extracting category data:', err);
-      setError('Failed to load category data');
-      setLoading(false);
-    }
+    loadSubcategoryData();
   }, [currentMonthlyBudget, categoryId, subcategoryId, isIncomeView]);
 
-  // Extract subcategory tabs for the same category
+  // Extract subcategory tabs for the same category (or all income categories for income view)
   useEffect(() => {
-    if (!currentMonthlyBudget || !categoryId) {
+    if (!categoryId) {
       return;
     }
 
-    try {
-      // Find all subcategories for this category
-      const categorySubcategories = currentMonthlyBudget.expenseBudgets?.filter(expense => {
-        const expenseCategoryId = typeof expense.categoryId === 'object' 
-          ? (expense.categoryId as any)?._id 
-          : expense.categoryId;
-        return expenseCategoryId === categoryId;
-      }) || [];
+    const loadSubcategoryTabs = async () => {
+      try {
+        if (isIncomeView) {
+          // For income categories, show all income categories as tabs
+          const [defaultCategories, userCategories] = await Promise.all([
+            categoriesApi.getDefaultOrder(),
+            categoriesApi.getUserCategories()
+          ]);
 
-      const tabs: SubcategoryTab[] = categorySubcategories.map(expense => {
-        const subCategoryId = typeof expense.subCategoryId === 'object'
-          ? (expense.subCategoryId as any)?._id
-          : expense.subCategoryId;
-        const subCategoryName = typeof expense.subCategoryId === 'object'
-          ? (expense.subCategoryId as any)?.name || 'Unknown'
-          : expense.subCategoryId || 'Unknown';
+          // Get all income categories from user categories
+          const incomeCategories = userCategories.filter(cat => cat.type === 'Income');
+          
+          // Get default income categories for ordering
+          const defaultIncomeCategories = defaultCategories.categories.filter(cat => cat.type === 'Income');
+          
+          // Order income categories by default ordering
+          let orderedIncomeCategories = incomeCategories;
+          if (defaultIncomeCategories.length > 0) {
+            orderedIncomeCategories = [];
+            
+            // First add categories in default order
+            defaultIncomeCategories.forEach(defaultCat => {
+              const matchingUserCat = incomeCategories.find(userCat => 
+                userCat.name === defaultCat.name
+              );
+              if (matchingUserCat) {
+                orderedIncomeCategories.push(matchingUserCat);
+              }
+            });
+            
+            // Then add any remaining user categories that don't have default ordering
+            incomeCategories.forEach(userCat => {
+              if (!orderedIncomeCategories.find(ordered => ordered._id === userCat._id)) {
+                orderedIncomeCategories.push(userCat);
+              }
+            });
+          }
 
-        return {
-          id: subCategoryId,
-          name: subCategoryName,
-          actualAmount: expense.actualAmount || 0,
-          budgetedAmount: expense.budgetedAmount || 0
-        };
-      });
+          // Create tabs for all income categories
+          const tabs: SubcategoryTab[] = await Promise.all(
+            orderedIncomeCategories.map(async (incomeCat) => {
+              // Try to find existing budget data for this income category
+              const existingBudget = currentMonthlyBudget?.otherIncomeBudgets?.find(income => {
+                const incomeCategoryId = typeof income.categoryId === 'object'
+                  ? (income.categoryId as any)?._id
+                  : income.categoryId;
+                return incomeCategoryId === incomeCat._id;
+              });
 
-      setSubcategoryTabs(tabs);
-    } catch (err) {
-      console.error('Error extracting subcategory tabs:', err);
-    }
-  }, [currentMonthlyBudget, categoryId]);
+              let actualAmount = 0; // Income budgets don't store actualAmount, need to calculate
+              const budgetedAmount = existingBudget?.amount || 0;
+
+              // If no existing budget, calculate actual amount from transactions
+              if (!existingBudget) {
+                try {
+                  const startDate = new Date(yearNum, monthNum - 1, 1);
+                  const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
+                  
+                  const transactionsResult = await transactionsApi.getTransactions({
+                    startDate,
+                    endDate,
+                    category: incomeCat._id,
+                    type: 'Income',
+                    limit: 1000
+                  });
+                  
+                  // Sum all transaction amounts for this income category
+                  actualAmount = transactionsResult.transactions.reduce((sum, transaction) => {
+                    return sum + Math.abs(transaction.amount || 0);
+                  }, 0);
+                } catch (transactionError) {
+                  console.error(`Error fetching transactions for income category ${incomeCat.name}:`, transactionError);
+                  actualAmount = 0;
+                }
+              }
+
+              return {
+                id: incomeCat._id,
+                name: incomeCat.name,
+                actualAmount,
+                budgetedAmount
+              };
+            })
+          );
+
+          setSubcategoryTabs(tabs);
+        } else {
+          // For expense categories, show subcategories as before
+          const [defaultCategories, userCategories] = await Promise.all([
+            categoriesApi.getDefaultOrder(),
+            categoriesApi.getUserCategories()
+          ]);
+
+          const userCategory = userCategories.find(cat => cat._id === categoryId);
+          
+          if (!userCategory || !userCategory.subCategories) {
+            setSubcategoryTabs([]);
+            return;
+          }
+
+          // Find the default category to get the correct subcategory ordering
+          const defaultCategory = defaultCategories.categories.find(cat => 
+            cat.name === userCategory.name && cat.type === 'Expense'
+          );
+
+          let orderedSubcategories = userCategory.subCategories;
+
+          // Apply default ordering if available
+          if (defaultCategory && defaultCategory.subCategories) {
+            orderedSubcategories = [];
+            
+            // First add subcategories in default order
+            defaultCategory.subCategories.forEach(defaultSub => {
+              const matchingUserSub = userCategory.subCategories.find(userSub => 
+                userSub.name === defaultSub.name
+              );
+              if (matchingUserSub) {
+                orderedSubcategories.push(matchingUserSub);
+              }
+            });
+            
+            // Then add any remaining user subcategories that don't have default ordering
+            userCategory.subCategories.forEach(userSub => {
+              if (!orderedSubcategories.find(ordered => ordered._id === userSub._id)) {
+                orderedSubcategories.push(userSub);
+              }
+            });
+          }
+
+          // Create tabs for all subcategories, merging with existing budget data
+          const tabs: SubcategoryTab[] = await Promise.all(
+            orderedSubcategories.map(async (subCat) => {
+              // Try to find existing budget data for this subcategory
+              const existingBudget = currentMonthlyBudget?.expenseBudgets?.find(expense => {
+                const expenseSubCategoryId = typeof expense.subCategoryId === 'object'
+                  ? (expense.subCategoryId as any)?._id
+                  : expense.subCategoryId;
+                return expenseSubCategoryId === subCat._id;
+              });
+
+              let actualAmount = existingBudget?.actualAmount || 0;
+              const budgetedAmount = existingBudget?.budgetedAmount || 0;
+
+              // If no existing budget, calculate actual amount from transactions
+              if (!existingBudget) {
+                try {
+                  const startDate = new Date(yearNum, monthNum - 1, 1);
+                  const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
+                  
+                  const transactionsResult = await transactionsApi.getTransactions({
+                    startDate,
+                    endDate,
+                    category: categoryId,
+                    type: 'Expense',
+                    limit: 1000
+                  });
+                  
+                  // Filter transactions by this specific subcategory
+                  const filteredTransactions = transactionsResult.transactions.filter(transaction => {
+                    const transactionSubCategoryId = typeof transaction.subCategory === 'object'
+                      ? (transaction.subCategory as any)?._id
+                      : transaction.subCategory;
+                    return transactionSubCategoryId === subCat._id;
+                  });
+                  
+                  // Sum filtered transaction amounts
+                  actualAmount = filteredTransactions.reduce((sum, transaction) => {
+                    return sum + Math.abs(transaction.amount || 0);
+                  }, 0);
+                } catch (transactionError) {
+                  console.error(`Error fetching transactions for subcategory ${subCat.name}:`, transactionError);
+                  actualAmount = 0;
+                }
+              }
+
+              return {
+                id: subCat._id,
+                name: subCat.name,
+                actualAmount,
+                budgetedAmount
+              };
+            })
+          );
+
+          setSubcategoryTabs(tabs);
+        }
+      } catch (err) {
+        console.error('Error loading subcategory tabs:', err);
+        setSubcategoryTabs([]);
+      }
+    };
+
+    loadSubcategoryTabs();
+  }, [currentMonthlyBudget, categoryId, yearNum, monthNum, isIncomeView]);
 
   // Transaction filters for this category/subcategory
   const transactionFilters = React.useMemo(() => {
@@ -246,7 +509,13 @@ const BudgetSubcategoryDetail: React.FC = () => {
   };
 
   const handleSubcategoryChange = (newSubcategoryId: string) => {
-    navigate(`/budgets/subcategory/${year}/${month}/${categoryId}/${newSubcategoryId}`);
+    if (isIncomeView) {
+      // For income categories, navigate to another income category
+      navigate(`/budgets/income/${year}/${month}/${newSubcategoryId}`);
+    } else {
+      // For expense categories, navigate to another subcategory within the same category
+      navigate(`/budgets/subcategory/${year}/${month}/${categoryId}/${newSubcategoryId}`);
+    }
   };
 
   const handleMonthChange = (newYear: number, newMonth: number) => {
@@ -317,6 +586,24 @@ const BudgetSubcategoryDetail: React.FC = () => {
     // Refresh budget data to update the summary
     try {
       await refreshBudgets();
+    } catch (error) {
+      console.error('Error refreshing budget data:', error);
+    }
+  };
+
+  // Budget editor handlers
+  const handleEditBudget = () => {
+    setBudgetEditorOpen(true);
+  };
+
+  const handleBudgetEditorClose = () => {
+    setBudgetEditorOpen(false);
+  };
+
+  const handleBudgetUpdated = async () => {
+    try {
+      await refreshBudgets();
+      setRefreshTrigger(prev => prev + 1);
     } catch (error) {
       console.error('Error refreshing budget data:', error);
     }
@@ -447,7 +734,7 @@ const BudgetSubcategoryDetail: React.FC = () => {
         {subcategoryTabs.length > 1 && (
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
             <Tabs
-              value={subcategoryId}
+              value={isIncomeView ? categoryId : subcategoryId}
               onChange={(_, newValue) => handleSubcategoryChange(newValue)}
               variant="scrollable"
               scrollButtons="auto"
@@ -552,10 +839,21 @@ const BudgetSubcategoryDetail: React.FC = () => {
                 }
               }}
             />
-            <Box sx={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', mt: 1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
               <Typography variant="body2" color="text.secondary">
                 {formatCurrencyDisplay(subcategoryData.actualAmount)} / {formatCurrencyDisplay(subcategoryData.budgetedAmount)}
               </Typography>
+              
+              {/* Edit Budget Button */}
+              <Button
+                startIcon={<EditIcon />}
+                onClick={handleEditBudget}
+                size="small"
+                variant="outlined"
+                sx={{ ml: 2 }}
+              >
+                Edit Budget
+              </Button>
             </Box>
           </Box>
         </CardContent>
@@ -589,6 +887,19 @@ const BudgetSubcategoryDetail: React.FC = () => {
         onClose={handleDetailDialogClose}
         onTransactionUpdated={handleTransactionUpdated}
       />
+
+      {/* Budget Editor Dialog */}
+      {subcategoryData && (
+        <BudgetEditor
+          open={budgetEditorOpen}
+          onClose={handleBudgetEditorClose}
+          categoryId={categoryId || ''}
+          subCategoryId={subcategoryId}
+          categoryName={subcategoryData.category}
+          subcategoryName={isIncomeView ? undefined : subcategoryData.subcategory}
+          onBudgetUpdated={handleBudgetUpdated}
+        />
+      )}
     </Container>
   );
 };

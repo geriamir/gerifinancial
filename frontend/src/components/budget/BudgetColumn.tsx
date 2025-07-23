@@ -11,6 +11,17 @@ import { categoriesApi, type DefaultCategory } from '../../services/api/categori
 import { sortGroupedCategoriesByDefaultOrder } from '../../utils/categoryOrdering';
 import type { MonthlyBudget } from '../../services/api/budgets';
 
+interface UserCategory {
+  _id: string;
+  name: string;
+  type: 'Income' | 'Expense' | 'Transfer';
+  subCategories: Array<{
+    _id: string;
+    name: string;
+    keywords: string[];
+  }>;
+}
+
 interface BudgetColumnProps {
   title: string;
   color: 'success' | 'error';
@@ -33,19 +44,25 @@ const BudgetColumn: React.FC<BudgetColumnProps> = ({
   type
 }) => {
   const [defaultCategories, setDefaultCategories] = useState<DefaultCategory[]>([]);
+  const [userCategories, setUserCategories] = useState<UserCategory[]>([]);
 
   useEffect(() => {
-    const fetchDefaultCategories = async () => {
+    const fetchCategories = async () => {
       try {
-        const categoriesData = await categoriesApi.getDefaultOrder();
-        setDefaultCategories(categoriesData.categories);
+        // Fetch both default categories (for ordering) and user categories (for actual IDs)
+        const [defaultData, userData] = await Promise.all([
+          categoriesApi.getDefaultOrder(),
+          categoriesApi.getUserCategories()
+        ]);
+        setDefaultCategories(defaultData.categories);
+        setUserCategories(userData);
       } catch (error) {
-        console.error('Error fetching default categories:', error);
+        console.error('Error fetching categories:', error);
         // Continue with default alphabetical sorting if API fails
       }
     };
 
-    fetchDefaultCategories();
+    fetchCategories();
   }, []);
 
   const renderIncomeCategories = () => {
@@ -109,18 +126,8 @@ const BudgetColumn: React.FC<BudgetColumnProps> = ({
   };
 
   const renderExpenseCategories = () => {
-    if (!currentMonthlyBudget?.expenseBudgets?.length) {
-      return (
-        <Box p={2} textAlign="center" color="text.secondary">
-          <Typography variant="body2">
-            No expense budgets set
-          </Typography>
-        </Box>
-      );
-    }
-
-    // Group expenses by category
-    const groupedExpenses = currentMonthlyBudget.expenseBudgets.reduce((acc, expense) => {
+    // Group existing expenses by category
+    const existingGroupedExpenses = currentMonthlyBudget?.expenseBudgets?.reduce((acc, expense) => {
       const categoryName = typeof expense.categoryId === 'object' 
         ? (expense.categoryId as any)?.name || 'Uncategorized'
         : expense.categoryId || 'Uncategorized';
@@ -129,31 +136,73 @@ const BudgetColumn: React.FC<BudgetColumnProps> = ({
       }
       acc[categoryName].push(expense);
       return acc;
-    }, {} as Record<string, typeof currentMonthlyBudget.expenseBudgets>);
+    }, {} as Record<string, any[]>) || {};
 
-    // Sort categories and their subcategories by default order (only if we have defaultCategories loaded)
+    // Get all expense categories from user categories and merge with existing budgets
+    const allExpenseCategories: Record<string, any[]> = {};
+    
+    // Add all user expense categories with real IDs
+    userCategories
+      .filter(cat => cat.type === 'Expense')
+      .forEach(category => {
+        allExpenseCategories[category.name] = [];
+        
+        // For each subcategory in this category, create a budget entry (with 0 if not exists)
+        if (category.subCategories && category.subCategories.length > 0) {
+          category.subCategories.forEach(subCat => {
+            // Check if this subcategory already has a budget
+            const existingBudget = existingGroupedExpenses[category.name]?.find(exp => {
+              const expSubCatName = typeof exp.subCategoryId === 'object' 
+                ? (exp.subCategoryId as any)?.name 
+                : exp.subCategoryId;
+              return expSubCatName === subCat.name;
+            });
+
+            if (existingBudget) {
+              // Use existing budget data
+              allExpenseCategories[category.name].push(existingBudget);
+            } else {
+              // Create a placeholder with 0 budget using real IDs
+              allExpenseCategories[category.name].push({
+                categoryId: { name: category.name, _id: category._id },
+                subCategoryId: { name: subCat.name, _id: subCat._id },
+                budgetedAmount: 0,
+                actualAmount: 0
+              });
+            }
+          });
+        }
+      });
+
+    // Add any existing categories that aren't in user categories
+    Object.entries(existingGroupedExpenses).forEach(([categoryName, expenses]) => {
+      if (!allExpenseCategories[categoryName]) {
+        allExpenseCategories[categoryName] = expenses;
+      }
+    });
+
+    // Sort categories by default order (only if we have defaultCategories loaded)
     const sortedExpenseEntries = defaultCategories.length > 0
       ? sortGroupedCategoriesByDefaultOrder(
-          groupedExpenses,
+          allExpenseCategories,
           defaultCategories,
           'Expense'
         )
-      : Object.entries(groupedExpenses);
+      : Object.entries(allExpenseCategories);
 
     return (
       <>
         {sortedExpenseEntries.map((entry) => {
           const [categoryName, expenses] = entry as [string, any[]];
-          const totalBudgeted = expenses.reduce((sum, exp) => sum + exp.budgetedAmount, 0);
+          const totalBudgeted = expenses.reduce((sum, exp) => sum + (exp.budgetedAmount || 0), 0);
           const totalActual = expenses.reduce((sum, exp) => sum + (exp.actualAmount || 0), 0);
           
-          // The expenses array is already sorted by the sortGroupedCategoriesByDefaultOrder function
-          // Now create subcategories array maintaining the sorted order
+          // Create subcategories array maintaining the sorted order
           const subcategories = expenses.map(exp => ({
             name: typeof exp.subCategoryId === 'object' 
               ? (exp.subCategoryId as any)?.name || 'General'
               : exp.subCategoryId || 'General',
-            budgeted: exp.budgetedAmount,
+            budgeted: exp.budgetedAmount || 0,
             actual: exp.actualAmount || 0,
             categoryId: typeof exp.categoryId === 'object' 
               ? (exp.categoryId as any)?._id 
@@ -176,6 +225,14 @@ const BudgetColumn: React.FC<BudgetColumnProps> = ({
             />
           );
         })}
+        
+        {sortedExpenseEntries.length === 0 && (
+          <Box p={2} textAlign="center" color="text.secondary">
+            <Typography variant="body2">
+              No expense categories available
+            </Typography>
+          </Box>
+        )}
       </>
     );
   };

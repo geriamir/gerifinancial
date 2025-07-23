@@ -1250,7 +1250,13 @@ router.get('/category/:categoryId/subcategory/:subCategoryId/edit',
   auth,
   [
     param('categoryId').isMongoId().withMessage('Invalid category ID'),
-    param('subCategoryId').optional().isMongoId().withMessage('Invalid subcategory ID')
+    param('subCategoryId').custom((value) => {
+      if (value === 'null') return true; // Allow 'null' string for income categories
+      if (value && !/^[0-9a-fA-F]{24}$/.test(value)) {
+        throw new Error('Invalid subcategory ID');
+      }
+      return true;
+    }).withMessage('Invalid subcategory ID')
   ],
   handleValidationErrors,
   async (req, res) => {
@@ -1285,7 +1291,13 @@ router.put('/category/:categoryId/subcategory/:subCategoryId',
   auth,
   [
     param('categoryId').isMongoId().withMessage('Invalid category ID'),
-    param('subCategoryId').optional().isMongoId().withMessage('Invalid subcategory ID'),
+    param('subCategoryId').custom((value) => {
+      if (value === 'null') return true; // Allow 'null' string for income categories
+      if (value && !/^[0-9a-fA-F]{24}$/.test(value)) {
+        throw new Error('Invalid subcategory ID');
+      }
+      return true;
+    }).withMessage('Invalid subcategory ID'),
     body('budgetType').isIn(['fixed', 'variable']).withMessage('Budget type must be fixed or variable'),
     body('fixedAmount').optional().isFloat({ min: 0 }).withMessage('Fixed amount must be non-negative'),
     body('monthlyAmounts').optional().isArray().withMessage('Monthly amounts must be an array'),
@@ -1328,7 +1340,13 @@ router.post('/category/:categoryId/subcategory/:subCategoryId/recalculate',
   auth,
   [
     param('categoryId').isMongoId().withMessage('Invalid category ID'),
-    param('subCategoryId').optional().isMongoId().withMessage('Invalid subcategory ID'),
+    param('subCategoryId').custom((value) => {
+      if (value === 'null') return true; // Allow 'null' string for income categories
+      if (value && !/^[0-9a-fA-F]{24}$/.test(value)) {
+        throw new Error('Invalid subcategory ID');
+      }
+      return true;
+    }).withMessage('Invalid subcategory ID'),
     body('monthsToAnalyze').optional().isInt({ min: 1, max: 24 }).withMessage('Months to analyze must be between 1 and 24')
   ],
   handleValidationErrors,

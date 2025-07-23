@@ -24,7 +24,23 @@ export const categoriesApi = {
    */
   getDefaultOrder: (): Promise<DefaultCategoriesResponse> =>
     api.get('/budgets/categories/default-order')
-      .then((res: AxiosResponse<{ success: boolean; data: DefaultCategoriesResponse }>) => res.data.data)
+      .then((res: AxiosResponse<{ success: boolean; data: DefaultCategoriesResponse }>) => res.data.data),
+
+  /**
+   * Get user's actual categories with subcategories and IDs
+   */
+  getUserCategories: (): Promise<Array<{
+    _id: string;
+    name: string;
+    type: 'Income' | 'Expense' | 'Transfer';
+    subCategories: Array<{
+      _id: string;
+      name: string;
+      keywords: string[];
+    }>;
+  }>> =>
+    api.get('/transactions/categories')
+      .then((res: AxiosResponse) => res.data)
 };
 
 export type { DefaultCategory, DefaultCategoriesResponse };

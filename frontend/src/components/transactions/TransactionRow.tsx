@@ -3,7 +3,11 @@ import {
   Box,
   Paper,
   Typography,
+  Chip,
 } from '@mui/material';
+import {
+  Block as ExcludeIcon,
+} from '@mui/icons-material';
 import type { Transaction } from '../../services/api/types/transactions';
 import { formatCurrencyDisplay } from '../../utils/formatters';
 import CategoryIcon from '../common/CategoryIcon';
@@ -56,22 +60,40 @@ const TransactionRow: React.FC<TransactionRowProps> = ({
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {/* Show category/subcategory info based on transaction type */}
           {transaction.category && (
-            <Typography 
-              variant="caption" 
-              data-testid={`${baseTestId}-category`}
-              sx={{ 
-                mb: 0.25, 
-                display: 'block', 
-                fontSize: '0.75rem', 
-                lineHeight: 1.2, 
-                fontWeight: 'bold',
-                color: categoryTheme?.primary || 'primary.main'
-              }}
-            >
-              {transaction.category.type === 'Expense' && transaction.subCategory 
-                ? transaction.subCategory.name 
-                : transaction.category.name}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.25 }}>
+              <Typography 
+                variant="caption" 
+                data-testid={`${baseTestId}-category`}
+                sx={{ 
+                  fontSize: '0.75rem', 
+                  lineHeight: 1.2, 
+                  fontWeight: 'bold',
+                  color: categoryTheme?.primary || 'primary.main'
+                }}
+              >
+                {transaction.category.type === 'Expense' && transaction.subCategory 
+                  ? transaction.subCategory.name 
+                  : transaction.category.name}
+              </Typography>
+              
+              {/* Budget exclusion indicator */}
+              {transaction.excludeFromBudgetCalculation && (
+                <Chip
+                  icon={<ExcludeIcon />}
+                  label="Excluded"
+                  color="warning"
+                  size="small"
+                  sx={{ 
+                    height: '18px',
+                    fontSize: '0.65rem',
+                    '& .MuiChip-icon': {
+                      fontSize: '12px'
+                    }
+                  }}
+                  data-testid={`${baseTestId}-excluded-indicator`}
+                />
+              )}
+            </Box>
           )}
           <Typography 
             variant="body2"

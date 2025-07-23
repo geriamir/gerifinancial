@@ -1,5 +1,6 @@
 import { AxiosResponse } from 'axios';
 import api from './base';
+import type { Category } from './types/categories';
 
 export interface MonthlyBudget {
   _id: string;
@@ -195,4 +196,85 @@ export const budgetsApi = {
   getDashboardOverview: () =>
     api.get('/budgets/dashboard')
       .then((res: AxiosResponse) => res.data),
+
+  // Transaction Exclusion API calls
+  excludeTransactionFromBudget: (transactionId: string, reason: string): Promise<{
+    transactionId: string;
+    excluded: boolean;
+    reason: string;
+    excludedAt: string;
+    budgetRecalculation: any;
+  }> =>
+    api.put(`/budgets/transactions/${transactionId}/exclude`, { reason })
+      .then((res: AxiosResponse) => res.data),
+
+  includeTransactionInBudget: (transactionId: string): Promise<{
+    transactionId: string;
+    excluded: boolean;
+    budgetRecalculation: any;
+  }> =>
+    api.delete(`/budgets/transactions/${transactionId}/exclude`)
+      .then((res: AxiosResponse) => res.data),
+
+  toggleTransactionExclusion: (transactionId: string, exclude: boolean, reason?: string): Promise<{
+    transactionId: string;
+    excluded: boolean;
+    reason?: string;
+    excludedAt?: string;
+  }> =>
+    api.post(`/budgets/transactions/${transactionId}/toggle-exclude`, { exclude, reason })
+      .then((res: AxiosResponse) => res.data),
+
+  getCategoryExclusions: (categoryId: string, subCategoryId?: string, startDate?: string, endDate?: string): Promise<{
+    exclusions: Array<{
+      id: string;
+      transactionId: string;
+      reason: string;
+      excludedAt: string;
+      transactionAmount: number;
+      transactionDate: string;
+      transactionDescription: string;
+      isActive: boolean;
+    }>;
+    totalCount: number;
+  }> =>
+    api.get(`/budgets/category/${categoryId}/subcategory/${subCategoryId || 'null'}/exclusions`, {
+      params: { startDate, endDate }
+    }).then((res: AxiosResponse) => res.data),
+
+  // Budget Editing API calls
+  getBudgetForEditing: (categoryId: string, subCategoryId?: string): Promise<{
+    _id: string | null;
+    userId: string;
+    categoryId: any;
+    subCategoryId: any;
+    budgetType: 'fixed' | 'variable';
+    fixedAmount: number;
+    monthlyAmounts: Array<{ month: number; amount: number }>;
+    isManuallyEdited: boolean;
+    isUniformAcrossMonths: boolean;
+    allMonthsData: Array<{ month: number; amount: number }>;
+    editHistory: Array<any>;
+  }> =>
+    api.get(`/budgets/category/${categoryId}/subcategory/${subCategoryId || 'null'}/edit`)
+      .then((res: AxiosResponse) => res.data.data),
+
+  updateCategoryBudget: (categoryId: string, subCategoryId: string | null, budgetData: {
+    budgetType: 'fixed' | 'variable';
+    fixedAmount?: number;
+    monthlyAmounts?: Array<{ month: number; amount: number }>;
+    reason?: string;
+  }): Promise<any> =>
+    api.put(`/budgets/category/${categoryId}/subcategory/${subCategoryId || 'null'}`, budgetData)
+      .then((res: AxiosResponse) => res.data),
+
+  recalculateBudgetWithExclusions: (categoryId: string, subCategoryId?: string, monthsToAnalyze?: number): Promise<{
+    recalculatedAmount: number;
+    transactionCount: number;
+    averagingPeriod: number;
+    excludedTransactions: number;
+  }> =>
+    api.post(`/budgets/category/${categoryId}/subcategory/${subCategoryId || 'null'}/recalculate`, {
+      monthsToAnalyze
+    }).then((res: AxiosResponse) => res.data),
 };

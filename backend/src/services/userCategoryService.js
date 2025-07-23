@@ -95,11 +95,11 @@ const defaultCategories = [
     name: "Health",
     type: "Expense",
     subCategories: [
+      { name: "Health Services", keywords: ["health services", "doctor", "רופא"] },
       { name: "Pharmacy", keywords: ["pharmacy", "pharm", "בית מרקחת"] },
+      { name: "Health Insurance", keywords: ["health insurance", "ביטוח בריאות"] },
       { name: "Fitness", keywords: ["fitness", "gym", "כושר"] },
       { name: "Grooming", keywords: ["grooming", "hairdresser", "מספרה"] },
-      { name: "Health Services", keywords: ["health services", "doctor", "רופא"] },
-      { name: "Health Insurance", keywords: ["health insurance", "ביטוח בריאות"] },
       { name: "Dental", keywords: ["dental", "dentist", "שיניים"] },
       { name: "Optometry", keywords: ["optometry", "glasses", "משקפיים"] },
       { name: "Health Miscellaneous", keywords: ["health", "בריאות"] }
