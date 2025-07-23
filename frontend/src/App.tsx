@@ -11,7 +11,7 @@ import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import AuthLayout from './components/layout/AuthLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
-import Dashboard from './pages/Dashboard';
+import Overview from './pages/Overview';
 import TransactionsPage from './pages/Transactions';
 import BudgetsPage from './pages/Budgets';
 import BudgetSubcategoryDetail from './pages/BudgetSubcategoryDetail';
@@ -61,7 +61,7 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Dashboard />} />
+              <Route index element={<Overview />} />
               <Route path="transactions" element={<TransactionsPage />} />
               <Route path="budgets" element={<BudgetsPage />} />
               <Route path="budgets/subcategory/:year/:month/:categoryId/:subcategoryId" element={<BudgetSubcategoryDetail />} />
