@@ -1,4 +1,4 @@
-const recurrenceDetectionService = require('../recurrenceDetectionService');
+const recurrenceDetectionService = require('../budget/recurrenceDetectionService');
 const { Transaction, TransactionPattern } = require('../../models');
 const mongoose = require('mongoose');
 

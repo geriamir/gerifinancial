@@ -1,4 +1,4 @@
-const averagingDenominatorService = require('../averagingDenominatorService');
+const averagingDenominatorService = require('../budget/averagingDenominatorService');
 
 describe('AveragingDenominatorService', () => {
   

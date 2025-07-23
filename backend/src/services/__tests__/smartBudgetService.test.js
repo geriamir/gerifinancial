@@ -1,11 +1,11 @@
-const smartBudgetService = require('../smartBudgetService');
-const recurrenceDetectionService = require('../recurrenceDetectionService');
+const smartBudgetService = require('../budget/smartBudgetService');
+const recurrenceDetectionService = require('../budget/recurrenceDetectionService');
 const TransactionPattern = require('../../models/TransactionPattern');
 const Transaction = require('../../models/Transaction');
 const mongoose = require('mongoose');
 
 // Mock dependencies
-jest.mock('../recurrenceDetectionService', () => ({
+jest.mock('../budget/recurrenceDetectionService', () => ({
   detectPatterns: jest.fn(),
   storeDetectedPatterns: jest.fn()
 }));

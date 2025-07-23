@@ -98,7 +98,7 @@ describe('External Import Verification', () => {
   test('should import with correct relative paths from parent directories', () => {
     expect(() => {
       // Test the paths that would be used from services directory
-      const budgetService = require('../budget/budgetService');
+      const budgetService = require('../budgetService');
       expect(budgetService).toBeDefined();
     }).not.toThrow();
   });
