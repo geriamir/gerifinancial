@@ -1,15 +1,16 @@
 import '@testing-library/jest-dom';
-import { configure } from '@testing-library/react';
+// Skip configure import due to React 19 compatibility issues
+// import { configure } from '@testing-library/react';
 
 // Add missing TextEncoder/TextDecoder implementations
 const { TextEncoder, TextDecoder } = require('util');
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder;
 
-// Set up testing library configuration
-configure({
-  testIdAttribute: 'data-testid',
-});
+// Skip testing library configuration due to React 19 compatibility issues
+// configure({
+//   testIdAttribute: 'data-testid',
+// });
 
 // Mock window.matchMedia for Material-UI
 Object.defineProperty(window, 'matchMedia', {

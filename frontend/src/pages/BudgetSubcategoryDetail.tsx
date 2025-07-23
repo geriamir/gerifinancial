@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useUrlParams } from '../hooks/useUrlParams';
 import {
   Box,
   Container,
@@ -54,15 +55,28 @@ interface SubcategoryTab {
 }
 
 const BudgetSubcategoryDetail: React.FC = () => {
-  const { year, month, categoryId, subcategoryId } = useParams<{
+  const urlParams = useParams<{
     year: string;
     month: string;
     categoryId: string;
     subcategoryId?: string;
   }>();
   
+  const location = useLocation();
   const navigate = useNavigate();
+  const { getParam } = useUrlParams();
   const { currentMonthlyBudget, loading: budgetLoading, refreshBudgets, setCurrentPeriod } = useBudget();
+
+  // Support both URL formats: legacy path-based and new query-based
+  const isNewFormat = location.pathname === '/budgets/detail';
+  
+  // Get parameters from either URL path or query parameters
+  const year = isNewFormat ? getParam('year', new Date().getFullYear().toString()) : urlParams.year;
+  const month = isNewFormat ? getParam('month', (new Date().getMonth() + 1).toString()) : urlParams.month;
+  const categoryId = isNewFormat ? getParam('category', '') : urlParams.categoryId;
+  const subcategoryId = isNewFormat ? getParam('subcategory', '') : urlParams.subcategoryId;
+  // urlType could be used for future income category detection in new format
+  // const urlType = isNewFormat ? getParam('type', '') : '';
   
   const [subcategoryData, setSubcategoryData] = useState<SubcategoryBudgetData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -509,20 +523,40 @@ const BudgetSubcategoryDetail: React.FC = () => {
   };
 
   const handleSubcategoryChange = (newSubcategoryId: string) => {
-    if (isIncomeView) {
-      // For income categories, navigate to another income category
-      navigate(`/budgets/income/${year}/${month}/${newSubcategoryId}`);
+    if (isNewFormat) {
+      // Use new query-based format
+      if (isIncomeView) {
+        // For income categories, navigate to another income category
+        navigate(`/budgets/detail?year=${year}&month=${month}&category=${newSubcategoryId}&type=income`);
+      } else {
+        // For expense categories, navigate to another subcategory within the same category
+        navigate(`/budgets/detail?year=${year}&month=${month}&category=${categoryId}&subcategory=${newSubcategoryId}`);
+      }
     } else {
-      // For expense categories, navigate to another subcategory within the same category
-      navigate(`/budgets/subcategory/${year}/${month}/${categoryId}/${newSubcategoryId}`);
+      // Use legacy path-based format for backward compatibility
+      if (isIncomeView) {
+        navigate(`/budgets/income/${year}/${month}/${newSubcategoryId}`);
+      } else {
+        navigate(`/budgets/subcategory/${year}/${month}/${categoryId}/${newSubcategoryId}`);
+      }
     }
   };
 
   const handleMonthChange = (newYear: number, newMonth: number) => {
-    if (isIncomeView) {
-      navigate(`/budgets/income/${newYear}/${newMonth}/${categoryId}`);
+    if (isNewFormat) {
+      // Use new query-based format
+      if (isIncomeView) {
+        navigate(`/budgets/detail?year=${newYear}&month=${newMonth}&category=${categoryId}&type=income`);
+      } else {
+        navigate(`/budgets/detail?year=${newYear}&month=${newMonth}&category=${categoryId}&subcategory=${subcategoryId}`);
+      }
     } else {
-      navigate(`/budgets/subcategory/${newYear}/${newMonth}/${categoryId}/${subcategoryId}`);
+      // Use legacy path-based format for backward compatibility
+      if (isIncomeView) {
+        navigate(`/budgets/income/${newYear}/${newMonth}/${categoryId}`);
+      } else {
+        navigate(`/budgets/subcategory/${newYear}/${newMonth}/${categoryId}/${subcategoryId}`);
+      }
     }
     setMonthMenuAnchor(null);
   };

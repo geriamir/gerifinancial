@@ -64,6 +64,9 @@ const App: React.FC = () => {
               <Route index element={<Overview />} />
               <Route path="transactions" element={<TransactionsPage />} />
               <Route path="budgets" element={<BudgetsPage />} />
+              {/* New simplified budget detail route */}
+              <Route path="budgets/detail" element={<BudgetSubcategoryDetail />} />
+              {/* Legacy routes for backward compatibility */}
               <Route path="budgets/subcategory/:year/:month/:categoryId/:subcategoryId" element={<BudgetSubcategoryDetail />} />
               <Route path="budgets/income/:year/:month/:categoryId" element={<BudgetSubcategoryDetail />} />
               <Route path="profile" element={<Profile />} />

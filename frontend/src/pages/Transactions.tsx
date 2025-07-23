@@ -1,7 +1,22 @@
+/**
+ * NAVIGATION SIMPLIFICATION - Updated TransactionsPage
+ * 
+ * Status: ✅ UPDATED
+ * Phase: 1.4
+ * Last Updated: July 23, 2025
+ * 
+ * Changes:
+ * - Replaced single transactions view with tabbed interface
+ * - Integrated bank management as third tab
+ * - Maintains all existing functionality
+ * - Added URL-based tab state persistence
+ */
+
 import React, { useEffect, useState } from 'react';
-import { Box, Container, Typography, Button, Alert } from '@mui/material';
+import { Box, Typography, Button, Alert } from '@mui/material';
 import { RestartAlt as ResetIcon } from '@mui/icons-material';
 import { useSearchParams } from 'react-router-dom';
+import TransactionTabs from '../components/transactions/TransactionTabs';
 import TransactionsList from '../components/transactions/TransactionsList';
 import FilterPanel from '../components/transactions/FilterPanel';
 import TransactionDetailDialog from '../components/transactions/TransactionDetailDialog';
@@ -31,7 +46,10 @@ const TransactionsPage: React.FC = () => {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Sync filters with URL parameters
+  // Check if we're showing uncategorized transactions (legacy URL support)
+  const isShowingUncategorized = filters.category === 'uncategorized';
+
+  // Sync filters with URL parameters for backward compatibility
   useEffect(() => {
     const categoryParam = searchParams.get('category');
     
@@ -72,14 +90,13 @@ const TransactionsPage: React.FC = () => {
     setRefreshTrigger(prev => prev + 1);
   };
 
-  const isShowingUncategorized = filters.category === 'uncategorized';
-
-  return (
-    <Container maxWidth="lg">
+  // If showing uncategorized transactions, render legacy view for backward compatibility
+  if (isShowingUncategorized) {
+    return (
       <Box sx={{ mt: 4, mb: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4" component="h1">
-            {isShowingUncategorized ? 'Uncategorized Transactions' : 'Transactions'}
+            Uncategorized Transactions
           </Typography>
           <Button
             startIcon={<ResetIcon />}
@@ -90,11 +107,9 @@ const TransactionsPage: React.FC = () => {
           </Button>
         </Box>
 
-        {isShowingUncategorized && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            Showing all transactions that need categorization. Click on any transaction to categorize it.
-          </Alert>
-        )}
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Showing all transactions that need categorization. Click on any transaction to categorize it.
+        </Alert>
 
         <FilterPanel
           startDate={filters.startDate}
@@ -103,22 +118,33 @@ const TransactionsPage: React.FC = () => {
           search={filters.search}
           onFilterChange={updateFilters}
         />
-        {/* TransactionsSummary will go here */}
+
         <TransactionsList 
           filters={filters} 
           onRowClick={handleTransactionClick}
           refreshTrigger={refreshTrigger}
         />
-      </Box>
 
-      {/* Transaction Detail Dialog */}
-      <TransactionDetailDialog
-        open={detailDialogOpen}
-        transaction={selectedTransaction}
-        onClose={handleDetailDialogClose}
-        onTransactionUpdated={handleTransactionUpdated}
-      />
-    </Container>
+        {/* Transaction Detail Dialog */}
+        <TransactionDetailDialog
+          open={detailDialogOpen}
+          transaction={selectedTransaction}
+          onClose={handleDetailDialogClose}
+          onTransactionUpdated={handleTransactionUpdated}
+        />
+      </Box>
+    );
+  }
+
+  // Default view - new tabbed interface
+  return (
+    <Box sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h4" component="h1" sx={{ mb: 3 }}>
+        Transactions
+      </Typography>
+      
+      <TransactionTabs />
+    </Box>
   );
 };
 
