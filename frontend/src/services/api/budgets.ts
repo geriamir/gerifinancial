@@ -1,6 +1,5 @@
 import { AxiosResponse } from 'axios';
 import api from './base';
-import type { Category } from './types/categories';
 
 export interface MonthlyBudget {
   _id: string;

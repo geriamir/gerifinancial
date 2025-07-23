@@ -33,7 +33,7 @@ import TransactionsList from '../components/transactions/TransactionsList';
 import TransactionDetailDialog from '../components/transactions/TransactionDetailDialog';
 import CategoryIconComponent from '../components/common/CategoryIcon';
 import BudgetEditor from '../components/budget/BudgetEditor';
-import { categoriesApi, type DefaultCategory } from '../services/api/categories';
+import { categoriesApi } from '../services/api/categories';
 import { transactionsApi } from '../services/api/transactions';
 import type { Transaction } from '../services/api/types/transactions';
 
@@ -285,7 +285,7 @@ const BudgetSubcategoryDetail: React.FC = () => {
     };
 
     loadSubcategoryData();
-  }, [currentMonthlyBudget, categoryId, subcategoryId, isIncomeView]);
+  }, [currentMonthlyBudget, categoryId, subcategoryId, isIncomeView, monthNum, yearNum]);
 
   // Extract subcategory tabs for the same category (or all income categories for income view)
   useEffect(() => {

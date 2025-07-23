@@ -18,7 +18,6 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
-  Grid,
   Divider,
   IconButton,
   Tooltip,
@@ -65,7 +64,6 @@ const BudgetEditor: React.FC<BudgetEditorProps> = ({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState(0);
   const [reason, setReason] = useState('');
   const [recalculateLoading, setRecalculateLoading] = useState(false);
 
@@ -151,7 +149,6 @@ const BudgetEditor: React.FC<BudgetEditorProps> = ({
       setBudgetData(null);
       setError(null);
       setReason('');
-      setActiveTab(0);
     }
   }, [open]);
 
@@ -371,7 +368,6 @@ const BudgetEditor: React.FC<BudgetEditorProps> = ({
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
               <Tabs
                 value={editedBudgetType === 'fixed' ? 0 : 1}
-                onChange={(_, newValue) => setActiveTab(newValue)}
               >
                 <Tab
                   label="Fixed Budget"
