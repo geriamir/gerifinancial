@@ -19,6 +19,10 @@ export interface Transaction {
   updatedAt: string;
   userId: string;
   status: 'verified' | 'deleted';
+  // Budget exclusion fields
+  excludeFromBudgetCalculation?: boolean;
+  exclusionReason?: string;
+  excludedAt?: string;
 }
 
 export interface GetTransactionsResponse {
@@ -72,8 +76,10 @@ export interface TransactionFilters {
   endDate?: Date;
   type?: string;
   category?: string;
+  subCategory?: string;
   search?: string;
   accountId?: string;
+  useProcessedDate?: boolean;
 }
 
 export interface UncategorizedStats {

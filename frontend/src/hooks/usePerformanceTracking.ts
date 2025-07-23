@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { analytics } from '../utils/analytics';
 import type { PerformanceTracker, PerformanceMetrics } from '../utils/analytics';
 
@@ -22,6 +22,19 @@ export const usePerformanceTracking = ({
   const trackerRef = useRef<PerformanceTracker | null>(null);
   const [isTracking, setIsTracking] = useState(autoStart);
 
+  const startTracking = useCallback(() => {
+    if (trackerRef.current) {
+      console.warn('Performance tracking already started');
+      return;
+    }
+    trackerRef.current = analytics.startPerformanceTracking(name, {
+      category,
+      tags,
+      data
+    });
+    setIsTracking(true);
+  }, [name, category, tags, data]);
+
   useEffect(() => {
     if (autoStart) {
       startTracking();
@@ -35,20 +48,7 @@ export const usePerformanceTracking = ({
         }
       };
     }
-  }, [name, category, autoStart]);
-
-  const startTracking = () => {
-    if (trackerRef.current) {
-      console.warn('Performance tracking already started');
-      return;
-    }
-    trackerRef.current = analytics.startPerformanceTracking(name, {
-      category,
-      tags,
-      data
-    });
-    setIsTracking(true);
-  };
+  }, [autoStart, startTracking, onComplete]);
 
   const stopTracking = () => {
     if (!trackerRef.current) {

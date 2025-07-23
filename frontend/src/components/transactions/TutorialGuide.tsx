@@ -50,7 +50,7 @@ export const TutorialGuide: React.FC<TutorialGuideProps> = ({
   } = useTutorialAnalytics();
 
   // Set up highlighting
-  const { isHighlighting } = useTutorialHighlight({
+  useTutorialHighlight({
     enabled: highlightEnabled,
     target: step?.target || null,
     pulseAnimation: true,

@@ -13,6 +13,8 @@ const scrapingSchedulerService = require('./services/scrapingSchedulerService');
 const authRoutes = require('./routes/auth');
 const bankAccountRoutes = require('./routes/bankAccounts');
 const transactionRoutes = require('./routes/transactions');
+const budgetRoutes = require('./routes/budgets');
+const categoryBudgetRoutes = require('./routes/categoryBudgets');
 const testRoutes = require('./routes/test');
 
 // Create Express app
@@ -69,6 +71,8 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/bank-accounts', bankAccountRoutes);
 app.use('/api/transactions', transactionRoutes);
+app.use('/api/budgets', budgetRoutes);
+app.use('/api/category-budgets', categoryBudgetRoutes);
 
 // Test routes (enabled in test and e2e environments)
 if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'e2e') {

@@ -1,4 +1,4 @@
-const { Transaction, Category, SubCategory, BankAccount } = require('../models');
+const { Transaction, Category, SubCategory, BankAccount, Tag } = require('../models');
 const { ObjectId } = require('mongodb');
 const stringSimilarity = require('string-similarity');
 const bankScraperService = require('./bankScraperService');
@@ -311,11 +311,13 @@ class TransactionService {
     endDate,
     type,
     category,
+    subCategory,
     search,
     limit = 20,
     skip = 0,
     accountId,
-    userId
+    userId,
+    useProcessedDate = false
   }) {
     if (!userId) {
       throw new Error('userId is required');
@@ -330,16 +332,18 @@ class TransactionService {
     }
 
     if (startDate || endDate) {
-      query.date = {};
+      // Use processedDate for budget views, regular date for transaction views
+      const dateField = useProcessedDate ? 'processedDate' : 'date';
+      query[dateField] = {};
       if (startDate) {
         const start = new Date(startDate);
         start.setUTCHours(0, 0, 0, 0);
-        query.date.$gte = start;
+        query[dateField].$gte = start;
       }
       if (endDate) {
         const end = new Date(endDate);
         end.setUTCHours(23, 59, 59, 999);
-        query.date.$lte = end;
+        query[dateField].$lte = end;
       }
     }
     if (type) {
@@ -356,13 +360,21 @@ class TransactionService {
         query.category = convertToObjectId(category);
       }
     }
+    if (subCategory) {
+      if (subCategory === 'uncategorized') {
+        query.subCategory = null; // Filter for transactions without subcategory
+      } else {
+        query.subCategory = convertToObjectId(subCategory);
+      }
+    }
     if (search) {
       query.description = { $regex: search, $options: 'i' };
     }
 
     const total = await Transaction.countDocuments(query);
+    const sortField = useProcessedDate ? 'processedDate' : 'date';
     const transactions = await Transaction.find(query)
-      .sort({ date: -1 })
+      .sort({ [sortField]: -1 })
       .skip(skip)
       .limit(limit)
       .populate('category subCategory');
@@ -392,12 +404,388 @@ class TransactionService {
     };
   }
 
+  // ============================================
+  // TRANSACTION TAGGING METHODS
+  // ============================================
+
+  /**
+   * Add tags to a transaction
+   */
+  async addTagsToTransaction(transactionId, tags, userId) {
+    try {
+      const transaction = await Transaction.findOne({
+        _id: convertToObjectId(transactionId),
+        userId: convertToObjectId(userId)
+      });
+
+      if (!transaction) {
+        throw new Error('Transaction not found');
+      }
+
+      // Ensure tags is an array
+      const tagArray = Array.isArray(tags) ? tags : [tags];
+      const tagIds = [];
+
+      // Find or create tags
+      for (const tagName of tagArray) {
+        if (typeof tagName === 'string') {
+          // Create tag if it's a string name
+          const tag = await Tag.findOrCreate({
+            name: tagName.trim(),
+            userId: convertToObjectId(userId),
+            type: tagName.startsWith('project:') ? 'project' : 'custom'
+          });
+          tagIds.push(tag._id);
+        } else {
+          // Assume it's already a tag ID
+          tagIds.push(convertToObjectId(tagName));
+        }
+      }
+
+      // Add tags to transaction
+      await transaction.addTags(tagIds);
+
+      logger.info(`Added ${tagIds.length} tags to transaction ${transactionId}`);
+      return transaction;
+    } catch (error) {
+      logger.error('Error adding tags to transaction:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove tags from a transaction
+   */
+  async removeTagsFromTransaction(transactionId, tags, userId) {
+    try {
+      const transaction = await Transaction.findOne({
+        _id: convertToObjectId(transactionId),
+        userId: convertToObjectId(userId)
+      });
+
+      if (!transaction) {
+        throw new Error('Transaction not found');
+      }
+
+      // Ensure tags is an array
+      const tagArray = Array.isArray(tags) ? tags : [tags];
+      const tagIds = tagArray.map(tag => convertToObjectId(tag));
+
+      // Remove tags from transaction
+      await transaction.removeTags(tagIds);
+
+      logger.info(`Removed ${tagIds.length} tags from transaction ${transactionId}`);
+      return transaction;
+    } catch (error) {
+      logger.error('Error removing tags from transaction:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get transactions by tag
+   */
+  async getTransactionsByTag(tagId, userId, options = {}) {
+    try {
+      const { limit = 20, skip = 0, startDate, endDate } = options;
+
+      let query = {
+        userId: convertToObjectId(userId),
+        tags: convertToObjectId(tagId)
+      };
+
+      // Add date range if provided
+      if (startDate || endDate) {
+        query.processedDate = {};
+        if (startDate) {
+          query.processedDate.$gte = new Date(startDate);
+        }
+        if (endDate) {
+          query.processedDate.$lte = new Date(endDate);
+        }
+      }
+
+      const total = await Transaction.countDocuments(query);
+      const transactions = await Transaction.find(query)
+        .sort({ processedDate: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('category subCategory tags');
+
+      return {
+        transactions,
+        total,
+        hasMore: total > skip + transactions.length
+      };
+    } catch (error) {
+      logger.error('Error getting transactions by tag:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get transactions by project (using project tag)
+   */
+  async getTransactionsByProject(projectId, userId, options = {}) {
+    try {
+      const { ProjectBudget } = require('../models');
+      
+      // Get project and its tag
+      const project = await ProjectBudget.findOne({
+        _id: convertToObjectId(projectId),
+        userId: convertToObjectId(userId)
+      }).populate('projectTag');
+
+      if (!project) {
+        throw new Error('Project not found');
+      }
+
+      if (!project.projectTag) {
+        // Return empty result if project has no tag yet
+        return {
+          transactions: [],
+          total: 0,
+          hasMore: false
+        };
+      }
+
+      // Get transactions using the project tag
+      return this.getTransactionsByTag(project.projectTag._id, userId, options);
+    } catch (error) {
+      logger.error('Error getting transactions by project:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get spending summary by tag
+   */
+  async getSpendingSummaryByTag(tagId, userId, startDate, endDate) {
+    try {
+      const summary = await Transaction.getSpendingSummaryByTag(
+        convertToObjectId(tagId),
+        startDate,
+        endDate
+      );
+
+      return summary;
+    } catch (error) {
+      logger.error('Error getting spending summary by tag:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's tag usage statistics
+   */
+  async getUserTagStats(userId) {
+    try {
+      const stats = await Tag.getUserTagsWithStats(convertToObjectId(userId));
+      return stats;
+    } catch (error) {
+      logger.error('Error getting user tag stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Bulk tag transactions (for batch operations)
+   */
+  async bulkTagTransactions(transactionIds, tags, userId) {
+    try {
+      const results = {
+        updated: 0,
+        errors: []
+      };
+
+      for (const transactionId of transactionIds) {
+        try {
+          await this.addTagsToTransaction(transactionId, tags, userId);
+          results.updated++;
+        } catch (error) {
+          results.errors.push({
+            transactionId,
+            error: error.message
+          });
+        }
+      }
+
+      return results;
+    } catch (error) {
+      logger.error('Error bulk tagging transactions:', error);
+      throw error;
+    }
+  }
+
+  // ============================================
+  // BUDGET ALLOCATION METHODS
+  // ============================================
+
+  /**
+   * Allocate transaction to a specific budget
+   */
+  async allocateTransactionToBudget(transactionId, budgetType, budgetId, userId) {
+    try {
+      const transaction = await Transaction.findOne({
+        _id: convertToObjectId(transactionId),
+        userId: convertToObjectId(userId)
+      });
+
+      if (!transaction) {
+        throw new Error('Transaction not found');
+      }
+
+      // Handle different budget types
+      switch (budgetType) {
+        case 'project':
+          const { ProjectBudget } = require('../models');
+          const project = await ProjectBudget.findOne({
+            _id: convertToObjectId(budgetId),
+            userId: convertToObjectId(userId)
+          });
+
+          if (!project) {
+            throw new Error('Project budget not found');
+          }
+
+          // Add project tag to transaction
+          if (project.projectTag) {
+            await this.addTagsToTransaction(transactionId, [project.projectTag], userId);
+          }
+          break;
+
+        default:
+          throw new Error('Invalid budget type');
+      }
+
+      logger.info(`Allocated transaction ${transactionId} to ${budgetType} budget ${budgetId}`);
+      return transaction;
+    } catch (error) {
+      logger.error('Error allocating transaction to budget:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get monthly budget actuals from transactions
+   */
+  async getMonthlyBudgetActuals(userId, year, month) {
+    try {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59);
+
+      const actuals = await Transaction.aggregate([
+        {
+          $match: {
+            userId: convertToObjectId(userId),
+            processedDate: { $gte: startDate, $lte: endDate },
+            category: { $ne: null }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              category: '$category',
+              subCategory: '$subCategory'
+            },
+            totalAmount: { $sum: { $abs: '$amount' } },
+            transactionCount: { $sum: 1 }
+          }
+        },
+        {
+          $lookup: {
+            from: 'categories',
+            localField: '_id.category',
+            foreignField: '_id',
+            as: 'categoryDetails'
+          }
+        },
+        {
+          $lookup: {
+            from: 'subcategories',
+            localField: '_id.subCategory',
+            foreignField: '_id',
+            as: 'subCategoryDetails'
+          }
+        }
+      ]);
+
+      return actuals;
+    } catch (error) {
+      logger.error('Error getting monthly budget actuals:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get project budget actuals from tagged transactions
+   */
+  async getProjectBudgetActuals(projectId, userId) {
+    try {
+      const { ProjectBudget } = require('../models');
+      
+      const project = await ProjectBudget.findOne({
+        _id: convertToObjectId(projectId),
+        userId: convertToObjectId(userId)
+      });
+
+      if (!project) {
+        throw new Error('Project not found');
+      }
+
+      if (!project.projectTag) {
+        return [];
+      }
+
+      const actuals = await Transaction.aggregate([
+        {
+          $match: {
+            userId: convertToObjectId(userId),
+            tags: project.projectTag,
+            processedDate: { $gte: project.startDate, $lte: project.endDate }
+          }
+        },
+        {
+          $group: {
+            _id: {
+              category: '$category',
+              subCategory: '$subCategory'
+            },
+            totalAmount: { $sum: { $abs: '$amount' } },
+            transactionCount: { $sum: 1 }
+          }
+        },
+        {
+          $lookup: {
+            from: 'categories',
+            localField: '_id.category',
+            foreignField: '_id',
+            as: 'categoryDetails'
+          }
+        },
+        {
+          $lookup: {
+            from: 'subcategories',
+            localField: '_id.subCategory',
+            foreignField: '_id',
+            as: 'subCategoryDetails'
+          }
+        }
+      ]);
+
+      return actuals;
+    } catch (error) {
+      logger.error('Error getting project budget actuals:', error);
+      throw error;
+    }
+  }
+
   /**
    * Apply manual categorization rule to historical transactions
    */
   async applyManualCategorizationToHistoricalTransactions(userId, matchingData, categoryId, subCategoryId, excludeTransactionId = null) {
     try {
-      console.log(`Applying manual categorization rule to historical transactions for user ${userId}, with matching data: ${JSON.stringify(matchingData)}`);
+      logger.info(`Applying manual categorization rule to historical transactions for user ${userId}, with matching data: ${JSON.stringify(matchingData)}`);
       
       // Build query to find matching transactions
       const query = {
@@ -411,25 +799,33 @@ class TransactionService {
         query._id = { $ne: convertToObjectId(excludeTransactionId) };
       }
 
+      // Helper function to escape special regex characters for MongoDB regex queries
+      const escapeRegExp = (string) => {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      };
+
       // Add description matching if provided
       if (matchingData.description) {
-        query.description = new RegExp(matchingData.description, 'i');
+        const escapedDescription = escapeRegExp(matchingData.description);
+        query.description = new RegExp(escapedDescription, 'i');
       }
 
       // Add memo matching if provided
       if (matchingData.memo) {
+        const escapedMemo = escapeRegExp(matchingData.memo);
         query.$or = [
-          { memo: new RegExp(matchingData.memo, 'i') },
-          { 'rawData.memo': new RegExp(matchingData.memo, 'i') }
+          { memo: new RegExp(escapedMemo, 'i') },
+          { 'rawData.memo': new RegExp(escapedMemo, 'i') }
         ];
       }
 
       // Add rawCategory matching if provided
       if (matchingData.rawCategory) {
+        const escapedRawCategory = escapeRegExp(matchingData.rawCategory);
         if (query.$or) {
-          query.$or.push({ 'rawData.category': new RegExp(matchingData.rawCategory, 'i') });
+          query.$or.push({ 'rawData.category': new RegExp(escapedRawCategory, 'i') });
         } else {
-          query['rawData.category'] = new RegExp(matchingData.rawCategory, 'i');
+          query['rawData.category'] = new RegExp(escapedRawCategory, 'i');
         }
       }
 

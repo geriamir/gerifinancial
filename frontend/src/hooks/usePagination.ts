@@ -2,8 +2,6 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useDebounce } from './useDebounce';
 import type {
   PaginationParams,
-  PagePaginationParams,
-  OffsetPaginationParams,
   PaginatedResponse
 } from '../services/api/types/verification';
 import {

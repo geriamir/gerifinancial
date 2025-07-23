@@ -26,6 +26,7 @@ import { EnhancedCategorizationDialog } from './EnhancedCategorizationDialog';
 import { transactionsApi } from '../../services/api/transactions';
 import { useCategories } from '../../hooks/useCategories';
 import CategoryIcon from '../common/CategoryIcon';
+import TransactionBudgetExclusion from './TransactionBudgetExclusion';
 
 interface TransactionDetailDialogProps {
   open: boolean;
@@ -296,6 +297,16 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 </Box>
               )}
             </Paper>
+
+            {/* Budget Exclusion Section - Only show for categorized expense transactions */}
+            {transaction.category && (transaction.category.type === 'Expense' || transaction.category.type === 'Income') && (
+              <Paper sx={{ p: 3, bgcolor: 'blue.50', border: '1px solid', borderColor: 'blue.200' }}>
+                <TransactionBudgetExclusion
+                  transaction={transaction}
+                  onTransactionUpdated={onTransactionUpdated}
+                />
+              </Paper>
+            )}
           </Box>
         </DialogContent>
 
