@@ -82,7 +82,7 @@ const Overview: React.FC = () => {
 
           {/* Center Column - Recent Activity Timeline */}
           <Box sx={{ flex: { lg: '0 0 42%' } }}>
-            <RecentActivityTimeline maxDays={7} maxTransactionsPerDay={5} />
+            <RecentActivityTimeline maxDays={7} />
           </Box>
 
           {/* Right Column - Quick Actions */}
