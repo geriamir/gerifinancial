@@ -36,6 +36,8 @@ interface FinancialSummary {
   budgetProgress: number;
   balanceChange: number;
   budgetStatus: 'on-track' | 'over-budget' | 'under-budget';
+  budgetExists?: boolean;
+  totalBudgetedExpenses?: number;
 }
 
 interface FinancialSummaryCardsProps {
@@ -131,11 +133,16 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
         // Calculate budget progress
         let budgetProgress = 0;
         let budgetStatus: 'on-track' | 'over-budget' | 'under-budget' = 'on-track';
+        let budgetExists = false;
+        let totalBudgetedExpenses = 0;
 
         if (budgetSummary.status === 'fulfilled' && budgetSummary.value.monthly) {
           const budget = budgetSummary.value.monthly;
-          if (budget.totalBudgetedExpenses > 0) {
-            budgetProgress = Math.round((monthlyExpenses / budget.totalBudgetedExpenses) * 100);
+          totalBudgetedExpenses = budget.totalBudgetedExpenses || 0;
+          
+          if (totalBudgetedExpenses > 0) {
+            budgetExists = true;
+            budgetProgress = Math.round((monthlyExpenses / totalBudgetedExpenses) * 100);
             
             if (budgetProgress > 100) {
               budgetStatus = 'over-budget';
@@ -144,6 +151,30 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
             } else {
               budgetStatus = 'on-track';
             }
+          }
+        }
+
+        // If no budget exists, try to fetch the current month budget or suggest creating one
+        if (!budgetExists && budgetSummary.status === 'fulfilled') {
+          try {
+            // Try to get the monthly budget directly
+            const monthlyBudget = await budgetsApi.getMonthlyBudget(currentYear, currentMonth);
+            if (monthlyBudget && monthlyBudget.totalBudgetedExpenses > 0) {
+              budgetExists = true;
+              totalBudgetedExpenses = monthlyBudget.totalBudgetedExpenses;
+              budgetProgress = Math.round((monthlyExpenses / totalBudgetedExpenses) * 100);
+              
+              if (budgetProgress > 100) {
+                budgetStatus = 'over-budget';
+              } else if (budgetProgress < 80) {
+                budgetStatus = 'under-budget';
+              } else {
+                budgetStatus = 'on-track';
+              }
+            }
+          } catch (err) {
+            // Monthly budget doesn't exist - this is okay, we'll show a "create budget" state
+            console.log('No monthly budget found for', currentYear, currentMonth);
           }
         }
 
@@ -156,7 +187,9 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
           monthlyExpenses,
           budgetProgress,
           balanceChange,
-          budgetStatus
+          budgetStatus,
+          budgetExists,
+          totalBudgetedExpenses
         });
 
       } catch (err) {
@@ -210,7 +243,7 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
     },
     {
       title: 'Budget Progress',
-      value: (
+      value: summary.budgetExists ? (
         <Box>
           <Typography variant="h4" component="div" gutterBottom>
             {summary.budgetProgress}%
@@ -227,11 +260,28 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
             size="small"
           />
         </Box>
+      ) : (
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="h6" component="div" gutterBottom color="text.secondary">
+            No Budget Set
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Create a budget to track your spending progress
+          </Typography>
+          <Chip 
+            label="Create Budget"
+            color="primary"
+            size="small"
+            clickable
+          />
+        </Box>
       ),
-      change: '',
-      changeColor: 'text.secondary',
+      change: summary.budgetExists ? 
+        `${formatCurrency(summary.monthlyExpenses)} of ${formatCurrency(summary.totalBudgetedExpenses || 0)}` :
+        'Click to create your first budget',
+      changeColor: summary.budgetExists ? 'text.secondary' : 'primary.main',
       icon: <BudgetIcon sx={{ fontSize: 40, color: 'secondary.main' }} />,
-      subtitle: 'monthly budget'
+      subtitle: summary.budgetExists ? 'monthly budget' : 'budget management'
     }
   ];
 
