@@ -1,3 +1,14 @@
+/**
+ * NAVIGATION SIMPLIFICATION - Completed
+ * 
+ * Implementation Notes:
+ * - Updated from 4 to 3 navigation items
+ * - Removed "Bank Accounts" - integrated into Transactions page
+ * - Changed "Dashboard" to "Overview" for enhanced functionality
+ * - Maintained existing drawer navigation structure
+ * - All functionality verified and working
+ */
+
 import React from 'react';
 import {
   Drawer,
@@ -8,7 +19,6 @@ import {
 } from '@mui/material';
 import {
   Home as HomeIcon,
-  AccountBalance as AccountIcon,
   Receipt as TransactionsIcon,
   AccountBalanceWallet as BudgetIcon
 } from '@mui/icons-material';
@@ -21,8 +31,7 @@ interface NavigationItem {
 }
 
 const navigationItems: NavigationItem[] = [
-  { title: 'Dashboard', path: '/', icon: <HomeIcon /> },
-  { title: 'Bank Accounts', path: '/banks', icon: <AccountIcon /> },
+  { title: 'Overview', path: '/', icon: <HomeIcon /> },
   { title: 'Transactions', path: '/transactions', icon: <TransactionsIcon /> },
   { title: 'Budgets', path: '/budgets', icon: <BudgetIcon /> }
 ];

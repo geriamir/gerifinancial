@@ -19,7 +19,13 @@ describe('Bank Accounts Management', () => {
     cy.intercept('POST', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('addAccount');
     
     // Visit the page and wait for initial load
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
+    
+    // Wait for the Bank Management tab to be active
+    cy.contains('Bank Management', { timeout: 10000 }).should('be.visible');
+    cy.get('[aria-selected="true"]').should('contain.text', 'Bank Management');
+    
+    // Wait for the API call to load bank accounts
     cy.wait('@getAccounts');
 
     // Click add bank account button
@@ -55,7 +61,13 @@ describe('Bank Accounts Management', () => {
     cy.intercept('GET', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('getAccounts');
     
     // Visit the page and wait for initial load
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
+    
+    // Wait for the Bank Management tab to be active
+    cy.contains('Bank Management', { timeout: 10000 }).should('be.visible');
+    cy.get('[aria-selected="true"]').should('contain.text', 'Bank Management');
+    
+    // Wait for the API call to load bank accounts
     cy.wait('@getAccounts');
 
     cy.contains('Add Bank Account').click();
@@ -80,7 +92,13 @@ describe('Bank Accounts Management', () => {
     cy.intercept('POST', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('addAccount');
     
     // Visit the page and wait for initial load
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
+    
+    // Wait for the Bank Management tab to be active
+    cy.contains('Bank Management', { timeout: 10000 }).should('be.visible');
+    cy.get('[aria-selected="true"]').should('contain.text', 'Bank Management');
+    
+    // Wait for the API call to load bank accounts
     cy.wait('@getAccounts');
 
     cy.contains('Add Bank Account').click();
@@ -127,7 +145,13 @@ describe('Bank Accounts Management', () => {
     });
 
     // Visit page and wait for accounts to load
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
+    
+    // Wait for the Bank Management tab to be active
+    cy.contains('Bank Management', { timeout: 10000 }).should('be.visible');
+    cy.get('[aria-selected="true"]').should('contain.text', 'Bank Management');
+    
+    // Wait for the API call to load bank accounts
     cy.wait('@getAccounts');
 
     // Assert accounts are listed
@@ -150,7 +174,13 @@ describe('Bank Accounts Management', () => {
       password: 'bankpass123'
     });
 
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
+    
+    // Wait for the Bank Management tab to be active
+    cy.contains('Bank Management', { timeout: 10000 }).should('be.visible');
+    cy.get('[aria-selected="true"]').should('contain.text', 'Bank Management');
+    
+    // Wait for the API call to load bank accounts
     cy.wait('@getAccounts');
 
     // Set up confirmation dialog handler
@@ -186,7 +216,13 @@ describe('Bank Accounts Management', () => {
       password: 'bankpass123'
     });
 
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
+    
+    // Wait for the Bank Management tab to be active
+    cy.contains('Bank Management', { timeout: 10000 }).should('be.visible');
+    cy.get('[aria-selected="true"]').should('contain.text', 'Bank Management');
+    
+    // Wait for the API call to load bank accounts
     cy.wait('@getAccounts');
 
     // Find and click test connection button
@@ -215,7 +251,13 @@ describe('Bank Accounts Management', () => {
       forceNetworkError: true
     }).as('failedRequest');
 
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
+    
+    // Wait for the Bank Management tab to be active (even though request will fail)
+    cy.contains('Bank Management', { timeout: 10000 }).should('be.visible');
+    cy.get('[aria-selected="true"]').should('contain.text', 'Bank Management');
+    
+    // Wait for the failed API call
     cy.wait('@failedRequest');
 
     // Assert error message
