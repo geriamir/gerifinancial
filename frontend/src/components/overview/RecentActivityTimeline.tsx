@@ -1,9 +1,5 @@
 /**
- * NAVIGATION SIMPLIFICATION - Component Status
- * 
- * Status: ⏳ IN PROGRESS
- * Phase: 1
- * Last Updated: July 23, 2025
+ * NAVIGATION SIMPLIFICATION - Completed
  * 
  * Implementation Notes:
  * - Recent activity timeline component for enhanced Overview page
@@ -11,7 +7,7 @@
  * - Grouped by date with category indicators and amounts
  * - Quick action buttons for categorization and details
  * - Integrates with existing transactionsApi service
- * - Testing status: Pending
+ * - Optimized condition logic for better code quality
  */
 
 import React, { useEffect, useState } from 'react';
@@ -357,9 +353,9 @@ export const RecentActivityTimeline: React.FC<RecentActivityTimelineProps> = ({
                           {transaction.description}
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.25 }}>
-                          {transaction.category && transaction.subCategory && !isUncategorized(transaction) && (
+                          {!isUncategorized(transaction) && (
                             <Chip
-                              label={transaction.subCategory.name || transaction.category.name}
+                              label={transaction.subCategory?.name || transaction.category?.name || 'Categorized'}
                               size="small"
                               variant="outlined"
                               sx={{ height: 16, fontSize: '0.65rem' }}
