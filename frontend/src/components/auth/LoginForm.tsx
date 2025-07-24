@@ -62,7 +62,7 @@ const LoginForm: React.FC = () => {
           onSubmit={async (values, { setSubmitting }) => {
             try {
               await login(values.email, values.password);
-              navigate('/dashboard');
+              navigate('/overview');
             } catch (err) {
               setError('Invalid email or password');
             } finally {
