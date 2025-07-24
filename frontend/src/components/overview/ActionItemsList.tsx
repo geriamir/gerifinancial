@@ -57,62 +57,8 @@ interface ActionItemsListProps {
   maxItems?: number;
 }
 
-// Mock action items for development - will be replaced with real data integration
-const mockActionItems: ActionItem[] = [
-  {
-    id: 'uncategorized-transactions',
-    type: 'warning',
-    title: '47 uncategorized transactions',
-    description: 'Review and categorize recent transactions to improve budget accuracy',
-    count: 47,
-    action: {
-      label: 'Review & Categorize',
-      route: '/transactions',
-      params: { filter: 'uncategorized' }
-    },
-    icon: <TransactionsIcon />,
-    priority: 'high'
-  },
-  {
-    id: 'bank-connection-expired',
-    type: 'error',
-    title: 'Bank connection expired',
-    description: 'Mizrahi bank account needs re-authentication to continue scraping',
-    action: {
-      label: 'Reconnect Account',
-      route: '/transactions',
-      params: { tab: 'bank-management' }
-    },
-    icon: <BankIcon />,
-    priority: 'high'
-  },
-  {
-    id: 'pattern-detected',
-    type: 'info',
-    title: 'New spending pattern detected',
-    description: 'Monthly rent pattern identified - create automatic budget rule?',
-    action: {
-      label: 'Review Pattern',
-      route: '/budgets',
-      params: { view: 'patterns' }
-    },
-    icon: <PatternIcon />,
-    priority: 'medium'
-  },
-  {
-    id: 'budget-overspend',
-    type: 'warning',
-    title: 'Food budget exceeded',
-    description: 'You\'ve spent 120% of your monthly food budget with 8 days remaining',
-    action: {
-      label: 'View Budget',
-      route: '/budgets',
-      params: { category: 'food' }
-    },
-    icon: <BudgetIcon />,
-    priority: 'medium'
-  }
-];
+// Default empty state when no action items are available
+const emptyActionItems: ActionItem[] = [];
 
 const getActionItemIcon = (type: string) => {
   switch (type) {
@@ -145,7 +91,7 @@ const getPriorityOrder = (priority: string) => {
 };
 
 export const ActionItemsList: React.FC<ActionItemsListProps> = ({
-  items = mockActionItems,
+  items = [],
   loading = false,
   maxItems = 5
 }) => {
