@@ -19,7 +19,7 @@ describe('Bank Accounts Management', () => {
     cy.intercept('POST', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('addAccount');
     
     // Visit the page and wait for initial load
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
     cy.wait('@getAccounts');
 
     // Click add bank account button
@@ -55,7 +55,7 @@ describe('Bank Accounts Management', () => {
     cy.intercept('GET', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('getAccounts');
     
     // Visit the page and wait for initial load
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
     cy.wait('@getAccounts');
 
     cy.contains('Add Bank Account').click();
@@ -80,7 +80,7 @@ describe('Bank Accounts Management', () => {
     cy.intercept('POST', `${Cypress.env('apiUrl')}/api/bank-accounts`).as('addAccount');
     
     // Visit the page and wait for initial load
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
     cy.wait('@getAccounts');
 
     cy.contains('Add Bank Account').click();
@@ -127,7 +127,7 @@ describe('Bank Accounts Management', () => {
     });
 
     // Visit page and wait for accounts to load
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
     cy.wait('@getAccounts');
 
     // Assert accounts are listed
@@ -150,7 +150,7 @@ describe('Bank Accounts Management', () => {
       password: 'bankpass123'
     });
 
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
     cy.wait('@getAccounts');
 
     // Set up confirmation dialog handler
@@ -186,7 +186,7 @@ describe('Bank Accounts Management', () => {
       password: 'bankpass123'
     });
 
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
     cy.wait('@getAccounts');
 
     // Find and click test connection button
@@ -215,7 +215,7 @@ describe('Bank Accounts Management', () => {
       forceNetworkError: true
     }).as('failedRequest');
 
-    cy.visit('/banks');
+    cy.visit('/transactions?tab=bank-management');
     cy.wait('@failedRequest');
 
     // Assert error message

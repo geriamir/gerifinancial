@@ -29,3 +29,5 @@ yarn-error.log*
 *.swp
 *.swo
 PR_DESCRIPTION.md
+
+frontend/cypress/screenshots/

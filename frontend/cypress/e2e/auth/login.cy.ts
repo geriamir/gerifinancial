@@ -17,7 +17,7 @@ describe('Login Flow', () => {
     cy.get('button[type="submit"]').click();
 
     // Assert successful login
-    cy.url().should('include', '/dashboard');
+    cy.url().should('include', '/overview');
     cy.get('.MuiAvatar-root').should('have.text', 'T');  // First letter of Test User
   });
 
@@ -64,7 +64,7 @@ describe('Login Flow', () => {
       localStorage.setItem('token', token);
       
       // Visit protected route
-      cy.visit('/dashboard');
+      cy.visit('/overview');
       
       // Assert we're logged in
       cy.get('.MuiAvatar-root').should('have.text', 'P');  // First letter of Persist User
@@ -74,7 +74,7 @@ describe('Login Flow', () => {
       
       // Assert we're still logged in
       cy.get('.MuiAvatar-root').should('have.text', 'P');
-      cy.url().should('include', '/dashboard');
+      cy.url().should('include', '/overview');
     });
   });
 
@@ -85,7 +85,7 @@ describe('Login Flow', () => {
       name: 'Logout User'
     }).then(token => {
       localStorage.setItem('token', token);
-      cy.visit('/dashboard');
+      cy.visit('/overview');
       
       // Open user menu and click logout
       cy.get('.MuiAvatar-root').click();
@@ -95,7 +95,7 @@ describe('Login Flow', () => {
       cy.url().should('include', '/login');
       
       // Try to visit protected route
-      cy.visit('/dashboard');
+      cy.visit('/overview');
       
       // Assert we're redirected to login
       cy.url().should('include', '/login');
