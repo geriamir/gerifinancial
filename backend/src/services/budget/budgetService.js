@@ -358,6 +358,7 @@ class BudgetService {
         monthly: monthlyBudget ? {
           totalBudgetedIncome: monthlyBudget.totalBudgetedIncome,
           totalBudgetedExpenses: monthlyBudget.totalBudgetedExpenses,
+          totalActualIncome: monthlyBudget.totalActualIncome,
           totalActualExpenses: monthlyBudget.totalActualExpenses,
           budgetBalance: monthlyBudget.budgetBalance,
           actualBalance: monthlyBudget.actualBalance

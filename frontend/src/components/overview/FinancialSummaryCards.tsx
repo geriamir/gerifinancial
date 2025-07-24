@@ -136,29 +136,45 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
         let budgetExists = false;
         let totalBudgetedExpenses = 0;
 
-        if (budgetSummary.status === 'fulfilled' && budgetSummary.value.monthly) {
-          const budget = budgetSummary.value.monthly;
-          totalBudgetedExpenses = budget.totalBudgetedExpenses || 0;
+        if (budgetSummary.status === 'fulfilled') {
+          // Budget summary API returns {success: true, data: {...}}
+          const budgetResponse = budgetSummary.value as any;
+          const budgetData = budgetResponse.data || budgetResponse;
           
-          if (totalBudgetedExpenses > 0) {
-            budgetExists = true;
-            budgetProgress = Math.round((monthlyExpenses / totalBudgetedExpenses) * 100);
+          if (budgetData.monthly) {
+            const budget = budgetData.monthly;
+            totalBudgetedExpenses = budget.totalBudgetedExpenses || 0;
             
-            if (budgetProgress > 100) {
-              budgetStatus = 'over-budget';
-            } else if (budgetProgress < 80) {
-              budgetStatus = 'under-budget';
-            } else {
-              budgetStatus = 'on-track';
+            // Use actual monthly data from budget summary instead of calculated from transactions
+            const actualMonthlyIncome = budget.totalActualIncome || 0;
+            
+            if (totalBudgetedExpenses > 0) {
+              budgetExists = true;
+              budgetProgress = Math.round((budget.totalActualExpenses / totalBudgetedExpenses) * 100);
+              
+              if (budgetProgress > 100) {
+                budgetStatus = 'over-budget';
+              } else if (budgetProgress < 80) {
+                budgetStatus = 'under-budget';
+              } else {
+                budgetStatus = 'on-track';
+              }
+              
+              // Update monthly amounts to match the budget data for consistency
+              monthlyExpenses = budget.totalActualExpenses;
+              monthlyIncome = actualMonthlyIncome;
             }
           }
         }
 
-        // If no budget exists, try to fetch the current month budget or suggest creating one
-        if (!budgetExists && budgetSummary.status === 'fulfilled') {
+        // If no budget exists, try to fetch the current month budget directly
+        if (!budgetExists) {
           try {
-            // Try to get the monthly budget directly
-            const monthlyBudget = await budgetsApi.getMonthlyBudget(currentYear, currentMonth);
+            const monthlyBudgetResponse = await budgetsApi.getMonthlyBudget(currentYear, currentMonth) as any;
+            
+            // Monthly budget API also returns {success: true, data: {...}}
+            const monthlyBudget = monthlyBudgetResponse.data || monthlyBudgetResponse;
+            
             if (monthlyBudget && monthlyBudget.totalBudgetedExpenses > 0) {
               budgetExists = true;
               totalBudgetedExpenses = monthlyBudget.totalBudgetedExpenses;
@@ -173,16 +189,25 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
               }
             }
           } catch (err) {
-            // Monthly budget doesn't exist - this is okay, we'll show a "create budget" state
             console.log('No monthly budget found for', currentYear, currentMonth);
           }
         }
 
+        // Use actualBalance from budget summary, fallback to calculated totalBalance
+        let actualBalance = totalBalance; // fallback to calculated from transactions
+        if (budgetSummary.status === 'fulfilled') {
+          const budgetResponse = budgetSummary.value as any;
+          const budgetData = budgetResponse.data || budgetResponse;
+          if (budgetData.monthly && budgetData.monthly.actualBalance !== undefined) {
+            actualBalance = budgetData.monthly.actualBalance;
+          }
+        }
+
         // Calculate balance change (simplified - would need last month's data for real calculation)
-        const balanceChange = totalBalance > 0 ? 5.2 : -2.1; // Placeholder
+        const balanceChange = actualBalance > 0 ? 5.2 : -2.1; // Placeholder
 
         setSummary({
-          totalBalance,
+          totalBalance: actualBalance,
           monthlyIncome,
           monthlyExpenses,
           budgetProgress,
@@ -263,13 +288,13 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
       ) : (
         <Box sx={{ textAlign: 'center' }}>
           <Typography variant="h6" component="div" gutterBottom color="text.secondary">
-            No Budget Set
+            No Budget
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Create a budget to track your spending progress
+            Set a budget to track spending
           </Typography>
           <Chip 
-            label="Create Budget"
+            label="Create"
             color="primary"
             size="small"
             clickable
@@ -278,10 +303,9 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
       ),
       change: summary.budgetExists ? 
         `${formatCurrency(summary.monthlyExpenses)} of ${formatCurrency(summary.totalBudgetedExpenses || 0)}` :
-        'Click to create your first budget',
+        '',
       changeColor: summary.budgetExists ? 'text.secondary' : 'primary.main',
-      icon: <BudgetIcon sx={{ fontSize: 40, color: 'secondary.main' }} />,
-      subtitle: summary.budgetExists ? 'monthly budget' : 'budget management'
+      icon: <BudgetIcon sx={{ fontSize: 40, color: 'secondary.main' }} />
     }
   ];
 
