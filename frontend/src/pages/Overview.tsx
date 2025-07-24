@@ -3,9 +3,9 @@
  * 
  * Implementation Notes:
  * - Enhanced Overview page replacing Dashboard
- * - Combines existing Dashboard functionality with new components
  * - Integrates FinancialSummaryCards, ActionItemsList, and RecentActivityTimeline
- * - Maintains UncategorizedTransactionsWidget for backward compatibility
+ * - ActionItemsList handles uncategorized transactions and other alerts
+ * - Eliminates duplicate UncategorizedTransactionsWidget 
  * - Responsive layout with mobile-first design
  * - All functionality verified and working
  */
@@ -26,9 +26,6 @@ import {
   TrendingUp as TrendingUpIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-
-// Existing Dashboard components
-import UncategorizedTransactionsWidget from '../components/dashboard/UncategorizedTransactionsWidget';
 
 // New Overview components
 import FinancialSummaryCards from '../components/overview/FinancialSummaryCards';
@@ -62,21 +59,16 @@ const Overview: React.FC = () => {
           flexDirection: { xs: 'column', lg: 'row' },
           gap: 3
         }}>
-          {/* Left Column - Action Items and Uncategorized Transactions */}
+          {/* Left Column - Action Items */}
           <Box sx={{ 
             flex: { lg: '0 0 33%' },
             display: 'flex', 
             flexDirection: 'column', 
             gap: 3 
           }}>
-            {/* Action Items */}
+            {/* Action Items (includes uncategorized transactions and other alerts) */}
             <Box sx={{ flex: 1 }}>
               <ActionItemsList maxItems={5} />
-            </Box>
-            
-            {/* Legacy Uncategorized Transactions Widget for compatibility */}
-            <Box>
-              <UncategorizedTransactionsWidget />
             </Box>
           </Box>
 

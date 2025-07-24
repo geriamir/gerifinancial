@@ -9,7 +9,7 @@
  * - TypeScript-safe color handling for Material-UI components
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -35,6 +35,7 @@ import {
   ArrowForward as ArrowIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
+import { transactionsApi } from '../../services/api/transactions';
 
 interface ActionItem {
   id: string;
@@ -91,11 +92,67 @@ const getPriorityOrder = (priority: string) => {
 };
 
 export const ActionItemsList: React.FC<ActionItemsListProps> = ({
-  items = [],
-  loading = false,
+  items: providedItems,
+  loading: externalLoading = false,
   maxItems = 5
 }) => {
+  const [actionItems, setActionItems] = useState<ActionItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchActionItems = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch uncategorized transactions count
+        const uncategorizedResponse = await transactionsApi.getUncategorizedStats();
+        
+        const realActionItems: ActionItem[] = [];
+
+        // Create action item for uncategorized transactions if any exist
+        if (uncategorizedResponse.total > 0) {
+          realActionItems.push({
+            id: 'uncategorized-transactions',
+            type: 'warning',
+            title: `${uncategorizedResponse.total} uncategorized transactions`,
+            description: `Review and categorize ${uncategorizedResponse.total} recent transactions to improve budget accuracy`,
+            count: uncategorizedResponse.total,
+            action: {
+              label: 'Review & Categorize',
+              route: '/transactions',
+              params: { filter: 'uncategorized' }
+            },
+            icon: <TransactionsIcon />,
+            priority: 'high'
+          });
+        }
+
+        // TODO: Add other real action items here in the future:
+        // - Bank connection errors
+        // - Budget overspending alerts
+        // - Detected spending patterns
+        // - Upcoming bill reminders
+
+        setActionItems(realActionItems);
+      } catch (err) {
+        console.error('Error fetching action items:', err);
+        setError('Failed to load action items');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // If items are provided externally, use those; otherwise fetch real data
+    if (providedItems) {
+      setActionItems(providedItems);
+      setLoading(false);
+    } else {
+      fetchActionItems();
+    }
+  }, [providedItems]);
 
   const handleActionClick = (actionItem: ActionItem) => {
     const { route, params } = actionItem.action;
@@ -107,9 +164,12 @@ export const ActionItemsList: React.FC<ActionItemsListProps> = ({
     navigate(finalRoute);
   };
 
+  const items = providedItems || actionItems;
+  const isLoading = externalLoading || loading;
+
   // Sort by priority and limit items
   const sortedItems = items
-    .sort((a, b) => getPriorityOrder(a.priority) - getPriorityOrder(b.priority))
+    .sort((a: ActionItem, b: ActionItem) => getPriorityOrder(a.priority) - getPriorityOrder(b.priority))
     .slice(0, maxItems);
 
   if (loading) {
