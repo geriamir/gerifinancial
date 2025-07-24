@@ -64,11 +64,11 @@ const AuthLayout: React.FC = () => {
               color="inherit"
             >
               {user?.name ? (
-                <Avatar sx={{ bgcolor: 'secondary.main' }}>
+                <Avatar sx={{ bgcolor: 'secondary.main' }} data-testid="user-avatar">
                   {user.name.charAt(0).toUpperCase()}
                 </Avatar>
               ) : (
-                <AccountCircleIcon />
+                <AccountCircleIcon data-testid="user-avatar" />
               )}
             </IconButton>
             <Menu

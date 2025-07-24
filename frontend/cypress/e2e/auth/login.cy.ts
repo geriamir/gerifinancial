@@ -18,7 +18,11 @@ describe('Login Flow', () => {
 
     // Assert successful login
     cy.url().should('include', '/overview');
-    cy.get('.MuiAvatar-root').should('have.text', 'T');  // First letter of Test User
+    
+    // Wait for the avatar to appear in the AppBar and verify user is logged in
+    cy.get('[data-testid="user-avatar"]', { timeout: 10000 })
+      .should('be.visible')
+      .and('contain.text', 'T');  // First letter of Test User
   });
 
   it('should show error with invalid credentials', () => {
@@ -67,13 +71,17 @@ describe('Login Flow', () => {
       cy.visit('/overview');
       
       // Assert we're logged in
-      cy.get('.MuiAvatar-root').should('have.text', 'P');  // First letter of Persist User
+      cy.get('[data-testid="user-avatar"]', { timeout: 10000 })
+        .should('be.visible')
+        .and('contain.text', 'P');  // First letter of Persist User
       
       // Refresh page
       cy.reload();
       
       // Assert we're still logged in
-      cy.get('.MuiAvatar-root').should('have.text', 'P');
+      cy.get('[data-testid="user-avatar"]', { timeout: 10000 })
+        .should('be.visible')
+        .and('contain.text', 'P');
       cy.url().should('include', '/overview');
     });
   });
@@ -88,7 +96,7 @@ describe('Login Flow', () => {
       cy.visit('/overview');
       
       // Open user menu and click logout
-      cy.get('.MuiAvatar-root').click();
+      cy.get('[data-testid="user-avatar"]', { timeout: 10000 }).should('be.visible').click();
       cy.get('.MuiMenu-paper').contains('Logout').click();
       
       // Assert we're logged out and redirected
