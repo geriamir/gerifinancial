@@ -29,9 +29,9 @@ import {
   Error as ErrorIcon,
   Info as InfoIcon,
   Receipt as TransactionsIcon,
-  AccountBalance as BankIcon,
-  TrendingUp as PatternIcon,
-  AccountBalanceWallet as BudgetIcon,
+  // AccountBalance as BankIcon,
+  // TrendingUp as PatternIcon,
+  // AccountBalanceWallet as BudgetIcon,
   ArrowForward as ArrowIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -57,9 +57,6 @@ interface ActionItemsListProps {
   loading?: boolean;
   maxItems?: number;
 }
-
-// Default empty state when no action items are available
-const emptyActionItems: ActionItem[] = [];
 
 const getActionItemIcon = (type: string) => {
   switch (type) {
@@ -93,12 +90,11 @@ const getPriorityOrder = (priority: string) => {
 
 export const ActionItemsList: React.FC<ActionItemsListProps> = ({
   items: providedItems,
-  loading: externalLoading = false,
   maxItems = 5
 }) => {
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -165,7 +161,6 @@ export const ActionItemsList: React.FC<ActionItemsListProps> = ({
   };
 
   const items = providedItems || actionItems;
-  const isLoading = externalLoading || loading;
 
   // Sort by priority and limit items
   const sortedItems = items
