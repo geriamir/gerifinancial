@@ -17,7 +17,7 @@ describe('Login Flow', () => {
     cy.get('button[type="submit"]').click();
 
     // Assert successful login
-    cy.url().should('include', '/overview');
+    cy.url().should('eq', 'http://localhost:3000/');
     
     // Wait for the avatar to appear in the AppBar and verify user is logged in
     cy.get('[data-testid="user-avatar"]', { timeout: 10000 })
@@ -68,7 +68,7 @@ describe('Login Flow', () => {
       localStorage.setItem('token', token);
       
       // Visit protected route
-      cy.visit('/overview');
+      cy.visit('/');
       
       // Assert we're logged in
       cy.get('[data-testid="user-avatar"]', { timeout: 10000 })
@@ -82,7 +82,7 @@ describe('Login Flow', () => {
       cy.get('[data-testid="user-avatar"]', { timeout: 10000 })
         .should('be.visible')
         .and('contain.text', 'P');
-      cy.url().should('include', '/overview');
+      cy.url().should('eq', 'http://localhost:3000/');
     });
   });
 
@@ -93,7 +93,7 @@ describe('Login Flow', () => {
       name: 'Logout User'
     }).then(token => {
       localStorage.setItem('token', token);
-      cy.visit('/overview');
+      cy.visit('/');
       
       // Open user menu and click logout
       cy.get('[data-testid="user-avatar"]', { timeout: 10000 }).should('be.visible').click();
@@ -103,7 +103,7 @@ describe('Login Flow', () => {
       cy.url().should('include', '/login');
       
       // Try to visit protected route
-      cy.visit('/overview');
+      cy.visit('/');
       
       // Assert we're redirected to login
       cy.url().should('include', '/login');
