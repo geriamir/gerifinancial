@@ -1,4 +1,4 @@
-const { StockPrice } = require('../models');
+const { StockPrice, RSUGrant } = require('../models');
 const cron = require('node-cron');
 
 class StockPriceService {
@@ -495,7 +495,6 @@ class StockPriceService {
       const activeStocks = await StockPrice.getActiveSymbols();
       
       // Also find stock symbols from RSU grants that might not have StockPrice records yet
-      const { RSUGrant } = require('../models');
       const grantsWithSymbols = await RSUGrant.aggregate([
         { $match: { status: 'active' } },
         { $group: { _id: '$stockSymbol' } },

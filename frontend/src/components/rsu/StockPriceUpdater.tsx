@@ -268,7 +268,7 @@ const StockPriceUpdater: React.FC<StockPriceUpdaterProps> = ({
         <Button
           variant="contained"
           onClick={handleUpdatePrice}
-          disabled={!validatePrice() === null || updating || success}
+          disabled={validatePrice() !== null || updating || success}
           startIcon={updating ? <CircularProgress size={20} /> : null}
         >
           {updating ? 'Updating...' : 'Update Price'}

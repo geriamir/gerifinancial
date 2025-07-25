@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -103,15 +103,23 @@ const GrantItem: React.FC<GrantItemProps> = ({
   const isPositiveGainLoss = grant.gainLoss >= 0;
   const vestingProgress = Math.round(grant.vestingProgress);
   
-  // Calculate available shares (vested shares minus sold shares)
-  // Handle both string grantId and populated grant object
-  const directFilteredSales = sales.filter(sale => {
-    const saleGrantId = typeof sale.grantId === 'string' ? sale.grantId : (sale.grantId as any)?._id;
-    return saleGrantId === grant._id;
-  }) || [];
-  
-  const sharesSold = directFilteredSales.reduce((total, sale) => total + sale.sharesAmount, 0);
-  const availableShares = Math.max(0, grant.vestedShares - sharesSold);
+  // Calculate available shares (vested shares minus sold shares) - memoized for performance
+  const { directFilteredSales, sharesSold, availableShares } = useMemo(() => {
+    // Handle both string grantId and populated grant object
+    const filteredSales = sales.filter(sale => {
+      const saleGrantId = typeof sale.grantId === 'string' ? sale.grantId : (sale.grantId as any)?._id;
+      return saleGrantId === grant._id;
+    }) || [];
+    
+    const soldShares = filteredSales.reduce((total, sale) => total + sale.sharesAmount, 0);
+    const available = Math.max(0, grant.vestedShares - soldShares);
+    
+    return {
+      directFilteredSales: filteredSales,
+      sharesSold: soldShares,
+      availableShares: available
+    };
+  }, [sales, grant._id, grant.vestedShares]);
   
   // Debug logging
   console.log(`Grant ${grant.stockSymbol} (${grant._id}):`, {
