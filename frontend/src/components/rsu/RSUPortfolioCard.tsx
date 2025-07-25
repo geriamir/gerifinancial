@@ -11,7 +11,6 @@ import {
 import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
-  Business as BusinessIcon,
   AccountBalance as AccountBalanceIcon
 } from '@mui/icons-material';
 import { PortfolioSummary } from '../../services/api/rsus';
