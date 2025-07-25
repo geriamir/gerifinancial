@@ -201,17 +201,17 @@ const RecentSalesWidget: React.FC<RecentSalesWidgetProps> = ({
                     </Box>
                   }
                   secondary={
-                    <Box sx={{ mt: 1 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Box sx={{ display: 'flex', gap: 2 }}>
-                          <Typography variant="caption" color="text.secondary">
+                    <span style={{ marginTop: '4px', display: 'block' }}>
+                      <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ display: 'flex', gap: '16px' }}>
+                          <Typography variant="caption" color="text.secondary" component="span">
                             Tax: ${sale.taxCalculation.totalTax.toLocaleString()}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" component="span">
                             Net: ${sale.taxCalculation.netValue.toLocaleString()}
                           </Typography>
-                        </Box>
-                        <Box>
+                        </span>
+                        <span>
                           <Chip
                             label={sale.taxCalculation.isLongTerm ? 'Long-term' : 'Short-term'}
                             size="small"
@@ -219,9 +219,9 @@ const RecentSalesWidget: React.FC<RecentSalesWidgetProps> = ({
                             variant="outlined"
                             sx={{ fontSize: '0.7rem', height: 18 }}
                           />
-                        </Box>
-                      </Box>
-                    </Box>
+                        </span>
+                      </span>
+                    </span>
                   }
                 />
               </ListItem>
