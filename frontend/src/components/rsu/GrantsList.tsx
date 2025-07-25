@@ -378,6 +378,22 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
       />
     </Card>
   );
+}, (prevProps, nextProps) => {
+  // Custom comparison function for React.memo
+  // Only re-render if the grant data actually changed
+  return (
+    prevProps.grant._id === nextProps.grant._id &&
+    prevProps.grant.totalShares === nextProps.grant.totalShares &&
+    prevProps.grant.vestedShares === nextProps.grant.vestedShares &&
+    prevProps.grant.currentPrice === nextProps.grant.currentPrice &&
+    prevProps.grant.currentValue === nextProps.grant.currentValue &&
+    prevProps.grant.gainLoss === nextProps.grant.gainLoss &&
+    prevProps.grant.vestingProgress === nextProps.grant.vestingProgress &&
+    prevProps.onEdit === nextProps.onEdit &&
+    prevProps.onDelete === nextProps.onDelete &&
+    prevProps.onRecordSale === nextProps.onRecordSale &&
+    prevProps.onViewDetails === nextProps.onViewDetails
+  );
 });
 
 GrantItem.displayName = 'GrantItem';
