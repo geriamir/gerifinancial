@@ -3,7 +3,6 @@ import {
   Box,
   Container,
   Typography,
-  Grid,
   Card,
   CardContent,
   Button,
@@ -14,11 +13,7 @@ import {
 } from '@mui/material';
 import {
   Add as AddIcon,
-  SellOutlined as SellIcon,
-  TrendingUp as TrendingUpIcon,
-  Schedule as ScheduleIcon,
-  AccountBalance as AccountBalanceIcon,
-  Assessment as AssessmentIcon
+  SellOutlined as SellIcon
 } from '@mui/icons-material';
 import { useRSU } from '../contexts/RSUContext';
 import RSUPortfolioCard from '../components/rsu/RSUPortfolioCard';
@@ -165,7 +160,10 @@ const RSUs: React.FC = () => {
                   </Box>
                 </Box>
                 <GrantsList 
-                  grants={grants}
+                  grants={(() => {
+                    console.log('GrantsList receiving grants:', grants.length, 'grants, loading:', grantsLoading);
+                    return grants;
+                  })()}
                   loading={grantsLoading}
                   onGrantSelect={handleViewGrantDetails}
                   onEditGrant={handleEditGrant}

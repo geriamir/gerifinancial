@@ -14,7 +14,6 @@ import {
 } from '@mui/material';
 import {
   Schedule as ScheduleIcon,
-  TrendingUp as TrendingUpIcon,
   CalendarToday as CalendarIcon
 } from '@mui/icons-material';
 import { UpcomingVestingEvent } from '../../services/api/rsus';

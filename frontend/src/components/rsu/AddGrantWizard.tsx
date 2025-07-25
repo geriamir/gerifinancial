@@ -19,10 +19,7 @@ import {
   Chip
 } from '@mui/material';
 import {
-  Business as BusinessIcon,
-  CalendarToday as CalendarIcon,
-  AttachMoney as MoneyIcon,
-  Timeline as TimelineIcon
+  Business as BusinessIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useRSU } from '../../contexts/RSUContext';
@@ -58,7 +55,7 @@ const AddGrantWizard: React.FC<AddGrantWizardProps> = ({
   open,
   onClose
 }) => {
-  const { createGrant, loading } = useRSU();
+  const { createGrant } = useRSU();
   const [activeStep, setActiveStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);

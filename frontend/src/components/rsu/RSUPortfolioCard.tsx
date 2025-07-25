@@ -6,13 +6,12 @@ import {
   Box,
   LinearProgress,
   Chip,
-  Skeleton,
-  useTheme
+  Skeleton
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
-  Schedule as ScheduleIcon,
+  Business as BusinessIcon,
   AccountBalance as AccountBalanceIcon
 } from '@mui/icons-material';
 import { PortfolioSummary } from '../../services/api/rsus';
@@ -26,7 +25,6 @@ const RSUPortfolioCard: React.FC<RSUPortfolioCardProps> = ({
   portfolioSummary,
   loading = false
 }) => {
-  const theme = useTheme();
 
   if (loading) {
     return (
@@ -68,9 +66,7 @@ const RSUPortfolioCard: React.FC<RSUPortfolioCardProps> = ({
     summary: {
       totalPortfolioValue,
       portfolioGainLoss,
-      overallProgress,
-      nextVestingDate,
-      vestedLiquidValue
+      overallProgress
     },
     grants: {
       totalGrants
@@ -78,7 +74,6 @@ const RSUPortfolioCard: React.FC<RSUPortfolioCardProps> = ({
     vesting: {
       totalVestedShares,
       totalUnvestedShares,
-      totalShares,
       vestedPostTax
     },
     sales: {

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useCallback, ReactNode } from 'react';
 import { rsuApi, RSUGrant, RSUSale, PortfolioSummary, CreateGrantData, CreateSaleData, TaxPreviewRequest, UpcomingVestingEvent } from '../services/api/rsus';
 
 // State interface
@@ -319,8 +319,8 @@ export const RSUProvider: React.FC<RSUProviderProps> = ({ children }) => {
     dispatch({ type: 'SET_SELECTED_SALE', payload: sale });
   };
 
-  // Data refresh functions
-  const refreshPortfolio = async (): Promise<void> => {
+  // Data refresh functions - wrapped with useCallback for stable references
+  const refreshPortfolio = useCallback(async (): Promise<void> => {
     try {
       dispatch({ type: 'SET_PORTFOLIO_LOADING', payload: true });
       const summary = await rsuApi.portfolio.getSummary();
@@ -330,9 +330,9 @@ export const RSUProvider: React.FC<RSUProviderProps> = ({ children }) => {
     } finally {
       dispatch({ type: 'SET_PORTFOLIO_LOADING', payload: false });
     }
-  };
+  }, []);
 
-  const refreshGrants = async (): Promise<void> => {
+  const refreshGrants = useCallback(async (): Promise<void> => {
     try {
       dispatch({ type: 'SET_GRANTS_LOADING', payload: true });
       const grants = await rsuApi.grants.getAll();
@@ -342,9 +342,9 @@ export const RSUProvider: React.FC<RSUProviderProps> = ({ children }) => {
     } finally {
       dispatch({ type: 'SET_GRANTS_LOADING', payload: false });
     }
-  };
+  }, []);
 
-  const refreshSales = async (): Promise<void> => {
+  const refreshSales = useCallback(async (): Promise<void> => {
     try {
       dispatch({ type: 'SET_SALES_LOADING', payload: true });
       const sales = await rsuApi.sales.getAll();
@@ -354,16 +354,16 @@ export const RSUProvider: React.FC<RSUProviderProps> = ({ children }) => {
     } finally {
       dispatch({ type: 'SET_SALES_LOADING', payload: false });
     }
-  };
+  }, []);
 
-  const refreshUpcomingVesting = async (days: number = 30): Promise<void> => {
+  const refreshUpcomingVesting = useCallback(async (days: number = 30): Promise<void> => {
     try {
       const upcomingVesting = await rsuApi.vesting.getUpcoming(days);
       dispatch({ type: 'SET_UPCOMING_VESTING', payload: upcomingVesting });
     } catch (error) {
       handleError(error);
     }
-  };
+  }, []);
 
   // Utilities
   const getTaxPreview = async (request: TaxPreviewRequest): Promise<any> => {

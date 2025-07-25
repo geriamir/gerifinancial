@@ -9,9 +9,7 @@ import {
   MenuItem,
   Chip,
   LinearProgress,
-  Skeleton,
-  Button,
-  Tooltip
+  Skeleton
 } from '@mui/material';
 import {
   MoreVert as MoreVertIcon,
@@ -26,7 +24,6 @@ import {
 } from '@mui/icons-material';
 import { RSUGrant } from '../../services/api/rsus';
 import { useRSU } from '../../contexts/RSUContext';
-import RecordSaleForm from './RecordSaleForm';
 import StockPriceUpdater from './StockPriceUpdater';
 
 interface GrantsListProps {
@@ -53,7 +50,7 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
   onRecordSale,
   onViewDetails
 }) => {
-  const { getSalesByGrant, sales, salesLoading } = useRSU();
+  const { sales, salesLoading } = useRSU();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [priceUpdaterOpen, setPriceUpdaterOpen] = useState(false);
   const open = Boolean(anchorEl);
@@ -379,37 +376,31 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
     </Card>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison function for React.memo with debugging
-  const isEqual = (
-    prevProps.grant._id === nextProps.grant._id &&
-    prevProps.grant.totalShares === nextProps.grant.totalShares &&
-    prevProps.grant.vestedShares === nextProps.grant.vestedShares &&
-    prevProps.grant.currentPrice === nextProps.grant.currentPrice &&
-    prevProps.grant.currentValue === nextProps.grant.currentValue &&
-    prevProps.grant.gainLoss === nextProps.grant.gainLoss &&
-    prevProps.grant.vestingProgress === nextProps.grant.vestingProgress &&
-    prevProps.onEdit === nextProps.onEdit &&
-    prevProps.onDelete === nextProps.onDelete &&
-    prevProps.onRecordSale === nextProps.onRecordSale &&
-    prevProps.onViewDetails === nextProps.onViewDetails
-  );
+  // Always log React.memo comparison - debug every attempt
+  console.log(`React.memo comparison for grant ${nextProps.grant._id}`);
   
-  // Debug logging to understand why re-renders are happening
-  if (!isEqual) {
-    console.log(`GrantItem ${nextProps.grant._id} re-rendering because:`, {
-      id: prevProps.grant._id !== nextProps.grant._id,
-      totalShares: prevProps.grant.totalShares !== nextProps.grant.totalShares,
-      vestedShares: prevProps.grant.vestedShares !== nextProps.grant.vestedShares,
-      currentPrice: prevProps.grant.currentPrice !== nextProps.grant.currentPrice,
-      currentValue: prevProps.grant.currentValue !== nextProps.grant.currentValue,
-      gainLoss: prevProps.grant.gainLoss !== nextProps.grant.gainLoss,
-      vestingProgress: prevProps.grant.vestingProgress !== nextProps.grant.vestingProgress,
-      onEdit: prevProps.onEdit !== nextProps.onEdit,
-      onDelete: prevProps.onDelete !== nextProps.onDelete,
-      onRecordSale: prevProps.onRecordSale !== nextProps.onRecordSale,
-      onViewDetails: prevProps.onViewDetails !== nextProps.onViewDetails
-    });
-  }
+  // Custom comparison function for React.memo with debugging
+  const comparisons = {
+    id: prevProps.grant._id === nextProps.grant._id,
+    totalShares: prevProps.grant.totalShares === nextProps.grant.totalShares,
+    vestedShares: prevProps.grant.vestedShares === nextProps.grant.vestedShares,
+    currentPrice: prevProps.grant.currentPrice === nextProps.grant.currentPrice,
+    currentValue: prevProps.grant.currentValue === nextProps.grant.currentValue,
+    gainLoss: prevProps.grant.gainLoss === nextProps.grant.gainLoss,
+    vestingProgress: prevProps.grant.vestingProgress === nextProps.grant.vestingProgress,
+    onEdit: prevProps.onEdit === nextProps.onEdit,
+    onDelete: prevProps.onDelete === nextProps.onDelete,
+    onRecordSale: prevProps.onRecordSale === nextProps.onRecordSale,
+    onViewDetails: prevProps.onViewDetails === nextProps.onViewDetails
+  };
+  
+  const isEqual = Object.values(comparisons).every(Boolean);
+  
+  // Always log the comparison results
+  console.log(`Grant ${nextProps.grant._id} React.memo comparison:`, {
+    isEqual,
+    failedComparisons: Object.entries(comparisons).filter(([key, value]) => !value).map(([key]) => key)
+  });
   
   return isEqual;
 });
@@ -472,16 +463,19 @@ const GrantsList: React.FC<GrantsListProps> = ({
 
   return (
     <Box>
-      {grants.map((grant) => (
-        <GrantItem
-          key={grant._id}
-          grant={grant}
-          onEdit={onEditGrant}
-          onDelete={onDeleteGrant}
-          onRecordSale={onRecordSale}
-          onViewDetails={onGrantSelect}
-        />
-      ))}
+      {grants.map((grant, index) => {
+        console.log(`Rendering GrantItem for grant ${grant._id} with key ${grant._id} at index ${index}`);
+        return (
+          <GrantItem
+            key={grant._id}
+            grant={grant}
+            onEdit={onEditGrant}
+            onDelete={onDeleteGrant}
+            onRecordSale={onRecordSale}
+            onViewDetails={onGrantSelect}
+          />
+        );
+      })}
     </Box>
   );
 };

@@ -19,7 +19,6 @@ import {
   Receipt as ReceiptIcon
 } from '@mui/icons-material';
 import { useRSU } from '../../contexts/RSUContext';
-import { RSUSale } from '../../services/api/rsus';
 
 interface RecentSalesWidgetProps {
   maxSales?: number;
