@@ -394,15 +394,22 @@ export const RSUProvider: React.FC<RSUProviderProps> = ({ children }) => {
   useEffect(() => {
     const loadInitialData = async () => {
       dispatch({ type: 'SET_LOADING', payload: true });
+      
       try {
-        // Load all data in parallel to prevent sequential loading re-renders
-        // Set upcoming vesting to 3 months (90 days)
-        await Promise.all([
-          refreshGrants(),
-          refreshSales(),    // Load sales with grants to prevent double render
-          refreshPortfolio(),
-          refreshUpcomingVesting(90)
+        // Load all data in parallel with minimal dispatches
+        const [grants, sales, portfolio, upcomingVesting] = await Promise.all([
+          rsuApi.grants.getAll(),
+          rsuApi.sales.getAll(),
+          rsuApi.portfolio.getSummary(),
+          rsuApi.vesting.getUpcoming(90)
         ]);
+        
+        // Batch all state updates in a single render cycle
+        dispatch({ type: 'SET_GRANTS', payload: grants });
+        dispatch({ type: 'SET_SALES', payload: sales });
+        dispatch({ type: 'SET_PORTFOLIO_SUMMARY', payload: portfolio });
+        dispatch({ type: 'SET_UPCOMING_VESTING', payload: upcomingVesting });
+        
       } catch (error) {
         handleError(error);
       } finally {
