@@ -179,13 +179,15 @@ const UpcomingVestingWidget: React.FC<UpcomingVestingWidgetProps> = ({
                   primary={
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <Box sx={{ flex: 1 }}>
-                        <Typography variant="subtitle2" component="div">
+                        <Typography variant="subtitle2" component="span">
                           {group.month}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" component="div">
+                        <br />
+                        <Typography variant="body2" color="text.secondary" component="span">
                           {stockSymbolsList} • {group.events.length} events
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" component="div">
+                        <br />
+                        <Typography variant="body2" color="text.secondary" component="span">
                           {group.totalShares.toLocaleString()} shares • ${group.totalValue.toLocaleString()} (pre-tax)
                         </Typography>
                       </Box>
