@@ -152,7 +152,7 @@ const UpcomingVestingWidget: React.FC<UpcomingVestingWidgetProps> = ({
             </Box>
             <Box sx={{ textAlign: 'right' }}>
               <Typography variant="body2" color="text.secondary">
-                Est. Value
+                Est. Value (Pre-Tax)
               </Typography>
               <Typography variant="h6" color="success.main">
                 ${totalUpcomingValue.toLocaleString()}
@@ -186,7 +186,7 @@ const UpcomingVestingWidget: React.FC<UpcomingVestingWidgetProps> = ({
                           {stockSymbolsList} • {group.events.length} events
                         </Typography>
                         <Typography variant="body2" color="text.secondary" component="div">
-                          {group.totalShares.toLocaleString()} shares • ${group.totalValue.toLocaleString()}
+                          {group.totalShares.toLocaleString()} shares • ${group.totalValue.toLocaleString()} (pre-tax)
                         </Typography>
                       </Box>
                       <Box sx={{ textAlign: 'right', ml: 2 }}>
