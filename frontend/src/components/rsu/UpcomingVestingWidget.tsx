@@ -177,8 +177,8 @@ const UpcomingVestingWidget: React.FC<UpcomingVestingWidgetProps> = ({
                 </ListItemIcon>
                 <ListItemText
                   primary={
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <Box sx={{ flex: 1 }}>
+                    <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <span style={{ flex: 1 }}>
                         <Typography variant="subtitle2" component="span">
                           {group.month}
                         </Typography>
@@ -190,8 +190,8 @@ const UpcomingVestingWidget: React.FC<UpcomingVestingWidgetProps> = ({
                         <Typography variant="body2" color="text.secondary" component="span">
                           {group.totalShares.toLocaleString()} shares • ${group.totalValue.toLocaleString()} (pre-tax)
                         </Typography>
-                      </Box>
-                      <Box sx={{ textAlign: 'right', ml: 2 }}>
+                      </span>
+                      <span style={{ textAlign: 'right', marginLeft: '16px' }}>
                         <Chip
                           label={relative}
                           size="small"
@@ -199,8 +199,8 @@ const UpcomingVestingWidget: React.FC<UpcomingVestingWidgetProps> = ({
                           variant="outlined"
                           sx={{ fontSize: '0.75rem', height: 20 }}
                         />
-                      </Box>
-                    </Box>
+                      </span>
+                    </span>
                   }
                 />
               </ListItem>
