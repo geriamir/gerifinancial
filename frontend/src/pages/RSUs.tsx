@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Box,
   Container,
@@ -47,44 +47,44 @@ const RSUs: React.FC = () => {
   const [recordSaleOpen, setRecordSaleOpen] = useState(false);
   const [selectedGrantForSale, setSelectedGrantForSale] = useState<RSUGrant | null>(null);
 
-  const handleAddGrant = () => {
+  const handleAddGrant = useCallback(() => {
     setAddGrantOpen(true);
-  };
+  }, []);
 
-  const handleCloseAddGrant = () => {
+  const handleCloseAddGrant = useCallback(() => {
     setAddGrantOpen(false);
-  };
+  }, []);
 
-  const handleRecordSale = (grant: RSUGrant) => {
+  const handleRecordSale = useCallback((grant: RSUGrant) => {
     setSelectedGrantForSale(grant);
     setRecordSaleOpen(true);
-  };
+  }, []);
 
-  const handleGlobalRecordSale = () => {
+  const handleGlobalRecordSale = useCallback(() => {
     setRecordSaleOpen(true);
     // Don't pre-select a grant - let user choose in the form
     setSelectedGrantForSale(null);
-  };
+  }, []);
 
-  const handleCloseRecordSale = () => {
+  const handleCloseRecordSale = useCallback(() => {
     setRecordSaleOpen(false);
     setSelectedGrantForSale(null);
-  };
+  }, []);
 
-  const handleEditGrant = (grant: RSUGrant) => {
+  const handleEditGrant = useCallback((grant: RSUGrant) => {
     // TODO: Implement edit grant functionality
     console.log('Edit grant:', grant);
-  };
+  }, []);
 
-  const handleDeleteGrant = (grant: RSUGrant) => {
+  const handleDeleteGrant = useCallback((grant: RSUGrant) => {
     // TODO: Implement delete grant functionality
     console.log('Delete grant:', grant);
-  };
+  }, []);
 
-  const handleViewGrantDetails = (grant: RSUGrant) => {
+  const handleViewGrantDetails = useCallback((grant: RSUGrant) => {
     // TODO: Implement view grant details functionality
     console.log('View grant details:', grant);
-  };
+  }, []);
 
   // Show loading backdrop on initial load
   if (loading) {

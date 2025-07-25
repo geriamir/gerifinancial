@@ -390,15 +390,16 @@ export const RSUProvider: React.FC<RSUProviderProps> = ({ children }) => {
     dispatch({ type: 'CLEAR_ERROR' });
   };
 
-  // Initial data load
+  // Initial data load - load all data together to prevent double renders
   useEffect(() => {
     const loadInitialData = async () => {
       dispatch({ type: 'SET_LOADING', payload: true });
       try {
-        // Load grants, portfolio summary, and upcoming vesting in parallel
+        // Load all data in parallel to prevent sequential loading re-renders
         // Set upcoming vesting to 3 months (90 days)
         await Promise.all([
           refreshGrants(),
+          refreshSales(),    // Load sales with grants to prevent double render
           refreshPortfolio(),
           refreshUpcomingVesting(90)
         ]);
@@ -411,13 +412,6 @@ export const RSUProvider: React.FC<RSUProviderProps> = ({ children }) => {
 
     loadInitialData();
   }, []);
-
-  // Load sales when grants are available
-  useEffect(() => {
-    if (state.grants.length > 0) {
-      refreshSales();
-    }
-  }, [state.grants.length]);
 
   // Context value
   const contextValue: RSUContextType = {
