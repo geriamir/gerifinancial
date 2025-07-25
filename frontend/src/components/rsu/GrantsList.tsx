@@ -379,9 +379,8 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
     </Card>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison function for React.memo
-  // Only re-render if the grant data actually changed
-  return (
+  // Custom comparison function for React.memo with debugging
+  const isEqual = (
     prevProps.grant._id === nextProps.grant._id &&
     prevProps.grant.totalShares === nextProps.grant.totalShares &&
     prevProps.grant.vestedShares === nextProps.grant.vestedShares &&
@@ -394,6 +393,25 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
     prevProps.onRecordSale === nextProps.onRecordSale &&
     prevProps.onViewDetails === nextProps.onViewDetails
   );
+  
+  // Debug logging to understand why re-renders are happening
+  if (!isEqual) {
+    console.log(`GrantItem ${nextProps.grant._id} re-rendering because:`, {
+      id: prevProps.grant._id !== nextProps.grant._id,
+      totalShares: prevProps.grant.totalShares !== nextProps.grant.totalShares,
+      vestedShares: prevProps.grant.vestedShares !== nextProps.grant.vestedShares,
+      currentPrice: prevProps.grant.currentPrice !== nextProps.grant.currentPrice,
+      currentValue: prevProps.grant.currentValue !== nextProps.grant.currentValue,
+      gainLoss: prevProps.grant.gainLoss !== nextProps.grant.gainLoss,
+      vestingProgress: prevProps.grant.vestingProgress !== nextProps.grant.vestingProgress,
+      onEdit: prevProps.onEdit !== nextProps.onEdit,
+      onDelete: prevProps.onDelete !== nextProps.onDelete,
+      onRecordSale: prevProps.onRecordSale !== nextProps.onRecordSale,
+      onViewDetails: prevProps.onViewDetails !== nextProps.onViewDetails
+    });
+  }
+  
+  return isEqual;
 });
 
 GrantItem.displayName = 'GrantItem';
