@@ -8,6 +8,8 @@ const ensureLogsDir = require('./middleware/ensureLogsDir');
 // Ensure logs directory exists in production
 ensureLogsDir();
 const scrapingSchedulerService = require('./services/scrapingSchedulerService');
+const stockPriceService = require('./services/stockPriceService');
+const vestingService = require('./services/vestingService');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -15,6 +17,7 @@ const bankAccountRoutes = require('./routes/bankAccounts');
 const transactionRoutes = require('./routes/transactions');
 const budgetRoutes = require('./routes/budgets');
 const categoryBudgetRoutes = require('./routes/categoryBudgets');
+const rsuRoutes = require('./routes/rsus');
 const testRoutes = require('./routes/test');
 
 // Create Express app
@@ -32,13 +35,27 @@ if (config.env === 'test') {
     .then(async () => {
       console.log('Connected to MongoDB');
 
-      // Only initialize scheduler in production and E2E environments
+      // Only initialize schedulers in production and E2E environments
       if (process.env.NODE_ENV !== 'test' || process.env.NODE_ENV === 'e2e') {
         try {
           await scrapingSchedulerService.initialize();
           logger.info('Transaction scraping scheduler initialized');
         } catch (error) {
           logger.error('Failed to initialize transaction scraping scheduler:', error);
+        }
+
+        try {
+          await stockPriceService.initialize();
+          logger.info('Stock price service initialized');
+        } catch (error) {
+          logger.error('Failed to initialize stock price service:', error);
+        }
+
+        try {
+          await vestingService.initialize();
+          logger.info('Vesting service initialized');
+        } catch (error) {
+          logger.error('Failed to initialize vesting service:', error);
         }
       }
     })
@@ -73,6 +90,7 @@ app.use('/api/bank-accounts', bankAccountRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/category-budgets', categoryBudgetRoutes);
+app.use('/api/rsus', rsuRoutes);
 
 // Test routes (enabled in test and e2e environments)
 if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'e2e') {
