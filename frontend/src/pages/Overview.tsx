@@ -31,6 +31,7 @@ import { useNavigate } from 'react-router-dom';
 import FinancialSummaryCards from '../components/overview/FinancialSummaryCards';
 import ActionItemsList from '../components/overview/ActionItemsList';
 import RecentActivityTimeline from '../components/overview/RecentActivityTimeline';
+import RSUOverviewWidget from '../components/overview/RSUOverviewWidget';
 
 const Overview: React.FC = () => {
   const navigate = useNavigate();
@@ -141,9 +142,23 @@ const Overview: React.FC = () => {
           </Box>
         </Box>
 
-        {/* Bottom Section - Optional Future Content */}
+        {/* Bottom Section - RSU Portfolio Widget */}
         <Box sx={{ mt: 4 }}>
-          {/* Reserved space for future widgets like spending insights, budget alerts, etc. */}
+          <Box sx={{ 
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            gap: 3
+          }}>
+            {/* RSU Portfolio Widget */}
+            <Box sx={{ flex: { md: '0 0 60%' } }}>
+              <RSUOverviewWidget maxUpcomingVesting={4} />
+            </Box>
+            
+            {/* Reserved space for future widgets */}
+            <Box sx={{ flex: { md: '0 0 40%' } }}>
+              {/* Placeholder for future widgets like spending insights, budget alerts, etc. */}
+            </Box>
+          </Box>
         </Box>
       </Box>
     </Container>

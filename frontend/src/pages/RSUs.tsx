@@ -22,6 +22,9 @@ import UpcomingVestingWidget from '../components/rsu/UpcomingVestingWidget';
 import RecentSalesWidget from '../components/rsu/RecentSalesWidget';
 import AddGrantWizard from '../components/rsu/AddGrantWizard';
 import RecordSaleForm from '../components/rsu/RecordSaleForm';
+import EditGrantDialog from '../components/rsu/EditGrantDialog';
+import DeleteGrantConfirmDialog from '../components/rsu/DeleteGrantConfirmDialog';
+import GrantDetailsDialog from '../components/rsu/GrantDetailsDialog';
 import { RSUGrant } from '../services/api/rsus';
 
 const RSUs: React.FC = () => {
@@ -40,7 +43,13 @@ const RSUs: React.FC = () => {
 
   const [addGrantOpen, setAddGrantOpen] = useState(false);
   const [recordSaleOpen, setRecordSaleOpen] = useState(false);
+  const [editGrantOpen, setEditGrantOpen] = useState(false);
+  const [deleteGrantOpen, setDeleteGrantOpen] = useState(false);
+  const [grantDetailsOpen, setGrantDetailsOpen] = useState(false);
   const [selectedGrantForSale, setSelectedGrantForSale] = useState<RSUGrant | null>(null);
+  const [selectedGrantForEdit, setSelectedGrantForEdit] = useState<RSUGrant | null>(null);
+  const [selectedGrantForDelete, setSelectedGrantForDelete] = useState<RSUGrant | null>(null);
+  const [selectedGrantForDetails, setSelectedGrantForDetails] = useState<RSUGrant | null>(null);
 
   const handleAddGrant = useCallback(() => {
     setAddGrantOpen(true);
@@ -67,18 +76,45 @@ const RSUs: React.FC = () => {
   }, []);
 
   const handleEditGrant = useCallback((grant: RSUGrant) => {
-    // TODO: Implement edit grant functionality
-    console.log('Edit grant:', grant);
+    setSelectedGrantForEdit(grant);
+    setEditGrantOpen(true);
+  }, []);
+
+  const handleCloseEditGrant = useCallback(() => {
+    setEditGrantOpen(false);
+    setSelectedGrantForEdit(null);
   }, []);
 
   const handleDeleteGrant = useCallback((grant: RSUGrant) => {
-    // TODO: Implement delete grant functionality
-    console.log('Delete grant:', grant);
+    setSelectedGrantForDelete(grant);
+    setDeleteGrantOpen(true);
+  }, []);
+
+  const handleCloseDeleteGrant = useCallback(() => {
+    setDeleteGrantOpen(false);
+    setSelectedGrantForDelete(null);
   }, []);
 
   const handleViewGrantDetails = useCallback((grant: RSUGrant) => {
-    // TODO: Implement view grant details functionality
-    console.log('View grant details:', grant);
+    setSelectedGrantForDetails(grant);
+    setGrantDetailsOpen(true);
+  }, []);
+
+  const handleCloseGrantDetails = useCallback(() => {
+    setGrantDetailsOpen(false);
+    setSelectedGrantForDetails(null);
+  }, []);
+
+  // Handle edit from grant details dialog
+  const handleEditFromDetails = useCallback((grant: RSUGrant) => {
+    setSelectedGrantForEdit(grant);
+    setEditGrantOpen(true);
+  }, []);
+
+  // Handle delete from grant details dialog
+  const handleDeleteFromDetails = useCallback((grant: RSUGrant) => {
+    setSelectedGrantForDelete(grant);
+    setDeleteGrantOpen(true);
   }, []);
 
   // Show loading backdrop on initial load
@@ -213,6 +249,29 @@ const RSUs: React.FC = () => {
         open={recordSaleOpen}
         onClose={handleCloseRecordSale}
         grant={selectedGrantForSale}
+      />
+
+      {/* Edit Grant Dialog */}
+      <EditGrantDialog
+        open={editGrantOpen}
+        grant={selectedGrantForEdit}
+        onClose={handleCloseEditGrant}
+      />
+
+      {/* Delete Grant Confirmation Dialog */}
+      <DeleteGrantConfirmDialog
+        open={deleteGrantOpen}
+        grant={selectedGrantForDelete}
+        onClose={handleCloseDeleteGrant}
+      />
+
+      {/* Grant Details Dialog */}
+      <GrantDetailsDialog
+        open={grantDetailsOpen}
+        grant={selectedGrantForDetails}
+        onClose={handleCloseGrantDetails}
+        onEdit={handleEditFromDetails}
+        onDelete={handleDeleteFromDetails}
       />
     </Container>
   );

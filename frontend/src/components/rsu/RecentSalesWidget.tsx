@@ -4,7 +4,6 @@ import {
   Typography,
   List,
   ListItem,
-  ListItemText,
   ListItemIcon,
   Chip,
   Skeleton,
@@ -151,12 +150,13 @@ const RecentSalesWidget: React.FC<RecentSalesWidgetProps> = ({
 
           return (
             <React.Fragment key={sale._id}>
-              <ListItem sx={{ px: 0, py: 1.5 }}>
-                <ListItemIcon sx={{ minWidth: 40 }}>
-                  <SellIcon color="primary" />
-                </ListItemIcon>
-                <ListItemText
-                  primary={
+              <ListItem sx={{ px: 0, py: 1.5, flexDirection: 'column', alignItems: 'stretch' }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <SellIcon color="primary" />
+                  </ListItemIcon>
+                  <Box sx={{ flex: 1 }}>
+                    {/* Primary Content */}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" component="div">
@@ -198,31 +198,27 @@ const RecentSalesWidget: React.FC<RecentSalesWidgetProps> = ({
                         </Box>
                       </Box>
                     </Box>
-                  }
-                  secondary={
-                    <span style={{ marginTop: '4px', display: 'block' }}>
-                      <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ display: 'flex', gap: '16px' }}>
-                          <Typography variant="caption" color="text.secondary" component="span">
-                            Tax: ${sale.taxCalculation.totalTax.toLocaleString()}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary" component="span">
-                            Net: ${sale.taxCalculation.netValue.toLocaleString()}
-                          </Typography>
-                        </span>
-                        <span>
-                          <Chip
-                            label={sale.taxCalculation.isLongTerm ? 'Long-term' : 'Short-term'}
-                            size="small"
-                            color={sale.taxCalculation.isLongTerm ? 'success' : 'warning'}
-                            variant="outlined"
-                            sx={{ fontSize: '0.7rem', height: 18 }}
-                          />
-                        </span>
-                      </span>
-                    </span>
-                  }
-                />
+                    
+                    {/* Secondary Content - Outside of ListItemText */}
+                    <Box sx={{ mt: 1, ml: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Tax: ${sale.taxCalculation.totalTax.toLocaleString()}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Net: ${sale.taxCalculation.netValue.toLocaleString()}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={sale.taxCalculation.isLongTerm ? 'Long-term' : 'Short-term'}
+                        size="small"
+                        color={sale.taxCalculation.isLongTerm ? 'success' : 'warning'}
+                        variant="outlined"
+                        sx={{ fontSize: '0.7rem', height: 18 }}
+                      />
+                    </Box>
+                  </Box>
+                </Box>
               </ListItem>
               {index < recentSales.length - 1 && <Divider />}
             </React.Fragment>
