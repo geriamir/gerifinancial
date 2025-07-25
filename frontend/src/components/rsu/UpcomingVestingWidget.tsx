@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -30,41 +30,45 @@ const UpcomingVestingWidget: React.FC<UpcomingVestingWidgetProps> = ({
   loading = false,
   maxEvents = 5
 }) => {
-  // Group events by month and accumulate shares/values
-  const groupedEvents = events.reduce((acc, event) => {
-    const date = new Date(event.vestDate);
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    
-    if (!acc[monthKey]) {
-      acc[monthKey] = {
-        month: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-        date: date,
-        totalShares: 0,
-        totalValue: 0,
-        events: [],
-        stockSymbols: new Set()
-      };
-    }
-    
-    acc[monthKey].totalShares += event.shares;
-    acc[monthKey].totalValue += event.estimatedValue;
-    acc[monthKey].events.push(event);
-    acc[monthKey].stockSymbols.add(event.stockSymbol);
-    
-    return acc;
-  }, {} as Record<string, {
-    month: string,
-    date: Date,
-    totalShares: number,
-    totalValue: number,
-    events: UpcomingVestingEvent[],
-    stockSymbols: Set<string>
-  }>);
+  // Group events by month and accumulate shares/values (memoized for performance)
+  const { groupedEvents, sortedGroupedEvents } = useMemo(() => {
+    const grouped = events.reduce((acc, event) => {
+      const date = new Date(event.vestDate);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!acc[monthKey]) {
+        acc[monthKey] = {
+          month: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+          date: date,
+          totalShares: 0,
+          totalValue: 0,
+          events: [],
+          stockSymbols: new Set()
+        };
+      }
+      
+      acc[monthKey].totalShares += event.shares;
+      acc[monthKey].totalValue += event.estimatedValue;
+      acc[monthKey].events.push(event);
+      acc[monthKey].stockSymbols.add(event.stockSymbol);
+      
+      return acc;
+    }, {} as Record<string, {
+      month: string,
+      date: Date,
+      totalShares: number,
+      totalValue: number,
+      events: UpcomingVestingEvent[],
+      stockSymbols: Set<string>
+    }>);
 
-  // Sort grouped events by date and limit to maxEvents
-  const sortedGroupedEvents = Object.values(groupedEvents)
-    .sort((a, b) => a.date.getTime() - b.date.getTime())
-    .slice(0, maxEvents);
+    // Sort grouped events by date and limit to maxEvents
+    const sorted = Object.values(grouped)
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .slice(0, maxEvents);
+
+    return { groupedEvents: grouped, sortedGroupedEvents: sorted };
+  }, [events, maxEvents]);
 
   if (loading) {
     return (
