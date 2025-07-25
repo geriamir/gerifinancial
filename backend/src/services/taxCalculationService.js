@@ -7,7 +7,7 @@ class TaxCalculationService {
       wageIncome: 0.65,           // 65% on original grant value
       capitalGainsLongTerm: 0.25, // 25% on profit after 2 years
       capitalGainsShortTerm: 0.65, // 65% on profit before 2 years
-      twoYearThreshold: 2 * 365 * 24 * 60 * 60 * 1000 // 2 years in milliseconds
+      twoYearThresholdYears: 2    // 2 years threshold (calculated precisely with Date objects)
     };
   }
 
@@ -30,8 +30,9 @@ class TaxCalculationService {
     const profit = saleValue - originalValue;
     
     // Determine if this is a long-term holding (> 2 years from grant date)
+    // Use precise date calculation to account for leap years
+    const isLongTerm = this.isLongTermHoldingPrecise(grant.grantDate, sale.saleDate, rates.twoYearThresholdYears);
     const holdingPeriodMs = sale.saleDate - grant.grantDate;
-    const isLongTerm = holdingPeriodMs >= rates.twoYearThreshold;
     
     // Calculate wage income tax (always applied to original value)
     const wageIncomeTax = originalValue * rates.wageIncome;
@@ -194,16 +195,34 @@ class TaxCalculationService {
   }
 
   /**
-   * Determine if holding period qualifies for long-term capital gains
+   * Determine if holding period qualifies for long-term capital gains (legacy method)
    * @param {Date} grantDate - Grant date
    * @param {Date} saleDate - Sale date
    * @param {number} threshold - Threshold in years (default: 2)
    * @returns {boolean} True if long-term holding
+   * @deprecated Use isLongTermHoldingPrecise for accurate leap year handling
    */
   isLongTermHolding(grantDate, saleDate, threshold = 2) {
     const holdingPeriodMs = saleDate - grantDate;
     const thresholdMs = threshold * 365 * 24 * 60 * 60 * 1000;
     return holdingPeriodMs >= thresholdMs;
+  }
+
+  /**
+   * Determine if holding period qualifies for long-term capital gains (precise calculation)
+   * Accounts for leap years and uses exact date arithmetic
+   * @param {Date} grantDate - Grant date
+   * @param {Date} saleDate - Sale date
+   * @param {number} thresholdYears - Threshold in years (default: 2)
+   * @returns {boolean} True if long-term holding
+   */
+  isLongTermHoldingPrecise(grantDate, saleDate, thresholdYears = 2) {
+    // Create a date that is exactly thresholdYears from the grant date
+    const thresholdDate = new Date(grantDate);
+    thresholdDate.setFullYear(thresholdDate.getFullYear() + thresholdYears);
+    
+    // Compare sale date with the precise threshold date
+    return saleDate >= thresholdDate;
   }
 
   /**
