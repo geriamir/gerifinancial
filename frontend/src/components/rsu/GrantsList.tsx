@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, memo } from 'react';
 import {
   Box,
   Card,
@@ -46,7 +46,7 @@ interface GrantItemProps {
   onViewDetails?: (grant: RSUGrant) => void;
 }
 
-const GrantItem: React.FC<GrantItemProps> = ({
+const GrantItem: React.FC<GrantItemProps> = memo(({
   grant,
   onEdit,
   onDelete,
@@ -378,7 +378,9 @@ const GrantItem: React.FC<GrantItemProps> = ({
       />
     </Card>
   );
-};
+});
+
+GrantItem.displayName = 'GrantItem';
 
 const GrantsList: React.FC<GrantsListProps> = ({
   grants,
