@@ -117,8 +117,9 @@ rsuGrantSchema.virtual('vestedShares').get(function() {
   if (!this.vestingSchedule || !Array.isArray(this.vestingSchedule)) {
     return 0;
   }
+  const now = new Date();
   return this.vestingSchedule
-    .filter(v => v.vested)
+    .filter(v => v.vestDate <= now)
     .reduce((total, v) => total + v.shares, 0);
 });
 
@@ -126,8 +127,9 @@ rsuGrantSchema.virtual('unvestedShares').get(function() {
   if (!this.vestingSchedule || !Array.isArray(this.vestingSchedule)) {
     return 0;
   }
+  const now = new Date();
   return this.vestingSchedule
-    .filter(v => !v.vested)
+    .filter(v => v.vestDate > now)
     .reduce((total, v) => total + v.shares, 0);
 });
 
@@ -191,12 +193,12 @@ rsuGrantSchema.methods.getUpcomingVesting = function(days = 30) {
     return [];
   }
   
+  const now = new Date();
   const futureDate = new Date();
   futureDate.setDate(futureDate.getDate() + days);
   
   return this.vestingSchedule.filter(v => 
-    !v.vested && 
-    v.vestDate >= new Date() && 
+    v.vestDate > now && 
     v.vestDate <= futureDate
   ).sort((a, b) => a.vestDate - b.vestDate);
 };
@@ -206,8 +208,9 @@ rsuGrantSchema.methods.getAvailableShares = function() {
     return 0;
   }
   
+  const now = new Date();
   return this.vestingSchedule
-    .filter(v => v.vested)
+    .filter(v => v.vestDate <= now)
     .reduce((total, v) => total + v.shares, 0);
 };
 

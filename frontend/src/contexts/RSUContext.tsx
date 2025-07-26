@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback, ReactNode } from 'react';
-import { rsuApi, RSUGrant, RSUSale, PortfolioSummary, CreateGrantData, CreateSaleData, TaxPreviewRequest, UpcomingVestingEvent } from '../services/api/rsus';
+import { rsuApi, RSUGrant, RSUSale, PortfolioSummary, CreateGrantData, CreateSaleData, TaxPreviewRequest, UpcomingVestingEvent, PortfolioTimelinePoint, TimelineResponse } from '../services/api/rsus';
 
 // State interface
 interface RSUState {
@@ -172,6 +172,14 @@ interface RSUContextType extends RSUState {
   refreshGrants: () => Promise<void>;
   refreshSales: () => Promise<void>;
   refreshUpcomingVesting: (days?: number) => Promise<void>;
+  
+  // Timeline operations
+  getPortfolioTimeline: (options?: {
+    timeframe?: '1Y' | '2Y' | '5Y' | 'ALL';
+    startDate?: string;
+    endDate?: string;
+  }) => Promise<TimelineResponse>;
+  validateTimeline: () => Promise<any>;
   
   // Utilities
   getTaxPreview: (request: TaxPreviewRequest) => Promise<any>;
@@ -390,6 +398,29 @@ export const RSUProvider: React.FC<RSUProviderProps> = ({ children }) => {
     dispatch({ type: 'CLEAR_ERROR' });
   };
 
+  // Timeline operations
+  const getPortfolioTimeline = async (options?: {
+    timeframe?: '1Y' | '2Y' | '5Y' | 'ALL';
+    startDate?: string;
+    endDate?: string;
+  }): Promise<TimelineResponse> => {
+    try {
+      return await rsuApi.timeline.getPortfolioTimeline(options);
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  };
+
+  const validateTimeline = async (): Promise<any> => {
+    try {
+      return await rsuApi.timeline.validateTimeline();
+    } catch (error) {
+      handleError(error);
+      throw error;
+    }
+  };
+
   // Initial data load - load all data together to prevent double renders
   useEffect(() => {
     const loadInitialData = async () => {
@@ -442,6 +473,10 @@ export const RSUProvider: React.FC<RSUProviderProps> = ({ children }) => {
     refreshGrants,
     refreshSales,
     refreshUpcomingVesting,
+    
+    // Timeline operations
+    getPortfolioTimeline,
+    validateTimeline,
     
     // Utilities
     getTaxPreview,

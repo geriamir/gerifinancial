@@ -17,6 +17,7 @@ import {
 } from '@mui/icons-material';
 import { useRSU } from '../contexts/RSUContext';
 import RSUPortfolioCard from '../components/rsu/RSUPortfolioCard';
+import RSUVestingChart from '../components/rsu/RSUVestingChart';
 import GrantsList from '../components/rsu/GrantsList';
 import UpcomingVestingWidget from '../components/rsu/UpcomingVestingWidget';
 import RecentSalesWidget from '../components/rsu/RecentSalesWidget';
@@ -154,7 +155,10 @@ const RSUs: React.FC = () => {
 
       {/* Main Content */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {/* Portfolio Overview */}
+        {/* Primary Visualization - Vesting Timeline Chart */}
+        <RSUVestingChart height={500} />
+
+        {/* Portfolio Summary (Compact) */}
         <RSUPortfolioCard 
           portfolioSummary={portfolioSummary}
           loading={portfolioLoading}

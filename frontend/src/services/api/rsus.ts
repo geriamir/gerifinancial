@@ -232,6 +232,96 @@ export interface TaxProjections {
   }>;
 }
 
+// Timeline Types
+export interface TimelineEvent {
+  date: string;
+  eventType: 'vesting' | 'sale';
+  grantId: string;
+  stockSymbol: string;
+  company?: string;
+  sharesVested?: number;
+  sharesForCalculation?: number; // Total shares used for tax calculation (accumulated for cliff events)
+  sharesSold?: number;
+  pricePerShare: number;
+  vestedValue?: number;
+  saleValue?: number;
+  taxCalculation?: TaxCalculation;
+  grantDate: string;
+  originalPricePerShare: number;
+  accumulatedShares: number;
+  accumulatedVestedShares: number;
+  accumulatedValue: number;
+  isCliffEvent?: boolean; // True if this vesting event is the 2-year cliff
+  taxDetails: {
+    originalValue: number;
+    currentValue: number;
+    profit: number;
+    isLongTerm: boolean;
+    wageIncomeTax: number;
+    capitalGainsTax: number;
+    taxLiability: number;
+    netValue: number;
+  };
+  eventTaxDetails?: {
+    originalValue: number;
+    currentValue: number;
+    profit: number;
+    isLongTerm: boolean;
+    wageIncomeTax: number;
+    capitalGainsTax: number;
+    taxLiability: number;
+    netValue: number;
+  };
+}
+
+export interface PortfolioTimelinePoint {
+  date: string;
+  month: string;
+  monthKey: string;
+  isHistorical: boolean;
+  isFuture: boolean;
+  isToday: boolean;
+  events: TimelineEvent[];
+  totalAccumulatedShares: number;
+  totalAccumulatedValue: number;
+  totalNetValue: number;
+  totalTaxLiability: number;
+  grantBreakdown: Array<{
+    grantId: string;
+    stockSymbol: string;
+    company?: string;
+    shares: number;
+    value: number;
+    netValue: number;
+    taxLiability: number;
+    isLongTerm: boolean;
+  }>;
+}
+
+export interface TimelineValidation {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  timelinePoints: number;
+  dateRange: {
+    start: string;
+    end: string;
+  } | null;
+}
+
+export interface TimelineResponse {
+  success: boolean;
+  data: PortfolioTimelinePoint[];
+  meta: {
+    timeframe: string;
+    totalDataPoints: number;
+    dateRange: {
+      start: string;
+      end: string;
+    } | null;
+  };
+}
+
 // API Response wrapper
 interface ApiResponse<T> {
   success: boolean;
@@ -422,6 +512,30 @@ export const stockPriceApi = {
   }
 };
 
+// Timeline API
+export const timelineApi = {
+  // Get portfolio timeline
+  getPortfolioTimeline: async (options?: {
+    timeframe?: '1Y' | '2Y' | '5Y' | 'ALL';
+    startDate?: string;
+    endDate?: string;
+  }): Promise<TimelineResponse> => {
+    const params = new URLSearchParams();
+    if (options?.timeframe) params.append('timeframe', options.timeframe);
+    if (options?.startDate) params.append('startDate', options.startDate);
+    if (options?.endDate) params.append('endDate', options.endDate);
+    
+    const response = await api.get<TimelineResponse>(`/rsus/timeline?${params.toString()}`);
+    return response.data;
+  },
+
+  // Validate timeline data
+  validateTimeline: async (): Promise<TimelineValidation> => {
+    const response = await api.get<ApiResponse<TimelineValidation>>('/rsus/timeline/validate');
+    return response.data.data;
+  }
+};
+
 // Combined API object
 export const rsuApi = {
   grants: grantsApi,
@@ -429,7 +543,8 @@ export const rsuApi = {
   portfolio: portfolioApi,
   vesting: vestingApi,
   tax: taxApi,
-  stockPrice: stockPriceApi
+  stockPrice: stockPriceApi,
+  timeline: timelineApi
 };
 
 export default rsuApi;

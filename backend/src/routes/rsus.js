@@ -6,6 +6,7 @@ const rsuService = require('../services/rsuService');
 const taxCalculationService = require('../services/taxCalculationService');
 const vestingService = require('../services/vestingService');
 const stockPriceService = require('../services/stockPriceService');
+const timelineService = require('../services/timelineService');
 
 // Middleware to handle validation errors
 const handleValidationErrors = (req, res, next) => {
@@ -976,6 +977,78 @@ router.get('/prices/:symbol/date/:date',
       });
     } catch (error) {
       console.error('Error getting price on date:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+// Timeline Routes
+
+/**
+ * GET /api/rsus/timeline
+ * Get portfolio timeline with proper event-driven calculation
+ */
+router.get('/timeline',
+  auth,
+  [
+    query('timeframe').optional().isIn(['1Y', '2Y', '5Y', 'ALL']),
+    query('startDate').optional().isISO8601().toDate(),
+    query('endDate').optional().isISO8601().toDate()
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { timeframe, startDate, endDate } = req.query;
+      
+      let timeline;
+      if (timeframe) {
+        timeline = await timelineService.getPortfolioTimelineByTimeframe(req.user.id, timeframe);
+      } else {
+        timeline = await timelineService.generatePortfolioTimeline(req.user.id, startDate, endDate);
+      }
+      
+      res.json({
+        success: true,
+        data: timeline,
+        meta: {
+          timeframe: timeframe || 'CUSTOM',
+          totalDataPoints: timeline.length,
+          dateRange: timeline.length > 0 ? {
+            start: timeline[0].date,
+            end: timeline[timeline.length - 1].date
+          } : null
+        }
+      });
+    } catch (error) {
+      console.error('Error getting portfolio timeline:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/rsus/timeline/validate
+ * Validate timeline data integrity
+ */
+router.get('/timeline/validate',
+  auth,
+  async (req, res) => {
+    try {
+      const timeline = await timelineService.generatePortfolioTimeline(req.user.id);
+      const validation = timelineService.validateTimeline(timeline);
+      
+      res.json({
+        success: true,
+        data: validation
+      });
+    } catch (error) {
+      console.error('Error validating timeline:', error);
       res.status(500).json({
         success: false,
         error: error.message

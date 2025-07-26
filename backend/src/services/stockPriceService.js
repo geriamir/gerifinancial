@@ -25,12 +25,6 @@ class StockPriceService {
       timezone: 'America/New_York' // US market timezone
     });
 
-    // Schedule cleanup of old historical data weekly
-    cron.schedule('0 2 * * 0', async () => {
-      console.log('Running weekly historical data cleanup...');
-      await this.cleanupOldHistoricalData();
-    });
-
     console.log('Stock Price Service initialized with scheduled tasks');
   }
 
@@ -42,7 +36,7 @@ class StockPriceService {
    */
   async getCurrentPrice(symbol, forceUpdate = false) {
     try {
-      let stockPrice = await StockPrice.findOne({ symbol: symbol.toUpperCase() });
+      let stockPrice = await StockPrice.getLatestPrice(symbol);
       
       if (!stockPrice) {
         // Create new stock price record and fetch current price
@@ -50,7 +44,7 @@ class StockPriceService {
       } else if (forceUpdate || stockPrice.isStale) {
         // Update existing price if stale or forced
         await this.updatePrice(symbol);
-        stockPrice = await StockPrice.findOne({ symbol: symbol.toUpperCase() });
+        stockPrice = await StockPrice.getLatestPrice(symbol);
       }
       
       return stockPrice;
@@ -70,14 +64,12 @@ class StockPriceService {
     
     // Prevent concurrent updates for the same symbol
     if (this.updateInProgress.has(upperSymbol)) {
-      console.log(`Price update already in progress for ${upperSymbol}`);
       return null;
     }
 
     this.updateInProgress.add(upperSymbol);
     
     try {
-      console.log(`Updating price for ${upperSymbol}...`);
       
       // Try multiple API sources with fallback
       let priceData = null;
@@ -91,7 +83,6 @@ class StockPriceService {
         try {
           priceData = await this.retryWithBackoff(sources[i], this.retryAttempts);
           if (priceData && priceData.price > 0) {
-            console.log(`Successfully fetched ${upperSymbol} price from source ${i + 1}: $${priceData.price}`);
             break;
           }
         } catch (error) {
@@ -104,39 +95,28 @@ class StockPriceService {
         throw new Error(`No valid price data found for ${upperSymbol}`);
       }
 
-      // Update or create stock price record
-      let stockPrice = await StockPrice.findOne({ symbol: upperSymbol });
-      
-      if (!stockPrice) {
-        stockPrice = new StockPrice({
-          symbol: upperSymbol,
-          price: priceData.price,
-          priceDate: new Date(), // Current date for real-time price
-          source: priceData.source,
+      // Create new price record for today
+      const today = new Date();
+      const stockPrice = await StockPrice.upsertPrice(
+        upperSymbol,
+        today,
+        priceData.price,
+        priceData.source,
+        {
           change: priceData.change || 0,
           changePercent: priceData.changePercent || 0,
           volume: priceData.volume || 0,
           marketCap: priceData.marketCap || 0,
-          metadata: {
-            companyName: priceData.companyName || '',
-            exchange: priceData.exchange || '',
-            sector: priceData.sector || ''
-          }
-        });
-      } else {
-        stockPrice.updatePrice(priceData.price, priceData.source, {
-          volume: priceData.volume,
-          marketCap: priceData.marketCap,
-          companyName: priceData.companyName,
-          exchange: priceData.exchange,
-          sector: priceData.sector
-        });
-        stockPrice.priceDate = new Date(); // Update price date for current price
-      }
+          open: priceData.open,
+          high: priceData.high,
+          low: priceData.low,
+          close: priceData.close,
+          companyName: priceData.companyName || '',
+          exchange: priceData.exchange || '',
+          sector: priceData.sector || ''
+        }
+      );
 
-      await stockPrice.save();
-      console.log(`Successfully updated ${upperSymbol}: $${priceData.price}`);
-      
       return stockPrice;
     } catch (error) {
       console.error(`Failed to update price for ${upperSymbol}:`, error);
@@ -231,6 +211,10 @@ class StockPriceService {
         changePercent: meta.regularMarketChangePercent || 0,
         volume: quote?.volume?.[quote.volume.length - 1] || 0,
         marketCap: meta.marketCap || 0,
+        open: meta.regularMarketOpen,
+        high: meta.regularMarketDayHigh,
+        low: meta.regularMarketDayLow,
+        close: meta.regularMarketPrice,
         companyName: meta.longName || meta.shortName,
         exchange: meta.exchangeName,
         source: 'yahoo'
@@ -276,6 +260,10 @@ class StockPriceService {
         change: change,
         changePercent: changePercent,
         volume: parseInt(quote['06. volume']) || 0,
+        open: parseFloat(quote['02. open']),
+        high: parseFloat(quote['03. high']),
+        low: parseFloat(quote['04. low']),
+        close: price,
         companyName: quote['01. symbol'],
         source: 'alphavantage'
       };
@@ -314,6 +302,10 @@ class StockPriceService {
         price: data.c, // current price
         change: data.d, // change
         changePercent: data.dp, // change percent
+        open: data.o, // open price
+        high: data.h, // high price
+        low: data.l, // low price
+        close: data.c, // close price (same as current)
         volume: 0, // Not provided in quote endpoint
         source: 'finnhub'
       };
@@ -333,32 +325,22 @@ class StockPriceService {
       const upperSymbol = symbol.toUpperCase();
       console.log(`Creating new stock price record for ${upperSymbol}...`);
 
-      let priceData = null;
-      
       if (initialPrice && initialPrice > 0) {
         // Use provided initial price
-        priceData = {
-          symbol: upperSymbol,
-          price: initialPrice,
-          source: 'manual'
-        };
+        const today = new Date();
+        const stockPrice = await StockPrice.upsertPrice(
+          upperSymbol,
+          today,
+          initialPrice,
+          'manual'
+        );
+        
+        console.log(`Created stock price record for ${upperSymbol}: $${initialPrice}`);
+        return stockPrice;
       } else {
         // Fetch current market price
-        await this.updatePrice(upperSymbol);
-        return await StockPrice.findOne({ symbol: upperSymbol });
+        return await this.updatePrice(upperSymbol);
       }
-
-      const stockPrice = new StockPrice({
-        symbol: upperSymbol,
-        price: priceData.price,
-        source: priceData.source,
-        lastUpdated: new Date()
-      });
-
-      await stockPrice.save();
-      console.log(`Created stock price record for ${upperSymbol}: $${priceData.price}`);
-      
-      return stockPrice;
     } catch (error) {
       console.error(`Error creating stock price for ${symbol}:`, error);
       throw error;
@@ -374,7 +356,7 @@ class StockPriceService {
   async handleNewGrant(symbol, grantPrice) {
     try {
       const upperSymbol = symbol.toUpperCase();
-      let stockPrice = await StockPrice.findOne({ symbol: upperSymbol });
+      let stockPrice = await StockPrice.getLatestPrice(upperSymbol);
 
       if (!stockPrice) {
         // Create new record with grant price, then try to get current market price
@@ -394,7 +376,7 @@ class StockPriceService {
         console.log(`Updating stale price for ${upperSymbol}...`);
         try {
           await this.updatePrice(upperSymbol);
-          stockPrice = await StockPrice.findOne({ symbol: upperSymbol });
+          stockPrice = await StockPrice.getLatestPrice(upperSymbol);
         } catch (error) {
           console.warn(`Failed to update price for ${upperSymbol}:`, error.message);
         }
@@ -403,23 +385,6 @@ class StockPriceService {
       return stockPrice;
     } catch (error) {
       console.error(`Error handling new grant for ${symbol}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Clean up old historical data
-   * @param {number} daysToKeep - Days of historical data to keep
-   * @returns {Object} Cleanup result
-   */
-  async cleanupOldHistoricalData(daysToKeep = 365) {
-    try {
-      console.log(`Cleaning up historical data older than ${daysToKeep} days...`);
-      const result = await StockPrice.cleanupOldPrices(daysToKeep);
-      console.log(`Historical data cleanup completed: ${result.modifiedCount} records updated`);
-      return result;
-    } catch (error) {
-      console.error('Error cleaning up historical data:', error);
       throw error;
     }
   }
@@ -485,13 +450,12 @@ class StockPriceService {
       console.log('Checking for today\'s stock prices...');
       
       const today = new Date();
-      const startOfToday = new Date(today);
-      startOfToday.setHours(0, 0, 0, 0);
+      today.setHours(0, 0, 0, 0);
       
-      const endOfToday = new Date(today);
-      endOfToday.setHours(23, 59, 59, 999);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // Find all active stock symbols from StockPrice collection
+      // Find all active stock symbols from existing price records
       const activeStocks = await StockPrice.getActiveSymbols();
       
       // Also find stock symbols from RSU grants that might not have StockPrice records yet
@@ -524,28 +488,13 @@ class StockPriceService {
       const stocksNeedingUpdate = [];
       
       for (const symbol of allSymbols) {
-        const fullStock = await StockPrice.findOne({ symbol });
+        const todayPrice = await StockPrice.getPriceOnDate(symbol, today);
         
-        if (!fullStock) {
-          // No StockPrice record exists yet
+        if (!todayPrice) {
           stocksNeedingUpdate.push(symbol);
-          console.log(`${symbol}: No price record exists`);
-        } else if (!fullStock.lastUpdated || fullStock.lastUpdated < startOfToday) {
-          // Last update was before today
-          stocksNeedingUpdate.push(symbol);
-          console.log(`${symbol}: Last updated ${fullStock.lastUpdated ? fullStock.lastUpdated.toDateString() : 'never'}`);
+          console.log(`${symbol}: No price record for today`);
         } else {
-          // Check if there's a historical price entry for today
-          const todayEntry = fullStock.historicalPrices.find(price => 
-            price.date >= startOfToday && price.date <= endOfToday
-          );
-          
-          if (!todayEntry) {
-            stocksNeedingUpdate.push(symbol);
-            console.log(`${symbol}: No historical entry for today`);
-          } else {
-            console.log(`${symbol}: Already has today's price`);
-          }
+          console.log(`${symbol}: Already has today's price`);
         }
       }
 
@@ -612,7 +561,6 @@ class StockPriceService {
   async fetchHistoricalPrices(symbol, startDate, endDate = new Date()) {
     try {
       const upperSymbol = symbol.toUpperCase();
-      console.log(`Fetching historical prices for ${upperSymbol} from ${startDate.toDateString()} to ${endDate.toDateString()}`);
 
       // Try different sources for historical data
       const sources = [
@@ -624,7 +572,6 @@ class StockPriceService {
         try {
           const historicalData = await this.retryWithBackoff(sources[i], this.retryAttempts);
           if (historicalData && historicalData.length > 0) {
-            console.log(`Successfully fetched ${historicalData.length} historical prices for ${upperSymbol} from source ${i + 1}`);
             return historicalData;
           }
         } catch (error) {
@@ -673,13 +620,22 @@ class StockPriceService {
 
       const timestamps = result.timestamp;
       const prices = result.indicators.quote[0].close;
+      const opens = result.indicators.quote[0].open;
+      const highs = result.indicators.quote[0].high;
+      const lows = result.indicators.quote[0].low;
+      const volumes = result.indicators.quote[0].volume;
       
       const historicalData = [];
       for (let i = 0; i < timestamps.length; i++) {
         if (prices[i] !== null) {
           historicalData.push({
             date: new Date(timestamps[i] * 1000),
-            price: prices[i]
+            price: prices[i],
+            open: opens?.[i],
+            high: highs?.[i],
+            low: lows?.[i],
+            close: prices[i],
+            volume: volumes?.[i] || 0
           });
         }
       }
@@ -731,7 +687,12 @@ class StockPriceService {
         if (dateTime >= startTime && dateTime <= endTime) {
           historicalData.push({
             date: date,
-            price: parseFloat(priceData['4. close'])
+            price: parseFloat(priceData['4. close']),
+            open: parseFloat(priceData['1. open']),
+            high: parseFloat(priceData['2. high']),
+            low: parseFloat(priceData['3. low']),
+            close: parseFloat(priceData['4. close']),
+            volume: parseInt(priceData['5. volume']) || 0
           });
         }
       }
@@ -750,7 +711,7 @@ class StockPriceService {
    * @param {string} symbol - Stock symbol
    * @param {Date} startDate - Start date for historical data
    * @param {Date} endDate - End date (default: today)
-   * @returns {Object} Updated stock price record
+   * @returns {Object} Population result
    */
   async populateHistoricalPrices(symbol, startDate, endDate = new Date()) {
     try {
@@ -763,50 +724,28 @@ class StockPriceService {
         throw new Error(`No historical data found for ${upperSymbol}`);
       }
 
-      // Find or create stock price record
-      let stockPrice = await StockPrice.findOne({ symbol: upperSymbol });
+      // Prepare bulk upsert data
+      const priceData = historicalData.map(dataPoint => ({
+        symbol: upperSymbol,
+        date: dataPoint.date,
+        price: dataPoint.price,
+        source: 'yahoo', // Historical data is typically from Yahoo Finance
+        open: dataPoint.open,
+        high: dataPoint.high,
+        low: dataPoint.low,
+        close: dataPoint.close,
+        volume: dataPoint.volume
+      }));
+
+      // Bulk upsert all historical prices
+      const result = await StockPrice.bulkUpsertPrices(priceData);
       
-      if (!stockPrice) {
-        // Create new record with the latest price
-        const latestPrice = historicalData[historicalData.length - 1];
-        stockPrice = new StockPrice({
-          symbol: upperSymbol,
-          price: latestPrice.price,
-          priceDate: latestPrice.date,
-          source: 'yahoo', // Historical data is typically from Yahoo Finance
-          lastUpdated: new Date()
-        });
-      }
-
-      // Add historical prices, avoiding duplicates
-      const existingDates = new Set(
-        stockPrice.historicalPrices.map(p => p.date.toDateString())
-      );
-
-      let addedCount = 0;
-      for (const dataPoint of historicalData) {
-        const dateStr = dataPoint.date.toDateString();
-        if (!existingDates.has(dateStr)) {
-          stockPrice.historicalPrices.push({
-            date: dataPoint.date,
-            price: dataPoint.price
-          });
-          addedCount++;
-        }
-      }
-
-      // Sort historical prices by date
-      stockPrice.historicalPrices.sort((a, b) => a.date - b.date);
-
-      // Keep only last 365 days
-      if (stockPrice.historicalPrices.length > 365) {
-        stockPrice.historicalPrices = stockPrice.historicalPrices.slice(-365);
-      }
-
-      await stockPrice.save();
-      console.log(`Added ${addedCount} historical price entries for ${upperSymbol}`);
-      
-      return stockPrice;
+      return {
+        symbol: upperSymbol,
+        recordsProcessed: historicalData.length,
+        upsertedCount: result.upsertedCount,
+        modifiedCount: result.modifiedCount
+      };
     } catch (error) {
       console.error(`Error populating historical prices for ${symbol}:`, error);
       throw error;
@@ -822,41 +761,55 @@ class StockPriceService {
   async getPriceOnDate(symbol, date) {
     try {
       const upperSymbol = symbol.toUpperCase();
-      const stockPrice = await StockPrice.findOne({ symbol: upperSymbol });
+      const targetDate = new Date(date);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999); // Set to end of today for comparison
       
-      if (!stockPrice) {
-        return null;
+      // If the requested date is in the future, return the most recent available price
+      if (targetDate > today) {
+        const latestPrice = await StockPrice.getLatestPrice(upperSymbol);
+        return latestPrice ? latestPrice.price : null;
+      }
+      
+      // First, try to get the exact date
+      const stockPrice = await StockPrice.getPriceOnDate(upperSymbol, targetDate);
+      
+      if (stockPrice) {
+        return stockPrice.price;
       }
 
-      // Check if we have historical data for that date
-      const targetDateStr = date.toDateString();
-      const historicalEntry = stockPrice.historicalPrices.find(
-        p => p.date.toDateString() === targetDateStr
-      );
-
-      if (historicalEntry) {
-        return historicalEntry.price;
+      // If no exact match, look for the most recent trading day before this date
+      const lastTradingDayPrice = await this.findLastTradingDayPrice(upperSymbol, targetDate);
+      
+      if (lastTradingDayPrice) {
+        return lastTradingDayPrice.price;
       }
 
-      // If we don't have data for that specific date, try to fetch it
-      const startDate = new Date(date);
-      startDate.setDate(startDate.getDate() - 5); // Get a few days around the target date
+      // If still no data, try to fetch historical data around this period
+      const startDate = new Date(targetDate);
+      startDate.setDate(startDate.getDate() - 10); // Look back 10 days to capture weekends/holidays
       
-      const endDate = new Date(date);
+      const endDate = new Date(targetDate);
       endDate.setDate(endDate.getDate() + 1);
 
       try {
         await this.populateHistoricalPrices(upperSymbol, startDate, endDate);
         
-        // Try again after populating
-        const updatedStockPrice = await StockPrice.findOne({ symbol: upperSymbol });
-        const newEntry = updatedStockPrice.historicalPrices.find(
-          p => p.date.toDateString() === targetDateStr
-        );
+        // Try to find exact date again after populating
+        const updatedStockPrice = await StockPrice.getPriceOnDate(upperSymbol, targetDate);
+        if (updatedStockPrice) {
+          return updatedStockPrice.price;
+        }
         
-        return newEntry ? newEntry.price : null;
+        // Try to find last trading day again after populating
+        const updatedLastTradingDayPrice = await this.findLastTradingDayPrice(upperSymbol, targetDate);
+        if (updatedLastTradingDayPrice) {
+          return updatedLastTradingDayPrice.price;
+        }
+        
+        return null;
       } catch (error) {
-        console.warn(`Could not fetch historical price for ${upperSymbol} on ${date.toDateString()}:`, error.message);
+        console.warn(`Could not fetch historical price for ${upperSymbol} around ${targetDate.toDateString()}:`, error.message);
         return null;
       }
     } catch (error) {
@@ -866,29 +819,57 @@ class StockPriceService {
   }
 
   /**
+   * Find the most recent trading day price before or on the given date
+   * @param {string} symbol - Stock symbol (should be uppercase)
+   * @param {Date} date - Target date
+   * @returns {Object|null} Price record with price and date, or null if not found
+   */
+  async findLastTradingDayPrice(symbol, date) {
+    try {
+      // Look for the most recent price within the last 14 days (to handle long weekends/holidays)
+      const lookbackDate = new Date(date);
+      lookbackDate.setDate(lookbackDate.getDate() - 14);
+      
+      const lastTradingDay = await StockPrice.findOne({
+        symbol: symbol,
+        date: {
+          $gte: lookbackDate,
+          $lte: date
+        },
+        isActive: true
+      }).sort({ date: -1 }); // Sort by date descending to get the most recent
+      
+      return lastTradingDay ? {
+        price: lastTradingDay.price,
+        date: lastTradingDay.date
+      } : null;
+    } catch (error) {
+      console.error(`Error finding last trading day price for ${symbol}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Manual price update for admin/testing
    * @param {string} symbol - Stock symbol
    * @param {number} price - Manual price
+   * @param {Date} date - Date for the price (default: today)
    * @param {Object} metadata - Additional metadata
    * @returns {Object} Updated stock price
    */
-  async setManualPrice(symbol, price, metadata = {}) {
+  async setManualPrice(symbol, price, date = new Date(), metadata = {}) {
     try {
       const upperSymbol = symbol.toUpperCase();
-      let stockPrice = await StockPrice.findOne({ symbol: upperSymbol });
+      
+      const stockPrice = await StockPrice.upsertPrice(
+        upperSymbol,
+        date,
+        price,
+        'manual',
+        metadata
+      );
 
-      if (!stockPrice) {
-        stockPrice = new StockPrice({
-          symbol: upperSymbol,
-          price: price,
-          source: 'manual'
-        });
-      } else {
-        stockPrice.updatePrice(price, 'manual', metadata);
-      }
-
-      await stockPrice.save();
-      console.log(`Manually set price for ${upperSymbol}: $${price}`);
+      console.log(`Manually set price for ${upperSymbol} on ${date.toDateString()}: $${price}`);
       
       return stockPrice;
     } catch (error) {

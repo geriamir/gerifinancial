@@ -6,18 +6,17 @@ import {
   Box,
   Button,
   Chip,
-  LinearProgress,
   Skeleton
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon,
-  Schedule as ScheduleIcon,
   ShowChart as ShowChartIcon,
   Add as AddIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useRSU } from '../../contexts/RSUContext';
+import RSUVestingChart from '../rsu/RSUVestingChart';
 
 interface RSUOverviewWidgetProps {
   maxUpcomingVesting?: number;
@@ -31,7 +30,6 @@ const RSUOverviewWidget: React.FC<RSUOverviewWidgetProps> = ({
   const {
     portfolioSummary,
     grants,
-    upcomingVesting,
     loading,
     portfolioLoading
   } = useRSU();
@@ -111,7 +109,6 @@ const RSUOverviewWidget: React.FC<RSUOverviewWidgetProps> = ({
   }
 
   const isPositiveGainLoss = portfolioSummary.grants.totalGainLoss >= 0;
-  const nextVestingEvents = upcomingVesting?.slice(0, maxUpcomingVesting) || [];
 
   return (
     <Card sx={{ height: '100%', minHeight: 300 }}>
@@ -129,120 +126,48 @@ const RSUOverviewWidget: React.FC<RSUOverviewWidgetProps> = ({
           />
         </Box>
 
-        {/* Total Portfolio Value */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Total Portfolio Value
-          </Typography>
-          <Typography variant="h4" color="primary.main" gutterBottom>
-            ${portfolioSummary.grants.totalCurrentValue.toLocaleString()}
-          </Typography>
-        </Box>
-
-        {/* Gain/Loss */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Total Gain/Loss
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            {isPositiveGainLoss ? (
-              <TrendingUpIcon fontSize="small" color="success" />
-            ) : (
-              <TrendingDownIcon fontSize="small" color="error" />
-            )}
-            <Typography 
-              variant="h5" 
-              color={isPositiveGainLoss ? 'success.main' : 'error.main'}
-            >
-              {isPositiveGainLoss ? '+' : ''}${portfolioSummary.grants.totalGainLoss.toLocaleString()}
-            </Typography>
-            <Typography 
-              variant="body2" 
-              color={isPositiveGainLoss ? 'success.main' : 'error.main'}
-              sx={{ ml: 1 }}
-            >
-              ({isPositiveGainLoss ? '+' : ''}{portfolioSummary.grants.gainLossPercentage.toFixed(1)}%)
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* Vesting Progress */}
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Overall Vesting Progress
-            </Typography>
-            <Typography variant="body2" color="info.main" fontWeight="medium">
-              {Math.round(portfolioSummary.vesting.overallProgress)}%
-            </Typography>
-          </Box>
-          <LinearProgress 
-            variant="determinate" 
-            value={portfolioSummary.vesting.overallProgress} 
-            sx={{ height: 6, borderRadius: 3 }}
-          />
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+        {/* Compact Portfolio Summary */}
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          mb: 3,
+          p: 2,
+          bgcolor: 'action.hover',
+          borderRadius: 1
+        }}>
+          <Box>
             <Typography variant="caption" color="text.secondary">
-              Vested: {portfolioSummary.vesting.totalVestedShares.toLocaleString()} shares
+              Portfolio Value
             </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Unvested: {portfolioSummary.vesting.totalUnvestedShares.toLocaleString()} shares
+            <Typography variant="h6" color="primary.main">
+              ${(portfolioSummary.grants.totalCurrentValue / 1000).toFixed(0)}k
             </Typography>
           </Box>
-        </Box>
-
-        {/* Upcoming Vesting Events */}
-        {nextVestingEvents.length > 0 && (
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Upcoming Vesting
+          <Box sx={{ textAlign: 'right' }}>
+            <Typography variant="caption" color="text.secondary">
+              Gain/Loss
             </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {nextVestingEvents.map((event, index) => {
-                const vestDate = new Date(event.vestDate);
-                const daysFromNow = Math.ceil((vestDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-                const isUrgent = daysFromNow <= 7;
-                
-                return (
-                  <Box key={index} sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between',
-                    p: 1,
-                    bgcolor: isUrgent ? 'warning.light' : 'action.hover',
-                    borderRadius: 1,
-                    fontSize: '0.875rem'
-                  }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <ScheduleIcon fontSize="small" color={isUrgent ? 'warning' : 'primary'} />
-                      <Box>
-                        <Typography variant="body2" fontWeight="medium">
-                          {event.stockSymbol}: {event.shares.toLocaleString()} shares
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {vestDate.toLocaleDateString('en-US', { 
-                            month: 'short', 
-                            day: 'numeric', 
-                            year: 'numeric' 
-                          })}
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Typography 
-                      variant="caption" 
-                      color={isUrgent ? 'warning.main' : 'text.secondary'}
-                      fontWeight="medium"
-                    >
-                      {daysFromNow <= 0 ? 'Today' : 
-                       daysFromNow === 1 ? 'Tomorrow' : 
-                       `${daysFromNow} days`}
-                    </Typography>
-                  </Box>
-                );
-              })}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              {isPositiveGainLoss ? (
+                <TrendingUpIcon fontSize="small" color="success" />
+              ) : (
+                <TrendingDownIcon fontSize="small" color="error" />
+              )}
+              <Typography 
+                variant="body2" 
+                color={isPositiveGainLoss ? 'success.main' : 'error.main'}
+                fontWeight="medium"
+              >
+                {isPositiveGainLoss ? '+' : ''}{portfolioSummary.grants.gainLossPercentage.toFixed(1)}%
+              </Typography>
             </Box>
           </Box>
-        )}
+        </Box>
+
+        {/* Compact Vesting Chart */}
+        <Box sx={{ mb: 3 }}>
+          <RSUVestingChart height={200} />
+        </Box>
 
         {/* Action Button */}
         <Button
