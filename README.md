@@ -467,7 +467,44 @@ Enhanced the transaction categorization system to eliminate false positives and 
 - Performance optimizations
 - Export functionality
 
-### Phase 8: Category System Enhancements (Planned)
+### Phase 8: RSU (Restricted Stock Units) Management 📋 (Planned)
+
+#### Comprehensive RSU Portfolio Management
+Advanced stock equity management system for tracking and managing RSU grants:
+
+1. **RSU Grant Tracking**:
+   - Multi-company RSU grant management
+   - Quarterly vesting schedules over 5 years (20 vesting points)
+   - Real-time stock price integration via external APIs
+   - Smart share distribution with remainder handling
+
+2. **Tax Calculation Engine**:
+   - Complex Israeli tax rules implementation (65% wage income, 25% capital gains)
+   - Two-year holding period threshold for capital gains optimization
+   - Real-time tax preview for sale scenarios
+   - Annual tax projection and planning tools
+
+3. **Portfolio Analytics**:
+   - Performance tracking and gain/loss analysis
+   - Vesting timeline visualization and upcoming events
+   - Portfolio value trends and market performance
+   - Integration with Overview dashboard for net worth calculation
+
+4. **Sales Management**:
+   - Manual sales recording with automatic tax calculations
+   - Sales history tracking and tax basis management
+   - Net proceeds calculation after tax optimization
+   - Export capabilities for tax reporting
+
+#### Implementation Plan
+- **Phase 1**: Backend models, services, and API endpoints (Week 1)
+- **Phase 2**: Frontend dashboard, navigation integration (Week 2)
+- **Phase 3**: Advanced analytics and stock price integration (Week 3)
+- **Phase 4**: Testing, polish, and Overview page integration (Week 4)
+
+See `RSU_FEATURE_ROADMAP.md` for complete technical specifications and implementation details.
+
+### Phase 9: Category System Enhancements (Planned)
 
 #### Category Structure Optimization
 Planned improvements to streamline the categorization experience:

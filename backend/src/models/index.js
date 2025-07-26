@@ -11,6 +11,9 @@ const ProjectBudget = require('./ProjectBudget');
 const CategoryBudget = require('./CategoryBudget');
 const TransactionPattern = require('./TransactionPattern');
 const TransactionExclusion = require('./TransactionExclusion');
+const RSUGrant = require('./RSUGrant');
+const RSUSale = require('./RSUSale');
+const StockPrice = require('./StockPrice');
 
 module.exports = {
   Category,
@@ -25,5 +28,8 @@ module.exports = {
   ProjectBudget,
   CategoryBudget,
   TransactionPattern,
-  TransactionExclusion
+  TransactionExclusion,
+  RSUGrant,
+  RSUSale,
+  StockPrice
 };

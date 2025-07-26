@@ -2,7 +2,7 @@
 
 ## 🎯 **Project Overview**
 
-**Objective**: Simplify the GeriFinancial navigation structure from 4 main items to 3, streamline URL patterns, and enhance mobile user experience.
+**Objective**: Simplify the GeriFinancial navigation structure, streamline URL patterns, and enhance mobile user experience. Updated to accommodate new RSU feature as 4th navigation item.
 
 **Status**: 🚧 **IN PROGRESS** | **Started**: July 23, 2025 | **Target Completion**: August 20, 2025
 
@@ -26,17 +26,18 @@
 Dashboard → Bank Accounts → Transactions → Budgets
 ```
 
-### **New Structure (3 Items)**
+### **New Structure (4 Items)**
 ```
-Overview → Transactions → Budgets
+Overview → Transactions → Budgets → RSUs
            ↳ [All Transactions] [By Account] [Bank Management]
 ```
 
 ### **Key Changes**
 1. **Dashboard → Overview**: Enhanced with financial summary and action items
 2. **Bank Accounts**: Integrated as tab within Transactions page
-3. **URL Simplification**: Complex paths → query parameters
-4. **Mobile Navigation**: Drawer → bottom tabs + gestures
+3. **RSUs Added**: New 4th navigation item for Restricted Stock Units management
+4. **URL Simplification**: Complex paths → query parameters
+5. **Mobile Navigation**: Drawer → bottom tabs + gestures
 
 ---
 
@@ -315,8 +316,8 @@ frontend/src/
 ## 🎯 **Success Metrics**
 
 ### **Quantitative Goals**
-- [ ] **Navigation Complexity**: 4 items → 3 items (25% reduction)
-- [ ] **Mobile Navigation**: 50% fewer taps to reach bank management
+- [ ] **Navigation Restructure**: 4 items → 4 items (Dashboard/Banks/Transactions/Budgets → Overview/Transactions/Budgets/RSUs)
+- [ ] **Mobile Navigation**: 50% fewer taps to reach bank management (via transaction tabs)
 - [ ] **URL Length**: Average URL length reduced by 40%
 - [ ] **Test Coverage**: Maintain 90%+ coverage for navigation components
 
