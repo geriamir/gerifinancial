@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback, ReactNode } from 'react';
-import { rsuApi, RSUGrant, RSUSale, PortfolioSummary, CreateGrantData, CreateSaleData, TaxPreviewRequest, UpcomingVestingEvent, PortfolioTimelinePoint, TimelineResponse } from '../services/api/rsus';
+import { rsuApi, RSUGrant, RSUSale, PortfolioSummary, CreateGrantData, CreateSaleData, TaxPreviewRequest, UpcomingVestingEvent, TimelineResponse } from '../services/api/rsus';
 
 // State interface
 interface RSUState {
