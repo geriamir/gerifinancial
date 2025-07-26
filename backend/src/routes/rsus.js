@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { body, param, query, validationResult } = require('express-validator');
 const auth = require('../middleware/auth');
-const rsuService = require('../services/rsuService');
-const taxCalculationService = require('../services/taxCalculationService');
-const vestingService = require('../services/vestingService');
-const stockPriceService = require('../services/stockPriceService');
-const timelineService = require('../services/timelineService');
+const rsuService = require('../services/rsu/rsuService');
+const taxCalculationService = require('../services/rsu/taxCalculationService');
+const vestingService = require('../services/rsu/vestingService');
+const stockPriceService = require('../services/rsu/stockPriceService');
+const timelineService = require('../services/rsu/timelineService');
 
 // Middleware to handle validation errors
 const handleValidationErrors = (req, res, next) => {

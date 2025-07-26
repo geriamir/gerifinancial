@@ -8,8 +8,8 @@ const ensureLogsDir = require('./middleware/ensureLogsDir');
 // Ensure logs directory exists in production
 ensureLogsDir();
 const scrapingSchedulerService = require('./services/scrapingSchedulerService');
-const stockPriceService = require('./services/stockPriceService');
-const vestingService = require('./services/vestingService');
+const stockPriceService = require('./services/rsu/stockPriceService');
+const vestingService = require('./services/rsu/vestingService');
 
 // Import routes
 const authRoutes = require('./routes/auth');

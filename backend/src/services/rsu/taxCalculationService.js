@@ -1,4 +1,4 @@
-const { RSUGrant, RSUSale } = require('../models');
+const { RSUGrant, RSUSale } = require('../../models');
 
 class TaxCalculationService {
   constructor() {
