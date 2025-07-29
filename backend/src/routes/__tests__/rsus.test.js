@@ -124,8 +124,14 @@ describe('RSU API Endpoints', () => {
             grantDate: new Date('2024-01-01'),
             totalValue: 100000,
             totalShares: 1000,
+            pricePerShare: 100,
             status: 'active',
-            vestingSchedule: []
+            vestingSchedule: [{
+              vestDate: new Date('2024-04-01'),
+              shares: 250,
+              vested: false,
+              vestedValue: 0
+            }]
           },
           {
             userId: testUser._id,
@@ -133,8 +139,14 @@ describe('RSU API Endpoints', () => {
             grantDate: new Date('2024-02-01'),
             totalValue: 50000,
             totalShares: 500,
+            pricePerShare: 100,
             status: 'completed',
-            vestingSchedule: []
+            vestingSchedule: [{
+              vestDate: new Date('2024-05-01'),
+              shares: 125,
+              vested: true,
+              vestedValue: 15000
+            }]
           }
         ]);
       });
@@ -182,8 +194,14 @@ describe('RSU API Endpoints', () => {
           grantDate: new Date('2024-01-01'),
           totalValue: 100000,
           totalShares: 1000,
+          pricePerShare: 100,
           status: 'active',
-          vestingSchedule: []
+          vestingSchedule: [{
+            vestDate: new Date('2024-04-01'),
+            shares: 250,
+            vested: false,
+            vestedValue: 0
+          }]
         });
       });
 
@@ -229,8 +247,14 @@ describe('RSU API Endpoints', () => {
           grantDate: new Date('2024-01-01'),
           totalValue: 100000,
           totalShares: 1000,
+          pricePerShare: 100,
           status: 'active',
-          vestingSchedule: []
+          vestingSchedule: [{
+            vestDate: new Date('2024-04-01'),
+            shares: 250,
+            vested: false,
+            vestedValue: 0
+          }]
         });
       });
 
@@ -279,6 +303,7 @@ describe('RSU API Endpoints', () => {
           grantDate: new Date('2024-01-01'),
           totalValue: 100000,
           totalShares: 1000,
+          pricePerShare: 100,
           status: 'active',
           vestingSchedule: [{
             vestDate: new Date('2024-04-01'),
@@ -343,6 +368,7 @@ describe('RSU API Endpoints', () => {
         grantDate: new Date('2022-01-01'), // 2+ years ago for long-term testing
         totalValue: 100000,
         totalShares: 1000,
+        pricePerShare: 100,
         status: 'active',
         vestingSchedule: [
           { vestDate: new Date('2023-01-01'), shares: 250, vested: true, vestedValue: 30000 },
@@ -422,8 +448,14 @@ describe('RSU API Endpoints', () => {
           grantDate: new Date('2024-01-01'),
           totalValue: 50000,
           totalShares: 500,
+          pricePerShare: 100,
           status: 'active',
-          vestingSchedule: []
+          vestingSchedule: [{
+            vestDate: new Date('2024-04-01'),
+            shares: 125,
+            vested: false,
+            vestedValue: 0
+          }]
         });
 
         const saleData = {
@@ -530,6 +562,7 @@ describe('RSU API Endpoints', () => {
           grantDate: new Date('2023-01-01'),
           totalValue: 100000,
           totalShares: 1000,
+          pricePerShare: 100,
           currentPrice: 120,
           status: 'active',
           vestingSchedule: [
@@ -542,6 +575,7 @@ describe('RSU API Endpoints', () => {
           grantDate: new Date('2023-06-01'),
           totalValue: 50000,
           totalShares: 500,
+          pricePerShare: 100,
           currentPrice: 180,
           status: 'active',
           vestingSchedule: [
@@ -604,6 +638,7 @@ describe('RSU API Endpoints', () => {
         grantDate: new Date('2022-01-01'),
         totalValue: 100000,
         totalShares: 1000,
+        pricePerShare: 100,
         status: 'active',
         vestingSchedule: [
           { vestDate: new Date('2023-01-01'), shares: 250, vested: true, vestedValue: 30000 }
@@ -645,8 +680,14 @@ describe('RSU API Endpoints', () => {
           grantDate: new Date('2024-01-01'),
           totalValue: 50000,
           totalShares: 500,
+          pricePerShare: 100,
           status: 'active',
-          vestingSchedule: []
+          vestingSchedule: [{
+            vestDate: new Date('2024-04-01'),
+            shares: 125,
+            vested: false,
+            vestedValue: 0
+          }]
         });
 
         const previewData = {
@@ -745,8 +786,14 @@ describe('RSU API Endpoints', () => {
         grantDate: new Date('2024-01-01'),
         totalValue: 75000,
         totalShares: 750,
+        pricePerShare: 100,
         status: 'active',
-        vestingSchedule: []
+        vestingSchedule: [{
+          vestDate: new Date('2024-04-01'),
+          shares: 187,
+          vested: false,
+          vestedValue: 0
+        }]
       });
 
       // Try to access other user's grant
