@@ -29,6 +29,15 @@ class VestingService {
    * @returns {Array} Array of share amounts per period
    */
   distributeSharesEvenly(totalShares, periods = 20) {
+    // Validate inputs
+    if (typeof totalShares !== 'number' || totalShares <= 0) {
+      throw new Error('Total shares must be a positive number');
+    }
+    
+    if (typeof periods !== 'number' || periods <= 0) {
+      throw new Error('Periods must be a positive number');
+    }
+    
     const baseShares = Math.floor(totalShares / periods);
     const remainder = totalShares % periods;
     

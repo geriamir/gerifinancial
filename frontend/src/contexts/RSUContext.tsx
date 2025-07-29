@@ -501,4 +501,5 @@ export const useRSU = (): RSUContextType => {
   return context;
 };
 
+export { RSUContext };
 export default RSUContext;

@@ -200,10 +200,7 @@ const RSUs: React.FC = () => {
                   </Box>
                 </Box>
                 <GrantsList 
-                  grants={(() => {
-                    console.log('GrantsList receiving grants:', grants.length, 'grants, loading:', grantsLoading);
-                    return grants;
-                  })()}
+                  grants={grants}
                   loading={grantsLoading}
                   onGrantSelect={handleViewGrantDetails}
                   onEditGrant={handleEditGrant}

@@ -71,10 +71,25 @@ const StockPriceUpdater: React.FC<StockPriceUpdaterProps> = ({
       setUpdating(true);
       setError(null);
 
-      // Simulate API call to update stock price
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      // Update stock price via backend API
       const price = parseFloat(newPrice);
+      const response = await fetch(`/api/rsus/prices/${grant?.stockSymbol}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          price: price,
+          companyName: grant?.company
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update price');
+      }
+
       onPriceUpdate?.(price);
       setSuccess(true);
       
@@ -96,19 +111,28 @@ const StockPriceUpdater: React.FC<StockPriceUpdaterProps> = ({
       setUpdating(true);
       setError(null);
 
-      // Simulate fetching from external API
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Fetch live price from backend API (which uses Yahoo Finance, Alpha Vantage, etc.)
+      const response = await fetch(`/api/rsus/prices/${grant.stockSymbol}/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch live price');
+      }
+
+      const data = await response.json();
+      const stockPrice = data.data;
       
-      // Generate a realistic price change (-5% to +5%)
-      const currentPrice = grant.currentPrice;
-      const changePercent = (Math.random() - 0.5) * 0.1; // -5% to +5%
-      const newPriceValue = currentPrice * (1 + changePercent);
-      
-      setNewPrice(newPriceValue.toFixed(2));
+      setNewPrice(stockPrice.price.toFixed(2));
       setSuccess(true);
       
     } catch (err) {
-      setError('Failed to fetch price from external API');
+      setError(err instanceof Error ? err.message : 'Failed to fetch price from external API');
     } finally {
       setUpdating(false);
     }
@@ -256,7 +280,7 @@ const StockPriceUpdater: React.FC<StockPriceUpdaterProps> = ({
 
           <Typography variant="caption" color="text.secondary">
             <strong>Note:</strong> Stock prices should be updated regularly for accurate portfolio tracking. 
-            Live price fetching will be available in a future update.
+            Use "Fetch Live" to get the latest price from Yahoo Finance, Alpha Vantage, or Finnhub APIs.
           </Typography>
         </Box>
       </DialogContent>

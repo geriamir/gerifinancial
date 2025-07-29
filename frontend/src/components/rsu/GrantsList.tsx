@@ -92,10 +92,6 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
     setPriceUpdaterOpen(false);
   };
 
-  const handlePriceUpdate = (newPrice: number) => {
-    // TODO: Implement actual price update via API
-    console.log(`Update price for ${grant.stockSymbol} to $${newPrice}`);
-  };
 
   const isPositiveGainLoss = grant.gainLoss >= 0;
   const vestingProgress = Math.round(grant.vestingProgress);
@@ -118,21 +114,6 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
     };
   }, [sales, grant._id, grant.vestedShares]);
   
-  // Debug logging
-  console.log(`Grant ${grant.stockSymbol} (${grant._id}):`, {
-    totalShares: grant.totalShares,
-    vestedShares: grant.vestedShares,
-    directFilteredSales: directFilteredSales.length,
-    sharesSold,
-    availableShares,
-    salesLoading,
-    allSales: sales.length,
-    sampleSale: sales.length > 0 ? { 
-      grantId: sales[0].grantId, 
-      grantIdType: typeof sales[0].grantId,
-      sharesAmount: sales[0].sharesAmount 
-    } : null
-  });
   
   // Format dates
   const grantDateFormatted = new Date(grant.grantDate).toLocaleDateString('en-US', {
@@ -371,15 +352,11 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
         open={priceUpdaterOpen}
         onClose={handleClosePriceUpdater}
         grant={grant}
-        onPriceUpdate={handlePriceUpdate}
       />
     </Card>
   );
 }, (prevProps, nextProps) => {
-  // Always log React.memo comparison - debug every attempt
-  console.log(`React.memo comparison for grant ${nextProps.grant._id}`);
-  
-  // Custom comparison function for React.memo with debugging
+  // Custom comparison function for React.memo
   const comparisons = {
     id: prevProps.grant._id === nextProps.grant._id,
     totalShares: prevProps.grant.totalShares === nextProps.grant.totalShares,
@@ -394,15 +371,7 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
     onViewDetails: prevProps.onViewDetails === nextProps.onViewDetails
   };
   
-  const isEqual = Object.values(comparisons).every(Boolean);
-  
-  // Always log the comparison results
-  console.log(`Grant ${nextProps.grant._id} React.memo comparison:`, {
-    isEqual,
-    failedComparisons: Object.entries(comparisons).filter(([key, value]) => !value).map(([key]) => key)
-  });
-  
-  return isEqual;
+  return Object.values(comparisons).every(Boolean);
 });
 
 GrantItem.displayName = 'GrantItem';
@@ -463,19 +432,16 @@ const GrantsList: React.FC<GrantsListProps> = ({
 
   return (
     <Box>
-      {grants.map((grant, index) => {
-        console.log(`Rendering GrantItem for grant ${grant._id} with key ${grant._id} at index ${index}`);
-        return (
-          <GrantItem
-            key={grant._id}
-            grant={grant}
-            onEdit={onEditGrant}
-            onDelete={onDeleteGrant}
-            onRecordSale={onRecordSale}
-            onViewDetails={onGrantSelect}
-          />
-        );
-      })}
+      {grants.map((grant) => (
+        <GrantItem
+          key={grant._id}
+          grant={grant}
+          onEdit={onEditGrant}
+          onDelete={onDeleteGrant}
+          onRecordSale={onRecordSale}
+          onViewDetails={onGrantSelect}
+        />
+      ))}
     </Box>
   );
 };

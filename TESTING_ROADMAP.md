@@ -28,7 +28,17 @@
 - Add service layer API documentation
 
 ## 2. Frontend Component Testing
-### High Priority
+### Completed
+- [x] Enhanced RSU component tests
+  - Fixed GrantsList component tests with proper mocking and act() usage
+  - Fixed RecordSaleForm component tests 
+  - Improved StockPriceUpdater tests with comprehensive scenarios
+  - Fixed RSUContext tests with proper API mocking
+
+### High Priority  
+- Fix remaining RSU component test issues
+  - AddGrantWizard validation tests (date picker element selection)
+  - RSUContext mock API structure improvements
 - Add unit tests for BankAccountsList component
 - Add unit tests for AccountScraping component
 - Add unit tests for ScrapeAllAccounts component
