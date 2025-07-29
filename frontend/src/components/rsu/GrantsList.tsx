@@ -355,22 +355,17 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
     </Card>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison function for React.memo
-  const comparisons = {
-    id: prevProps.grant._id === nextProps.grant._id,
-    totalShares: prevProps.grant.totalShares === nextProps.grant.totalShares,
-    vestedShares: prevProps.grant.vestedShares === nextProps.grant.vestedShares,
-    currentPrice: prevProps.grant.currentPrice === nextProps.grant.currentPrice,
-    currentValue: prevProps.grant.currentValue === nextProps.grant.currentValue,
-    gainLoss: prevProps.grant.gainLoss === nextProps.grant.gainLoss,
-    vestingProgress: prevProps.grant.vestingProgress === nextProps.grant.vestingProgress,
-    onEdit: prevProps.onEdit === nextProps.onEdit,
-    onDelete: prevProps.onDelete === nextProps.onDelete,
-    onRecordSale: prevProps.onRecordSale === nextProps.onRecordSale,
-    onViewDetails: prevProps.onViewDetails === nextProps.onViewDetails
-  };
-  
-  return Object.values(comparisons).every(Boolean);
+  // Simple shallow comparison - React.memo is most effective with stable props
+  return (
+    prevProps.grant._id === nextProps.grant._id &&
+    prevProps.grant.currentPrice === nextProps.grant.currentPrice &&
+    prevProps.grant.currentValue === nextProps.grant.currentValue &&
+    prevProps.grant.vestedShares === nextProps.grant.vestedShares &&
+    prevProps.onEdit === nextProps.onEdit &&
+    prevProps.onDelete === nextProps.onDelete &&
+    prevProps.onRecordSale === nextProps.onRecordSale &&
+    prevProps.onViewDetails === nextProps.onViewDetails
+  );
 });
 
 GrantItem.displayName = 'GrantItem';
