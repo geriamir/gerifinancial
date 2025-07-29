@@ -141,7 +141,7 @@ export interface StockPrice {
   symbol: string;
   price: number;
   lastUpdated: string;
-  source: 'yahoo' | 'alphavantage' | 'manual';
+  source: 'yahoo' | 'alphaVantage' | 'manual';
   change: number;
   changePercent: number;
   volume: number;

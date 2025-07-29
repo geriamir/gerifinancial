@@ -50,7 +50,7 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
   onRecordSale,
   onViewDetails
 }) => {
-  const { sales, salesLoading } = useRSU();
+  const { sales } = useRSU();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [priceUpdaterOpen, setPriceUpdaterOpen] = useState(false);
   const open = Boolean(anchorEl);
@@ -97,7 +97,7 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
   const vestingProgress = Math.round(grant.vestingProgress);
   
   // Calculate available shares (vested shares minus sold shares) - memoized for performance
-  const { directFilteredSales, sharesSold, availableShares } = useMemo(() => {
+  const { sharesSold, availableShares } = useMemo(() => {
     // Handle both string grantId and populated grant object
     const filteredSales = sales.filter(sale => {
       const saleGrantId = typeof sale.grantId === 'string' ? sale.grantId : (sale.grantId as any)?._id;
@@ -108,7 +108,6 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
     const available = Math.max(0, grant.vestedShares - soldShares);
     
     return {
-      directFilteredSales: filteredSales,
       sharesSold: soldShares,
       availableShares: available
     };

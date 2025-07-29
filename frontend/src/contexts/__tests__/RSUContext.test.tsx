@@ -66,7 +66,7 @@ jest.mock('../../services/api/rsus', () => {
   };
 });
 
-// Import the mocked API to get reference to it
+// Import the mocked API (Jest will return our mock instead of the real implementation)
 import { rsuApi } from '../../services/api/rsus';
 
 // Cast the mock to the correct type for Jest - use any to bypass complex nested mock typing

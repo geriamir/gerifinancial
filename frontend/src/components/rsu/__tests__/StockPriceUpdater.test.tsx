@@ -722,18 +722,22 @@ describe('StockPriceUpdater', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Price Change Preview')).toBeInTheDocument();
-        // Use more flexible matchers for formatted numbers
-        expect(screen.getByText((content) => {
-          return content.includes('+$9,880') || content.includes('+9,880') || content.includes('+9880');
-        })).toBeInTheDocument();
-        expect(screen.getByText((content) => {
-          return content.includes('+8,233') || content.includes('+8233') || content.includes('8,233');
-        })).toBeInTheDocument();
-        expect(screen.getByText((content) => {
-          return content.includes('$10,000,000') || content.includes('10,000,000') || content.includes('10000000');
-        })).toBeInTheDocument();
-      }, { timeout: 5000 });
-    });
+      }, { timeout: 3000 });
+
+      // Check for test IDs, but fallback to text matching if not found
+      try {
+        expect(screen.getByTestId('price-change-amount')).toHaveTextContent('+$9,880.00');
+        expect(screen.getByTestId('price-change-percent')).toHaveTextContent('+8,233.33%');
+        expect(screen.getByTestId('new-portfolio-value')).toHaveTextContent('$10,000,000');
+        expect(screen.getByTestId('gain-loss-impact')).toHaveTextContent('+$9,880,000');
+      } catch (error) {
+        // Fallback to more flexible text matching if test IDs are not found
+        expect(screen.getByText(/\+\$9,880\.00/)).toBeInTheDocument();
+        expect(screen.getByText(/\+8,233\.33%/)).toBeInTheDocument();
+        expect(screen.getByText(/\$10,000,000/)).toBeInTheDocument();
+        expect(screen.getByText(/\+\$9,880,000/)).toBeInTheDocument();
+      }
+    }, 10000);
 
     it('should handle network errors gracefully', async () => {
       const user = userEvent.setup();

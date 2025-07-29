@@ -235,6 +235,7 @@ const StockPriceUpdater: React.FC<StockPriceUpdaterProps> = ({
                       variant="h6"
                       color={isPositiveChange ? 'success.main' : 'error.main'}
                       sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                      data-testid="price-change-amount"
                     >
                       {isPositiveChange ? <TrendingUpIcon fontSize="small" /> : <TrendingDownIcon fontSize="small" />}
                       {isPositiveChange ? '+' : ''}${priceChange.toFixed(2)}
@@ -247,6 +248,7 @@ const StockPriceUpdater: React.FC<StockPriceUpdaterProps> = ({
                     <Typography 
                       variant="h6"
                       color={isPositiveChange ? 'success.main' : 'error.main'}
+                      data-testid="price-change-percent"
                     >
                       {isPositiveChange ? '+' : ''}{priceChangePercent.toFixed(2)}%
                     </Typography>
@@ -258,7 +260,7 @@ const StockPriceUpdater: React.FC<StockPriceUpdaterProps> = ({
                     <Typography variant="body2" color="text.secondary">
                       New Portfolio Value
                     </Typography>
-                    <Typography variant="h6" color="primary">
+                    <Typography variant="h6" color="primary" data-testid="new-portfolio-value">
                       ${(grant.totalShares * inputPrice).toLocaleString()}
                     </Typography>
                   </Box>
@@ -269,6 +271,7 @@ const StockPriceUpdater: React.FC<StockPriceUpdaterProps> = ({
                     <Typography 
                       variant="h6"
                       color={isPositiveChange ? 'success.main' : 'error.main'}
+                      data-testid="gain-loss-impact"
                     >
                       {isPositiveChange ? '+' : ''}${(grant.totalShares * priceChange).toLocaleString()}
                     </Typography>
@@ -280,7 +283,7 @@ const StockPriceUpdater: React.FC<StockPriceUpdaterProps> = ({
 
           <Typography variant="caption" color="text.secondary">
             <strong>Note:</strong> Stock prices should be updated regularly for accurate portfolio tracking. 
-            Use "Fetch Live" to get the latest price from Yahoo Finance, Alpha Vantage, or Finnhub APIs.
+            Use "Fetch Live" to get the latest price from Yahoo Finance or Alpha Vantage APIs.
           </Typography>
         </Box>
       </DialogContent>
