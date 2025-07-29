@@ -23,6 +23,14 @@ describe('RSUGrant Model', () => {
 
   describe('Model Creation and Validation', () => {
     it('should create a valid RSU grant with all fields', async () => {
+      // Add required vestingSchedule
+      mockGrant.vestingSchedule = [{
+        vestDate: new Date('2024-04-15'),
+        shares: 250,
+        vested: false,
+        vestedValue: 0
+      }];
+      
       const grant = new RSUGrant(mockGrant);
       await grant.save();
 
@@ -43,6 +51,7 @@ describe('RSUGrant Model', () => {
         grantDate: new Date('2024-01-01'),
         totalValue: 50000,
         totalShares: 500,
+        pricePerShare: 100, // Required field
         vestingSchedule: [{
           vestDate: new Date('2024-04-01'),
           shares: 125,
@@ -136,22 +145,33 @@ describe('RSUGrant Model', () => {
     let grant;
 
     beforeEach(async () => {
-      // Create grant with vesting schedule
+      // Mock current time to 2024-08-01 for consistent vesting calculations
+      jest.useFakeTimers().setSystemTime(new Date('2024-08-01'));
+      
+      // Create grant with vesting schedule - virtuals use vestDate comparison, not vested boolean
       mockGrant.vestingSchedule = [
-        { vestDate: new Date('2024-04-15'), shares: 250, vested: true, vestedValue: 30000 },
-        { vestDate: new Date('2024-07-15'), shares: 250, vested: true, vestedValue: 32000 },
-        { vestDate: new Date('2024-10-15'), shares: 250, vested: false, vestedValue: 0 },
-        { vestDate: new Date('2025-01-15'), shares: 250, vested: false, vestedValue: 0 }
+        { vestDate: new Date('2024-04-15'), shares: 250, vested: true, vestedValue: 30000 },  // Past date = vested
+        { vestDate: new Date('2024-07-15'), shares: 250, vested: true, vestedValue: 32000 },  // Past date = vested
+        { vestDate: new Date('2024-10-15'), shares: 250, vested: false, vestedValue: 0 },     // Future date = unvested
+        { vestDate: new Date('2025-01-15'), shares: 250, vested: false, vestedValue: 0 }      // Future date = unvested
       ];
       grant = new RSUGrant(mockGrant);
       await grant.save();
     });
 
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it('should calculate vested shares correctly', () => {
+      // Vested shares are calculated by vestDate <= now (2024-08-01)
+      // So shares from 2024-04-15 and 2024-07-15 are vested
       expect(grant.vestedShares).toBe(500); // 250 + 250
     });
 
     it('should calculate unvested shares correctly', () => {
+      // Unvested shares are calculated by vestDate > now (2024-08-01)
+      // So shares from 2024-10-15 and 2025-01-15 are unvested
       expect(grant.unvestedShares).toBe(500); // 250 + 250
     });
 
@@ -241,6 +261,7 @@ describe('RSUGrant Model', () => {
         grantDate: new Date('2024-01-01'),
         totalValue: 100000,
         totalShares: 1000,
+        pricePerShare: 100,
         status: 'active',
         vestingSchedule: [{
           vestDate: new Date('2024-04-01'),
@@ -256,6 +277,7 @@ describe('RSUGrant Model', () => {
         grantDate: new Date('2024-02-01'),
         totalValue: 50000,
         totalShares: 500,
+        pricePerShare: 100,
         status: 'completed',
         vestingSchedule: [{
           vestDate: new Date('2024-05-01'),
