@@ -34,9 +34,9 @@ const RecentSalesWidget: React.FC<RecentSalesWidgetProps> = ({
     .slice(0, maxSales);
 
   // Helper function to get grant info for a sale
-  const getGrantInfo = (saleGrantId: any) => {
+  const getGrantInfo = (saleGrantId: string | { _id: string }) => {
     // Handle both string grantId and populated grant object
-    const grantId = typeof saleGrantId === 'string' ? saleGrantId : saleGrantId?._id;
+    const grantId = typeof saleGrantId === 'string' ? saleGrantId : saleGrantId._id;
     return grants.find(grant => grant._id === grantId);
   };
 
