@@ -354,18 +354,6 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
       />
     </Card>
   );
-}, (prevProps, nextProps) => {
-  // Simple shallow comparison - React.memo is most effective with stable props
-  return (
-    prevProps.grant._id === nextProps.grant._id &&
-    prevProps.grant.currentPrice === nextProps.grant.currentPrice &&
-    prevProps.grant.currentValue === nextProps.grant.currentValue &&
-    prevProps.grant.vestedShares === nextProps.grant.vestedShares &&
-    prevProps.onEdit === nextProps.onEdit &&
-    prevProps.onDelete === nextProps.onDelete &&
-    prevProps.onRecordSale === nextProps.onRecordSale &&
-    prevProps.onViewDetails === nextProps.onViewDetails
-  );
 });
 
 GrantItem.displayName = 'GrantItem';
