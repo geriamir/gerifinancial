@@ -6,7 +6,12 @@ const bankScraperService = require('../bankScraperService');
 const logger = require('../../utils/logger');
 
 // Mock dependencies
-jest.mock('../scrapingSchedulerService');
+jest.mock('../scrapingSchedulerService', () => ({
+  scheduleAccount: jest.fn(),
+  stopAccount: jest.fn(),
+  initialize: jest.fn(),
+  stopAll: jest.fn()
+}));
 jest.mock('../bankScraperService');
 jest.mock('../../utils/logger');
 
