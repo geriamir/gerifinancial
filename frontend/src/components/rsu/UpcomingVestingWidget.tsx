@@ -29,7 +29,8 @@ const UpcomingVestingWidget: React.FC<UpcomingVestingWidgetProps> = ({
   loading = false,
   maxEvents = 5
 }) => {
-  // Step 1: Group events by month (memoized separately for efficiency)
+  // Step 1: Group events by month (memoized separately for performance optimization)
+  // This useMemo only recalculates when events array changes, not on every render
   const groupedEvents = useMemo(() => {
     return events.reduce((acc, event) => {
       const date = new Date(event.vestDate);
