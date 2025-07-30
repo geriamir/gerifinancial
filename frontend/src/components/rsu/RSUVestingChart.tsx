@@ -28,6 +28,24 @@ interface RSUVestingChartProps {
   height?: number;
 }
 
+const eventsVestingReduce = (sum: number, event: any): number => {
+  if (event.eventType === 'vesting') {
+    return sum + (event.taxDetails?.netValue || 0);
+  }
+  
+  if (event.eventType === 'sale') {
+    // Subtract sale proceeds (already net after taxes)
+    return sum - (event.taxCalculation?.netValue || 0);
+  }
+  
+  return sum;
+};
+
+// Helper function to calculate vesting value from events
+const calculateVestingValue = (events: any[]): number => {
+  return events.reduce(eventsVestingReduce, 0);
+};
+
 const RSUVestingChart: React.FC<RSUVestingChartProps> = ({ height = 400 }) => {
   const theme = useTheme();
   const { grants, loading, getPortfolioTimeline } = useRSU();
@@ -58,15 +76,7 @@ const RSUVestingChart: React.FC<RSUVestingChartProps> = ({ height = 400 }) => {
       month: point.month,
       monthKey: point.monthKey,
       cumulativeValue: point.totalNetValue, // Use net value (after taxes)
-      vestingValue: point.events.reduce((sum, event) => {
-        if (event.eventType === 'vesting') {
-          return sum + (event.taxDetails?.netValue || 0);
-        } else if (event.eventType === 'sale') {
-          // Subtract sale proceeds (already net after taxes)
-          return sum - (event.taxCalculation?.netValue || 0);
-        }
-        return sum;
-      }, 0),
+      vestingValue: calculateVestingValue(point.events),
       isHistorical: point.isHistorical,
       isFuture: point.isFuture,
       isToday: point.isToday,
