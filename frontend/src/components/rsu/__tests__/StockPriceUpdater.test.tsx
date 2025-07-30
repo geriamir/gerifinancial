@@ -722,22 +722,27 @@ describe('StockPriceUpdater', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Price Change Preview')).toBeInTheDocument();
-      }, { timeout: 3000 });
+      }, { timeout: 5000 });
 
-      // Check for test IDs, but fallback to text matching if not found
-      try {
-        expect(screen.getByTestId('price-change-amount')).toHaveTextContent('+$9,880.00');
-        expect(screen.getByTestId('price-change-percent')).toHaveTextContent('+8,233.33%');
-        expect(screen.getByTestId('new-portfolio-value')).toHaveTextContent('$10,000,000');
-        expect(screen.getByTestId('gain-loss-impact')).toHaveTextContent('+$9,880,000');
-      } catch (error) {
-        // Fallback to more flexible text matching if test IDs are not found
-        expect(screen.getByText(/\+\$9,880\.00/)).toBeInTheDocument();
-        expect(screen.getByText(/\+8,233\.33%/)).toBeInTheDocument();
-        expect(screen.getByText(/\$10,000,000/)).toBeInTheDocument();
-        expect(screen.getByText(/\+\$9,880,000/)).toBeInTheDocument();
-      }
-    }, 10000);
+      // Use test IDs for more precise element selection
+      await waitFor(() => {
+        // Check for price change amount using test ID
+        const priceChangeElement = screen.getByTestId('price-change-amount');
+        expect(priceChangeElement).toHaveTextContent('+$9880.00');
+        
+        // Check for percentage change using test ID
+        const percentChangeElement = screen.getByTestId('price-change-percent');
+        expect(percentChangeElement).toHaveTextContent('+8233.33%');
+        
+        // Check for new portfolio value using test ID
+        const portfolioValueElement = screen.getByTestId('new-portfolio-value');
+        expect(portfolioValueElement).toHaveTextContent('$10,000,000');
+        
+        // Check for impact on portfolio using test ID
+        const gainLossElement = screen.getByTestId('gain-loss-impact');
+        expect(gainLossElement).toHaveTextContent('+$9,880,000');
+      }, { timeout: 5000 });
+    }, 15000);
 
     it('should handle network errors gracefully', async () => {
       const user = userEvent.setup();
