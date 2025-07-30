@@ -47,7 +47,7 @@ const RecordSaleForm: React.FC<RecordSaleFormProps> = ({
   onClose,
   grant
 }) => {
-  const { recordSale, getTaxPreview, grants } = useRSU();
+  const { recordSale, getTaxPreview, grants, getSalesByGrant } = useRSU();
   const [selectedGrant, setSelectedGrant] = useState<RSUGrant | null>(grant);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -130,7 +130,15 @@ const RecordSaleForm: React.FC<RecordSaleFormProps> = ({
     
     if (isNaN(shares) || shares <= 0) return 'Shares amount must be a positive number';
     if (isNaN(price) || price <= 0) return 'Price per share must be a positive number';
-    if (shares > selectedGrant.vestedShares) return `Cannot sell more than ${selectedGrant.vestedShares} vested shares`;
+    
+    // Calculate available shares: vested shares minus already sold shares
+    const existingSales = getSalesByGrant(selectedGrant._id);
+    const totalSoldShares = existingSales.reduce((sum, sale) => sum + sale.sharesAmount, 0);
+    const availableShares = selectedGrant.vestedShares - totalSoldShares;
+    
+    if (shares > availableShares) {
+      return `Cannot sell more than ${availableShares.toLocaleString()} shares (${selectedGrant.vestedShares.toLocaleString()} vested - ${totalSoldShares.toLocaleString()} already sold)`;
+    }
     
     return null;
   };
@@ -150,7 +158,7 @@ const RecordSaleForm: React.FC<RecordSaleFormProps> = ({
         grantId: selectedGrant!._id,
         sharesAmount: parseInt(formData.sharesAmount),
         salePrice: parseFloat(formData.pricePerShare),
-        saleDate: formData.saleDate?.toISOString()
+        saleDate: formData.saleDate?.toISOString() || new Date().toISOString()
       });
       
       setTaxPreview(preview);
@@ -301,9 +309,24 @@ const RecordSaleForm: React.FC<RecordSaleFormProps> = ({
               value={formData.sharesAmount}
               onChange={handleInputChange('sharesAmount')}
               placeholder="100"
-              helperText={`Max: ${selectedGrant.vestedShares.toLocaleString()} vested shares`}
+              helperText={(() => {
+                const existingSales = getSalesByGrant(selectedGrant._id);
+                const totalSoldShares = existingSales.reduce((sum, sale) => sum + sale.sharesAmount, 0);
+                const availableShares = selectedGrant.vestedShares - totalSoldShares;
+                return totalSoldShares > 0 
+                  ? `Max: ${availableShares.toLocaleString()} available (${selectedGrant.vestedShares.toLocaleString()} vested - ${totalSoldShares.toLocaleString()} sold)`
+                  : `Max: ${availableShares.toLocaleString()} vested shares`;
+              })()}
               type="number"
-              inputProps={{ min: 1, max: selectedGrant.vestedShares, step: 1 }}
+              inputProps={{ 
+                min: 1, 
+                max: (() => {
+                  const existingSales = getSalesByGrant(selectedGrant._id);
+                  const totalSoldShares = existingSales.reduce((sum, sale) => sum + sale.sharesAmount, 0);
+                  return selectedGrant.vestedShares - totalSoldShares;
+                })(),
+                step: 1 
+              }}
             />
             <TextField
               fullWidth
