@@ -390,25 +390,15 @@ const RSUVestingChart: React.FC<RSUVestingChartProps> = ({ height = 400 }) => {
                 />
               )}
 
-              {/* Historical line (solid) */}
+              {/* Historical line with custom dots for vesting events */}
               <Line
                 type="monotone"
                 dataKey="cumulativeValue"
                 stroke={theme.palette.primary.main}
                 strokeWidth={3}
-                dot={false}
+                dot={<CustomDot />}
                 connectNulls={false}
                 name="Cumulative Post-Tax Value"
-              />
-
-              {/* Custom dots for vesting events */}
-              <Line
-                type="monotone"
-                dataKey="cumulativeValue"
-                stroke="transparent"
-                dot={<CustomDot />}
-                strokeWidth={0}
-                legendType="none"
               />
 
               {/* Custom Tooltip */}
