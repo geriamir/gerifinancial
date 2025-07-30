@@ -134,8 +134,14 @@ rsuGrantSchema.virtual('unvestedShares').get(function() {
 });
 
 rsuGrantSchema.virtual('vestingProgress').get(function() {
-  const vestedShares = this.vestedShares;
-  return this.totalShares > 0 ? (vestedShares / this.totalShares) * 100 : 0;
+  if (!this.vestingSchedule || !Array.isArray(this.vestingSchedule) || this.totalShares <= 0) {
+    return 0;
+  }
+  const now = new Date();
+  const vestedShares = this.vestingSchedule
+    .filter(v => v.vestDate <= now)
+    .reduce((total, v) => total + v.shares, 0);
+  return (vestedShares / this.totalShares) * 100;
 });
 
 rsuGrantSchema.virtual('gainLoss').get(function() {
