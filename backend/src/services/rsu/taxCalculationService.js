@@ -103,7 +103,6 @@ class TaxCalculationService {
     const taxCalculation = await this.calculateSaleTax(grant, tempSale, taxRates);
     
     return {
-      ...taxCalculation,
       grantInfo: {
         stockSymbol: grant.stockSymbol,
         company: grant.company,
@@ -116,7 +115,8 @@ class TaxCalculationService {
         pricePerShare: salePrice,
         saleDate: tempSale.saleDate,
         totalSaleValue: sharesAmount * salePrice
-      }
+      },
+      taxCalculation
     };
   }
 

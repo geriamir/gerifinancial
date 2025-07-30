@@ -170,8 +170,8 @@ class RSUService {
       await RSUGrant.findByIdAndDelete(grantId);
 
       return {
-        deletedGrant: grant,
-        deletedSales: sales.length,
+        deletedGrant: true,
+        deletedSalesCount: sales.length,
         stockSymbol: grant.stockSymbol
       };
     } catch (error) {

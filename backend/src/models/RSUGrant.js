@@ -239,8 +239,60 @@ rsuGrantSchema.statics.getUserGrants = function(userId, filters = {}) {
 };
 
 rsuGrantSchema.statics.getUpcomingVestingEvents = function(userId, days = 30) {
-  // Simplified for debugging - return empty array
-  return Promise.resolve([]);
+  const now = new Date();
+  const futureDate = new Date();
+  futureDate.setDate(futureDate.getDate() + days);
+  
+  // Convert userId to ObjectId if it's a string
+  let userObjectId;
+  try {
+    userObjectId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+  } catch (error) {
+    console.error('Invalid userId format:', error);
+    return Promise.resolve([]);
+  }
+  
+  return this.aggregate([
+    {
+      $match: {
+        userId: userObjectId,
+        status: 'active'
+      }
+    },
+    {
+      $unwind: '$vestingSchedule'
+    },
+    {
+      $match: {
+        'vestingSchedule.vestDate': {
+          $gt: now,
+          $lte: futureDate
+        }
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        grantId: '$_id',
+        stockSymbol: 1,
+        company: 1,
+        vestDate: '$vestingSchedule.vestDate',
+        shares: '$vestingSchedule.shares',
+        estimatedValue: {
+          $multiply: [
+            '$vestingSchedule.shares',
+            { $ifNull: ['$currentPrice', '$pricePerShare'] }
+          ]
+        }
+      }
+    },
+    {
+      $sort: { vestDate: 1 }
+    }
+  ]).catch(error => {
+    console.error('Error in getUpcomingVestingEvents aggregation:', error);
+    return [];
+  });
 };
 
 rsuGrantSchema.statics.getPortfolioSummary = function(userId) {

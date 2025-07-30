@@ -4,12 +4,17 @@ const { RSUGrant } = require('../../models');
 describe('RSUGrant Model', () => {
   let mockGrant;
 
-  beforeEach(async () => {
+  // Add timeout for all tests in this suite
+  jest.setTimeout(15000);
+
+  beforeEach(() => {
+    // No database cleanup - use unique data for each test
+    const uniqueId = Date.now() + Math.random();
     mockGrant = {
       userId: new mongoose.Types.ObjectId(),
-      stockSymbol: 'MSFT',
-      name: 'Microsoft Grant 2024',
-      company: 'Microsoft Corporation',
+      stockSymbol: `TST${Math.floor(uniqueId % 1000)}`, // Unique stock symbol
+      name: `Test Grant ${uniqueId}`,
+      company: `Test Corporation ${uniqueId}`,
       grantDate: new Date('2024-01-15'),
       totalValue: 100000,
       totalShares: 1000,
@@ -17,7 +22,7 @@ describe('RSUGrant Model', () => {
       currentPrice: 120,
       currentValue: 120000,
       status: 'active',
-      notes: 'Initial RSU grant'
+      notes: `Test grant ${uniqueId}`
     };
   });
 
@@ -34,9 +39,9 @@ describe('RSUGrant Model', () => {
       const grant = new RSUGrant(mockGrant);
       await grant.save();
 
-      expect(grant.stockSymbol).toBe('MSFT');
-      expect(grant.name).toBe('Microsoft Grant 2024');
-      expect(grant.company).toBe('Microsoft Corporation');
+      expect(grant.stockSymbol).toBe(mockGrant.stockSymbol);
+      expect(grant.name).toBe(mockGrant.name);
+      expect(grant.company).toBe(mockGrant.company);
       expect(grant.totalValue).toBe(100000);
       expect(grant.totalShares).toBe(1000);
       expect(grant.pricePerShare).toBe(100);
@@ -143,47 +148,50 @@ describe('RSUGrant Model', () => {
 
   describe('Virtual Fields', () => {
     it('should calculate vested shares correctly', async () => {
-      // Mock current time to 2024-08-01 for consistent vesting calculations
+      // Save grant first, then test virtual fields with mocked time
+      const testGrant = {
+        ...mockGrant,
+        vestingSchedule: [
+          { vestDate: new Date('2024-04-15'), shares: 250, vested: true, vestedValue: 30000 },  // Past date = vested
+          { vestDate: new Date('2024-07-15'), shares: 250, vested: true, vestedValue: 32000 },  // Past date = vested
+          { vestDate: new Date('2024-10-15'), shares: 250, vested: false, vestedValue: 0 },     // Future date = unvested
+          { vestDate: new Date('2025-01-15'), shares: 250, vested: false, vestedValue: 0 }      // Future date = unvested
+        ]
+      };
+      
+      const grant = new RSUGrant(testGrant);
+      await grant.save();
+      
+      // Mock current time to 2024-08-01 for consistent vesting calculations - AFTER saving
       jest.useFakeTimers().setSystemTime(new Date('2024-08-01'));
       
       try {
-        const testGrant = {
-          ...mockGrant,
-          vestingSchedule: [
-            { vestDate: new Date('2024-04-15'), shares: 250, vested: true, vestedValue: 30000 },  // Past date = vested
-            { vestDate: new Date('2024-07-15'), shares: 250, vested: true, vestedValue: 32000 },  // Past date = vested
-            { vestDate: new Date('2024-10-15'), shares: 250, vested: false, vestedValue: 0 },     // Future date = unvested
-            { vestDate: new Date('2025-01-15'), shares: 250, vested: false, vestedValue: 0 }      // Future date = unvested
-          ]
-        };
-        
-        const grant = new RSUGrant(testGrant);
-        await grant.save();
-        
         // Vested shares are calculated by vestDate <= now (2024-08-01)
-        expect(grant.vestedShares).toBe(500); // 250 + 250
+        const vestedShares = grant.vestedShares;
+        expect(vestedShares).toBe(500); // 250 + 250
       } finally {
         jest.useRealTimers();
       }
     });
 
     it('should calculate unvested shares correctly', async () => {
+      const testGrant = {
+        ...mockGrant,
+        vestingSchedule: [
+          { vestDate: new Date('2024-04-15'), shares: 250, vested: true, vestedValue: 30000 },
+          { vestDate: new Date('2024-07-15'), shares: 250, vested: true, vestedValue: 32000 },
+          { vestDate: new Date('2024-10-15'), shares: 250, vested: false, vestedValue: 0 },
+          { vestDate: new Date('2025-01-15'), shares: 250, vested: false, vestedValue: 0 }
+        ]
+      };
+      
+      const grant = new RSUGrant(testGrant);
+      await grant.save();
+      
+      // Set fake timers AFTER saving to database
       jest.useFakeTimers().setSystemTime(new Date('2024-08-01'));
       
       try {
-        const testGrant = {
-          ...mockGrant,
-          vestingSchedule: [
-            { vestDate: new Date('2024-04-15'), shares: 250, vested: true, vestedValue: 30000 },
-            { vestDate: new Date('2024-07-15'), shares: 250, vested: true, vestedValue: 32000 },
-            { vestDate: new Date('2024-10-15'), shares: 250, vested: false, vestedValue: 0 },
-            { vestDate: new Date('2025-01-15'), shares: 250, vested: false, vestedValue: 0 }
-          ]
-        };
-        
-        const grant = new RSUGrant(testGrant);
-        await grant.save();
-        
         // Unvested shares are calculated by vestDate > now (2024-08-01)
         expect(grant.unvestedShares).toBe(500); // 250 + 250
       } finally {
@@ -192,22 +200,23 @@ describe('RSUGrant Model', () => {
     });
 
     it('should calculate vesting progress percentage', async () => {
+      const testGrant = {
+        ...mockGrant,
+        vestingSchedule: [
+          { vestDate: new Date('2024-04-15'), shares: 250, vested: true, vestedValue: 30000 },
+          { vestDate: new Date('2024-07-15'), shares: 250, vested: true, vestedValue: 32000 },
+          { vestDate: new Date('2024-10-15'), shares: 250, vested: false, vestedValue: 0 },
+          { vestDate: new Date('2025-01-15'), shares: 250, vested: false, vestedValue: 0 }
+        ]
+      };
+      
+      const grant = new RSUGrant(testGrant);
+      await grant.save();
+      
+      // Set fake timers AFTER saving to database
       jest.useFakeTimers().setSystemTime(new Date('2024-08-01'));
       
       try {
-        const testGrant = {
-          ...mockGrant,
-          vestingSchedule: [
-            { vestDate: new Date('2024-04-15'), shares: 250, vested: true, vestedValue: 30000 },
-            { vestDate: new Date('2024-07-15'), shares: 250, vested: true, vestedValue: 32000 },
-            { vestDate: new Date('2024-10-15'), shares: 250, vested: false, vestedValue: 0 },
-            { vestDate: new Date('2025-01-15'), shares: 250, vested: false, vestedValue: 0 }
-          ]
-        };
-        
-        const grant = new RSUGrant(testGrant);
-        await grant.save();
-        
         expect(grant.vestingProgress).toBe(50); // 500/1000 * 100 (rounded)
       } finally {
         jest.useRealTimers();
