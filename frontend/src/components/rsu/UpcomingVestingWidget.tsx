@@ -29,9 +29,9 @@ const UpcomingVestingWidget: React.FC<UpcomingVestingWidgetProps> = ({
   loading = false,
   maxEvents = 5
 }) => {
-  // Group events by month and accumulate shares/values (memoized for performance)
-  const { groupedEvents, sortedGroupedEvents } = useMemo(() => {
-    const grouped = events.reduce((acc, event) => {
+  // Step 1: Group events by month (memoized separately for efficiency)
+  const groupedEvents = useMemo(() => {
+    return events.reduce((acc, event) => {
       const date = new Date(event.vestDate);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       
@@ -42,7 +42,7 @@ const UpcomingVestingWidget: React.FC<UpcomingVestingWidgetProps> = ({
           totalShares: 0,
           totalValue: 0,
           events: [],
-          stockSymbols: new Set()
+          stockSymbols: new Set<string>()
         };
       }
       
@@ -60,14 +60,14 @@ const UpcomingVestingWidget: React.FC<UpcomingVestingWidgetProps> = ({
       events: UpcomingVestingEvent[],
       stockSymbols: Set<string>
     }>);
+  }, [events]);
 
-    // Sort grouped events by date and limit to maxEvents
-    const sorted = Object.values(grouped)
+  // Step 2: Sort and limit grouped events (only recalculates when groupedEvents or maxEvents change)
+  const sortedGroupedEvents = useMemo(() => {
+    return Object.values(groupedEvents)
       .sort((a, b) => a.date.getTime() - b.date.getTime())
       .slice(0, maxEvents);
-
-    return { groupedEvents: grouped, sortedGroupedEvents: sorted };
-  }, [events, maxEvents]);
+  }, [groupedEvents, maxEvents]);
 
   if (loading) {
     return (
