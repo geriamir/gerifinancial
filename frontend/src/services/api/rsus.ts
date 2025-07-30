@@ -181,7 +181,7 @@ export interface TaxPreviewRequest {
   grantId: string;
   sharesAmount: number;
   salePrice: number;
-  saleDate?: string;
+  saleDate: string; // Required for accurate tax calculations (long-term vs short-term capital gains)
 }
 
 export interface UpcomingVestingEvent {
