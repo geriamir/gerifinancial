@@ -4,12 +4,20 @@ import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import StockPriceUpdater from '../StockPriceUpdater';
-import { RSUGrant } from '../../../services/api/rsus';
+import { RSUGrant, rsuApi } from '../../../services/api/rsus';
 
 const theme = createTheme();
 
-// Mock fetch for API calls
-global.fetch = jest.fn();
+// Mock the rsuApi
+jest.mock('../../../services/api/rsus', () => ({
+  ...jest.requireActual('../../../services/api/rsus'),
+  rsuApi: {
+    stockPrice: {
+      update: jest.fn(),
+      get: jest.fn(),
+    }
+  }
+}));
 
 const renderWithProviders = (component: React.ReactElement) => {
   return render(
@@ -49,7 +57,6 @@ describe('StockPriceUpdater', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (fetch as jest.Mock).mockClear();
     
     // Mock localStorage
     Object.defineProperty(window, 'localStorage', {
@@ -274,9 +281,10 @@ describe('StockPriceUpdater', () => {
   describe('Manual Price Update', () => {
     it('should update price successfully', async () => {
       const user = userEvent.setup();
-      (fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true, data: { symbol: 'MSFT', price: 150 } })
+      (rsuApi.stockPrice.update as jest.Mock).mockResolvedValueOnce({
+        symbol: 'MSFT', 
+        price: 150,
+        lastUpdated: new Date().toISOString()
       });
 
       renderWithProviders(
@@ -296,17 +304,7 @@ describe('StockPriceUpdater', () => {
       await user.click(updateButton);
 
       await waitFor(() => {
-        expect(fetch).toHaveBeenCalledWith('/api/rsus/prices/MSFT', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer mock-token'
-          },
-          body: JSON.stringify({
-            price: 150,
-            companyName: 'Microsoft Corporation'
-          })
-        });
+        expect(rsuApi.stockPrice.update).toHaveBeenCalledWith('MSFT', 150, 'Microsoft Corporation');
       });
 
       await waitFor(() => {
@@ -323,10 +321,7 @@ describe('StockPriceUpdater', () => {
 
     it('should handle update error', async () => {
       const user = userEvent.setup();
-      (fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({ error: 'Failed to update price' })
-      });
+      (rsuApi.stockPrice.update as jest.Mock).mockRejectedValueOnce(new Error('Failed to update price'));
 
       renderWithProviders(
         <StockPriceUpdater
@@ -354,10 +349,11 @@ describe('StockPriceUpdater', () => {
 
     it('should disable update button during submission', async () => {
       const user = userEvent.setup();
-      (fetch as jest.Mock).mockImplementationOnce(() => 
+      (rsuApi.stockPrice.update as jest.Mock).mockImplementationOnce(() => 
         new Promise(resolve => setTimeout(() => resolve({
-          ok: true,
-          json: async () => ({ success: true })
+          symbol: 'MSFT', 
+          price: 150,
+          lastUpdated: new Date().toISOString()
         }), 1000))
       );
 
@@ -385,12 +381,10 @@ describe('StockPriceUpdater', () => {
   describe('Live Price Fetching', () => {
     it('should fetch live price successfully', async () => {
       const user = userEvent.setup();
-      (fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          success: true,
-          data: { symbol: 'MSFT', price: 155.25 }
-        })
+      (rsuApi.stockPrice.get as jest.Mock).mockResolvedValueOnce({
+        symbol: 'MSFT', 
+        price: 155.25,
+        lastUpdated: new Date().toISOString()
       });
 
       renderWithProviders(
@@ -406,13 +400,7 @@ describe('StockPriceUpdater', () => {
       await user.click(fetchButton);
 
       await waitFor(() => {
-        expect(fetch).toHaveBeenCalledWith('/api/rsus/prices/MSFT/refresh', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer mock-token'
-          }
-        });
+        expect(rsuApi.stockPrice.get).toHaveBeenCalledWith('MSFT');
       });
 
       await waitFor(() => {
@@ -426,10 +414,7 @@ describe('StockPriceUpdater', () => {
 
     it('should handle fetch live price error', async () => {
       const user = userEvent.setup();
-      (fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        json: async () => ({ error: 'Failed to fetch live price' })
-      });
+      (rsuApi.stockPrice.get as jest.Mock).mockRejectedValueOnce(new Error('Failed to fetch live price'));
 
       renderWithProviders(
         <StockPriceUpdater
@@ -444,16 +429,17 @@ describe('StockPriceUpdater', () => {
       await user.click(fetchButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to fetch live price')).toBeInTheDocument();
+        expect(screen.getByText('Failed to fetch price from external API')).toBeInTheDocument();
       });
     });
 
     it('should disable fetch button during fetching', async () => {
       const user = userEvent.setup();
-      (fetch as jest.Mock).mockImplementationOnce(() => 
+      (rsuApi.stockPrice.get as jest.Mock).mockImplementationOnce(() => 
         new Promise(resolve => setTimeout(() => resolve({
-          ok: true,
-          json: async () => ({ success: true, data: { symbol: 'MSFT', price: 155 } })
+          symbol: 'MSFT', 
+          price: 155,
+          lastUpdated: new Date().toISOString()
         }), 1000))
       );
 
@@ -746,7 +732,7 @@ describe('StockPriceUpdater', () => {
 
     it('should handle network errors gracefully', async () => {
       const user = userEvent.setup();
-      (fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+      (rsuApi.stockPrice.get as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
       renderWithProviders(
         <StockPriceUpdater

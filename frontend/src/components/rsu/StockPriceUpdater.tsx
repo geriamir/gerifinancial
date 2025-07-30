@@ -19,7 +19,7 @@ import {
   TrendingUp as TrendingUpIcon,
   TrendingDown as TrendingDownIcon
 } from '@mui/icons-material';
-import { RSUGrant } from '../../services/api/rsus';
+import { RSUGrant, rsuApi } from '../../services/api/rsus';
 
 interface StockPriceUpdaterProps {
   open: boolean;
@@ -67,28 +67,15 @@ const StockPriceUpdater: React.FC<StockPriceUpdaterProps> = ({
       return;
     }
 
+    if (!grant) return;
+
     try {
       setUpdating(true);
       setError(null);
 
-      // Update stock price via backend API
+      // Update stock price via API service
       const price = parseFloat(newPrice);
-      const response = await fetch(`/api/rsus/prices/${grant?.stockSymbol}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          price: price,
-          companyName: grant?.company
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update price');
-      }
+      await rsuApi.stockPrice.update(grant.stockSymbol, price, grant.company);
 
       onPriceUpdate?.(price);
       setSuccess(true);
@@ -111,22 +98,8 @@ const StockPriceUpdater: React.FC<StockPriceUpdaterProps> = ({
       setUpdating(true);
       setError(null);
 
-      // Fetch live price from backend API (which uses Yahoo Finance, Alpha Vantage, etc.)
-      const response = await fetch(`/api/rsus/prices/${grant.stockSymbol}/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch live price');
-      }
-
-      const data = await response.json();
-      const stockPrice = data.data;
+      // Fetch live price via API service (uses Yahoo Finance, Alpha Vantage, etc.)
+      const stockPrice = await rsuApi.stockPrice.get(grant.stockSymbol);
       
       setNewPrice(stockPrice.price.toFixed(2));
       setSuccess(true);
