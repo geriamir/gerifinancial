@@ -98,11 +98,8 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
   
   // Calculate available shares (vested shares minus sold shares) - memoized for performance
   const { sharesSold, availableShares } = useMemo(() => {
-    // Handle both string grantId and populated grant object
-    const filteredSales = sales.filter(sale => {
-      const saleGrantId = typeof sale.grantId === 'string' ? sale.grantId : (sale.grantId as any)?._id;
-      return saleGrantId === grant._id;
-    }) || [];
+    // Filter sales for this specific grant (grantId is always a string in RSUSale)
+    const filteredSales = sales.filter(sale => sale.grantId === grant._id);
     
     const soldShares = filteredSales.reduce((total, sale) => total + sale.sharesAmount, 0);
     const available = Math.max(0, grant.vestedShares - soldShares);
