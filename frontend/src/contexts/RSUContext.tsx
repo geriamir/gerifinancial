@@ -421,28 +421,73 @@ export const RSUProvider: React.FC<RSUProviderProps> = ({ children }) => {
     }
   };
 
-  // Initial data load - load all data together to prevent double renders
+  // Initial data load - load all data together with graceful error handling
   useEffect(() => {
     const loadInitialData = async () => {
       dispatch({ type: 'SET_LOADING', payload: true });
       
       try {
-        // Load all data in parallel with minimal dispatches
-        const [grants, sales, portfolio, upcomingVesting] = await Promise.all([
+        // Load all data in parallel with individual error handling
+        const results = await Promise.allSettled([
           rsuApi.grants.getAll(),
           rsuApi.sales.getAll(),
           rsuApi.portfolio.getSummary(),
           rsuApi.vesting.getUpcoming(90)
         ]);
         
-        // Batch all state updates in a single render cycle
-        dispatch({ type: 'SET_GRANTS', payload: grants });
-        dispatch({ type: 'SET_SALES', payload: sales });
-        dispatch({ type: 'SET_PORTFOLIO_SUMMARY', payload: portfolio });
-        dispatch({ type: 'SET_UPCOMING_VESTING', payload: upcomingVesting });
+        // Process results and update state for successful calls
+        const [grantsResult, salesResult, portfolioResult, vestingResult] = results;
+        
+        // Update grants if successful
+        if (grantsResult.status === 'fulfilled') {
+          dispatch({ type: 'SET_GRANTS', payload: grantsResult.value });
+        } else {
+          console.error('Failed to load grants:', grantsResult.reason);
+          dispatch({ type: 'SET_GRANTS', payload: [] }); // Fallback to empty array
+        }
+        
+        // Update sales if successful
+        if (salesResult.status === 'fulfilled') {
+          dispatch({ type: 'SET_SALES', payload: salesResult.value });
+        } else {
+          console.error('Failed to load sales:', salesResult.reason);
+          dispatch({ type: 'SET_SALES', payload: [] }); // Fallback to empty array
+        }
+        
+        // Update portfolio if successful
+        if (portfolioResult.status === 'fulfilled') {
+          dispatch({ type: 'SET_PORTFOLIO_SUMMARY', payload: portfolioResult.value });
+        } else {
+          console.error('Failed to load portfolio summary:', portfolioResult.reason);
+          dispatch({ type: 'SET_PORTFOLIO_SUMMARY', payload: null }); // Fallback to null
+        }
+        
+        // Update upcoming vesting if successful
+        if (vestingResult.status === 'fulfilled') {
+          dispatch({ type: 'SET_UPCOMING_VESTING', payload: vestingResult.value });
+        } else {
+          console.error('Failed to load upcoming vesting:', vestingResult.reason);
+          dispatch({ type: 'SET_UPCOMING_VESTING', payload: [] }); // Fallback to empty array
+        }
+        
+        // Only show error if all requests failed
+        const failedCount = results.filter(result => result.status === 'rejected').length;
+        if (failedCount === results.length) {
+          // All requests failed
+          handleError(new Error('Failed to load RSU data. Please check your connection and try again.'));
+        } else if (failedCount > 0) {
+          // Some requests failed - log warnings but don't block the UI
+          console.warn(`${failedCount} out of ${results.length} RSU data requests failed. Some features may not be available.`);
+        }
         
       } catch (error) {
+        // Fallback error handler for unexpected issues
         handleError(error);
+        // Set fallback state
+        dispatch({ type: 'SET_GRANTS', payload: [] });
+        dispatch({ type: 'SET_SALES', payload: [] });
+        dispatch({ type: 'SET_PORTFOLIO_SUMMARY', payload: null });
+        dispatch({ type: 'SET_UPCOMING_VESTING', payload: [] });
       } finally {
         dispatch({ type: 'SET_LOADING', payload: false });
       }
