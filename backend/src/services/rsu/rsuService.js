@@ -171,7 +171,7 @@ class RSUService {
 
       return {
         deletedGrant: true,
-        deletedSalesCount: sales.length,
+        deletedSales: sales.length,
         stockSymbol: grant.stockSymbol
       };
     } catch (error) {

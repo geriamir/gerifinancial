@@ -346,7 +346,7 @@ describe('RSU API Endpoints', () => {
 
         expect(response.body.success).toBe(true);
         expect(response.body.data.deletedGrant).toBe(true);
-        expect(response.body.data.deletedSalesCount).toBe(1);
+        expect(response.body.data.deletedSales).toBe(1);
         expect(response.body.message).toBe('Grant and associated sales deleted successfully');
 
         // Verify deletion

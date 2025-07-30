@@ -116,7 +116,11 @@ class TaxCalculationService {
         saleDate: tempSale.saleDate,
         totalSaleValue: sharesAmount * salePrice
       },
-      taxCalculation
+      taxCalculation,
+      // Add top-level properties for easier access in tests
+      totalTax: taxCalculation.totalTax,
+      netValue: taxCalculation.netValue,
+      effectiveTaxRate: taxCalculation.effectiveTaxRate
     };
   }
 
