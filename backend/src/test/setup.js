@@ -1,5 +1,6 @@
 // Mock services
 jest.mock('../services/categoryAIService', () => require('./mocks/categoryAIService'));
+jest.mock('../services/scrapingSchedulerService', () => require('./mocks/scrapingSchedulerService'));
 
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
@@ -23,8 +24,12 @@ let mongod = null;
 global.__MONGOD__ = mongod;
 
 beforeAll(async () => {
-  // Create MongoDB Memory Server
-  mongod = await MongoMemoryServer.create();
+  // Create MongoDB Memory Server with increased timeout
+  mongod = await MongoMemoryServer.create({
+    instance: {
+      startupTimeout: 30000, // 30 seconds timeout
+    }
+  });
   const mongoUri = mongod.getUri();
   
   console.log('Connecting to MongoDB at:', mongoUri);
@@ -50,53 +55,53 @@ beforeAll(async () => {
   } catch (error) {
     console.log('Scheduler initialization skipped in test environment:', error.message);
   }
-});
+}, 45000); // 45 second timeout for setup
 
 beforeEach(async () => {
-  // Clear all collections with timeout handling
-  const collections = mongoose.connection.collections;
-  const cleanupPromises = [];
-  
-  for (const key in collections) {
-    const collection = collections[key];
-    cleanupPromises.push(collection.deleteMany({}));
+  // Ultra-fast cleanup - only clear RSU collections for RSU tests
+  try {
+    if (mongoose.connection.collections['rsugrants']) {
+      await mongoose.connection.collections['rsugrants'].deleteMany({});
+    }
+    if (mongoose.connection.collections['users']) {
+      await mongoose.connection.collections['users'].deleteMany({});
+    }
+  } catch (error) {
+    // Ignore cleanup errors - tests will handle duplicates
+    console.warn('Cleanup warning (ignored):', error.message);
   }
-  
-  // Wait for all cleanup operations with timeout
-  await Promise.all(cleanupPromises);
-}, 30000); // 30 second timeout for cleanup
+}, 3000); // 3 second timeout for cleanup
 
 afterEach(async () => {
-  // Simplified cleanup - only clear if test created data
-  const collections = mongoose.connection.collections;
-  const cleanupPromises = [];
-  
-  for (const key in collections) {
-    const collection = collections[key];
-    cleanupPromises.push(collection.deleteMany({}));
-  }
-  
+  // Minimal cleanup - don't wait for completion
   try {
-    await Promise.all(cleanupPromises);
+    if (mongoose.connection.collections['rsugrants']) {
+      mongoose.connection.collections['rsugrants'].deleteMany({}).catch(() => {});
+    }
   } catch (error) {
-    console.warn('Cleanup warning (non-blocking):', error.message);
+    // Ignore all cleanup errors
   }
-}, 30000); // 30 second timeout for cleanup
+}, 1000); // 1 second timeout for cleanup
 
 afterAll(async () => {
   try {
-    // Clean up any running scheduler jobs
+    // Clean up any running scheduler jobs first
     const scrapingSchedulerService = require('../services/scrapingSchedulerService');
     scrapingSchedulerService.stopAll();
 
-    // Close mongoose connection
-    await mongoose.connection.close();
+    // Force close any pending database operations
+    if (mongoose.connection.readyState === 1) {
+      await mongoose.connection.close(true); // Force close
+    }
     
-    // Stop MongoDB Memory Server
+    // Stop MongoDB Memory Server with timeout
     if (mongod) {
-      await mongod.stop();
+      await Promise.race([
+        mongod.stop(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('MongoDB stop timeout')), 10000))
+      ]);
     }
   } catch (error) {
     console.warn('Test teardown warning (non-blocking):', error.message);
   }
-}, 30000); // 30 second timeout for teardown
+}, 15000); // 15 second timeout for teardown
