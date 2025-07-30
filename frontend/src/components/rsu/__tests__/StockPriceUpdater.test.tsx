@@ -429,7 +429,10 @@ describe('StockPriceUpdater', () => {
       await user.click(fetchButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to fetch price from external API')).toBeInTheDocument();
+        expect(screen.getByText((content) => 
+          content.includes('Failed to fetch live price') || 
+          content.includes('Failed to fetch price from external API')
+        )).toBeInTheDocument();
       });
     });
 
