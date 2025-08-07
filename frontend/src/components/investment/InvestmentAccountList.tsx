@@ -6,7 +6,6 @@ import {
   Box,
   List,
   ListItem,
-  ListItemText,
   Chip,
   IconButton,
   Tooltip,
@@ -16,12 +15,10 @@ import {
 import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  AccountBalance as AccountIcon,
-  TrendingUp as GainIcon,
-  TrendingDown as LossIcon
+  AccountBalance as AccountIcon
 } from '@mui/icons-material';
 import { Investment } from '../../services/api/types/investment';
-import { formatCurrency, formatPercentage } from '../../utils/formatters';
+import { formatCurrency } from '../../utils/formatters';
 
 interface InvestmentAccountListProps {
   investments: Investment[];

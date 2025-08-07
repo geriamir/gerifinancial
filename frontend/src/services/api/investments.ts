@@ -10,14 +10,6 @@ import {
   InvestmentFilters
 } from './types/investment';
 
-// API Response wrapper
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-  error?: string;
-  details?: any[];
-}
 
 export const investmentApi = {
   // Get user's investments

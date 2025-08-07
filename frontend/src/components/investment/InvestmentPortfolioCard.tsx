@@ -11,12 +11,10 @@ import {
 } from '@mui/material';
 import {
   Refresh as RefreshIcon,
-  TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
   AccountBalance as AccountIcon
 } from '@mui/icons-material';
 import { PortfolioSummary } from '../../services/api/types/investment';
-import { formatCurrency, formatNumber } from '../../utils/formatters';
+import { formatCurrency } from '../../utils/formatters';
 
 interface InvestmentPortfolioCardProps {
   portfolioSummary: PortfolioSummary | null;
