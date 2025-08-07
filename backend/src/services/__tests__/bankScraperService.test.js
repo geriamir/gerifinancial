@@ -73,8 +73,8 @@ describe('BankScraperService', () => {
 
   describe('scrapeTransactions', () => {
     it('should successfully scrape transactions', async () => {
-      const accounts = await bankScraperService.scrapeTransactions(mockBankAccount);
-      expect(accounts[0].txns).toEqual(mockTransactions);
+      const result = await bankScraperService.scrapeTransactions(mockBankAccount);
+      expect(result.accounts[0].txns).toEqual(mockTransactions);
     });
 
     it('should retry on scraping failure', async () => {
