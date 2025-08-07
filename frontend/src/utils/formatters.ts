@@ -21,9 +21,22 @@ export const formatCurrencyDisplay = (amount: number, currency: string = 'ILS'):
   return `${isNegative ? '-' : ''}${formattedNumber} ${currencySymbol}`;
 };
 
+export const formatPercentage = (percentage: number): string => {
+  const isNegative = percentage < 0;
+  const absPercentage = Math.abs(percentage);
+  const formatted = absPercentage.toFixed(2);
+  return `${isNegative ? '-' : '+'}${formatted}%`;
+};
+
+export const formatNumber = (num: number): string => {
+  return new Intl.NumberFormat('en-US').format(num);
+};
+
 const formatters = {
   formatCurrency,
-  formatCurrencyDisplay
+  formatCurrencyDisplay,
+  formatPercentage,
+  formatNumber
 };
 
 export default formatters;

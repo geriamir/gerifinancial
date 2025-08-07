@@ -8,6 +8,7 @@ import { he } from 'date-fns/locale';
 import { AuthProvider } from './contexts/AuthContext';
 import { BudgetProvider } from './contexts/BudgetContext';
 import { RSUProvider } from './contexts/RSUContext';
+import { InvestmentProvider } from './contexts/InvestmentContext';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import AuthLayout from './components/layout/AuthLayout';
@@ -17,6 +18,7 @@ import TransactionsPage from './pages/Transactions';
 import BudgetsPage from './pages/Budgets';
 import BudgetSubcategoryDetail from './pages/BudgetSubcategoryDetail';
 import RSUs from './pages/RSUs';
+import Investments from './pages/Investments';
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
@@ -59,7 +61,9 @@ const App: React.FC = () => {
                 <ProtectedRoute>
                   <BudgetProvider>
                     <RSUProvider>
-                      <AuthLayout />
+                      <InvestmentProvider>
+                        <AuthLayout />
+                      </InvestmentProvider>
                     </RSUProvider>
                   </BudgetProvider>
                 </ProtectedRoute>
@@ -74,6 +78,7 @@ const App: React.FC = () => {
               <Route path="budgets/subcategory/:year/:month/:categoryId/:subcategoryId" element={<BudgetSubcategoryDetail />} />
               <Route path="budgets/income/:year/:month/:categoryId" element={<BudgetSubcategoryDetail />} />
               <Route path="rsus" element={<RSUs />} />
+              <Route path="investments" element={<Investments />} />
               <Route path="profile" element={<Profile />} />
             </Route>
           </Routes>

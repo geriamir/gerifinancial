@@ -12,6 +12,8 @@ interface ScrapeResult {
   duplicates: number;
   needsVerification: number;
   errors: Array<{ error: string }>;
+  newInvestments?: number;
+  updatedInvestments?: number;
 }
 
 interface AccountScrapingProps {
@@ -85,9 +87,9 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
 
       {scrapeResult && (
         <Stack spacing={1}>
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1} flexWrap="wrap">
             <Chip
-              label={`${scrapeResult.newTransactions} New`}
+              label={`${scrapeResult.newTransactions} New Transactions`}
               size="small"
               color="primary"
             />
@@ -103,6 +105,20 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
                 label={`${scrapeResult.duplicates} Duplicates`}
                 size="small"
                 color="default"
+              />
+            )}
+            {(scrapeResult.newInvestments || 0) > 0 && (
+              <Chip
+                label={`${scrapeResult.newInvestments} New Investments`}
+                size="small"
+                color="secondary"
+              />
+            )}
+            {(scrapeResult.updatedInvestments || 0) > 0 && (
+              <Chip
+                label={`${scrapeResult.updatedInvestments} Updated Investments`}
+                size="small"
+                color="info"
               />
             )}
           </Stack>

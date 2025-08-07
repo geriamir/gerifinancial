@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const { BankAccount } = require('../models');
-const transactionService = require('./transactionService');
+const dataSyncService = require('./dataSyncService');
 const logger = require('../utils/logger');
 const rateLimiter = require('../utils/rateLimiter');
 
@@ -48,7 +48,7 @@ class ScrapingSchedulerService {
         
         logger.info(`Starting scheduled scraping for account ${account._id}`);
         
-        const result = await transactionService.scrapeTransactions(account, {
+        const result = await dataSyncService.syncBankAccountData(account, {
           startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
           showBrowser: false
         });

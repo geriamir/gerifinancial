@@ -18,6 +18,8 @@ const transactionRoutes = require('./routes/transactions');
 const budgetRoutes = require('./routes/budgets');
 const categoryBudgetRoutes = require('./routes/categoryBudgets');
 const rsuRoutes = require('./routes/rsus');
+const investmentRoutes = require('./routes/investments');
+const portfolioRoutes = require('./routes/portfolios');
 const testRoutes = require('./routes/test');
 
 // Create Express app
@@ -91,6 +93,8 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/category-budgets', categoryBudgetRoutes);
 app.use('/api/rsus', rsuRoutes);
+app.use('/api/investments', investmentRoutes);
+app.use('/api/portfolios', portfolioRoutes);
 
 // Test routes (enabled in test and e2e environments)
 if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'e2e') {

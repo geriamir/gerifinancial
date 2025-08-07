@@ -378,24 +378,24 @@ const RecordSaleForm: React.FC<RecordSaleFormProps> = ({
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2">Sale Value:</Typography>
                     <Typography variant="body1" fontWeight="medium">
-                      ${(taxPreview.originalValue + taxPreview.profit).toLocaleString()}
+                      ${((taxPreview.originalValue || 0) + (taxPreview.profit || 0)).toLocaleString()}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2">Original Value:</Typography>
                     <Typography variant="body1">
-                      ${taxPreview.originalValue.toLocaleString()}
+                      ${(taxPreview.originalValue || 0).toLocaleString()}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant="body2">Profit:</Typography>
                     <Typography 
                       variant="body1"
-                      color={taxPreview.profit >= 0 ? 'success.main' : 'error.main'}
+                      color={(taxPreview.profit || 0) >= 0 ? 'success.main' : 'error.main'}
                       sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
                     >
-                      {taxPreview.profit >= 0 ? <TrendingUpIcon fontSize="small" /> : <TrendingDownIcon fontSize="small" />}
-                      ${taxPreview.profit.toLocaleString()}
+                      {(taxPreview.profit || 0) >= 0 ? <TrendingUpIcon fontSize="small" /> : <TrendingDownIcon fontSize="small" />}
+                      ${(taxPreview.profit || 0).toLocaleString()}
                     </Typography>
                   </Box>
                   
@@ -404,7 +404,7 @@ const RecordSaleForm: React.FC<RecordSaleFormProps> = ({
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2">Wage Income Tax (65%):</Typography>
                     <Typography variant="body1" color="error.main">
-                      ${taxPreview.wageIncomeTax.toLocaleString()}
+                      ${(taxPreview.wageIncomeTax || 0).toLocaleString()}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
@@ -412,13 +412,13 @@ const RecordSaleForm: React.FC<RecordSaleFormProps> = ({
                       Capital Gains Tax ({taxPreview.isLongTerm ? '25%' : '65%'}):
                     </Typography>
                     <Typography variant="body1" color="error.main">
-                      ${taxPreview.capitalGainsTax.toLocaleString()}
+                      ${(taxPreview.capitalGainsTax || 0).toLocaleString()}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant="body1" fontWeight="medium">Total Tax:</Typography>
                     <Typography variant="body1" fontWeight="medium" color="error.main">
-                      ${taxPreview.totalTax.toLocaleString()}
+                      ${(taxPreview.totalTax || 0).toLocaleString()}
                     </Typography>
                   </Box>
                   
@@ -427,7 +427,7 @@ const RecordSaleForm: React.FC<RecordSaleFormProps> = ({
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography variant="h6">Net Proceeds:</Typography>
                     <Typography variant="h6" color="success.main">
-                      ${taxPreview.netValue.toLocaleString()}
+                      ${(taxPreview.netValue || 0).toLocaleString()}
                     </Typography>
                   </Box>
                 </Box>

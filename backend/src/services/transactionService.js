@@ -118,13 +118,19 @@ class TransactionService {
       newTransactions: 0,
       duplicates: 0,
       skippedPending: 0,
-      errors: []
+      errors: [],
+      mostRecentTransactionDate: null
     };
 
     for (const account of scrapedAccounts) {
       for (const transaction of account.txns) {
         try {
           const transactionDate = new Date(transaction.date);
+          
+          // Track the most recent transaction date
+          if (!results.mostRecentTransactionDate || transactionDate > results.mostRecentTransactionDate) {
+            results.mostRecentTransactionDate = transactionDate;
+          }
           
           // Skip transactions with pending status from scraper
           if (transaction.status === 'pending') {
