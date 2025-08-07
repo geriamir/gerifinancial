@@ -139,7 +139,7 @@ portfolioSchema.methods.calculateMarketValue = function() {
 
   this.totalMarketValue = this.investments.reduce((total, investment) => {
     const marketValue = investment.marketValue || (investment.quantity * (investment.currentPrice || 0));
-    return total + marketValue;
+    return total + (Number.isFinite(marketValue) ? marketValue : 0);
   }, 0);
 
   // Total value is market value plus cash balance

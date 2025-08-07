@@ -137,12 +137,12 @@ investmentSchema.methods.calculateMarketValue = function() {
     const currentPrice = Number(holding.currentPrice) || 0;
     const marketValue = Number(holding.marketValue) || (quantity * currentPrice);
     
-    // Only add to total if marketValue is a valid number
-    return total + (isNaN(marketValue) ? 0 : marketValue);
+    // Only add to total if marketValue is a finite number
+    return total + (Number.isFinite(marketValue) ? marketValue : 0);
   }, 0);
 
-  // Ensure the result is a valid number
-  this.totalMarketValue = isNaN(this.totalMarketValue) ? 0 : this.totalMarketValue;
+  // Ensure the result is a finite number
+  this.totalMarketValue = Number.isFinite(this.totalMarketValue) ? this.totalMarketValue : 0;
   
   return this.totalMarketValue;
 };

@@ -34,9 +34,9 @@ class InvestmentService {
           accountNumber: accountNumber
         });
 
-        // Ensure numeric values are valid numbers, not NaN or undefined
-        const quantity = Number(investmentData.amount) || 0;
-        const value = Number(investmentData.value) || 0;
+        // Ensure numeric values are valid finite numbers, not NaN, undefined, or Infinity
+        const quantity = Number.isFinite(Number(investmentData.amount)) ? Number(investmentData.amount) : 0;
+        const value = Number.isFinite(Number(investmentData.value)) ? Number(investmentData.value) : 0;
         const currentPrice = quantity > 0 ? value / quantity : 0;
         
         const holdingData = {
