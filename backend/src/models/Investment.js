@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const INVESTMENT_CONSTANTS = require('../constants/investmentConstants');
 
 const holdingSchema = new mongoose.Schema({
   symbol: {
@@ -26,7 +27,7 @@ const holdingSchema = new mongoose.Schema({
   },
   currency: {
     type: String,
-    default: 'ILS'
+    default: INVESTMENT_CONSTANTS.DEFAULT_CURRENCY
   },
   sector: {
     type: String,
@@ -34,8 +35,8 @@ const holdingSchema = new mongoose.Schema({
   },
   holdingType: {
     type: String,
-    enum: ['stock', 'bond', 'etf', 'mutual_fund', 'other'],
-    default: 'stock'
+    enum: Object.values(INVESTMENT_CONSTANTS.HOLDING_TYPES),
+    default: INVESTMENT_CONSTANTS.HOLDING_TYPES.STOCK
   }
 }, { _id: false });
 
@@ -65,8 +66,8 @@ const investmentSchema = new mongoose.Schema({
   },
   accountType: {
     type: String,
-    enum: ['investment', 'pension', 'savings', 'portfolio', 'other'],
-    default: 'investment'
+    enum: Object.values(INVESTMENT_CONSTANTS.ACCOUNT_TYPES),
+    default: INVESTMENT_CONSTANTS.ACCOUNT_TYPES.INVESTMENT
   },
   accountName: {
     type: String,
@@ -81,7 +82,7 @@ const investmentSchema = new mongoose.Schema({
   currency: {
     type: String,
     required: true,
-    default: 'ILS'
+    default: INVESTMENT_CONSTANTS.DEFAULT_CURRENCY
   },
   holdings: [holdingSchema],
   totalMarketValue: {
@@ -100,8 +101,8 @@ const investmentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'closed', 'suspended'],
-    default: 'active'
+    enum: Object.values(INVESTMENT_CONSTANTS.STATUS_TYPES),
+    default: INVESTMENT_CONSTANTS.STATUS_TYPES.ACTIVE
   },
   // Store raw data from scraper for debugging and future enhancements
   rawData: {

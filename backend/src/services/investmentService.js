@@ -1,5 +1,6 @@
 const { Investment, InvestmentSnapshot } = require('../models');
 const bankScraperService = require('./bankScraperService');
+const INVESTMENT_CONSTANTS = require('../constants/investmentConstants');
 const logger = require('../utils/logger');
 
 class InvestmentService {
@@ -39,13 +40,13 @@ class InvestmentService {
         const currentPrice = quantity > 0 ? value / quantity : 0;
         
         const holdingData = {
-          symbol: investmentData.symbol || investmentData.paperName || 'UNKNOWN',
-          name: investmentData.paperName || investmentData.symbol || 'Unknown Investment',
+          symbol: investmentData.symbol || investmentData.paperName || INVESTMENT_CONSTANTS.FALLBACK_SYMBOLS.UNKNOWN_SYMBOL,
+          name: investmentData.paperName || investmentData.symbol || INVESTMENT_CONSTANTS.FALLBACK_SYMBOLS.PLACEHOLDER_NAME,
           quantity: quantity,
           currentPrice: currentPrice,
           marketValue: value,
-          currency: investmentData.currency || 'ILS',
-          holdingType: 'stock' // Default, could be enhanced based on symbol analysis
+          currency: investmentData.currency || INVESTMENT_CONSTANTS.DEFAULT_CURRENCY,
+          holdingType: INVESTMENT_CONSTANTS.HOLDING_TYPES.STOCK // Default, could be enhanced based on symbol analysis
         };
 
         if (existingInvestment) {
