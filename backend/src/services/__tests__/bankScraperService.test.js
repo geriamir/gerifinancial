@@ -1,8 +1,7 @@
 const bankScraperService = require('../bankScraperService');
 const { mockTransactions } = require('../../test/mocks/bankScraper');
 
-// Mock israeli-bank-scrapers
-jest.mock('israeli-bank-scrapers', () => require('../../test/mocks/bankScraper'));
+// bankScraperService handles the mocking automatically based on NODE_ENV
 
 describe('BankScraperService', () => {
   const mockBankAccount = {
