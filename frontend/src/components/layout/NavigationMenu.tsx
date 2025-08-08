@@ -22,7 +22,8 @@ import {
   Home as HomeIcon,
   Receipt as TransactionsIcon,
   AccountBalanceWallet as BudgetIcon,
-  AccountBalance as RSUIcon
+  AccountBalance as RSUIcon,
+  TrendingUp as InvestmentIcon
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -36,7 +37,8 @@ const navigationItems: NavigationItem[] = [
   { title: 'Overview', path: '/', icon: <HomeIcon /> },
   { title: 'Transactions', path: '/transactions', icon: <TransactionsIcon /> },
   { title: 'Budgets', path: '/budgets', icon: <BudgetIcon /> },
-  { title: 'RSUs', path: '/rsus', icon: <RSUIcon /> }
+  { title: 'RSUs', path: '/rsus', icon: <RSUIcon /> },
+  { title: 'Investments', path: '/investments', icon: <InvestmentIcon /> }
 ];
 
 export const NavigationMenu: React.FC = () => {

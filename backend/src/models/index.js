@@ -14,6 +14,10 @@ const TransactionExclusion = require('./TransactionExclusion');
 const RSUGrant = require('./RSUGrant');
 const RSUSale = require('./RSUSale');
 const StockPrice = require('./StockPrice');
+const Investment = require('./Investment');
+const InvestmentSnapshot = require('./InvestmentSnapshot');
+const Portfolio = require('./Portfolio');
+const PortfolioSnapshot = require('./PortfolioSnapshot');
 
 module.exports = {
   Category,
@@ -31,5 +35,9 @@ module.exports = {
   TransactionExclusion,
   RSUGrant,
   RSUSale,
-  StockPrice
+  StockPrice,
+  Investment,
+  InvestmentSnapshot,
+  Portfolio,
+  PortfolioSnapshot
 };

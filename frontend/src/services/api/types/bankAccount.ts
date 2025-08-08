@@ -41,6 +41,9 @@ export interface SingleAccountScrapeResult {
   duplicates: number;
   needsVerification: number;
   errors: Array<{ error: string }>;
+  // Enhanced fields for investment data (optional for backward compatibility)
+  newInvestments?: number;
+  updatedInvestments?: number;
 }
 
 export interface BulkScrapeResult {

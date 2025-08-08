@@ -48,7 +48,7 @@
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "express-validator": "^7.2.1",
-    "israeli-bank-scrapers": "^6.1.2",
+    "israeli-bank-scrapers": "file:../../israeli-bank-scrapers",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.16.0",
     "natural": "^6.12.0",

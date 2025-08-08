@@ -18,14 +18,14 @@ class BankScraperService {
     
     const {
       startDate = scraperOptions.startDate, // Use smart start date from bank account
-      showBrowser = false,
-      verbose = false,
+      showBrowser = true,
+      verbose = true,
       timeout = this.DEFAULT_TIMEOUT
     } = options;
 
     // Log the scraping strategy being used
     const isIncrementalScraping = bankAccount.lastScraped;
-    logger.info(`Creating scraper for bank account ${bankAccount._id} with ${isIncrementalScraping ? 'incremental' : 'initial'} scraping from ${startDate.toISOString()}`);
+    logger.info(`Creating scraper for bank account ${bankAccount._id}  with ${isIncrementalScraping ? 'incremental' : 'initial'} scraping from ${startDate.toISOString()}`);
 
     const scraper = createScraper({
       companyId: bankAccount.bankId,
@@ -75,7 +75,7 @@ class BankScraperService {
     let attempts = 0;
     let error = null;
 
-    logger.info(`Starting transaction scraping for bank account ${bankAccount._id}...`);
+    logger.info(`Starting scraping for bank account ${bankAccount._id} (${bankAccount.name})...`);
     while (attempts < this.MAX_RETRIES) {
       try {
         const scraperResult = await scraper.scrape(bankAccount.getScraperOptions().credentials);
@@ -86,7 +86,25 @@ class BankScraperService {
           throw new Error(`Scraping failed: ${errorType} - ${errorMessage}`);
         }
 
-        return scraperResult.accounts;
+        logger.info(`Successfully scraped bank account ${bankAccount._id} (${bankAccount.name}) - ${scraperResult.accounts?.length || 0} accounts found`);
+        
+        // Log if portfolios are available (new structure)
+        if (scraperResult.portfolios && scraperResult.portfolios.length > 0) {
+          logger.info(`Successfully scraped accounts and ${scraperResult.portfolios.length} portfolios for bank account ${bankAccount._id}`);
+        }
+        // Log if legacy investments are available
+        else if (scraperResult.investments && scraperResult.investments.length > 0) {
+          logger.info(`Successfully scraped accounts and ${scraperResult.investments.length} legacy investment accounts for bank account ${bankAccount._id}`);
+        } else {
+          logger.info(`Successfully scraped accounts for bank account ${bankAccount._id}`);
+        }
+
+        // Return accounts, portfolios (new structure), and investments (legacy)
+        return {
+          accounts: scraperResult.accounts || [],
+          portfolios: scraperResult.portfolios || [],
+          investments: scraperResult.investments || []
+        };
       } catch (err) {
         error = err;
         attempts++;
@@ -99,6 +117,52 @@ class BankScraperService {
     }
 
     this.handleScraperError(error, 'Transaction scraping', bankAccount._id);
+  }
+
+  // Helper method to extract just investments from scraping result
+  async scrapeInvestments(bankAccount, options = {}) {
+    const result = await this.scrapeTransactions(bankAccount, options);
+    return result.investments || [];
+  }
+
+  // Helper method to validate investment data structure
+  validateInvestmentData(investment) {
+    // Updated for new israeli-bank-scrapers format
+    const requiredFields = ['paperId']; // paperId is the unique identifier for investments
+    const missingFields = requiredFields.filter(field => !investment[field]);
+    
+    if (missingFields.length > 0) {
+      logger.warn(`Investment data missing required fields: ${missingFields.join(', ')}`);
+      return false;
+    }
+
+    return true;
+  }
+
+  // Helper method to process investment data for storage
+  processInvestmentData(investments) {
+    if (!investments || !Array.isArray(investments)) {
+      return [];
+    }
+
+    return investments
+      .filter(investment => this.validateInvestmentData(investment))
+      .map(investment => ({
+        // Use paperId as unique identifier since that's what the new format provides
+        accountNumber: investment.paperId?.toString() || investment.accountNumber,
+        accountType: 'investment',
+        balance: investment.value || investment.balance || 0,
+        currency: investment.currency || 'ILS',
+        holdings: [{
+          symbol: investment.symbol || '',
+          name: investment.paperName || '',
+          quantity: investment.amount || 0,
+          value: investment.value || 0,
+          paperId: investment.paperId
+        }],
+        lastUpdated: new Date(),
+        rawData: investment
+      }));
   }
 
   async validateCredentials(bankId, credentials) {

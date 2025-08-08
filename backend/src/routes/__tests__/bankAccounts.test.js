@@ -4,10 +4,7 @@ const { createTestUser } = require('../../test/testUtils');
 const app = require('../../app');
 const { User, BankAccount } = require('../../models');
 
-// Setup mock for israeli-bank-scrapers
-jest.mock('israeli-bank-scrapers', () => require('../../test/mocks/bankScraper'));
-
-// Import valid credentials from mock
+// Import valid credentials from mock (bankScraperService handles the mocking automatically based on NODE_ENV)
 const { validCredentials } = require('../../test/mocks/bankScraper');
 
 describe('Bank Account Routes', () => {
