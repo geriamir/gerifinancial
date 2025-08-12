@@ -39,8 +39,6 @@ export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [analysisComplete, setAnalysisComplete] = useState(false);
 
-  // Get the bank account ID from step data or from connected bank accounts
-  const bankAccountId = stepData?.bankAccountId || stepData?.transitionData?.bankAccountId;
 
   // Poll for scraping status
   const pollScrapingStatus = useCallback(async () => {
@@ -112,7 +110,9 @@ export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
         clearInterval(interval);
       }
     };
-  }, []); // Remove pollScrapingStatus from dependencies to prevent infinite re-creation
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Note: pollScrapingStatus is intentionally omitted from dependencies to prevent infinite loops
+  // since it depends on state that gets updated within the polling function
 
   const handleConnectMoreCards = () => {
     // Go back to credit card setup to connect more accounts

@@ -32,6 +32,16 @@ export const OnboardingComplete: React.FC<OnboardingStepProps> = ({
   const creditCardData = stepData?.creditcards || stepData?.creditCards;
   const analysisData = stepData?.creditcarddetection || stepData?.creditCardAnalysis;
 
+  const getSetupSummary = () => {
+    const summary = {
+      hasCheckingAccount: !!checkingAccount,
+      transactionsImported: transactionData?.transactionsImported || 0,
+      hasCreditCards: creditCardData && creditCardData.length > 0,
+      creditCardCount: creditCardData?.length || 0
+    };
+    return summary;
+  };
+
   useEffect(() => {
     // Mark the completion step as complete when component mounts
     // This is crucial for updating the backend onboarding status
@@ -48,20 +58,10 @@ export const OnboardingComplete: React.FC<OnboardingStepProps> = ({
     }, 10000);
 
     return () => clearTimeout(timer);
-  }, [navigate, onComplete]);
+  }, [navigate, onComplete, getSetupSummary]);
 
   const handleGoToDashboard = () => {
     navigate('/');
-  };
-
-  const getSetupSummary = () => {
-    const summary = {
-      hasCheckingAccount: !!checkingAccount,
-      transactionsImported: transactionData?.transactionsImported || 0,
-      hasCreditCards: creditCardData && creditCardData.length > 0,
-      creditCardCount: creditCardData?.length || 0
-    };
-    return summary;
   };
 
   const summary = getSetupSummary();
