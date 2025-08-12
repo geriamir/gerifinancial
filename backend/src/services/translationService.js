@@ -69,7 +69,7 @@ class TranslationService {
 
     // Check if the text contains only Latin characters, numbers, and common punctuation
     // If so, it likely doesn't need translation
-    const latinOnlyPattern = /^[a-zA-Z0-9\s.,!?;:"'-]+$/;
+    const latinOnlyPattern = /^[a-zA-Z0-9\s.,!?;:'"'-]+$/;
     if (latinOnlyPattern.test(cleanText)) {
       return null;
     }
