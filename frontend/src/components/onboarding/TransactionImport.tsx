@@ -99,7 +99,8 @@ const TransactionImport: React.FC<TransactionImportProps> = ({ onComplete, bankA
         intervalRef.current = null;
       }
     }
-  }, []); // No dependencies - using refs instead
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Note: Empty dependency array is intentional - using refs to avoid stale closures
 
   // Single effect to handle all polling logic
   useEffect(() => {
@@ -121,7 +122,8 @@ const TransactionImport: React.FC<TransactionImportProps> = ({ onComplete, bankA
         intervalRef.current = null;
       }
     };
-  }, [isPolling, pollStatus]);
+  }, [isPolling]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Note: pollStatus is intentionally omitted to prevent infinite re-renders since it uses refs
 
   // Get current stage information
   const getCurrentStageInfo = () => {
