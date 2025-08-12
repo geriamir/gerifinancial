@@ -49,7 +49,7 @@ class CategoryMappingService {
       const validMatches = await Promise.all(
         manualMatches.map(async match => {
           const category = await Category.findById(match.category);
-          return categoryTypes.includes(category?.type) ? match : null;
+          return (category && categoryTypes.includes(category.type)) ? match : null;
         })
       );
 

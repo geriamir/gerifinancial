@@ -188,33 +188,34 @@ describe('Pattern Detection Integration Tests', () => {
       console.log('🧪 Testing quarterly pattern detection...');
 
       // Create quarterly car insurance transactions using proper 3-month spacing
-      const currentDate = new Date();
+      // Use fixed date to make test deterministic
+      const fixedDate = new Date('2025-07-25');
       const quarterlyTransactions = [
         createTransaction({
           description: 'Car Insurance Premium - InsureCo',
           amount: -1200,
-          processedDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 9, 10), // 9 months ago
+          processedDate: new Date('2024-10-10'), // October - month 10
           category: insuranceCategory._id,
           subCategory: carSubCategory._id,
         }),
         createTransaction({
           description: 'Car Insurance Premium - InsureCo',
           amount: -1200,
-          processedDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 6, 10), // 6 months ago
+          processedDate: new Date('2025-01-10'), // January - month 1
           category: insuranceCategory._id,
           subCategory: carSubCategory._id,
         }),
         createTransaction({
           description: 'Car Insurance Premium - InsureCo',
           amount: -1200,
-          processedDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 3, 10), // 3 months ago
+          processedDate: new Date('2025-04-10'), // April - month 4
           category: insuranceCategory._id,
           subCategory: carSubCategory._id,
         }),
         createTransaction({
           description: 'Car Insurance Premium - InsureCo',
           amount: -1200,
-          processedDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 10), // Current month (0 months ago - completes quarterly pattern)
+          processedDate: new Date('2025-07-10'), // July - month 7
           category: insuranceCategory._id,
           subCategory: carSubCategory._id,
         })

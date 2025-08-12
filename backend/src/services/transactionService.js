@@ -1,4 +1,6 @@
 const { Transaction, Category, SubCategory, BankAccount, Tag } = require('../models');
+const CreditCard = require('../models/CreditCard');
+const BankClassificationService = require('./bankClassificationService');
 const { ObjectId } = require('mongodb');
 const stringSimilarity = require('string-similarity');
 const bankScraperService = require('./bankScraperService');
@@ -119,10 +121,40 @@ class TransactionService {
       duplicates: 0,
       skippedPending: 0,
       errors: [],
-      mostRecentTransactionDate: null
+      mostRecentTransactionDate: null,
+      creditCardsCreated: 0
     };
 
+    // Check once if this is a credit card provider
+    const isCreditCardProvider = BankClassificationService.isCreditCardProvider(bankAccount.bankId);
+
     for (const account of scrapedAccounts) {
+      let creditCard = null;
+      
+      // Create CreditCard instance for credit card providers
+      if (isCreditCardProvider && account.accountNumber) {
+        try {
+          creditCard = await CreditCard.findOrCreate({
+            userId: bankAccount.userId,
+            bankAccountId: bankAccount._id,
+            cardNumber: account.accountNumber,
+            displayName: account.accountNumber,
+            isActive: true,
+            cardType: account.cardType || null,
+            lastFourDigits: account.accountNumber.slice(-4)
+          });
+          
+          results.creditCardsCreated++;
+          logger.info(`Created/found credit card: ${creditCard.displayName} for bank account ${bankAccount._id}`);
+        } catch (error) {
+          logger.error(`Error creating credit card for account ${account.accountNumber}:`, error);
+          results.errors.push({
+            identifier: account.accountNumber,
+            error: `Credit card creation failed: ${error.message}`
+          });
+        }
+      }
+
       for (const transaction of account.txns) {
         try {
           const transactionDate = new Date(transaction.date);
@@ -134,7 +166,7 @@ class TransactionService {
           
           // Skip transactions with pending status from scraper
           if (transaction.status === 'pending') {
-            logger.info(`Skipping pending transaction: ${transaction.identifier}, date: ${transactionDate}, description: ${transaction.description}`);
+            logger.info(`Skipping pending transaction: ${transaction.description}, date: ${transactionDate}`);
             results.skippedPending++;
             continue;
           }
@@ -155,18 +187,28 @@ class TransactionService {
           // }
 
           // Create transaction without type initially
+          // For credit card providers, include the specific account identifier for later credit card matching
+          const rawData = {
+            ...transaction,
+            memo: transaction.rawData?.memo || transaction.memo || null
+          };
+          
+          // Add credit card account identifier for credit card providers
+          if (isCreditCardProvider && account.accountNumber) {
+            rawData.creditCardAccountNumber = account.accountNumber;
+          }
+
           const savedTx = await Transaction.create({
             identifier: transaction.identifier,
             accountId: bankAccount._id,
             userId: bankAccount.userId,
+            creditCardId: creditCard?._id || null, // Link transaction to specific credit card
             date: transactionDate,
+            processedDate: transaction.processedDate || transactionDate, // Copy processedDate from scraped data
             description: transaction.description,
             amount: transaction.chargedAmount,
             currency: bankAccount.defaultCurrency,
-            rawData: {
-              ...transaction,
-              memo: transaction.rawData?.memo || transaction.memo || null
-            },
+            rawData,
             status: TransactionStatus.VERIFIED
           });
           

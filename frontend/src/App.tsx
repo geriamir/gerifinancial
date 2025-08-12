@@ -13,12 +13,14 @@ import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import AuthLayout from './components/layout/AuthLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import { OnboardingGuard } from './components/auth/OnboardingGuard';
 import Overview from './pages/Overview';
 import TransactionsPage from './pages/Transactions';
 import BudgetsPage from './pages/Budgets';
 import BudgetSubcategoryDetail from './pages/BudgetSubcategoryDetail';
 import RSUs from './pages/RSUs';
 import Investments from './pages/Investments';
+import OnboardingPage from './pages/Onboarding';
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
@@ -51,9 +53,11 @@ const App: React.FC = () => {
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={he}>
       <AuthProvider>
         <Router>
-          <Routes>
+          <OnboardingGuard>
+            <Routes>
             <Route path="/login" element={<LoginForm />} />
             <Route path="/register" element={<RegisterForm />} />
+            <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
             
             <Route
               path="/"
@@ -81,7 +85,8 @@ const App: React.FC = () => {
               <Route path="investments" element={<Investments />} />
               <Route path="profile" element={<Profile />} />
             </Route>
-          </Routes>
+            </Routes>
+          </OnboardingGuard>
         </Router>
       </AuthProvider>
       </LocalizationProvider>

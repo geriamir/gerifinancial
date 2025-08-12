@@ -19,8 +19,21 @@ Cypress.Commands.add('createTestUser', (options = {}) => {
 
   return cy.request('POST', `${Cypress.env('apiUrl')}/api/auth/register`, defaultOptions)
     .then((response) => {
+      const token = response.body.token;
       Cypress.env('testUserId', response.body.userId);
-      return response.body.token;
+      
+      // Set onboarding as complete for test users to skip onboarding flow
+      return cy.request({
+        method: 'POST',
+        url: `${Cypress.env('apiUrl')}/api/users/onboarding-status`,
+        headers: { Authorization: `Bearer ${token}` },
+        body: {
+          isComplete: true,
+          completedSteps: ['checking-account', 'complete'],
+          hasCheckingAccount: true,
+          hasCreditCards: false
+        }
+      }).then(() => token);
     });
 });
 

@@ -21,6 +21,11 @@ const transactionSchema = new mongoose.Schema({
     ref: 'BankAccount',
     required: true,
   },
+  creditCardId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CreditCard',
+    required: false, // Only required for credit card transactions
+  },
   amount: {
     type: Number,
     required: [true, 'Amount is required'],
@@ -56,7 +61,7 @@ const transactionSchema = new mongoose.Schema({
     type: Date,
     required: false,
     default: function() {
-      return this.date || new Date();
+      return this.date;
     },
     validate: {
       validator: function(v) {
@@ -178,7 +183,6 @@ transactionSchema.methods.categorize = async function(categoryId, subCategoryId,
   this.subCategory = subCategoryId;
   this.categorizationMethod = method;
   this.categorizationReasoning = reasoning;
-  this.processedDate = new Date();
   await this.save();
 };
 

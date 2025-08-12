@@ -45,6 +45,44 @@ const bankAccountSchema = new mongoose.Schema({
     message: String,
     date: Date
   },
+  // Real-time scraping status tracking
+  scrapingStatus: {
+    isActive: {
+      type: Boolean,
+      default: false
+    },
+    status: {
+      type: String,
+      enum: ['connecting', 'scraping', 'categorizing', 'complete', 'error', 'idle'],
+      default: 'idle'
+    },
+    progress: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100
+    },
+    message: {
+      type: String,
+      default: null
+    },
+    startedAt: {
+      type: Date,
+      default: null
+    },
+    lastUpdatedAt: {
+      type: Date,
+      default: null
+    },
+    transactionsImported: {
+      type: Number,
+      default: 0
+    },
+    transactionsCategorized: {
+      type: Number,
+      default: 0
+    }
+  },
   scrapingConfig: {
     schedule: {
       frequency: {
