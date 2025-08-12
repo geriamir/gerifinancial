@@ -24,20 +24,21 @@ router.get('/onboarding-status', auth, async (req, res) => {
       completedSteps.push('checking-account');
     }
 
-    // Only consider onboarding complete if explicitly marked complete
-    // This allows users to progress through intermediate steps without being kicked out
-    isComplete = user.isComplete || false;
-
     // Check if user has explicit onboarding status
     if (user.onboardingStatus) {
       return res.json({
-        isComplete: user.onboardingStatus.isComplete || isComplete,
+        isComplete: user.onboardingStatus.isComplete || false,
         hasCheckingAccount: user.onboardingStatus.hasCheckingAccount || hasCheckingAccount,
         completedSteps: user.onboardingStatus.completedSteps || completedSteps,
         creditCardAnalysisResults: user.onboardingStatus.creditCardAnalysisResults
       });
     }
 
+    // For legacy users without onboarding status:
+    // If they have a checking account, assume onboarding is complete
+    // This maintains backward compatibility with existing users
+    isComplete = hasCheckingAccount;
+    
     // Return computed status for users without explicit onboarding data
     res.json({
       isComplete,
