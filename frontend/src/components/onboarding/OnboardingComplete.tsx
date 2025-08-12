@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -32,7 +32,7 @@ export const OnboardingComplete: React.FC<OnboardingStepProps> = ({
   const creditCardData = stepData?.creditcards || stepData?.creditCards;
   const analysisData = stepData?.creditcarddetection || stepData?.creditCardAnalysis;
 
-  const getSetupSummary = () => {
+  const getSetupSummary = useCallback(() => {
     const summary = {
       hasCheckingAccount: !!checkingAccount,
       transactionsImported: transactionData?.transactionsImported || 0,
@@ -40,7 +40,7 @@ export const OnboardingComplete: React.FC<OnboardingStepProps> = ({
       creditCardCount: creditCardData?.length || 0
     };
     return summary;
-  };
+  }, [checkingAccount, transactionData, creditCardData]);
 
   useEffect(() => {
     // Mark the completion step as complete when component mounts
