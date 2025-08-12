@@ -20,6 +20,7 @@ const categoryBudgetRoutes = require('./routes/categoryBudgets');
 const rsuRoutes = require('./routes/rsus');
 const investmentRoutes = require('./routes/investments');
 const portfolioRoutes = require('./routes/portfolios');
+const onboardingRoutes = require('./routes/onboarding');
 const testRoutes = require('./routes/test');
 
 // Create Express app
@@ -88,6 +89,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', require('./routes/users'));
 app.use('/api/bank-accounts', bankAccountRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/budgets', budgetRoutes);
@@ -95,6 +97,7 @@ app.use('/api/category-budgets', categoryBudgetRoutes);
 app.use('/api/rsus', rsuRoutes);
 app.use('/api/investments', investmentRoutes);
 app.use('/api/portfolios', portfolioRoutes);
+app.use('/api/onboarding', onboardingRoutes);
 
 // Test routes (enabled in test and e2e environments)
 if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'e2e') {

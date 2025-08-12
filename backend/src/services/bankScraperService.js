@@ -18,8 +18,8 @@ class BankScraperService {
     
     const {
       startDate = scraperOptions.startDate, // Use smart start date from bank account
-      showBrowser = true,
-      verbose = true,
+      showBrowser = false,
+      verbose = false,
       timeout = this.DEFAULT_TIMEOUT
     } = options;
 
@@ -76,8 +76,29 @@ class BankScraperService {
     let error = null;
 
     logger.info(`Starting scraping for bank account ${bankAccount._id} (${bankAccount.name})...`);
+    
+    // Initialize scraping status
+    await this.updateScrapingStatus(bankAccount._id, {
+      isActive: true,
+      status: 'connecting',
+      progress: 10,
+      message: 'Connecting to bank...',
+      startedAt: new Date(),
+      lastUpdatedAt: new Date(),
+      transactionsImported: 0,
+      transactionsCategorized: 0
+    });
+
     while (attempts < this.MAX_RETRIES) {
       try {
+        // Update status: scraping
+        await this.updateScrapingStatus(bankAccount._id, {
+          status: 'scraping',
+          progress: 30,
+          message: 'Downloading transactions...',
+          lastUpdatedAt: new Date()
+        });
+
         const scraperResult = await scraper.scrape(bankAccount.getScraperOptions().credentials);
 
         if (!scraperResult.success) {
@@ -85,6 +106,20 @@ class BankScraperService {
           const errorMessage = scraperResult.errorMessage || 'No additional error details';
           throw new Error(`Scraping failed: ${errorType} - ${errorMessage}`);
         }
+
+        // Calculate transaction count for status update
+        const totalTransactions = (scraperResult.accounts || []).reduce((total, account) => {
+          return total + (account.txns ? account.txns.length : 0);
+        }, 0);
+
+        // Update status: processing
+        await this.updateScrapingStatus(bankAccount._id, {
+          status: 'categorizing',
+          progress: 80,
+          message: `Processing ${totalTransactions} transactions...`,
+          lastUpdatedAt: new Date(),
+          transactionsImported: totalTransactions
+        });
 
         logger.info(`Successfully scraped bank account ${bankAccount._id} (${bankAccount.name}) - ${scraperResult.accounts?.length || 0} accounts found`);
         
@@ -99,6 +134,16 @@ class BankScraperService {
           logger.info(`Successfully scraped accounts for bank account ${bankAccount._id}`);
         }
 
+        // Update status: processing (don't mark as complete yet - categorization happens later)
+        await this.updateScrapingStatus(bankAccount._id, {
+          status: 'categorizing',
+          progress: 90,
+          message: `Downloaded ${totalTransactions} transactions, categorizing...`,
+          lastUpdatedAt: new Date(),
+          transactionsImported: totalTransactions,
+          transactionsCategorized: 0 // Not categorized yet
+        });
+
         // Return accounts, portfolios (new structure), and investments (legacy)
         return {
           accounts: scraperResult.accounts || [],
@@ -111,10 +156,28 @@ class BankScraperService {
 
         if (attempts < this.MAX_RETRIES) {
           logger.info(`Scraping attempt ${attempts} failed for bank account ${bankAccount._id} with error ${error}, retrying in ${this.RETRY_DELAY}ms...`);
+          
+          // Update status: retrying
+          await this.updateScrapingStatus(bankAccount._id, {
+            status: 'connecting',
+            progress: 20,
+            message: `Retrying connection (attempt ${attempts + 1}/${this.MAX_RETRIES})...`,
+            lastUpdatedAt: new Date()
+          });
+
           await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY));
         }
       }
     }
+
+    // Update status: error
+    await this.updateScrapingStatus(bankAccount._id, {
+      status: 'error',
+      progress: 0,
+      message: error.message,
+      lastUpdatedAt: new Date(),
+      isActive: false
+    });
 
     this.handleScraperError(error, 'Transaction scraping', bankAccount._id);
   }
@@ -212,6 +275,25 @@ class BankScraperService {
 
     logger.error(`${operation} failed for bank account ${bankAccountId}: ${errorMsg}`);
     throw new Error(errorMsg);
+  }
+
+  // Helper method to update scraping status in BankAccount
+  async updateScrapingStatus(bankAccountId, statusUpdate) {
+    try {
+      const { BankAccount } = require('../models');
+      const updateData = {};
+      
+      // Prefix all fields with 'scrapingStatus.'
+      Object.keys(statusUpdate).forEach(key => {
+        updateData[`scrapingStatus.${key}`] = statusUpdate[key];
+      });
+      
+      await BankAccount.findByIdAndUpdate(bankAccountId, { $set: updateData });
+      logger.debug(`Updated scraping status for bank account ${bankAccountId}:`, statusUpdate);
+    } catch (error) {
+      logger.error(`Failed to update scraping status for bank account ${bankAccountId}:`, error);
+      // Don't throw error - scraping should continue even if status update fails
+    }
   }
 
   getScraperInfo() {

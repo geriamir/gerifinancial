@@ -1,6 +1,7 @@
 const { BankAccount } = require('../models');
 const scrapingSchedulerService = require('./scrapingSchedulerService');
 const bankScraperService = require('./bankScraperService');
+const onboardingTransactionService = require('./onboardingTransactionService');
 const logger = require('../utils/logger');
 
 class BankAccountService {
@@ -23,6 +24,24 @@ class BankAccountService {
     // Schedule scraping for active account
     await scrapingSchedulerService.scheduleAccount(bankAccount);
     logger.info(`Scheduled scraping for new bank account: ${bankAccount._id}`);
+
+    // Initiate immediate scraping for new account
+    try {
+      const dataSyncService = require('./dataSyncService');
+      // Fire and forget - don't wait for scraping to complete
+      setImmediate(async () => {
+        try {
+          await dataSyncService.syncBankAccountData(bankAccount);
+          logger.info(`Initial scraping completed for new bank account: ${bankAccount._id}`);
+        } catch (error) {
+          logger.warn(`Initial scraping failed for new bank account ${bankAccount._id}: ${error.message}`);
+        }
+      });
+      logger.info(`Initiated immediate scraping for new bank account: ${bankAccount._id}`);
+    } catch (error) {
+      logger.warn(`Failed to initiate immediate scraping for bank account ${bankAccount._id}: ${error.message}`);
+      // Don't throw error - bank account creation should still succeed
+    }
 
     return bankAccount;
   }
@@ -74,6 +93,59 @@ class BankAccountService {
         date: new Date()
       };
       await bankAccount.save();
+      throw error;
+    }
+  }
+
+  async getScrapingStatus(userId) {
+    try {
+      const bankAccounts = await BankAccount.find({ userId });
+      
+      // Find the most recent bank account or one that's currently scraping
+      const activeBankAccount = bankAccounts.find(account => 
+        account.scrapingStatus && account.scrapingStatus.isActive
+      ) || bankAccounts[0];
+      
+      if (activeBankAccount && activeBankAccount.scrapingStatus) {
+        const scrapingStatus = activeBankAccount.scrapingStatus;
+        
+        return {
+          status: scrapingStatus.status || 'idle',
+          isActive: scrapingStatus.isActive || false,
+          progress: scrapingStatus.progress || 0,
+          message: scrapingStatus.message || 'No import in progress',
+          sessionId: null, // No session-based tracking with new system
+          hasImportedTransactions: scrapingStatus.transactionsImported > 0,
+          transactionsImported: scrapingStatus.transactionsImported || 0,
+          transactionsCategorized: scrapingStatus.transactionsCategorized || 0
+        };
+      } else if (bankAccounts.length > 0) {
+        // User has bank accounts but no scraping status yet
+        return {
+          status: 'idle',
+          isActive: false,
+          progress: 0,
+          message: 'Ready to import transactions',
+          sessionId: null,
+          hasImportedTransactions: false,
+          transactionsImported: 0,
+          transactionsCategorized: 0
+        };
+      } else {
+        // No bank accounts
+        return {
+          status: 'not_started',
+          isActive: false,
+          progress: 0,
+          message: 'Please connect your bank account to start importing transactions',
+          sessionId: null,
+          hasImportedTransactions: false,
+          transactionsImported: 0,
+          transactionsCategorized: 0
+        };
+      }
+    } catch (error) {
+      logger.error(`Error getting scraping status for user ${userId}:`, error);
       throw error;
     }
   }

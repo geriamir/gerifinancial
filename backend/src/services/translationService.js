@@ -33,6 +33,57 @@ class TranslationService {
   }
 
   /**
+   * Extract only words that need translation, filtering out numbers, currency, and special characters
+   * @private
+   * @param {string} text - Original text
+   * @returns {string|null} - Cleaned text with only translatable words, or null if nothing to translate
+   */
+  _extractTranslatableWords(text) {
+    if (!text || typeof text !== 'string') {
+      return null;
+    }
+
+    // Remove common patterns that don't need translation
+    let cleanText = text
+      // Remove currency symbols and amounts (like $68.25, ₪123.45, €50.00)
+      .replace(/[₪$€£¥]\s*\d+(?:[.,]\d+)?/g, '')
+      // Remove standalone currency symbols
+      .replace(/\s+[₪$€£¥]\s*/g, ' ')
+      // Remove dates (DD.MM.YYYY, DD/MM/YYYY, YYYY-MM-DD, MM/YYYY, etc.)
+      .replace(/\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/g, '')
+      .replace(/\b\d{1,2}[./-]\d{4}\b/g, '')
+      .replace(/\b\d{4}[./-]\d{1,2}[./-]\d{1,2}\b/g, '')
+      // Remove standalone numbers (integers and decimals)
+      .replace(/\b\d+(?:[.,]\d+)?\b/g, '')
+      // Remove common punctuation and special characters but keep basic punctuation
+      .replace(/[-_=+*/\\|<>{}[\]()]/g, ' ')
+      // Remove multiple spaces and extra dots/commas
+      .replace(/\s*[.,]+\s*$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // If the cleaned text is empty or too short, don't translate
+    if (!cleanText || cleanText.length < 2) {
+      return null;
+    }
+
+    // Check if the text contains only Latin characters, numbers, and common punctuation
+    // If so, it likely doesn't need translation
+    const latinOnlyPattern = /^[a-zA-Z0-9\s.,!?;:"'-]+$/;
+    if (latinOnlyPattern.test(cleanText)) {
+      return null;
+    }
+
+    // Additional check: if only punctuation and spaces remain, skip
+    const onlyPunctuationPattern = /^[\s.,!?;:"'-]+$/;
+    if (onlyPunctuationPattern.test(cleanText)) {
+      return null;
+    }
+
+    return cleanText;
+  }
+
+  /**
    * Extract retry after value from error
    * @private
    * @param {Error} error - Error object from translation attempt
@@ -73,13 +124,22 @@ class TranslationService {
       maxRetries = 3
     } = options;
 
-    // Check memory cache first
+    // First, extract only translatable words
+    const translatableText = this._extractTranslatableWords(text);
+    
+    // If no translatable content found, return original text
+    if (!translatableText) {
+      logger.debug(`Skipping translation - no translatable words found in: "${text}"`);
+      return text;
+    }
+
+    // Check memory cache first (using original text as key for consistency)
     const cacheKey = `${text}:${from}:${to}`;
     if (this.memoryCache.has(cacheKey)) {
       return this.memoryCache.get(cacheKey);
     }
 
-    // Check MongoDB cache
+    // Check MongoDB cache (using original text as key)
     try {
       const cachedTranslation = await Translation.findOne({
         originalText: text,
@@ -100,21 +160,29 @@ class TranslationService {
 
     while (retryCount <= maxRetries) {
       try {
-        const result = await translate(text, { from, to });
+        // Translate only the cleaned text
+        const result = await translate(translatableText, { from, to });
         
-        // Save to MongoDB and memory cache
+        // Create a translated version by replacing the translatable part in original text
+        let translatedText = text;
+        if (result.text && result.text !== translatableText) {
+          // Replace the original translatable words with translated words
+          translatedText = text.replace(translatableText, result.text);
+        }
+        
+        // Save to MongoDB and memory cache (using original text as key)
         try {
-          await Translation.findOrCreate(text, result.text, from, to);
-          this._addToMemoryCache(cacheKey, result.text);
+          await Translation.findOrCreate(text, translatedText, from, to);
+          this._addToMemoryCache(cacheKey, translatedText);
         } catch (error) {
           logger.warn('Failed to cache translation:', error);
         }
         
-        return result.text;
+        return translatedText;
       } catch (error) {
         if (error.message.toLowerCase().includes('too many requests') || error.response?.status === 429) {
           if (retryCount === maxRetries) {
-            logger.error(`Translation of ${text} failed after ${maxRetries} retries:`, error);
+            logger.error(`Translation of "${translatableText}" (from "${text}") failed after ${maxRetries} retries:`, error);
             return text; // Return original text after all retries exhausted
           }
 

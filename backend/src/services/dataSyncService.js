@@ -15,6 +15,9 @@ class DataSyncService {
       
       // Delegate processing to dedicated services
       const transactionResults = await transactionService.processScrapedTransactions(scrapingResult.accounts || [], bankAccount);
+
+      // Update scraping status to complete after transactions are processed and categorized
+      await this.updateScrapingStatusComplete(bankAccount._id, transactionResults);
       
       // Process portfolios (new structure) or legacy investments
       let portfolioResults = { newPortfolios: 0, updatedPortfolios: 0, errors: [] };
@@ -45,6 +48,18 @@ class DataSyncService {
         totalUpdatedItems: investmentResults.updatedInvestments + portfolioResults.updatedPortfolios,
         hasErrors: transactionResults.errors.length > 0 || investmentResults.errors.length > 0 || portfolioResults.errors.length > 0
       };
+      
+      // Step 4: Post-categorization credit card detection
+      if (syncSuccessful) {
+        try {
+          const creditCardDetectionService = require('./creditCardDetectionService');
+          await creditCardDetectionService.detectAndUpdateCreditCards(bankAccount.userId);
+          logger.info(`Credit card detection completed for user ${bankAccount.userId}`);
+        } catch (detectionError) {
+          logger.warn(`Credit card detection failed for user ${bankAccount.userId}: ${detectionError.message}`);
+          // Don't fail the entire sync for detection errors
+        }
+      }
       
       logger.info(`Data sync completed for account ${bankAccount._id}:`, {
         newTransactions: transactionResults.newTransactions,
@@ -227,6 +242,29 @@ class DataSyncService {
     
     const lowerErrorMessage = errorMessage.toLowerCase();
     return credentialsErrorPatterns.some(pattern => lowerErrorMessage.includes(pattern));
+  }
+
+  // Update scraping status to complete after transactions are processed and categorized
+  async updateScrapingStatusComplete(bankAccountId, transactionResults) {
+    try {
+      const totalTransactions = transactionResults.newTransactions + transactionResults.duplicates;
+      const categorizedTransactions = transactionResults.newTransactions; // Newly added transactions are categorized
+
+      await bankScraperService.updateScrapingStatus(bankAccountId, {
+        status: 'complete',
+        progress: 100,
+        message: `Successfully imported and categorized ${totalTransactions} transactions`,
+        lastUpdatedAt: new Date(),
+        isActive: false,
+        hasImportedTransactions: totalTransactions > 0,
+        transactionsCategorized: categorizedTransactions
+      });
+
+      logger.info(`Scraping marked as complete for bank account ${bankAccountId}: ${totalTransactions} transactions imported, ${categorizedTransactions} categorized`);
+    } catch (error) {
+      logger.error(`Failed to update scraping status to complete for bank account ${bankAccountId}:`, error);
+      // Don't throw error - this shouldn't fail the sync
+    }
   }
 }
 
