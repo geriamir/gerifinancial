@@ -543,7 +543,7 @@ class CreditCardDetectionService {
           totalSpent: monthData.totalSpent,
           transactionCount: monthData.transactionCount
         }));
-        console.log(`Monthly data for card ${creditCard.displayName}:`, cardMonthlyData);
+        logger.debug(`Monthly data for card ${creditCard.displayName}:`, cardMonthlyData);
 
         monthlyTotals.push(...cardMonthlyData);
       }
