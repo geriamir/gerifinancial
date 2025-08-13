@@ -1,5 +1,7 @@
+const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction');
-const Category = require('../models/Category');
+const CreditCard = require('../models/CreditCard');
+const User = require('../models/User');
 const logger = require('../utils/logger');
 
 /**
@@ -16,12 +18,12 @@ class CreditCardDetectionService {
    */
   async analyzeCreditCardUsage(userId, monthsBack = 6) {
     try {
-      const mongoose = require('mongoose');
       logger.info(`Analyzing credit card usage for user ${userId} over ${monthsBack} months`);
       
       // Calculate date threshold
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - monthsBack);
+      
       
       // Get credit card transactions using aggregation pipeline
       // This leverages the existing AI categorization that identifies "Credit Card" + "Transfer"
@@ -112,7 +114,6 @@ class CreditCardDetectionService {
    */
   async getMonthlyBreakdown(userId, startDate) {
     try {
-      const mongoose = require('mongoose');
       const monthlyData = await Transaction.aggregate([
         {
           $match: {
@@ -186,7 +187,6 @@ class CreditCardDetectionService {
    */
   async hasCreditCardTransactions(userId) {
     try {
-      const mongoose = require('mongoose');
       const count = await Transaction.aggregate([
         {
           $match: { userId: new mongoose.Types.ObjectId(userId) }
@@ -264,7 +264,6 @@ class CreditCardDetectionService {
       }
       
       // Check if user already has credit card accounts connected
-      const CreditCard = require('../models/CreditCard');
       const existingCreditCards = await CreditCard.find({ 
         userId, 
         isActive: true 
@@ -293,9 +292,7 @@ class CreditCardDetectionService {
    * @returns {Promise<void>}
    */
   async createCreditCardConnectionTask(userId, analysis) {
-    try {
-      const User = require('../models/User');
-      
+    try {      
       const taskData = {
         type: 'credit_card_connection',
         title: 'Connect Credit Card Accounts',
@@ -330,8 +327,6 @@ class CreditCardDetectionService {
    */
   async clearCreditCardConnectionTask(userId) {
     try {
-      const User = require('../models/User');
-      
       // Remove credit card connection tasks
       await User.findByIdAndUpdate(
         userId,
@@ -355,7 +350,6 @@ class CreditCardDetectionService {
    */
   async analyzeCreditCardCoverage(userId) {
     try {
-      const mongoose = require('mongoose');
       logger.info(`Analyzing credit card coverage for user ${userId}`);
       
       // Get analysis period (last 1 month for recent transactions only)
@@ -408,7 +402,6 @@ class CreditCardDetectionService {
       logger.info(`Found ${creditCardPayments.length} credit card payment transactions`);
 
       // Get all connected credit cards
-      const CreditCard = require('../models/CreditCard');
       const connectedCreditCards = await CreditCard.find({ 
         userId: new mongoose.Types.ObjectId(userId), 
         isActive: true 
@@ -506,7 +499,6 @@ class CreditCardDetectionService {
    */
   async getCreditCardMonthlyTotals(connectedCreditCards, startDate) {
     try {
-      const mongoose = require('mongoose');
       const monthlyTotals = [];
 
       for (const creditCard of connectedCreditCards) {
