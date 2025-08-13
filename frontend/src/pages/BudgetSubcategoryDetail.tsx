@@ -187,8 +187,8 @@ const BudgetSubcategoryDetail: React.FC = () => {
               startDate,
               endDate,
               category: categoryId,
-              type: 'Income',
-              limit: 1000
+              limit: 1000,
+              useProcessedDate: true
             });
             
             // Sum all transaction amounts for this income category
@@ -233,8 +233,8 @@ const BudgetSubcategoryDetail: React.FC = () => {
                     startDate,
                     endDate,
                     category: categoryId,
-                    type: 'Expense',
-                    limit: 1000 // Get all transactions for the month
+                    limit: 1000, // Get all transactions for the month
+                    useProcessedDate: true
                   });
                   
                   // Filter transactions by subcategory on the client side
@@ -369,8 +369,8 @@ const BudgetSubcategoryDetail: React.FC = () => {
                     startDate,
                     endDate,
                     category: incomeCat._id,
-                    type: 'Income',
-                    limit: 1000
+                    limit: 1000,
+                    useProcessedDate: true
                   });
                   
                   // Sum all transaction amounts for this income category
@@ -460,8 +460,8 @@ const BudgetSubcategoryDetail: React.FC = () => {
                     startDate,
                     endDate,
                     category: categoryId,
-                    type: 'Expense',
-                    limit: 1000
+                    limit: 1000,
+                    useProcessedDate: true
                   });
                   
                   // Filter transactions by this specific subcategory
@@ -512,7 +512,7 @@ const BudgetSubcategoryDetail: React.FC = () => {
       endDate,
       category: categoryId,
       subCategory: isIncomeView ? undefined : subcategoryId,
-      type: isIncomeView ? 'Income' : 'Expense',
+      // Don't filter by type when we have category/subcategory - it's redundant
       useProcessedDate: true // Use processedDate for budget views to match budget calculations
     };
   }, [yearNum, monthNum, categoryId, subcategoryId, isIncomeView]);

@@ -109,8 +109,10 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
       endDate: propsFilters.endDate?.toISOString(),
       type: propsFilters.type,
       category: propsFilters.category,
+      subCategory: propsFilters.subCategory,
       search: propsFilters.search,
-      accountId: propsFilters.accountId
+      accountId: propsFilters.accountId,
+      useProcessedDate: propsFilters.useProcessedDate
     });
     
     // If the filters haven't actually changed, don't update
@@ -350,8 +352,8 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
         </Box>
       ))}
       
-      {/* Infinite scroll sentinel */}
-      {hasFilters && (
+      {/* Infinite scroll sentinel - only show when there are more items to load */}
+      {hasFilters && hasMore && (
         <Box ref={sentinelRef} sx={{ height: '20px', width: '100%' }} />
       )}
       

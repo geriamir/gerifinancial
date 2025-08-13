@@ -26,6 +26,7 @@ import {
   TrendingDown as ExpenseIcon,
   AccountBalanceWallet as BudgetIcon
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { transactionsApi } from '../../services/api/transactions';
 import { budgetsApi } from '../../services/api/budgets';
 
@@ -77,6 +78,7 @@ const getBudgetStatusLabel = (status: string) => {
 export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
   loading: externalLoading = false
 }) => {
+  const navigate = useNavigate();
   const [summary, setSummary] = useState<FinancialSummary>({
     totalBalance: 0,
     monthlyIncome: 0,
@@ -228,6 +230,11 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
     fetchFinancialData();
   }, []);
 
+  const handleCreateBudget = () => {
+    // Navigate to budgets page to create a new budget
+    navigate('/budgets');
+  };
+
   const isLoading = loading || externalLoading;
 
   if (error) {
@@ -298,6 +305,7 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
             color="primary"
             size="small"
             clickable
+            onClick={handleCreateBudget}
           />
         </Box>
       ),

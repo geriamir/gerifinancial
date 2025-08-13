@@ -193,7 +193,10 @@ class DataSyncService {
       } else {
         logger.info(`No recent transaction date found, using current time as lastScraped for account ${freshBankAccount._id}`);
       }
-      
+
+      // Adding 1 minute to avoid duplicate transactions
+      lastScrapedDate.setMinutes(lastScrapedDate.getMinutes() + 1);
+
       freshBankAccount.lastScraped = lastScrapedDate;
       freshBankAccount.status = 'active';
       freshBankAccount.lastError = null; // Clear any previous errors

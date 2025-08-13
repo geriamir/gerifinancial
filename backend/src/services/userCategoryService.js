@@ -85,6 +85,7 @@ const defaultCategories = [
     subCategories: [
       { name: "Daycare, Kids Activities and Summer Camps", keywords: ["daycare", "kids", "summer camps", "פעילויות ילדים", "קייטנה"] },
       { name: "School", keywords: ["school", "education", "בית ספר", "חינוך"] },
+      { name: "Private Tutors", keywords: [] },
       { name: "Pets", keywords: ["pets", "vet", "חיות מחמד", "וטרינר"] },
       { name: "Toys", keywords: ["toys", "צעצועים"] },
       { name: "Babysitting", keywords: ["babysitting", "בייביסיטר"] },

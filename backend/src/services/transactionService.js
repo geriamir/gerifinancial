@@ -19,79 +19,6 @@ const convertToObjectId = (id) => {
 };
 
 class TransactionService {
-  /**
-   * Calculate similarity score between two transactions based on multiple factors
-   * @private
-   */
-  _calculateSimilarityScore(baseTransaction, compareTransaction) {
-    // Text similarity for description (0-1)
-    const descriptionSimilarity = stringSimilarity.compareTwoStrings(
-      baseTransaction.description.toLowerCase(),
-      compareTransaction.description.toLowerCase()
-    );
-
-    // Amount similarity (0-1)
-    const amountSimilarity = Math.max(0, 1 - Math.abs(
-      (baseTransaction.amount - compareTransaction.amount) / baseTransaction.amount
-    ));
-
-    // Category match (0 or 1)
-    const categoryMatch = baseTransaction.category?.toString() === compareTransaction.category?.toString() ? 1 : 0;
-
-    // Vendor match from raw data (0 or 1)
-    const vendorMatch = baseTransaction.rawData?.vendor === compareTransaction.rawData?.vendor ? 1 : 0;
-
-    // Weight the factors
-    const weights = {
-      description: 0.4,
-      amount: 0.3,
-      category: 0.2,
-      vendor: 0.1
-    };
-
-    return (
-      descriptionSimilarity * weights.description +
-      amountSimilarity * weights.amount +
-      categoryMatch * weights.category +
-      vendorMatch * weights.vendor
-    );
-  }
-
-  /**
-   * Find similar transactions for potential batch verification
-   */
-  async findSimilarTransactions(transactionId, userId) {
-    const baseTransaction = await Transaction.findOne({
-      _id: convertToObjectId(transactionId),
-      userId: convertToObjectId(userId)
-    });
-
-    if (!baseTransaction) {
-      throw new Error('Transaction not found');
-    }
-
-    // Find potential matches with same category and pending verification
-    const potentialMatches = await Transaction.find({
-      _id: { $ne: baseTransaction._id },
-      userId: convertToObjectId(userId),
-      category: baseTransaction.category,
-      status: 'needs_verification'
-    });
-
-    // Calculate similarity scores
-    const similarTransactions = potentialMatches
-      .map(transaction => ({
-        transaction,
-        similarity: this._calculateSimilarityScore(baseTransaction, transaction)
-      }))
-      .filter(({ similarity }) => similarity >= 0.7) // Only include highly similar transactions
-      .sort((a, b) => b.similarity - a.similarity); // Sort by similarity score
-
-    return {
-      transactions: similarTransactions.map(({ transaction }) => transaction),
-      similarity: similarTransactions.length > 0 ? similarTransactions[0].similarity : 0
-    };
-  }
 
   async scrapeTransactions(bankAccount, options = {}) {
     try {
@@ -296,6 +223,7 @@ class TransactionService {
     // Update and save transaction
     transaction.category = categoryId;
     transaction.subCategory = subCategoryId;
+    transaction.type = category.type; // Set transaction type based on category type
     transaction.categorizationMethod = CategorizationMethod.MANUAL;
     transaction.categorizationReasoning = reasoning;
     transaction.status = TransactionStatus.VERIFIED;

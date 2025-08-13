@@ -178,23 +178,37 @@ const BudgetEditor: React.FC<BudgetEditorProps> = ({
         6 // 6 months analysis
       );
       
+      console.log('Recalculate result:', result); // Debug log
+      
+      // Check if the response has the expected structure
+      if (!result || typeof result.recalculatedAmount === 'undefined') {
+        throw new Error('Invalid response from recalculation API');
+      }
+      
+      const recalculatedAmount = result.recalculatedAmount || 0;
+      
       // Update the budget with recalculated amount
       if (editedBudgetType === 'fixed') {
-        setEditedFixedAmount(result.recalculatedAmount.toString());
+        setEditedFixedAmount(recalculatedAmount.toString());
       } else {
         // For variable budgets, set all months to the recalculated amount
         const newMonthlyAmounts: { [month: number]: string } = {};
         for (let month = 1; month <= 12; month++) {
-          newMonthlyAmounts[month] = result.recalculatedAmount.toString();
+          newMonthlyAmounts[month] = recalculatedAmount.toString();
         }
         setEditedMonthlyAmounts(newMonthlyAmounts);
       }
       
-      alert(`Budget recalculated based on ${result.transactionCount} transactions over ${result.averagingPeriod} months (${result.excludedTransactions} excluded).`);
+      const transactionCount = result.transactionCount || 0;
+      const averagingPeriod = result.averagingPeriod || 0;
+      const excludedTransactions = result.excludedTransactions || 0;
+      
+      alert(`Budget recalculated based on ${transactionCount} transactions over ${averagingPeriod} months (${excludedTransactions} excluded).`);
       
     } catch (err) {
       console.error('Failed to recalculate budget:', err);
-      setError('Failed to recalculate budget. Please try again.');
+      const errorMessage = (err as Error).message || 'Failed to recalculate budget. Please try again.';
+      setError(`Failed to recalculate budget: ${errorMessage}`);
     } finally {
       setRecalculateLoading(false);
     }

@@ -18,10 +18,12 @@ export const transactionsApi = {
     endDate?: Date;
     type?: string;
     category?: string;
+    subCategory?: string;
     search?: string;
     limit?: number;
     skip?: number;
     accountId?: string;
+    useProcessedDate?: boolean;
   }): Promise<GetTransactionsResponse> =>
     api.get<GetTransactionsResponse>('/transactions', { params: filters })
       .then((res: AxiosResponse<GetTransactionsResponse>) => res.data),
