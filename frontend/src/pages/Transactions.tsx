@@ -28,9 +28,11 @@ const defaultFilters: Partial<TransactionFilters> = {
 const TransactionsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const [filters, setFilters] = useState<Partial<TransactionFilters>>(() => {
-    // Check URL params on initial load
+    // Check URL params on initial load - support both 'category' and 'filter' for backward compatibility
     const categoryParam = searchParams.get('category');
-    if (categoryParam === 'uncategorized') {
+    const filterParam = searchParams.get('filter');
+    
+    if (categoryParam === 'uncategorized' || filterParam === 'uncategorized') {
       return {
         category: 'uncategorized',
         startDate: undefined,
@@ -49,14 +51,15 @@ const TransactionsPage: React.FC = () => {
   // Sync filters with URL parameters for backward compatibility
   useEffect(() => {
     const categoryParam = searchParams.get('category');
+    const filterParam = searchParams.get('filter');
     
-    if (categoryParam === 'uncategorized') {
+    if (categoryParam === 'uncategorized' || filterParam === 'uncategorized') {
       setFilters({
         category: 'uncategorized',
         startDate: undefined,
         endDate: undefined,
       });
-    } else if (!categoryParam && filters.category === 'uncategorized') {
+    } else if (!categoryParam && !filterParam && filters.category === 'uncategorized') {
       // If URL param is removed but filter is still uncategorized, reset to default
       setFilters(defaultFilters);
     }

@@ -13,6 +13,7 @@ router.get('/', auth, async (req, res) => {
       endDate,
       type,
       category,
+      filter, // Support 'filter' parameter for backward compatibility
       subCategory,
       search,
       limit = '20',
@@ -21,12 +22,15 @@ router.get('/', auth, async (req, res) => {
       useProcessedDate = 'false'
     } = req.query;
 
+    // Use 'filter' parameter if 'category' is not provided (backward compatibility)
+    const finalCategory = category || filter;
+
     const validTypes = ['Expense', 'Income', 'Transfer'];
     const query = {
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       type: validTypes.includes(type) ? type : undefined,
-      category,
+      category: finalCategory, // Use finalCategory which supports both 'category' and 'filter' params
       subCategory,
       search,
       limit: parseInt(limit),
