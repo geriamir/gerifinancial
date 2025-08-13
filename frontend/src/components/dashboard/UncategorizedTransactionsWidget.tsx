@@ -52,7 +52,8 @@ const UncategorizedTransactionsWidget: React.FC<UncategorizedTransactionsWidgetP
 
   const handleViewUncategorized = () => {
     // Navigate to transactions page with filter for uncategorized
-    navigate('/transactions?category=uncategorized');
+    // Using both parameters for maximum compatibility
+    navigate('/transactions?category=uncategorized&filter=uncategorized');
   };
 
   if (loading) {
