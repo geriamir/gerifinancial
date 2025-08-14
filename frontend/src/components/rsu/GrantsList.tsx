@@ -115,7 +115,7 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
       sharesSold: soldShares,
       availableShares: available
     };
-  }, [sales, grant._id, grant.vestedShares, grant.stockSymbol]);
+  }, [sales, grant._id, grant.vestedShares]);
   
   
   // Format dates
@@ -308,13 +308,13 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
 
           <Box>
             <Typography variant="body2" color="text.secondary">
-              {sharesSold > 0 ? 'Available / Sold Shares' : 'Available Shares'}
+              Available Shares
             </Typography>
             <Typography variant="body1" color="secondary.main">
-              {availableShares.toLocaleString()} available
+              {availableShares.toLocaleString()}
               {sharesSold > 0 && (
                 <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                  / {sharesSold.toLocaleString()} sold
+                  ({sharesSold.toLocaleString()} sold)
                 </Typography>
               )}
             </Typography>
