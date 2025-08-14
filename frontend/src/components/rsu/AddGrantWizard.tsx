@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -17,18 +17,12 @@ import {
   CardContent,
   Divider,
   Chip,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem
 } from '@mui/material';
 import {
   Business as BusinessIcon,
-  Schedule as ScheduleIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useRSU } from '../../contexts/RSUContext';
-import { VestingPlan, vestingApi } from '../../services/api/rsus';
 
 interface AddGrantWizardProps {
   open: boolean;

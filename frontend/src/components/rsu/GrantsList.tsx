@@ -313,7 +313,7 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
             <Typography variant="body1" color="secondary.main">
               {availableShares.toLocaleString()} available
               {sharesSold > 0 && (
-                <Typography component="span" variant="caption" color="error.main" sx={{ ml: 1 }}>
+                <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
                   / {sharesSold.toLocaleString()} sold
                 </Typography>
               )}
