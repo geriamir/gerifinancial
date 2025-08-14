@@ -113,6 +113,36 @@ describe('RSU Service', () => {
       
       return schedule;
     });
+
+    // Mock the new generateVestingSchedule method that the RSUService actually calls
+    vestingService.generateVestingSchedule.mockImplementation((planType, grantDate, totalShares) => {
+      // Default to quarterly-5yr behavior (20 periods)
+      let periods = 20;
+      if (planType === 'quarterly-4yr') periods = 16;
+      if (planType === 'semi-annual-4yr') periods = 8;
+      
+      const schedule = [];
+      const sharesPerPeriod = Math.floor(totalShares / periods);
+      const remainder = totalShares % periods;
+      
+      for (let i = 0; i < periods; i++) {
+        const vestDate = new Date(grantDate);
+        if (planType === 'semi-annual-4yr') {
+          vestDate.setMonth(vestDate.getMonth() + (i + 1) * 6); // 6 months for semi-annual
+        } else {
+          vestDate.setMonth(vestDate.getMonth() + (i + 1) * 3); // 3 months for quarterly
+        }
+        
+        schedule.push({
+          vestDate,
+          shares: sharesPerPeriod + (i < remainder ? 1 : 0),
+          vested: false,
+          vestedValue: 0
+        });
+      }
+      
+      return schedule;
+    });
     
     vestingService.validateVestingSchedule.mockReturnValue({
       isValid: true,

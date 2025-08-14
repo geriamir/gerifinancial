@@ -425,6 +425,9 @@ export const RSUProvider: React.FC<RSUProviderProps> = ({ children }) => {
   useEffect(() => {
     const loadInitialData = async () => {
       dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'SET_GRANTS_LOADING', payload: true });
+      dispatch({ type: 'SET_SALES_LOADING', payload: true });
+      dispatch({ type: 'SET_PORTFOLIO_LOADING', payload: true });
       
       try {
         // Load all data in parallel with individual error handling

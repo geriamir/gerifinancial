@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -16,13 +16,19 @@ import {
   Card,
   CardContent,
   Divider,
-  Chip
+  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
-  Business as BusinessIcon
+  Business as BusinessIcon,
+  Schedule as ScheduleIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useRSU } from '../../contexts/RSUContext';
+import { VestingPlan, vestingApi } from '../../services/api/rsus';
 
 interface AddGrantWizardProps {
   open: boolean;
@@ -36,6 +42,7 @@ interface GrantFormData {
   grantDate: Date | null;
   totalValue: string;
   totalShares: string;
+  vestingPlan: string;
   notes: string;
 }
 
@@ -67,6 +74,7 @@ const AddGrantWizard: React.FC<AddGrantWizardProps> = ({
     grantDate: null,
     totalValue: '',
     totalShares: '',
+    vestingPlan: 'quarterly-5yr', // Default to quarterly 5-year plan
     notes: ''
   });
 
@@ -91,6 +99,7 @@ const AddGrantWizard: React.FC<AddGrantWizardProps> = ({
           grantDate: null,
           totalValue: '',
           totalShares: '',
+          vestingPlan: 'quarterly-5yr',
           notes: ''
         });
         setVestingPreview([]);

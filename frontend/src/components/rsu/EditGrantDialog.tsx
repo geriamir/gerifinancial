@@ -10,14 +10,22 @@ import {
   Box,
   Alert,
   CircularProgress,
-  IconButton
+  IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Divider,
+  Chip
 } from '@mui/material';
 import {
   Close as CloseIcon,
-  Edit as EditIcon
+  Edit as EditIcon,
+  Schedule as ScheduleIcon,
+  Preview as PreviewIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers';
-import { RSUGrant, CreateGrantData } from '../../services/api/rsus';
+import { RSUGrant, CreateGrantData, VestingPlan, VestingPlanChangePreview, vestingApi } from '../../services/api/rsus';
 import { useRSU } from '../../contexts/RSUContext';
 
 interface EditGrantDialogProps {
@@ -48,9 +56,36 @@ const EditGrantDialog: React.FC<EditGrantDialogProps> = ({
   const [submitError, setSubmitError] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Vesting plan state
+  const [vestingPlans, setVestingPlans] = useState<VestingPlan[]>([]);
+  const [selectedVestingPlan, setSelectedVestingPlan] = useState<string>('');
+  const [originalVestingPlan, setOriginalVestingPlan] = useState<string>('');
+  const [vestingPlanPreview, setVestingPlanPreview] = useState<VestingPlanChangePreview | null>(null);
+  const [showVestingPreview, setShowVestingPreview] = useState(false);
+  const [vestingPlanChanging, setVestingPlanChanging] = useState(false);
+  const [vestingPlanError, setVestingPlanError] = useState<string>('');
+
+  // Load vesting plans on mount
+  useEffect(() => {
+    const loadVestingPlans = async () => {
+      try {
+        const plans = await vestingApi.getPlans();
+        setVestingPlans(plans);
+      } catch (error) {
+        console.error('Error loading vesting plans:', error);
+        setVestingPlanError('Failed to load vesting plans');
+      }
+    };
+
+    if (open) {
+      loadVestingPlans();
+    }
+  }, [open]);
+
   // Reset form when grant changes
   useEffect(() => {
     if (grant) {
+      const initialVestingPlan = grant.vestingPlan || 'quarterly-5yr';
       setFormData({
         stockSymbol: grant.stockSymbol,
         name: grant.name || '',
@@ -60,8 +95,13 @@ const EditGrantDialog: React.FC<EditGrantDialogProps> = ({
         totalShares: grant.totalShares,
         notes: grant.notes || ''
       });
+      setSelectedVestingPlan(initialVestingPlan);
+      setOriginalVestingPlan(initialVestingPlan);
       setErrors({});
       setSubmitError('');
+      setVestingPlanError('');
+      setVestingPlanPreview(null);
+      setShowVestingPreview(false);
     }
   }, [grant]);
 
@@ -131,6 +171,9 @@ const EditGrantDialog: React.FC<EditGrantDialogProps> = ({
     setSubmitError('');
 
     try {
+      // Check if vesting plan has changed
+      const vestingPlanChanged = selectedVestingPlan !== originalVestingPlan;
+
       // Prepare update data - only include changed fields
       const updateData: Partial<CreateGrantData> = {};
       
@@ -156,14 +199,22 @@ const EditGrantDialog: React.FC<EditGrantDialogProps> = ({
         updateData.notes = formData.notes?.trim() || undefined;
       }
 
-      // Only update if there are changes
-      if (Object.keys(updateData).length === 0) {
-        onClose();
-        return;
+      // Handle vesting plan change if needed
+      if (vestingPlanChanged) {
+        await vestingApi.changePlan(grant._id, selectedVestingPlan);
       }
 
-      await updateGrant(grant._id, updateData);
-      onClose();
+      // Handle basic field updates if there are any changes
+      if (Object.keys(updateData).length > 0) {
+        await updateGrant(grant._id, updateData);
+      }
+
+      // Close dialog if there were any changes
+      if (Object.keys(updateData).length > 0 || vestingPlanChanged) {
+        onClose();
+      } else {
+        onClose(); // No changes, just close
+      }
     } catch (error) {
       console.error('Error updating grant:', error);
       setSubmitError(error instanceof Error ? error.message : 'Failed to update grant');
@@ -172,8 +223,34 @@ const EditGrantDialog: React.FC<EditGrantDialogProps> = ({
     }
   };
 
+  const handleVestingPlanChange = async (newPlanType: string) => {
+    if (!grant || newPlanType === selectedVestingPlan) return;
+
+    setSelectedVestingPlan(newPlanType);
+    setVestingPlanError('');
+    
+    // Show preview if plan changed from original
+    if (newPlanType !== originalVestingPlan && grant.unvestedShares > 0) {
+      try {
+        setVestingPlanChanging(true);
+        const preview = await vestingApi.previewPlanChange(grant._id, newPlanType);
+        setVestingPlanPreview(preview);
+        setShowVestingPreview(true);
+      } catch (error) {
+        console.error('Error previewing vesting plan change:', error);
+        setVestingPlanError(error instanceof Error ? error.message : 'Failed to preview vesting plan change');
+      } finally {
+        setVestingPlanChanging(false);
+      }
+    } else {
+      // Hide preview if back to original plan
+      setVestingPlanPreview(null);
+      setShowVestingPreview(false);
+    }
+  };
+
   const handleClose = () => {
-    if (!submitting) {
+    if (!submitting && !vestingPlanChanging) {
       onClose();
     }
   };
@@ -324,6 +401,108 @@ const EditGrantDialog: React.FC<EditGrantDialogProps> = ({
               disabled={submitting}
               inputProps={{ maxLength: 500 }}
             />
+
+            {/* Vesting Plan Section */}
+            <Divider sx={{ my: 2 }} />
+            
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ScheduleIcon color="primary" />
+                Vesting Schedule
+              </Typography>
+
+              {vestingPlanError && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {vestingPlanError}
+                </Alert>
+              )}
+
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start', flexDirection: { xs: 'column', sm: 'row' } }}>
+                <FormControl fullWidth>
+                  <InputLabel>Vesting Plan</InputLabel>
+                  <Select
+                    value={selectedVestingPlan}
+                    onChange={(e) => handleVestingPlanChange(e.target.value)}
+                    disabled={submitting || vestingPlanChanging || vestingPlans.length === 0}
+                    label="Vesting Plan"
+                  >
+                    {vestingPlans.map((plan) => (
+                      <MenuItem key={plan.id} value={plan.id}>
+                        <Box>
+                          <Typography variant="body2" fontWeight="medium">
+                            {plan.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {plan.description}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {grant?.unvestedShares > 0 && (
+                  <Box sx={{ minWidth: 200 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                      Current Plan
+                    </Typography>
+                    <Chip 
+                      label={vestingPlans.find(p => p.id === selectedVestingPlan)?.name || 'Loading...'}
+                      size="small" 
+                      color="primary"
+                      variant="outlined"
+                    />
+                  </Box>
+                )}
+              </Box>
+
+              {vestingPlanChanging && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+                  <CircularProgress size={16} />
+                  <Typography variant="body2" color="text.secondary">
+                    Analyzing vesting plan change...
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+
+            {/* Vesting Plan Change Preview */}
+            {showVestingPreview && vestingPlanPreview && (
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'info.main', color: 'info.contrastText', borderRadius: 1, opacity: 0.9 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <PreviewIcon />
+                  Vesting Plan Change Preview
+                </Typography>
+
+                {!vestingPlanPreview.canChange ? (
+                  <Alert severity="warning" sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>Cannot change vesting plan:</strong> {vestingPlanPreview.reason}
+                    </Typography>
+                  </Alert>
+                ) : (
+                  <>
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>From:</strong> {vestingPlanPreview.currentPlan.name} → <strong>To:</strong> {vestingPlanPreview.newPlan.name}
+                      </Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        • Vested shares remain unchanged: <strong>{vestingPlanPreview.impact.vestedSharesUnchanged.toLocaleString()}</strong>
+                      </Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        • Unvested shares will be redistributed: <strong>{vestingPlanPreview.impact.unvestedShares.toLocaleString()}</strong>
+                      </Typography>
+                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                        • Schedule will change from <strong>{vestingPlanPreview.impact.periodsKept}</strong> to <strong>{vestingPlanPreview.impact.newPeriods}</strong> periods
+                      </Typography>
+                    </Box>
+                    <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                      This change will be applied when you click "Update Grant" below.
+                    </Typography>
+                  </>
+                )}
+              </Box>
+            )}
           </Box>
         </Box>
       </DialogContent>

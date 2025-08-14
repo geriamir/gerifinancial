@@ -2,16 +2,117 @@ const { RSUGrant } = require('../../models');
 
 class VestingService {
   /**
-   * Generate quarterly vesting schedule for 5 years (20 periods)
+   * Get available vesting plans
+   * @returns {Array} Array of available vesting plan configurations
+   */
+  getAvailableVestingPlans() {
+    return [
+      {
+        id: 'quarterly-5yr',
+        name: 'Quarterly - 5 Years',
+        description: 'Vest every 3 months for 5 years (20 periods)',
+        periods: 20,
+        intervalMonths: 3,
+        years: 5,
+        isDefault: true
+      },
+      {
+        id: 'quarterly-4yr',
+        name: 'Quarterly - 4 Years', 
+        description: 'Vest every 3 months for 4 years (16 periods)',
+        periods: 16,
+        intervalMonths: 3,
+        years: 4,
+        isDefault: false
+      },
+      {
+        id: 'semi-annual-4yr',
+        name: 'Semi-Annual - 4 Years',
+        description: 'Vest every 6 months for 4 years (8 periods)',
+        periods: 8,
+        intervalMonths: 6,
+        years: 4,
+        isDefault: false
+      }
+    ];
+  }
+
+  /**
+   * Change vesting plan for an existing grant
+   * Completely replaces the vesting schedule with a new one based on the correct plan
+   */
+  async changeGrantVestingPlan(grantId, newPlanType) {
+    console.log(`🔄 Changing vesting plan for grant ${grantId} to ${newPlanType}`);
+    
+    const grant = await RSUGrant.findById(grantId);
+    if (!grant) {
+      throw new Error('Grant not found');
+    }
+
+    const plans = this.getAvailableVestingPlans();
+    const newPlan = plans.find(p => p.id === newPlanType);
+    if (!newPlan) {
+      throw new Error('Invalid vesting plan type');
+    }
+
+    // Check if there are unvested shares BEFORE recalculating
+    // This uses the current schedule to determine unvested shares
+    const currentUnvestedShares = grant.unvestedShares;
+    if (currentUnvestedShares <= 0) {
+      throw new Error('Cannot change vesting plan - all shares are already vested');
+    }
+
+    // Store original data for comparison
+    const originalSchedule = [...grant.vestingSchedule];
+    const originalVestedShares = grant.vestedShares || 0;
+    
+    // Generate completely new vesting schedule from grant date with correct plan
+    const newSchedule = await this.generateVestingSchedule(
+      newPlanType,
+      grant.grantDate,
+      grant.totalShares
+    );
+
+    // Update grant with completely new schedule
+    grant.vestingSchedule = newSchedule;
+    grant.vestingPlan = newPlanType;
+    
+    // Process any past vesting events to mark them as vested
+    await this.processGrantPastVestingEvents(grant);
+    
+    await grant.save();
+
+    console.log(`✅ Changed vesting plan for grant ${grantId} to ${newPlanType}`);
+    console.log(`   - Original schedule: ${originalSchedule.length} periods`);
+    console.log(`   - New schedule: ${newSchedule.length} periods`);
+    console.log(`   - Original vested shares: ${originalVestedShares}`);
+    console.log(`   - New vested shares: ${grant.vestedShares || 0}`);
+    
+    return {
+      grant,
+      summary: {
+        vestedShares: grant.vestedShares || 0,
+        unvestedShares: grant.totalShares - (grant.vestedShares || 0),
+        newPlanType,
+        originalPeriods: originalSchedule.length,
+        newPeriods: newSchedule.length,
+        originalVestedShares,
+        newVestedShares: grant.vestedShares || 0
+      }
+    };
+  }
+
+  /**
+   * Generate semi-annual vesting schedule
    * @param {Date} grantDate - The grant date
    * @param {number} totalShares - Total shares to vest
-   * @param {number} years - Number of years for vesting (default: 5)
+   * @param {number} years - Number of years for vesting (default: 4)
    * @returns {Array} Array of vesting schedule objects
    */
-  generateQuarterlySchedule(grantDate, totalShares, years = 5) {
-    const periods = years * 4; // Quarterly vesting = 20 periods
+  generateSemiAnnualSchedule(grantDate, totalShares, years = 4) {
+    const periods = years * 2; // Semi-annual vesting = 8 periods for 4 years
     const shareDistribution = this.distributeSharesEvenly(totalShares, periods);
-    const vestingDates = this.calculateVestingDates(grantDate, periods);
+    const vestingDates = this.calculateVestingDates(grantDate, periods, 6); // 6 months interval
     const now = new Date();
     
     return vestingDates.map((date, index) => ({
@@ -59,18 +160,19 @@ class VestingService {
   }
 
   /**
-   * Calculate quarterly vesting dates starting from grant date
+   * Calculate vesting dates starting from grant date
    * @param {Date} grantDate - The grant date
    * @param {number} periods - Number of vesting periods
+   * @param {number} intervalMonths - Months between vesting periods (default: 3 for quarterly)
    * @returns {Array} Array of vesting dates
    */
-  calculateVestingDates(grantDate, periods = 20) {
+  calculateVestingDates(grantDate, periods = 20, intervalMonths = 3) {
     const dates = [];
     const baseDate = new Date(grantDate);
     
     for (let i = 1; i <= periods; i++) {
       const vestDate = new Date(baseDate);
-      vestDate.setMonth(vestDate.getMonth() + (i * 3)); // Add 3 months for each quarter
+      vestDate.setMonth(vestDate.getMonth() + (i * intervalMonths));
       dates.push(vestDate);
     }
     
@@ -382,6 +484,173 @@ class VestingService {
       console.error('Error initializing Vesting Service:', error);
       throw error;
     }
+  }
+
+
+  /**
+   * Generate vesting schedule for unvested shares starting from a specific date
+   * @param {string} planType - Vesting plan type
+   * @param {Date} startDate - Start date for new vesting schedule
+   * @param {number} unvestedShares - Number of unvested shares
+   * @returns {Array} New vesting schedule for unvested shares
+   */
+  generateVestingScheduleForUnvestedShares(planType, startDate, unvestedShares) {
+    const plan = this.getAvailableVestingPlans().find(p => p.id === planType);
+    if (!plan) {
+      throw new Error(`Invalid vesting plan type: ${planType}`);
+    }
+
+    // Calculate how many periods we need based on the plan
+    const shareDistribution = this.distributeSharesEvenly(unvestedShares, plan.periods);
+    
+    // Generate vesting dates starting from the next interval after startDate
+    const vestingDates = this.calculateVestingDates(startDate, plan.periods, plan.intervalMonths);
+    
+    return vestingDates.map((date, index) => ({
+      vestDate: date,
+      shares: shareDistribution[index],
+      vested: false, // All new periods are unvested
+      vestedValue: 0
+    }));
+  }
+
+  /**
+   * Preview vesting plan change impact
+   * @param {string} grantId - Grant ID
+   * @param {string} newPlanType - New vesting plan type
+   * @returns {Object} Preview of the change impact
+   */
+  async previewVestingPlanChange(grantId, newPlanType) {
+    const grant = await RSUGrant.findById(grantId);
+    if (!grant) {
+      throw new Error('Grant not found');
+    }
+
+    const newPlan = this.getAvailableVestingPlans().find(p => p.id === newPlanType);
+    if (!newPlan) {
+      throw new Error(`Invalid vesting plan type: ${newPlanType}`);
+    }
+
+    const now = new Date();
+    const currentPlan = this.getAvailableVestingPlans().find(p => p.id === grant.vestingPlan) || 
+                       this.getAvailableVestingPlans().find(p => p.isDefault);
+
+    // Analyze current schedule
+    const vestedSchedule = grant.vestingSchedule.filter(v => v.vestDate <= now);
+    const unvestedSchedule = grant.vestingSchedule.filter(v => v.vestDate > now);
+    const unvestedShares = unvestedSchedule.reduce((sum, v) => sum + v.shares, 0);
+
+    if (unvestedShares === 0) {
+      return {
+        canChange: false,
+        reason: 'All shares have already vested',
+        vestedShares: grant.vestedShares,
+        unvestedShares: 0
+      };
+    }
+
+    // Generate preview of new schedule
+    const newUnvestedSchedule = this.generateVestingScheduleForUnvestedShares(
+      newPlanType,
+      now,
+      unvestedShares
+    );
+
+    return {
+      canChange: true,
+      currentPlan: {
+        id: grant.vestingPlan || currentPlan.id,
+        name: currentPlan.name,
+        unvestedPeriods: unvestedSchedule.length,
+        nextVestingDate: unvestedSchedule.length > 0 ? unvestedSchedule[0].vestDate : null
+      },
+      newPlan: {
+        id: newPlan.id,
+        name: newPlan.name,
+        unvestedPeriods: newUnvestedSchedule.length,
+        nextVestingDate: newUnvestedSchedule.length > 0 ? newUnvestedSchedule[0].vestDate : null
+      },
+      impact: {
+        vestedSharesUnchanged: vestedSchedule.reduce((sum, v) => sum + v.shares, 0),
+        unvestedShares,
+        periodsKept: vestedSchedule.length,
+        periodsReplaced: unvestedSchedule.length,
+        newPeriods: newUnvestedSchedule.length,
+        totalPeriodsAfter: vestedSchedule.length + newUnvestedSchedule.length
+      },
+      schedulePreview: {
+        keptSchedule: vestedSchedule,
+        newSchedule: newUnvestedSchedule
+      }
+    };
+  }
+
+  /**
+   * Generate vesting schedule based on plan type
+   * @param {string} planType - Vesting plan type
+   * @param {Date} grantDate - Grant date
+   * @param {number} totalShares - Total shares
+   * @returns {Array} Vesting schedule
+   */
+  generateVestingSchedule(planType, grantDate, totalShares) {
+    const plan = this.getAvailableVestingPlans().find(p => p.id === planType);
+    if (!plan) {
+      throw new Error(`Invalid vesting plan type: ${planType}`);
+    }
+
+    switch (planType) {
+      case 'quarterly-5yr':
+        return this.generateQuarterlySchedule(grantDate, totalShares, 5);
+      case 'quarterly-4yr':
+        return this.generateQuarterlySchedule(grantDate, totalShares, 4);
+      case 'semi-annual-4yr':
+        return this.generateSemiAnnualSchedule(grantDate, totalShares, 4);
+      default:
+        throw new Error(`Unsupported vesting plan type: ${planType}`);
+    }
+  }
+
+  /**
+   * Generate quarterly vesting schedule
+   * @param {Date} grantDate - The grant date
+   * @param {number} totalShares - Total shares to vest
+   * @param {number} years - Number of years for vesting (default: 5)
+   * @returns {Array} Array of vesting schedule objects
+   */
+  generateQuarterlySchedule(grantDate, totalShares, years = 5) {
+    const periods = years * 4; // Quarterly vesting
+    const shareDistribution = this.distributeSharesEvenly(totalShares, periods);
+    const vestingDates = this.calculateVestingDates(grantDate, periods, 3); // 3 months interval
+    const now = new Date();
+    
+    return vestingDates.map((date, index) => ({
+      vestDate: date,
+      shares: shareDistribution[index],
+      vested: date <= now, // Automatically mark past dates as vested
+      vestedValue: 0
+    }));
+  }
+
+  /**
+   * Process past vesting events for a single grant
+   * @param {Object} grant - Grant object
+   * @returns {boolean} Whether any events were processed
+   */
+  async processGrantPastVestingEvents(grant) {
+    const now = new Date();
+    let eventsProcessed = false;
+
+    for (const vestingEvent of grant.vestingSchedule) {
+      if (vestingEvent.vestDate <= now && !vestingEvent.vested) {
+        vestingEvent.vested = true;
+        // Set a default vested value based on current or grant price
+        const priceAtVesting = grant.currentPrice || grant.pricePerShare;
+        vestingEvent.vestedValue = vestingEvent.shares * priceAtVesting;
+        eventsProcessed = true;
+      }
+    }
+
+    return eventsProcessed;
   }
 
   /**
