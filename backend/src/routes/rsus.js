@@ -70,13 +70,15 @@ router.post('/grants',
     body('grantDate').isISO8601().toDate(),
     body('totalValue').isFloat({ min: 0.01 }),
     body('totalShares').isInt({ min: 1 }),
+    body('vestingPlan').optional().isIn(['quarterly-5yr', 'quarterly-4yr', 'semi-annual-4yr']),
     body('notes').optional().isString().trim().isLength({ max: 500 })
   ],
   handleValidationErrors,
   async (req, res) => {
     try {
       const grantData = req.body;
-      const grant = await rsuService.createGrant(req.user.id, grantData);
+      const { vestingPlan, ...restGrantData } = grantData;
+      const grant = await rsuService.createGrant(req.user.id, restGrantData, vestingPlan);
       
       res.status(201).json({
         success: true,
@@ -527,6 +529,113 @@ router.get('/grants/:id/performance',
 );
 
 // Vesting Routes
+
+/**
+ * GET /api/rsus/vesting-plans
+ * Get available vesting plans
+ */
+router.get('/vesting-plans',
+  auth,
+  async (req, res) => {
+    try {
+      const vestingPlans = rsuService.getAvailableVestingPlans();
+      
+      res.json({
+        success: true,
+        data: vestingPlans
+      });
+    } catch (error) {
+      console.error('Error getting vesting plans:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * PUT /api/rsus/grants/:id/vesting-plan
+ * Change vesting plan for a grant
+ */
+router.put('/grants/:id/vesting-plan',
+  auth,
+  [
+    param('id').isMongoId(),
+    body('newPlanType').isIn(['quarterly-5yr', 'quarterly-4yr', 'semi-annual-4yr'])
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      // Verify grant ownership
+      const grants = await rsuService.getUserGrants(req.user.id);
+      const existingGrant = grants.find(g => g._id.toString() === req.params.id);
+      
+      if (!existingGrant) {
+        return res.status(404).json({
+          success: false,
+          error: 'Grant not found'
+        });
+      }
+      
+      const { newPlanType } = req.body;
+      const result = await rsuService.changeVestingPlan(req.params.id, newPlanType);
+      
+      res.json({
+        success: true,
+        data: result,
+        message: `Vesting plan changed to ${newPlanType} successfully`
+      });
+    } catch (error) {
+      console.error('Error changing vesting plan:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/rsus/grants/:id/vesting-plan/preview
+ * Preview vesting plan change impact
+ */
+router.post('/grants/:id/vesting-plan/preview',
+  auth,
+  [
+    param('id').isMongoId(),
+    body('newPlanType').isIn(['quarterly-5yr', 'quarterly-4yr', 'semi-annual-4yr'])
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      // Verify grant ownership
+      const grants = await rsuService.getUserGrants(req.user.id);
+      const existingGrant = grants.find(g => g._id.toString() === req.params.id);
+      
+      if (!existingGrant) {
+        return res.status(404).json({
+          success: false,
+          error: 'Grant not found'
+        });
+      }
+      
+      const { newPlanType } = req.body;
+      const preview = await rsuService.previewVestingPlanChange(req.params.id, newPlanType);
+      
+      res.json({
+        success: true,
+        data: preview
+      });
+    } catch (error) {
+      console.error('Error previewing vesting plan change:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+);
 
 /**
  * GET /api/rsus/vesting/upcoming

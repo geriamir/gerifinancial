@@ -8,9 +8,10 @@ class RSUService {
    * Create a new RSU grant with vesting schedule
    * @param {string} userId - User ID
    * @param {Object} grantData - Grant data
+   * @param {string} vestingPlan - Vesting plan type (default: 'quarterly-5yr')
    * @returns {Object} Created grant with vesting schedule
    */
-  async createGrant(userId, grantData) {
+  async createGrant(userId, grantData, vestingPlan = 'quarterly-5yr') {
     try {
     // Validate required fields
     if (!grantData.stockSymbol || !grantData.grantDate || 
@@ -18,11 +19,11 @@ class RSUService {
       throw new Error('Missing required grant fields');
     }
 
-      // Generate vesting schedule
-      const vestingSchedule = vestingService.generateQuarterlySchedule(
+      // Generate vesting schedule based on plan
+      const vestingSchedule = vestingService.generateVestingSchedule(
+        vestingPlan,
         new Date(grantData.grantDate),
-        grantData.totalShares,
-        5 // 5 years
+        grantData.totalShares
       );
 
       // Validate vesting schedule
@@ -70,6 +71,7 @@ class RSUService {
         pricePerShare: pricePerShare,
         currentPrice: stockPrice.price,
         vestingSchedule,
+        vestingPlan,
         notes: grantData.notes || ''
       });
 
@@ -653,6 +655,96 @@ class RSUService {
     } catch (error) {
       throw new Error(`Failed to get tax projections: ${error.message}`);
     }
+  }
+
+  /**
+   * Get available vesting plans
+   * @returns {Array} Array of available vesting plan configurations
+   */
+  getAvailableVestingPlans() {
+    return vestingService.getAvailableVestingPlans();
+  }
+
+  /**
+   * Change vesting plan for an existing grant
+   * @param {string} grantId - Grant ID
+   * @param {string} newPlanType - New vesting plan type
+   * @returns {Object} Updated grant with new vesting schedule
+   */
+  async changeVestingPlan(grantId, newPlanType) {
+    try {
+      return await vestingService.changeGrantVestingPlan(grantId, newPlanType);
+    } catch (error) {
+      throw new Error(`Failed to change vesting plan: ${error.message}`);
+    }
+  }
+
+  /**
+   * Preview vesting plan change impact
+   * @param {string} grantId - Grant ID
+   * @param {string} newPlanType - New vesting plan type
+   * @returns {Object} Preview of the change impact
+   */
+  async previewVestingPlanChange(grantId, newPlanType) {
+    try {
+      return await vestingService.previewVestingPlanChange(grantId, newPlanType);
+    } catch (error) {
+      throw new Error(`Failed to preview vesting plan change: ${error.message}`);
+    }
+  }
+
+  /**
+   * Enhanced validate grant data with vesting plan support
+   * @param {Object} grantData - Grant data to validate
+   * @param {string} vestingPlan - Vesting plan type (optional)
+   * @returns {Object} Validation result
+   */
+  validateGrantData(grantData, vestingPlan) {
+    const errors = [];
+
+    if (!grantData.stockSymbol || typeof grantData.stockSymbol !== 'string') {
+      errors.push('Stock symbol is required');
+    }
+
+    // Company name is now optional
+    if (grantData.company && typeof grantData.company !== 'string') {
+      errors.push('Company name must be a string if provided');
+    }
+
+    if (!grantData.grantDate) {
+      errors.push('Grant date is required');
+    } else {
+      const grantDate = new Date(grantData.grantDate);
+      if (isNaN(grantDate.getTime())) {
+        errors.push('Invalid grant date');
+      }
+    }
+
+    if (!grantData.totalValue || grantData.totalValue <= 0) {
+      errors.push('Total value must be greater than 0');
+    }
+
+    if (!grantData.totalShares || grantData.totalShares <= 0) {
+      errors.push('Total shares must be greater than 0');
+    }
+
+    if (grantData.totalShares && !Number.isInteger(grantData.totalShares)) {
+      errors.push('Total shares must be a whole number');
+    }
+
+    // Validate vesting plan if provided
+    if (vestingPlan) {
+      const availablePlans = this.getAvailableVestingPlans();
+      const validPlan = availablePlans.find(plan => plan.id === vestingPlan);
+      if (!validPlan) {
+        errors.push(`Invalid vesting plan: ${vestingPlan}`);
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
   }
 }
 

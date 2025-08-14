@@ -98,8 +98,15 @@ const GrantItem: React.FC<GrantItemProps> = memo(({
   
   // Calculate available shares (vested shares minus sold shares) - memoized for performance
   const { sharesSold, availableShares } = useMemo(() => {
-    // Filter sales for this specific grant (grantId is always a string in RSUSale)
-    const filteredSales = sales.filter(sale => sale.grantId === grant._id);
+    // Filter sales for this specific grant - handle both string and object grantId
+    const filteredSales = sales.filter(sale => {
+      // grantId can be either a string or an object with _id field
+      const saleGrantId = typeof sale.grantId === 'string' 
+        ? sale.grantId 
+        : sale.grantId?._id || (sale.grantId as any)?.id;
+      
+      return saleGrantId === grant._id;
+    });
     
     const soldShares = filteredSales.reduce((total, sale) => total + sale.sharesAmount, 0);
     const available = Math.max(0, grant.vestedShares - soldShares);
@@ -363,7 +370,12 @@ const GrantsList: React.FC<GrantsListProps> = ({
   onDeleteGrant,
   onRecordSale
 }) => {
-  if (loading) {
+  const { grantsLoading, salesLoading } = useRSU();
+  
+  // Show loading if explicitly passed or if grants or sales are still loading
+  const isLoading = loading || grantsLoading || salesLoading;
+  
+  if (isLoading) {
     return (
       <Box>
         {[1, 2, 3].map((item) => (

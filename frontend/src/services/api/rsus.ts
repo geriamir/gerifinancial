@@ -14,6 +14,7 @@ export interface RSUGrant {
   currentPrice: number;
   currentValue: number;
   vestingSchedule: VestingEvent[];
+  vestingPlan?: 'quarterly-5yr' | 'quarterly-4yr' | 'semi-annual-4yr';
   status: 'active' | 'completed' | 'cancelled';
   notes?: string;
   createdAt: string;
@@ -36,7 +37,7 @@ export interface VestingEvent {
 export interface RSUSale {
   _id: string;
   userId: string;
-  grantId: string;
+  grantId: string | { _id: string; [key: string]: any };
   saleDate: string;
   sharesAmount: number;
   pricePerShare: number;
@@ -166,7 +167,59 @@ export interface CreateGrantData {
   grantDate: string;
   totalValue: number;
   totalShares: number;
+  vestingPlan?: 'quarterly-5yr' | 'quarterly-4yr' | 'semi-annual-4yr';
   notes?: string;
+}
+
+export interface VestingPlan {
+  id: 'quarterly-5yr' | 'quarterly-4yr' | 'semi-annual-4yr';
+  name: string;
+  description: string;
+  periods: number;
+  intervalMonths: number;
+  years: number;
+  isDefault: boolean;
+}
+
+export interface VestingPlanChangePreview {
+  canChange: boolean;
+  reason?: string;
+  currentPlan: {
+    id: string;
+    name: string;
+    unvestedPeriods: number;
+    nextVestingDate: string | null;
+  };
+  newPlan: {
+    id: string;
+    name: string;
+    unvestedPeriods: number;
+    nextVestingDate: string | null;
+  };
+  impact: {
+    vestedSharesUnchanged: number;
+    unvestedShares: number;
+    periodsKept: number;
+    periodsReplaced: number;
+    newPeriods: number;
+    totalPeriodsAfter: number;
+  };
+  schedulePreview: {
+    keptSchedule: VestingEvent[];
+    newSchedule: VestingEvent[];
+  };
+}
+
+export interface VestingPlanChangeResult {
+  grant: RSUGrant;
+  summary: {
+    vestedShares: number;
+    unvestedShares: number;
+    newPlanType: string;
+    vestedPeriodsKept: number;
+    newUnvestedPeriods: number;
+    totalNewPeriods: number;
+  };
 }
 
 export interface CreateSaleData {
@@ -443,6 +496,28 @@ export const vestingApi = {
   getCalendar: async (months?: number): Promise<VestingCalendarMonth[]> => {
     const params = months ? `?months=${months}` : '';
     const response = await api.get<ApiResponse<VestingCalendarMonth[]>>(`/rsus/vesting/calendar${params}`);
+    return response.data.data;
+  },
+
+  // Get available vesting plans
+  getPlans: async (): Promise<VestingPlan[]> => {
+    const response = await api.get<ApiResponse<VestingPlan[]>>('/rsus/vesting-plans');
+    return response.data.data;
+  },
+
+  // Preview vesting plan change
+  previewPlanChange: async (grantId: string, newPlanType: string): Promise<VestingPlanChangePreview> => {
+    const response = await api.post<ApiResponse<VestingPlanChangePreview>>(`/rsus/grants/${grantId}/vesting-plan/preview`, {
+      newPlanType
+    });
+    return response.data.data;
+  },
+
+  // Change vesting plan
+  changePlan: async (grantId: string, newPlanType: string): Promise<VestingPlanChangeResult> => {
+    const response = await api.put<ApiResponse<VestingPlanChangeResult>>(`/rsus/grants/${grantId}/vesting-plan`, {
+      newPlanType
+    });
     return response.data.data;
   }
 };

@@ -90,6 +90,12 @@ const rsuGrantSchema = new mongoose.Schema({
       message: 'Vesting schedule cannot be empty'
     }
   },
+  vestingPlan: {
+    type: String,
+    enum: ['quarterly-5yr', 'quarterly-4yr', 'semi-annual-4yr'],
+    default: 'quarterly-5yr',
+    index: true
+  },
   status: {
     type: String,
     enum: ['active', 'completed', 'cancelled'],

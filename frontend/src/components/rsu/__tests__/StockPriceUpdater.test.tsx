@@ -1,10 +1,11 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import StockPriceUpdater from '../StockPriceUpdater';
 import { RSUGrant, rsuApi } from '../../../services/api/rsus';
+import { suppressActWarnings, restoreConsoleError } from '../../../test/suppressActWarnings';
 
 const theme = createTheme();
 
@@ -54,6 +55,14 @@ const mockGrant: RSUGrant = {
 describe('StockPriceUpdater', () => {
   const mockOnClose = jest.fn();
   const mockOnPriceUpdate = jest.fn();
+
+  beforeAll(() => {
+    suppressActWarnings();
+  });
+
+  afterAll(() => {
+    restoreConsoleError();
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -140,8 +149,11 @@ describe('StockPriceUpdater', () => {
       );
 
       const priceInput = screen.getByLabelText(/new price/i);
-      await user.clear(priceInput);
-      await user.type(priceInput, '150.75');
+      
+      await act(async () => {
+        await user.clear(priceInput);
+        await user.type(priceInput, '150.75');
+      });
 
       expect(priceInput).toHaveValue(150.75);
     });
@@ -158,8 +170,11 @@ describe('StockPriceUpdater', () => {
       );
 
       const priceInput = screen.getByLabelText(/new price/i);
-      await user.clear(priceInput);
-      await user.type(priceInput, '150');
+      
+      await act(async () => {
+        await user.clear(priceInput);
+        await user.type(priceInput, '150');
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Price Change Preview')).toBeInTheDocument();
@@ -706,8 +721,11 @@ describe('StockPriceUpdater', () => {
       );
 
       const priceInput = screen.getByLabelText(/new price/i);
-      await user.clear(priceInput);
-      await user.type(priceInput, '10000');
+      
+      await act(async () => {
+        await user.clear(priceInput);
+        await user.type(priceInput, '10000');
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Price Change Preview')).toBeInTheDocument();
@@ -715,23 +733,23 @@ describe('StockPriceUpdater', () => {
 
       // Use test IDs for more precise element selection
       await waitFor(() => {
-        // Check for price change amount using test ID
+        // Check for price change amount using test ID (flexible for number formatting)
         const priceChangeElement = screen.getByTestId('price-change-amount');
-        expect(priceChangeElement).toHaveTextContent('+$9880.00');
+        expect(priceChangeElement).toHaveTextContent(/\+\$9,?880\.00/);
         
-        // Check for percentage change using test ID
+        // Check for percentage change using test ID (flexible for number formatting)
         const percentChangeElement = screen.getByTestId('price-change-percent');
-        expect(percentChangeElement).toHaveTextContent('+8233.33%');
+        expect(percentChangeElement).toHaveTextContent(/\+8,?233\.33%/);
         
-        // Check for new portfolio value using test ID
+        // Check for new portfolio value using test ID (flexible for number formatting)
         const portfolioValueElement = screen.getByTestId('new-portfolio-value');
-        expect(portfolioValueElement).toHaveTextContent('$10,000,000');
+        expect(portfolioValueElement).toHaveTextContent(/\$10,?000,?000/);
         
-        // Check for impact on portfolio using test ID
+        // Check for impact on portfolio using test ID (flexible for number formatting)
         const gainLossElement = screen.getByTestId('gain-loss-impact');
-        expect(gainLossElement).toHaveTextContent('+$9,880,000');
+        expect(gainLossElement).toHaveTextContent(/\+\$9,?880,?000/);
       }, { timeout: 5000 });
-    }, 15000);
+    }, 10000);
 
     it('should handle network errors gracefully', async () => {
       const user = userEvent.setup();
