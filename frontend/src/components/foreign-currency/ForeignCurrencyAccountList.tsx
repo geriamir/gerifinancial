@@ -33,6 +33,7 @@ import {
   getCurrencySymbol,
   ACCOUNT_STATUSES
 } from '../../types/foreignCurrency';
+import { encodeAccountNumber } from '../../utils/urlUtils';
 
 interface ForeignCurrencyAccountListProps {
   bankAccountId?: string;
@@ -72,7 +73,7 @@ export const ForeignCurrencyAccountList: React.FC<ForeignCurrencyAccountListProp
       onAccountSelect(account);
     } else {
       // URL encode account number to handle slashes and special characters
-      const encodedAccountNumber = encodeURIComponent(account.accountNumber);
+      const encodedAccountNumber = encodeAccountNumber(account.accountNumber);
       navigate(`/foreign-currency/accounts/${encodedAccountNumber}`);
     }
   };
@@ -80,7 +81,7 @@ export const ForeignCurrencyAccountList: React.FC<ForeignCurrencyAccountListProp
   const handleViewTransactions = () => {
     if (selectedAccount) {
       // URL encode account number to handle slashes and special characters
-      const encodedAccountNumber = encodeURIComponent(selectedAccount.accountNumber);
+      const encodedAccountNumber = encodeAccountNumber(selectedAccount.accountNumber);
       navigate(`/foreign-currency/accounts/${encodedAccountNumber}/transactions`);
     }
     handleMenuClose();
