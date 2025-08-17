@@ -20,6 +20,7 @@ import BudgetsPage from './pages/Budgets';
 import BudgetSubcategoryDetail from './pages/BudgetSubcategoryDetail';
 import RSUs from './pages/RSUs';
 import Investments from './pages/Investments';
+import ForeignCurrency from './pages/ForeignCurrency';
 import OnboardingPage from './pages/Onboarding';
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
@@ -83,6 +84,10 @@ const App: React.FC = () => {
               <Route path="budgets/income/:year/:month/:categoryId" element={<BudgetSubcategoryDetail />} />
               <Route path="rsus" element={<RSUs />} />
               <Route path="investments" element={<Investments />} />
+              <Route path="foreign-currency" element={<ForeignCurrency />} />
+              <Route path="foreign-currency/accounts/:accountNumber" element={<ForeignCurrency />} />
+              <Route path="foreign-currency/accounts/:accountNumber/transactions" element={<ForeignCurrency />} />
+              <Route path="foreign-currency/convert" element={<ForeignCurrency />} />
               <Route path="profile" element={<Profile />} />
             </Route>
             </Routes>

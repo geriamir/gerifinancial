@@ -1,4 +1,4 @@
-const { BankAccount } = require('../models');
+const { BankAccount, ForeignCurrencyAccount, CurrencyExchange } = require('../models');
 const bankScraperService = require('./bankScraperService');
 const transactionService = require('./transactionService');
 const investmentService = require('./investmentService');
@@ -32,6 +32,26 @@ class DataSyncService {
         if (portfolioResults.aggregatedInvestmentResults) {
           investmentResults = portfolioResults.aggregatedInvestmentResults;
         }
+      }
+
+      // Process investment transactions if available
+      let transactionProcessingResult = { newTransactions: 0, duplicatesSkipped: 0, errors: [] };
+      if (scrapingResult.investmentTransactions && scrapingResult.investmentTransactions.length > 0) {
+        logger.info(`Processing ${scrapingResult.investmentTransactions.length} investment transactions for bank account ${bankAccount._id}`);
+        transactionProcessingResult = await investmentService.processPortfolioTransactions(
+          scrapingResult.investmentTransactions, 
+          bankAccount
+        );
+      }
+
+      // Process foreign currency accounts if available
+      let foreignCurrencyResults = { newAccounts: 0, updatedAccounts: 0, newTransactions: 0, errors: [] };
+      if (scrapingResult.foreignCurrencyAccounts && scrapingResult.foreignCurrencyAccounts.length > 0) {
+        logger.info(`Processing ${scrapingResult.foreignCurrencyAccounts.length} foreign currency accounts for bank account ${bankAccount._id}`);
+        foreignCurrencyResults = await this.processForeignCurrencyAccounts(
+          scrapingResult.foreignCurrencyAccounts, 
+          bankAccount
+        );
       }
       
       // Update bank account status on successful sync
@@ -268,6 +288,173 @@ class DataSyncService {
       logger.error(`Failed to update scraping status to complete for bank account ${bankAccountId}:`, error);
       // Don't throw error - this shouldn't fail the sync
     }
+  }
+
+  // NEW: Process foreign currency accounts from scraping results
+  async processForeignCurrencyAccounts(foreignCurrencyAccounts, bankAccount) {
+    const results = {
+      newAccounts: 0,
+      updatedAccounts: 0,
+      newTransactions: 0,
+      errors: []
+    };
+
+    const { Transaction } = require('../models');
+
+    try {
+      for (const fcAccount of foreignCurrencyAccounts) {
+        try {
+          // Validate required fields - use originalAccountNumber from scraper data as accountNumber
+          if (!fcAccount.originalAccountNumber || !fcAccount.currency) {
+            logger.warn(`Skipping foreign currency account with missing required fields:`, fcAccount);
+            results.errors.push({
+              type: 'account',
+              currency: fcAccount.currency || 'unknown',
+              accountNumber: fcAccount.originalAccountNumber || 'unknown',
+              error: 'Missing required accountNumber or currency'
+            });
+            continue;
+          }
+
+          // Find or create the foreign currency account
+          // Use originalAccountNumber from scraper as the accountNumber in our model
+          const foreignCurrencyAccount = await ForeignCurrencyAccount.findOrCreate(
+            bankAccount.userId,
+            bankAccount._id,
+            fcAccount.originalAccountNumber, // This becomes accountNumber in our model
+            fcAccount.currency,
+            {
+              accountType: fcAccount.accountType,
+              balance: fcAccount.balance,
+              transactionCount: fcAccount.transactionCount,
+              lastTransactionDate: fcAccount.transactions.length > 0 
+                ? new Date(Math.max(...fcAccount.transactions.map(t => new Date(t.date)))) 
+                : null,
+              rawAccountData: fcAccount.rawAccountData
+            }
+          );
+
+          // Track if this was a new account
+          const wasNewAccount = foreignCurrencyAccount.createdAt >= new Date(Date.now() - 1000);
+          if (wasNewAccount) {
+            results.newAccounts++;
+          } else {
+            results.updatedAccounts++;
+          }
+
+          // Process transactions for this foreign currency account
+          let transactionsProcessed = 0;
+          for (const transaction of fcAccount.transactions) {
+            try {
+              // Check if transaction already exists
+              const existingTransaction = await Transaction.findOne({
+                identifier: transaction.identifier,
+                userId: bankAccount.userId,
+                currency: transaction.currency
+              });
+
+              if (!existingTransaction) {
+                // Create new foreign currency transaction
+                const newTransaction = new Transaction({
+                  identifier: transaction.identifier,
+                  userId: bankAccount.userId,
+                  accountId: foreignCurrencyAccount._id, // Link to foreign currency account
+                  amount: transaction.amount,
+                  currency: transaction.currency,
+                  date: new Date(transaction.date),
+                  description: transaction.description,
+                  memo: transaction.memo,
+                  type: transaction.amount > 0 ? 'income' : 'expense',
+                  rawData: {
+                    ...transaction.rawData,
+                    originalAmount: transaction.originalAmount,
+                    exchangeRate: transaction.exchangeRate,
+                    foreignCurrencyAccount: true
+                  }
+                });
+
+                await newTransaction.save();
+                transactionsProcessed++;
+                results.newTransactions++;
+                
+                logger.debug(`Created foreign currency transaction: ${transaction.currency} ${transaction.amount} - ${transaction.description}`);
+              }
+            } catch (transactionError) {
+              logger.error(`Failed to process foreign currency transaction:`, transactionError);
+              results.errors.push({
+                type: 'transaction',
+                currency: transaction.currency,
+                identifier: transaction.identifier,
+                error: transactionError.message
+              });
+            }
+          }
+
+          // Update account transaction statistics
+          if (transactionsProcessed > 0) {
+            await foreignCurrencyAccount.updateTransactionStats(
+              foreignCurrencyAccount.transactionCount + transactionsProcessed,
+              fcAccount.transactions.length > 0 
+                ? new Date(Math.max(...fcAccount.transactions.map(t => new Date(t.date))))
+                : foreignCurrencyAccount.lastTransactionDate
+            );
+          }
+
+          // Update exchange rate if available
+          if (fcAccount.transactions.length > 0) {
+            const latestTransaction = fcAccount.transactions
+              .filter(t => t.exchangeRate)
+              .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+              
+            if (latestTransaction && latestTransaction.exchangeRate) {
+              await foreignCurrencyAccount.updateBalance(
+                fcAccount.balance, 
+                latestTransaction.exchangeRate
+              );
+
+              // Update currency exchange rate in database
+              try {
+                await CurrencyExchange.updateRate(
+                  fcAccount.currency,
+                  'ILS',
+                  latestTransaction.exchangeRate,
+                  new Date(latestTransaction.date),
+                  'israeli-bank-scrapers',
+                  {
+                    accountNumber: fcAccount.originalAccountNumber,
+                    source: 'transaction'
+                  }
+                );
+              } catch (rateError) {
+                logger.warn(`Failed to update exchange rate for ${fcAccount.currency}:`, rateError.message);
+              }
+            }
+          }
+
+          logger.info(`Processed foreign currency account: ${foreignCurrencyAccount.displayName} with ${transactionsProcessed} new transactions`);
+
+        } catch (accountError) {
+          logger.error(`Failed to process foreign currency account:`, accountError);
+          results.errors.push({
+            type: 'account',
+            currency: fcAccount.currency,
+            accountNumber: fcAccount.originalAccountNumber,
+            error: accountError.message
+          });
+        }
+      }
+
+      logger.info(`Foreign currency processing complete: ${results.newAccounts} new accounts, ${results.updatedAccounts} updated, ${results.newTransactions} transactions, ${results.errors.length} errors`);
+
+    } catch (error) {
+      logger.error(`Failed to process foreign currency accounts:`, error);
+      results.errors.push({
+        type: 'general',
+        error: error.message
+      });
+    }
+
+    return results;
   }
 }
 

@@ -10,6 +10,7 @@ import { useInvestment } from '../contexts/InvestmentContext';
 import { InvestmentPortfolioCard } from '../components/investment/InvestmentPortfolioCard';
 import { InvestmentAccountList } from '../components/investment/InvestmentAccountList';
 import { PerformanceMetrics } from '../components/investment/PerformanceMetrics';
+import { InvestmentTransactionList } from '../components/investments/InvestmentTransactionList';
 
 const Investments: React.FC = () => {
   const {
@@ -110,6 +111,9 @@ const Investments: React.FC = () => {
           loading={loading}
           onRefresh={handleRefresh}
         />
+
+        {/* Investment Transactions */}
+        <InvestmentTransactionList />
       </Box>
 
       {/* Empty State */}

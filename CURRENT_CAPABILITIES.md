@@ -56,6 +56,60 @@ GeriFinancial is a comprehensive financial management platform specifically desi
 
 ---
 
+## 📈 **Investment Portfolio Transactions** (NEW - Backend Complete)
+
+### **What You Can Do:**
+
+#### **Investment Transaction History**
+- **Complete Transaction Records**: Track all buy/sell/dividend transactions from portfolio data
+- **Historical Backfill**: Automatically retrieve 6 months of transaction history for existing investments
+- **Transaction Classification**: Automatic identification of BUY, SELL, DIVIDEND, and other transaction types
+- **Multi-Currency Support**: Handle transactions in different currencies (ILS, USD, EUR)
+
+#### **Advanced Analytics & Reporting**
+- **Cost Basis Calculations**: Accurate cost basis tracking per security symbol
+- **Performance Metrics**: Calculate realized gains/losses, total dividends, and return performance
+- **Transaction-Based Analytics**: Portfolio performance calculations using actual transaction data
+- **Tax Information**: Preserve tax amounts paid for potential tax reporting
+
+#### **Transaction Management Features**
+- **Comprehensive Filtering**: Find transactions by investment, symbol, date range, or transaction type
+- **Symbol-Based Views**: View all transactions for specific securities across portfolios
+- **Transaction Summaries**: Aggregate views with counts, values, and unique symbols
+- **API-Driven Access**: Full REST API for transaction data retrieval and analysis
+
+#### **Investment Account Integration**
+- **Automatic Processing**: Investment transactions processed during bank account syncing
+- **Duplicate Prevention**: Smart duplicate detection prevents transaction re-import
+- **Investment Linking**: Transactions automatically linked to corresponding investment accounts
+- **Historical Resync**: Force historical transaction re-import when needed
+
+#### **Backend Infrastructure Complete**
+- **InvestmentTransaction Model**: Comprehensive database schema with efficient indexing
+- **Service Layer**: Full transaction processing, retrieval, and analytics services
+- **API Endpoints**: 8 new endpoints for transaction management and analytics
+- **Data Sync Integration**: Investment transactions processed automatically during sync
+
+### **Available API Endpoints:**
+```
+GET  /api/investments/transactions           - All user investment transactions
+GET  /api/investments/:id/transactions       - Transactions for specific investment
+GET  /api/investments/transactions/symbol/:symbol - Transactions by symbol
+GET  /api/investments/transactions/summary   - Transaction summary with analytics
+GET  /api/investments/cost-basis/:symbol     - Cost basis calculation for symbol
+GET  /api/investments/:id/performance        - Performance metrics from transactions
+POST /api/investments/:id/resync-history     - Resync historical transactions
+POST /api/investments/resync-history/:bankAccountId - Resync all account transactions
+```
+
+### **Ready for Frontend Integration:**
+- Transaction list and detail components
+- Investment performance charts using transaction data
+- Cost basis and tax reporting features
+- Historical transaction timeline visualization
+
+---
+
 ## 📊 **Budget Management System** (Advanced)
 
 ### **What You Can Do:**

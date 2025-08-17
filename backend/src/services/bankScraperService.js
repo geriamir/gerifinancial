@@ -5,6 +5,7 @@ const scraperModule = ['test', 'e2e'].includes(process.env.NODE_ENV)
 const { createScraper } = scraperModule;
 const logger = require('../utils/logger');
 
+
 class BankScraperService {
   constructor() {
     this.MAX_RETRIES = 3;
@@ -22,6 +23,8 @@ class BankScraperService {
       verbose = false,
       timeout = this.DEFAULT_TIMEOUT
     } = options;
+
+    startDate.setDate(startDate.getDate() + 1);
 
     // Log the scraping strategy being used
     const isIncrementalScraping = bankAccount.lastScraped;
@@ -144,11 +147,23 @@ class BankScraperService {
           transactionsCategorized: 0 // Not categorized yet
         });
 
-        // Return accounts, portfolios (new structure), and investments (legacy)
+        // Extract investment transactions from portfolios
+        const investmentTransactions = this.extractInvestmentTransactions(scraperResult.portfolios || []);
+
+        // Extract foreign currency accounts from both dedicated foreign currency accounts and regular accounts with foreign currency transactions
+        const foreignCurrencyAccountsFromDedicated = this.extractForeignCurrencyAccountsFromDedicated(scraperResult.foreignCurrencyAccounts || []);
+        const foreignCurrencyAccountsFromRegular = this.extractForeignCurrencyAccounts(scraperResult.accounts || []);
+        
+        // Combine both sources of foreign currency accounts
+        const foreignCurrencyAccounts = [...foreignCurrencyAccountsFromDedicated, ...foreignCurrencyAccountsFromRegular];
+
+        // Return accounts, portfolios (new structure), investments (legacy), investment transactions, and foreign currency accounts
         return {
           accounts: scraperResult.accounts || [],
           portfolios: scraperResult.portfolios || [],
-          investments: scraperResult.investments || []
+          investments: scraperResult.investments || [],
+          investmentTransactions: investmentTransactions,
+          foreignCurrencyAccounts: foreignCurrencyAccounts
         };
       } catch (err) {
         error = err;
@@ -180,12 +195,6 @@ class BankScraperService {
     });
 
     this.handleScraperError(error, 'Transaction scraping', bankAccount._id);
-  }
-
-  // Helper method to extract just investments from scraping result
-  async scrapeInvestments(bankAccount, options = {}) {
-    const result = await this.scrapeTransactions(bankAccount, options);
-    return result.investments || [];
   }
 
   // Helper method to validate investment data structure
@@ -226,6 +235,209 @@ class BankScraperService {
         lastUpdated: new Date(),
         rawData: investment
       }));
+  }
+
+  // NEW: Extract investment transactions from portfolio data
+  extractInvestmentTransactions(portfolios) {
+    if (!portfolios || !Array.isArray(portfolios)) {
+      return [];
+    }
+
+    const allTransactions = [];
+
+    portfolios.forEach(portfolio => {
+      if (!portfolio.transactions || !Array.isArray(portfolio.transactions)) {
+        return;
+      }
+
+      portfolio.transactions.forEach(transaction => {
+        // Validate required transaction fields
+        if (!transaction.paperId || !transaction.executionDate || transaction.amount === undefined) {
+          logger.warn(`Skipping invalid investment transaction:`, transaction);
+          return;
+        }
+
+        // Process and normalize transaction data
+        const processedTransaction = {
+          portfolioId: portfolio.portfolioId,
+          portfolioName: portfolio.portfolioName,
+          
+          // Security identification
+          paperId: transaction.paperId,
+          paperName: transaction.paperName || '',
+          symbol: transaction.symbol || '',
+          
+          // Transaction details - ensure numeric values are valid
+          amount: Number.isFinite(Number(transaction.amount)) ? Number(transaction.amount) : 0,
+          value: Number.isFinite(Number(transaction.value)) ? Math.abs(Number(transaction.value)) : 0,
+          currency: transaction.currency || 'ILS',
+          taxSum: Number.isFinite(Number(transaction.taxSum)) ? Number(transaction.taxSum) : 0,
+          executablePrice: Number.isFinite(Number(transaction.executablePrice)) ? Number(transaction.executablePrice) : 0,
+          
+          // Date handling - ensure proper date parsing
+          executionDate: new Date(transaction.executionDate),
+          
+          // Store original data for debugging
+          rawData: transaction
+        };
+
+        // Validate processed data
+        if (!processedTransaction.executionDate || isNaN(processedTransaction.executionDate.getTime())) {
+          logger.warn(`Invalid execution date for investment transaction:`, transaction);
+          return;
+        }
+
+        allTransactions.push(processedTransaction);
+      });
+    });
+
+    logger.info(`Extracted ${allTransactions.length} investment transactions from ${portfolios.length} portfolios`);
+    return allTransactions;
+  }
+
+  // NEW: Extract foreign currency accounts from dedicated foreign currency accounts (TransactionsForeignAccount[])
+  extractForeignCurrencyAccountsFromDedicated(foreignCurrencyAccounts) {
+    if (!foreignCurrencyAccounts || !Array.isArray(foreignCurrencyAccounts)) {
+      return [];
+    }
+
+    const processedAccounts = [];
+
+    foreignCurrencyAccounts.forEach(foreignAccount => {
+      if (!foreignAccount.accountNumber || !foreignAccount.currency) {
+        logger.warn(`Skipping invalid dedicated foreign currency account:`, foreignAccount);
+        return;
+      }
+
+      // Process dedicated foreign currency account
+      const processedAccount = {
+        originalAccountNumber: foreignAccount.accountNumber,
+        currency: foreignAccount.currency,
+        accountType: foreignAccount.type === 'foreignCurrency' ? 'checking' : (foreignAccount.type || 'checking'),
+        balance: foreignAccount.balance || 0,
+        transactionCount: (foreignAccount.txns || []).length,
+        transactions: (foreignAccount.txns || []).map(txn => ({
+          identifier: txn.identifier || `${txn.date}_${txn.chargedAmount}_${foreignAccount.currency}`,
+          date: txn.date,
+          amount: txn.chargedAmount || txn.originalAmount || 0,
+          currency: foreignAccount.currency,
+          originalAmount: txn.originalAmount || txn.chargedAmount, // Amount in original currency
+          exchangeRate: txn.originalCurrency && txn.originalAmount && txn.chargedAmount ? 
+            Math.abs(txn.chargedAmount / txn.originalAmount) : null,
+          description: txn.description,
+          memo: txn.memo,
+          rawData: txn
+        })),
+        rawAccountData: foreignAccount,
+        source: 'dedicated' // Mark as coming from dedicated foreign currency accounts
+      };
+
+      processedAccounts.push(processedAccount);
+    });
+
+    if (processedAccounts.length > 0) {
+      logger.info(`Extracted ${processedAccounts.length} dedicated foreign currency accounts with currencies: ${[...new Set(processedAccounts.map(fca => fca.currency))].join(', ')}`);
+    }
+
+    return processedAccounts;
+  }
+
+  // NEW: Extract foreign currency accounts from scraped account data
+  extractForeignCurrencyAccounts(accounts) {
+    if (!accounts || !Array.isArray(accounts)) {
+      return [];
+    }
+
+    const foreignCurrencyAccounts = [];
+
+    accounts.forEach(account => {
+      // Check if account has transactions in foreign currency
+      if (account.txns && Array.isArray(account.txns)) {
+        const currenciesFound = new Set();
+        
+        account.txns.forEach(transaction => {
+          if (transaction.originalCurrency && transaction.originalCurrency !== 'ILS') {
+            currenciesFound.add(transaction.originalCurrency);
+          }
+          // Also check the main currency field
+          if (transaction.currency && transaction.currency !== 'ILS') {
+            currenciesFound.add(transaction.currency);
+          }
+        });
+
+        // If foreign currencies found, create foreign currency account entries
+        currenciesFound.forEach(currency => {
+          const foreignCurrencyTransactions = account.txns.filter(txn => 
+            txn.originalCurrency === currency || 
+            (txn.currency === currency && currency !== 'ILS')
+          );
+
+          if (foreignCurrencyTransactions.length > 0) {
+            foreignCurrencyAccounts.push({
+              originalAccountNumber: account.accountNumber,
+              currency: currency,
+              accountType: account.type || 'checking',
+              balance: this.calculateForeignCurrencyBalance(foreignCurrencyTransactions),
+              transactionCount: foreignCurrencyTransactions.length,
+              transactions: foreignCurrencyTransactions.map(txn => ({
+                identifier: txn.identifier || `${txn.date}_${txn.chargedAmount}_${currency}`,
+                date: txn.date,
+                amount: txn.originalAmount || txn.chargedAmount,
+                currency: currency,
+                originalAmount: txn.chargedAmount, // Amount in ILS
+                exchangeRate: txn.originalAmount ? Math.abs(txn.chargedAmount / txn.originalAmount) : null,
+                description: txn.description,
+                memo: txn.memo,
+                rawData: txn
+              })),
+              rawAccountData: account,
+              source: 'regular' // Mark as coming from regular accounts with foreign currency transactions
+            });
+          }
+        });
+      }
+
+      // Also check if the account itself has a non-ILS currency
+      if (account.currency && account.currency !== 'ILS') {
+        const existingForeignAccount = foreignCurrencyAccounts.find(
+          fca => fca.originalAccountNumber === account.accountNumber && fca.currency === account.currency
+        );
+
+        if (!existingForeignAccount) {
+          foreignCurrencyAccounts.push({
+            originalAccountNumber: account.accountNumber,
+            currency: account.currency,
+            accountType: account.type || 'checking',
+            balance: account.balance || 0,
+            transactionCount: (account.txns || []).length,
+            transactions: (account.txns || []).map(txn => ({
+              identifier: txn.identifier || `${txn.date}_${txn.chargedAmount}_${account.currency}`,
+              date: txn.date,
+              amount: txn.chargedAmount,
+              currency: account.currency,
+              description: txn.description,
+              memo: txn.memo,
+              rawData: txn
+            })),
+            rawAccountData: account
+          });
+        }
+      }
+    });
+
+    if (foreignCurrencyAccounts.length > 0) {
+      logger.info(`Extracted ${foreignCurrencyAccounts.length} foreign currency accounts with currencies: ${[...new Set(foreignCurrencyAccounts.map(fca => fca.currency))].join(', ')}`);
+    }
+
+    return foreignCurrencyAccounts;
+  }
+
+  // Helper method to calculate balance from foreign currency transactions
+  calculateForeignCurrencyBalance(transactions) {
+    return transactions.reduce((balance, txn) => {
+      const amount = txn.originalAmount || txn.chargedAmount || 0;
+      return balance + amount;
+    }, 0);
   }
 
   async validateCredentials(bankId, credentials) {
