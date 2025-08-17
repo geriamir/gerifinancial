@@ -27,7 +27,7 @@ const handleValidationErrors = (req, res, next) => {
  * @access  Private
  */
 router.get('/accounts', [
-  query('currency').optional().isLength({ min: 3, max: 3 }).withMessage('Currency must be 3 characters'),
+  query('currency').optional().matches(/^[A-Z]{3}$/).withMessage('Currency must be a valid 3-letter uppercase ISO code'),
   query('bankAccountId').optional().isMongoId().withMessage('Invalid bank account ID'),
   handleValidationErrors
 ], async (req, res) => {
@@ -65,6 +65,13 @@ router.get('/accounts/:accountNumber', [
 ], async (req, res) => {
   try {
     const accountNumber = decodeURIComponent(req.params.accountNumber);
+    
+    // Validate account number format (alphanumeric, slashes, dashes, underscores, max 50 chars)
+    if (!/^[A-Za-z0-9/_-]{1,50}$/.test(accountNumber)) {
+      return res.status(400).json({
+        error: 'Invalid account number format'
+      });
+    }
     
     const account = await ForeignCurrencyAccount.findOne({
       accountNumber: accountNumber,
@@ -112,6 +119,13 @@ router.get('/accounts/:accountNumber/transactions', [
   try {
     const { limit = 25, offset = 0, startDate, endDate } = req.query;
     const accountNumber = decodeURIComponent(req.params.accountNumber);
+    
+    // Validate account number format (alphanumeric, slashes, dashes, underscores, max 50 chars)
+    if (!/^[A-Za-z0-9/_-]{1,50}$/.test(accountNumber)) {
+      return res.status(400).json({
+        error: 'Invalid account number format'
+      });
+    }
     
     // Verify account belongs to user
     const account = await ForeignCurrencyAccount.findOne({
@@ -227,7 +241,7 @@ router.get('/summary', async (req, res) => {
  * @access  Private
  */
 router.get('/exchange-rates', [
-  query('baseCurrency').optional().isLength({ min: 3, max: 3 }).withMessage('Base currency must be 3 characters'),
+  query('baseCurrency').optional().matches(/^[A-Z]{3}$/).withMessage('Base currency must be a valid 3-letter uppercase ISO code'),
   handleValidationErrors
 ], async (req, res) => {
   try {
@@ -256,8 +270,8 @@ router.get('/exchange-rates', [
  * @access  Private
  */
 router.post('/exchange-rates', [
-  body('fromCurrency').isLength({ min: 3, max: 3 }).withMessage('From currency must be 3 characters'),
-  body('toCurrency').isLength({ min: 3, max: 3 }).withMessage('To currency must be 3 characters'),
+  body('fromCurrency').matches(/^[A-Z]{3}$/).withMessage('From currency must be a valid 3-letter uppercase ISO code'),
+  body('toCurrency').matches(/^[A-Z]{3}$/).withMessage('To currency must be a valid 3-letter uppercase ISO code'),
   body('rate').isFloat({ min: 0.001 }).withMessage('Rate must be a positive number'),
   body('date').optional().isISO8601().withMessage('Invalid date format'),
   handleValidationErrors
@@ -303,6 +317,13 @@ router.put('/accounts/:accountNumber/balance', [
     const { balance, exchangeRate } = req.body;
     const accountNumber = decodeURIComponent(req.params.accountNumber);
     
+    // Validate account number format (alphanumeric, slashes, dashes, underscores, max 50 chars)
+    if (!/^[A-Za-z0-9/_-]{1,50}$/.test(accountNumber)) {
+      return res.status(400).json({
+        error: 'Invalid account number format'
+      });
+    }
+    
     const account = await ForeignCurrencyAccount.findOne({
       accountNumber: accountNumber,
       userId: req.user.id
@@ -337,8 +358,8 @@ router.put('/accounts/:accountNumber/balance', [
  */
 router.get('/convert', [
   query('amount').isFloat({ min: 0 }).withMessage('Amount must be non-negative'),
-  query('fromCurrency').isLength({ min: 3, max: 3 }).withMessage('From currency must be 3 characters'),
-  query('toCurrency').isLength({ min: 3, max: 3 }).withMessage('To currency must be 3 characters'),
+  query('fromCurrency').matches(/^[A-Z]{3}$/).withMessage('From currency must be a valid 3-letter uppercase ISO code'),
+  query('toCurrency').matches(/^[A-Z]{3}$/).withMessage('To currency must be a valid 3-letter uppercase ISO code'),
   query('date').optional().isISO8601().withMessage('Invalid date format'),
   handleValidationErrors
 ], async (req, res) => {
