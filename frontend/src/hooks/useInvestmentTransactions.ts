@@ -106,7 +106,8 @@ export function useInvestmentTransactions({
     if (autoFetch) {
       fetchTransactions();
     }
-  }, [autoFetch]); // Only depend on autoFetch to avoid infinite re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFetch]); // fetchTransactions intentionally omitted to prevent infinite re-renders
 
   // Recalculate hasMore when transactions or filters change
   const currentOffset = filters.offset || 0;
