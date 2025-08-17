@@ -26,7 +26,7 @@ const currencyExchangeSchema = new mongoose.Schema({
   },
   source: {
     type: String,
-    enum: ['bank-of-israel', 'xe-api', 'manual', 'fixer-api'],
+    enum: ['bank-of-israel', 'xe-api', 'manual', 'fixer-api', 'israeli-bank-scrapers'],
     default: 'bank-of-israel'
   },
   // Store additional metadata from the source
