@@ -24,11 +24,13 @@ class BankScraperService {
       timeout = this.DEFAULT_TIMEOUT
     } = options;
 
-    startDate.setDate(startDate.getDate() + 1);
+    // Create a copy to avoid mutating the input parameter
+    const startDateCopy = new Date(startDate);
+    startDateCopy.setDate(startDateCopy.getDate() + 1);
 
     // Log the scraping strategy being used
     const isIncrementalScraping = bankAccount.lastScraped;
-    logger.info(`Creating scraper for bank account ${bankAccount._id}  with ${isIncrementalScraping ? 'incremental' : 'initial'} scraping from ${startDate.toISOString()}`);
+    logger.info(`Creating scraper for bank account ${bankAccount._id}  with ${isIncrementalScraping ? 'incremental' : 'initial'} scraping from ${startDateCopy.toISOString()}`);
 
     const scraper = createScraper({
       companyId: bankAccount.bankId,
@@ -36,7 +38,7 @@ class BankScraperService {
       showBrowser,
       timeout,
       defaultTimeout: timeout,
-      startDate,
+      startDate: startDateCopy,
       combineInstallments: false,
       excludePendingTransactions: true
     });
