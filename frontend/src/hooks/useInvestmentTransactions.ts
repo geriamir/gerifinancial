@@ -106,7 +106,7 @@ export function useInvestmentTransactions({
     if (autoFetch) {
       fetchTransactions();
     }
-  }, [autoFetch, fetchTransactions]); // Include fetchTransactions in dependency array
+  }, [autoFetch]); // Only depend on autoFetch to avoid infinite re-renders
 
   // Recalculate hasMore when transactions or filters change
   const currentOffset = filters.offset || 0;
