@@ -1,4 +1,4 @@
-const { Investment, InvestmentSnapshot } = require('../models');
+const { Investment, InvestmentSnapshot, InvestmentTransaction } = require('../models');
 const bankScraperService = require('./bankScraperService');
 const INVESTMENT_CONSTANTS = require('../constants/investmentConstants');
 const logger = require('../utils/logger');
@@ -477,6 +477,349 @@ class InvestmentService {
       return snapshotResults;
     } catch (error) {
       logger.error(`Error creating snapshots after scraping: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // === NEW INVESTMENT TRANSACTION METHODS ===
+
+  // Process investment transactions from scraped portfolio data
+  async processPortfolioTransactions(investmentTransactions, bankAccount) {
+    const results = {
+      newTransactions: 0,
+      updatedTransactions: 0,
+      duplicatesSkipped: 0,
+      errors: []
+    };
+
+    if (!investmentTransactions || investmentTransactions.length === 0) {
+      logger.info(`No investment transactions found for bank account ${bankAccount._id}`);
+      return results;
+    }
+
+    // Get all investments for this bank account to link transactions
+    const investments = await Investment.findByUser(bankAccount.userId, { 
+      bankAccountId: bankAccount._id 
+    });
+
+    // Create a map for quick investment lookup by paperId
+    const investmentMap = new Map();
+    investments.forEach(investment => {
+      if (investment.holdings && investment.holdings.length > 0) {
+        investment.holdings.forEach(holding => {
+          if (holding.paperId) {
+            investmentMap.set(holding.paperId, investment);
+          }
+        });
+      }
+      // Also try to match by account number if it matches paperId
+      if (investment.accountNumber) {
+        investmentMap.set(investment.accountNumber, investment);
+      }
+    });
+
+    for (const transactionData of investmentTransactions) {
+      try {
+        // Find matching investment by paperId
+        const matchingInvestment = investmentMap.get(transactionData.paperId);
+        
+        if (!matchingInvestment) {
+          logger.warn(`No matching investment found for paperId: ${transactionData.paperId}, symbol: ${transactionData.symbol}`);
+          results.errors.push({
+            paperId: transactionData.paperId,
+            symbol: transactionData.symbol,
+            error: 'No matching investment account found'
+          });
+          continue;
+        }
+
+        // Check for existing transaction to prevent duplicates
+        const existingTransaction = await InvestmentTransaction.findOne({
+          userId: bankAccount.userId,
+          investmentId: matchingInvestment._id,
+          paperId: transactionData.paperId,
+          executionDate: transactionData.executionDate,
+          amount: transactionData.amount,
+          value: transactionData.value
+        });
+
+        if (existingTransaction) {
+          results.duplicatesSkipped++;
+          continue;
+        }
+
+        // Classify transaction type
+        const transactionType = InvestmentTransaction.classifyTransactionType(transactionData.amount);
+
+        // Create new investment transaction
+        const newTransaction = new InvestmentTransaction({
+          userId: bankAccount.userId,
+          investmentId: matchingInvestment._id,
+          bankAccountId: bankAccount._id,
+          portfolioId: transactionData.portfolioId,
+          
+          // Security identification
+          paperId: transactionData.paperId,
+          paperName: transactionData.paperName,
+          symbol: transactionData.symbol,
+          
+          // Transaction details
+          amount: transactionData.amount,
+          value: transactionData.value,
+          currency: transactionData.currency,
+          taxSum: transactionData.taxSum,
+          executionDate: transactionData.executionDate,
+          executablePrice: transactionData.executablePrice,
+          
+          // Derived fields
+          transactionType: transactionType,
+          rawData: transactionData.rawData
+        });
+
+        await newTransaction.save();
+        results.newTransactions++;
+        
+        logger.info(`Created investment transaction: ${transactionData.symbol} ${transactionType} ${Math.abs(transactionData.amount)} shares on ${transactionData.executionDate.toISOString().split('T')[0]}`);
+
+      } catch (error) {
+        results.errors.push({
+          paperId: transactionData.paperId,
+          symbol: transactionData.symbol,
+          error: error.message
+        });
+        logger.error(`Error processing investment transaction ${transactionData.symbol}: ${error.message}`);
+      }
+    }
+    
+    logger.info(`Investment transaction processing completed for account ${bankAccount._id}:`, {
+      newTransactions: results.newTransactions,
+      duplicatesSkipped: results.duplicatesSkipped,
+      errors: results.errors.length
+    });
+    
+    return results;
+  }
+
+  // Get investment transactions for a user with filtering options
+  async getInvestmentTransactions(userId, options = {}) {
+    try {
+      const {
+        investmentId,
+        symbol,
+        transactionType,
+        startDate,
+        endDate,
+        limit = 100,
+        offset = 0
+      } = options;
+
+      const query = { userId };
+
+      if (investmentId) {
+        query.investmentId = investmentId;
+      }
+
+      if (symbol) {
+        query.symbol = symbol.toUpperCase();
+      }
+
+      if (transactionType) {
+        query.transactionType = transactionType;
+      }
+
+      if (startDate || endDate) {
+        query.executionDate = {};
+        if (startDate) query.executionDate.$gte = startDate;
+        if (endDate) query.executionDate.$lte = endDate;
+      }
+
+      const transactions = await InvestmentTransaction.find(query)
+        .sort({ executionDate: -1 })
+        .limit(limit)
+        .skip(offset)
+        .populate('investmentId', 'accountName accountNumber')
+        .populate('bankAccountId', 'name bankId');
+
+      const totalCount = await InvestmentTransaction.countDocuments(query);
+
+      return {
+        transactions,
+        totalCount,
+        hasMore: totalCount > offset + limit
+      };
+    } catch (error) {
+      logger.error(`Error fetching investment transactions: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Get transactions by symbol
+  async getTransactionsBySymbol(userId, symbol, options = {}) {
+    try {
+      const {
+        startDate,
+        endDate,
+        limit = 50
+      } = options;
+
+      return await InvestmentTransaction.findBySymbol(userId, symbol, {
+        startDate,
+        endDate,
+        limit
+      });
+    } catch (error) {
+      logger.error(`Error fetching transactions by symbol: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Get transaction summary for user
+  async getInvestmentTransactionSummary(userId, options = {}) {
+    try {
+      const { startDate, endDate } = options;
+      
+      const summary = await InvestmentTransaction.getTransactionSummary(userId, {
+        startDate,
+        endDate
+      });
+      
+      return summary;
+    } catch (error) {
+      logger.error(`Error fetching investment transaction summary: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Calculate performance metrics using transactions
+  async calculatePerformanceFromTransactions(investmentId) {
+    try {
+      const transactions = await InvestmentTransaction.findByInvestment(investmentId)
+        .sort({ executionDate: 1 });
+
+      if (!transactions || transactions.length === 0) {
+        return null;
+      }
+
+      let totalInvested = 0;
+      let totalShares = 0;
+      let realizedGains = 0;
+      let totalDividends = 0;
+
+      transactions.forEach(transaction => {
+        switch (transaction.transactionType) {
+          case 'BUY':
+            totalInvested += transaction.value + transaction.taxSum;
+            totalShares += Math.abs(transaction.amount);
+            break;
+          case 'SELL':
+            const sharessSold = Math.abs(transaction.amount);
+            const avgCost = totalShares > 0 ? totalInvested / totalShares : 0;
+            const costBasis = sharessSold * avgCost;
+            realizedGains += (transaction.value - transaction.taxSum) - costBasis;
+            
+            // Update totals
+            totalShares -= sharessSold;
+            totalInvested -= costBasis;
+            break;
+          case 'DIVIDEND':
+            totalDividends += transaction.value - transaction.taxSum;
+            break;
+        }
+      });
+
+      const avgCostPerShare = totalShares > 0 ? totalInvested / totalShares : 0;
+
+      return {
+        totalInvested,
+        totalShares,
+        avgCostPerShare,
+        realizedGains,
+        totalDividends,
+        transactionCount: transactions.length,
+        firstTransactionDate: transactions[0].executionDate,
+        lastTransactionDate: transactions[transactions.length - 1].executionDate
+      };
+    } catch (error) {
+      logger.error(`Error calculating performance from transactions: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Get cost basis for a symbol across all investments
+  async getCostBasisBySymbol(userId, symbol) {
+    try {
+      return await InvestmentTransaction.calculateCostBasis(userId, symbol);
+    } catch (error) {
+      logger.error(`Error calculating cost basis by symbol: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // Check if historical transaction data exists and trigger resync if needed
+  async checkAndResyncHistoricalTransactions(bankAccount, forceResync = false) {
+    try {
+      const investments = await Investment.findByUser(bankAccount.userId, { 
+        bankAccountId: bankAccount._id 
+      });
+
+      if (!investments || investments.length === 0) {
+        logger.info(`No investments found for bank account ${bankAccount._id}, skipping transaction resync`);
+        return { message: 'No investments to sync transactions for' };
+      }
+
+      let needsResync = forceResync;
+
+      if (!forceResync) {
+        // Check if we have transaction data for investments
+        for (const investment of investments) {
+          const transactionCount = await InvestmentTransaction.countDocuments({
+            userId: bankAccount.userId,
+            investmentId: investment._id
+          });
+
+          // If investment exists but has no transactions, we need historical data
+          if (transactionCount === 0) {
+            needsResync = true;
+            logger.info(`Investment ${investment.accountName} has no transaction history, will resync`);
+            break;
+          }
+        }
+      }
+
+      if (needsResync) {
+        logger.info(`Resyncing historical transaction data for bank account ${bankAccount._id}`);
+        
+        // Scrape with extended date range for historical transactions (6 months back)
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        
+        const scrapingResult = await bankScraperService.scrapeTransactions(bankAccount, {
+          startDate: sixMonthsAgo,
+          verbose: true
+        });
+
+        if (scrapingResult.investmentTransactions && scrapingResult.investmentTransactions.length > 0) {
+          const transactionResult = await this.processPortfolioTransactions(
+            scrapingResult.investmentTransactions, 
+            bankAccount
+          );
+          
+          return {
+            message: 'Historical transaction resync completed',
+            result: transactionResult
+          };
+        } else {
+          return {
+            message: 'No historical transactions found during resync'
+          };
+        }
+      } else {
+        return {
+          message: 'Investment transactions are up to date, no resync needed'
+        };
+      }
+    } catch (error) {
+      logger.error(`Error during historical transaction resync: ${error.message}`);
       throw error;
     }
   }

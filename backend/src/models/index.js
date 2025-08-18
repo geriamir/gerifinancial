@@ -16,6 +16,9 @@ const RSUSale = require('./RSUSale');
 const StockPrice = require('./StockPrice');
 const Investment = require('./Investment');
 const InvestmentSnapshot = require('./InvestmentSnapshot');
+const InvestmentTransaction = require('./InvestmentTransaction');
+const CurrencyExchange = require('./CurrencyExchange');
+const ForeignCurrencyAccount = require('./ForeignCurrencyAccount');
 const Portfolio = require('./Portfolio');
 const PortfolioSnapshot = require('./PortfolioSnapshot');
 
@@ -38,6 +41,9 @@ module.exports = {
   StockPrice,
   Investment,
   InvestmentSnapshot,
+  InvestmentTransaction,
+  CurrencyExchange,
+  ForeignCurrencyAccount,
   Portfolio,
   PortfolioSnapshot
 };

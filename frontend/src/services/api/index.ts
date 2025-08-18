@@ -5,3 +5,8 @@ export * from './transactions';
 export * from './budgets';
 export * from './patterns';
 export * from './categories';
+export { investmentApi } from './investments';
+export { portfolioApi } from './portfolios';
+export * from './rsus';
+export * from './onboarding';
+export * from './foreignCurrency';

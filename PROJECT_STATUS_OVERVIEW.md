@@ -81,6 +81,10 @@ GeriFinancial has evolved from a basic financial management application into a *
 - Visualize vesting timeline with event-driven accuracy
 - Preview tax implications before sales (Israeli tax compliance)
 - Manage stock price updates with external API integration
+- **NEW**: Track investment portfolio transactions (buy/sell/dividend history)
+- **NEW**: Calculate cost basis and performance metrics from transaction data
+- **NEW**: Historical transaction data with 6-month backfill capability
+- **NEW**: Investment transaction analytics with realized/unrealized gains
 
 #### **Budget Management**
 - Create monthly budgets with subcategory-level precision
