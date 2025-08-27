@@ -252,6 +252,7 @@ describe('Budget API Endpoints', () => {
       const projectData = {
         name: 'Kitchen Renovation',
         description: 'Complete kitchen renovation project',
+        type: 'home_renovation',
         startDate: '2025-03-01',
         endDate: '2025-06-30',
         fundingSources: [{
@@ -292,6 +293,7 @@ describe('Budget API Endpoints', () => {
       const project1 = new ProjectBudget({
         userId: testUser._id,
         name: 'Project 1',
+        type: 'vacation',
         startDate: new Date('2025-01-01'),
         endDate: new Date('2025-03-31'),
         status: 'active',
@@ -303,6 +305,7 @@ describe('Budget API Endpoints', () => {
       const project2 = new ProjectBudget({
         userId: testUser._id,
         name: 'Project 2',
+        type: 'home_renovation',
         startDate: new Date('2025-04-01'),
         endDate: new Date('2025-06-30'),
         status: 'planning',
@@ -343,6 +346,7 @@ describe('Budget API Endpoints', () => {
       const project = new ProjectBudget({
         userId: testUser._id,
         name: 'Test Project',
+        type: 'investment',
         startDate: new Date('2025-01-01'),
         endDate: new Date('2025-03-31'),
         fundingSources: [],
@@ -372,6 +376,7 @@ describe('Budget API Endpoints', () => {
       const project = new ProjectBudget({
         userId: testUser._id,
         name: 'Test Project',
+        type: 'vacation',
         startDate: new Date('2025-01-01'),
         endDate: new Date('2025-03-31'),
         fundingSources: [],
@@ -403,6 +408,7 @@ describe('Budget API Endpoints', () => {
       const project = new ProjectBudget({
         userId: testUser._id,
         name: 'Test Project',
+        type: 'home_renovation',
         startDate: new Date('2025-01-01'),
         endDate: new Date('2025-12-31'),
         fundingSources: [{
@@ -429,7 +435,7 @@ describe('Budget API Endpoints', () => {
       expect(response.body.data).toHaveProperty('name', 'Test Project');
       expect(response.body.data).toHaveProperty('progress');
       expect(response.body.data).toHaveProperty('totalBudget');
-      expect(response.body.data).toHaveProperty('totalSpent');
+      expect(response.body.data).toHaveProperty('totalPaid');
       expect(response.body.data).toHaveProperty('remainingBudget');
       expect(response.body.data).toHaveProperty('categoryBreakdown');
     });
@@ -461,6 +467,7 @@ describe('Budget API Endpoints', () => {
       const project = new ProjectBudget({
         userId: testUser._id,
         name: 'Active Project',
+        type: 'home_renovation',
         startDate: new Date('2025-01-01'),
         endDate: new Date('2025-12-31'),
         status: 'active',
@@ -504,6 +511,7 @@ describe('Budget API Endpoints', () => {
       const project = new ProjectBudget({
         userId: testUser._id,
         name: 'Active Project',
+        type: 'investment',
         startDate: new Date(currentYear, currentMonth - 2, 1), // Started 2 months ago
         endDate: new Date(currentYear, currentMonth + 3, 30), // Ends in 3 months
         status: 'active',
@@ -581,7 +589,7 @@ describe('Budget API Endpoints', () => {
       await request(app)
         .post('/api/budgets/projects')
         .set('Authorization', `Bearer ${authToken}`)
-        .send({ name: 'Test Project' }) // Missing startDate and endDate
+        .send({ name: 'Test Project' }) // Missing type, startDate and endDate
         .expect(400);
 
       // Test invalid date range
@@ -590,6 +598,7 @@ describe('Budget API Endpoints', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           name: 'Test Project',
+          type: 'vacation',
           startDate: '2025-06-01',
           endDate: '2025-03-01' // End before start
         })
@@ -601,6 +610,7 @@ describe('Budget API Endpoints', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           name: 'Test Project',
+          type: 'vacation',
           startDate: '2025-03-01',
           endDate: '2025-06-01',
           priority: 'invalid'

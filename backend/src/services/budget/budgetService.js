@@ -471,11 +471,23 @@ class BudgetService {
         projectBudgetService.getUpcomingProjectBudgets(userId, 30)
       ]);
 
+      // Calculate overview data for each active project to get totalBudget
+      const projectOverviewService = require('./projectOverviewService');
+      const activeProjectsWithOverview = await Promise.all(
+        activeProjects.map(async (project) => {
+          const overview = await projectOverviewService.getProjectOverview(project);
+          return {
+            ...project.toObject(),
+            ...overview
+          };
+        })
+      );
+
       return {
         currentMonth: currentMonthBudget,
         activeProjects: activeProjects.length,
         upcomingProjects: upcomingProjects.length,
-        totalActiveProjectBudget: activeProjects.reduce((sum, p) => sum + p.totalBudget, 0)
+        totalActiveProjectBudget: activeProjectsWithOverview.reduce((sum, p) => sum + (p.totalBudget || 0), 0)
       };
     } catch (error) {
       logger.error('Error getting dashboard overview:', error);

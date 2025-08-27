@@ -223,20 +223,38 @@ export const EXCHANGE_RATE_SOURCES = [
   { value: 'manual', label: 'Manual Entry' }
 ] as const;
 
+// Currency-to-locale mapping
+const CURRENCY_LOCALE_MAP: Record<string, string> = {
+  'ILS': 'he-IL',
+  'USD': 'en-US',
+  'EUR': 'de-DE',
+  'GBP': 'en-GB',
+  'JPY': 'ja-JP',
+  'CHF': 'de-CH',
+  'CAD': 'en-CA',
+  'AUD': 'en-AU'
+};
+
+// Get appropriate locale for currency
+export const getLocaleForCurrency = (currency: string): string => {
+  return CURRENCY_LOCALE_MAP[currency] || 'en-US';
+};
+
 // Currency formatting utilities
 export const formatCurrency = (
   amount: number, 
   currency: string, 
-  locale: string = 'he-IL'
+  locale?: string
 ): string => {
   const currencyInfo = SUPPORTED_CURRENCIES.find(c => c.code === currency);
+  const effectiveLocale = locale || getLocaleForCurrency(currency);
   
   if (!currencyInfo) {
     return `${amount.toFixed(2)} ${currency}`;
   }
 
   try {
-    return new Intl.NumberFormat(locale, {
+    return new Intl.NumberFormat(effectiveLocale, {
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 2,

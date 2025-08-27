@@ -2,6 +2,8 @@ const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const auth = require('../middleware/auth');
 const budgetService = require('../services/budget/budgetService');
+const projectBudgetService = require('../services/budget/projectBudgetService');
+const projectExpensesService = require('../services/budget/projectExpensesService');
 const smartBudgetService = require('../services/budget/smartBudgetService');
 const { defaultCategories } = require('../services/userCategoryService');
 const { TransactionPattern } = require('../models');
@@ -429,41 +431,23 @@ router.get('/projects',
     try {
       const { status, year, limit = 20, offset = 0 } = req.query;
       
-      // Build query based on filters
-      let query = { userId: req.user._id };
+      // Build filters for the service layer
+      const filters = {
+        status,
+        year: year ? parseInt(year) : undefined,
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      };
       
-      if (status) {
-        query.status = status;
-      }
-      
-      if (year) {
-        const yearInt = parseInt(year);
-        query.$or = [
-          { startDate: { $gte: new Date(yearInt, 0, 1), $lte: new Date(yearInt, 11, 31) } },
-          { endDate: { $gte: new Date(yearInt, 0, 1), $lte: new Date(yearInt, 11, 31) } }
-        ];
-      }
-      
-      const { ProjectBudget } = require('../models');
-      const projects = await ProjectBudget.find(query)
-        .populate('projectTag', 'name')
-        .populate('categoryBudgets.categoryId', 'name')
-        .populate('categoryBudgets.subCategoryId', 'name')
-        .sort({ startDate: -1 })
-        .limit(parseInt(limit))
-        .skip(parseInt(offset));
-      
-      const total = await ProjectBudget.countDocuments(query);
+      // Use the project budget service to get projects with calculated overview data
+      const result = await projectBudgetService.getProjectBudgets(req.user._id, filters);
       
       res.json({
         success: true,
         data: {
-          projects,
+          projects: result.projects,
           pagination: {
-            total,
-            limit: parseInt(limit),
-            offset: parseInt(offset),
-            hasMore: (parseInt(offset) + projects.length) < total
+            total: result.total
           }
         }
       });
@@ -486,6 +470,7 @@ router.post('/projects',
   auth,
   [
     body('name').isString().isLength({ min: 1, max: 100 }).withMessage('Name must be 1-100 characters'),
+    body('type').isIn(['vacation', 'home_renovation', 'investment']).withMessage('Project type must be vacation, home_renovation, or investment'),
     body('description').optional().isString().isLength({ max: 500 }).withMessage('Description must be under 500 characters'),
     body('startDate').isISO8601().withMessage('Start date must be valid ISO8601 date'),
     body('endDate').isISO8601().withMessage('End date must be valid ISO8601 date'),
@@ -509,7 +494,7 @@ router.post('/projects',
         });
       }
       
-      const project = await budgetService.createProjectBudget(req.user._id, req.body);
+      const project = await projectBudgetService.createProjectBudget(req.user._id, req.body);
       
       res.status(201).json({
         success: true,
@@ -547,7 +532,7 @@ router.get('/projects/:id',
   handleValidationErrors,
   async (req, res) => {
     try {
-      const project = await budgetService.getProjectBudget(req.params.id);
+      const project = await projectBudgetService.getProjectBudget(req.params.id);
       
       // Check if user owns this project
       if (project.userId.toString() !== req.user._id) {
@@ -600,7 +585,7 @@ router.put('/projects/:id',
   handleValidationErrors,
   async (req, res) => {
     try {
-      const project = await budgetService.updateProjectBudget(req.params.id, req.body);
+      const project = await projectBudgetService.updateProjectBudget(req.params.id, req.body);
       
       res.json({
         success: true,
@@ -638,7 +623,7 @@ router.delete('/projects/:id',
   handleValidationErrors,
   async (req, res) => {
     try {
-      const result = await budgetService.deleteProjectBudget(req.params.id);
+      const result = await projectBudgetService.deleteProjectBudget(req.params.id);
       
       res.json({
         success: true,
@@ -675,7 +660,7 @@ router.get('/projects/:id/progress',
   handleValidationErrors,
   async (req, res) => {
     try {
-      const progress = await budgetService.getProjectProgress(req.params.id);
+      const progress = await projectBudgetService.getProjectProgress(req.params.id);
       
       res.json({
         success: true,
@@ -694,6 +679,498 @@ router.get('/projects/:id/progress',
       res.status(500).json({
         success: false,
         message: 'Failed to fetch project progress',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/budgets/projects/:id/expenses/tag
+ * Tag single transaction to project as unplanned expense
+ */
+router.post('/projects/:id/expenses/tag',
+  auth,
+  [
+    param('id').isMongoId().withMessage('Invalid project ID'),
+    body('transactionId').isMongoId().withMessage('Invalid transaction ID')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { ProjectBudget } = require('../models');
+      
+      // Get project and verify ownership
+      const project = await ProjectBudget.findOne({
+        _id: req.params.id,
+        userId: req.user._id
+      });
+      
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: 'Project not found'
+        });
+      }
+      
+      // Add transaction as unplanned expense
+      const transaction = await project.addUnplannedExpense(req.body.transactionId);
+      
+      res.json({
+        success: true,
+        data: {
+          transactionId: transaction._id,
+          projectId: project._id,
+          projectName: project.name
+        },
+        message: 'Transaction tagged to project successfully'
+      });
+    } catch (error) {
+      logger.error('Error tagging transaction to project:', error);
+      
+      if (error.message.includes('not found') || error.message.includes('not an expense')) {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to tag transaction to project',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/budgets/projects/:id/expenses/bulk-tag
+ * Tag multiple transactions to project as unplanned expenses
+ */
+router.post('/projects/:id/expenses/bulk-tag',
+  auth,
+  [
+    param('id').isMongoId().withMessage('Invalid project ID'),
+    body('transactionIds').isArray({ min: 1 }).withMessage('Transaction IDs must be a non-empty array'),
+    body('transactionIds.*').isMongoId().withMessage('Each transaction ID must be valid')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { ProjectBudget } = require('../models');
+      
+      // Get project and verify ownership
+      const project = await ProjectBudget.findOne({
+        _id: req.params.id,
+        userId: req.user._id
+      });
+      
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: 'Project not found'
+        });
+      }
+      
+      const { transactionIds } = req.body;
+      const results = [];
+      const errors = [];
+      
+      // Tag each transaction
+      for (const transactionId of transactionIds) {
+        try {
+          const transaction = await project.addUnplannedExpense(transactionId);
+          results.push({
+            transactionId: transaction._id,
+            success: true
+          });
+        } catch (error) {
+          errors.push({
+            transactionId,
+            error: error.message
+          });
+        }
+      }
+      
+      res.json({
+        success: true,
+        data: {
+          projectId: project._id,
+          projectName: project.name,
+          successfulTags: results.length,
+          totalRequested: transactionIds.length,
+          results,
+          errors
+        },
+        message: `Successfully tagged ${results.length} out of ${transactionIds.length} transactions`
+      });
+    } catch (error) {
+      logger.error('Error bulk tagging transactions to project:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to bulk tag transactions to project',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /api/budgets/projects/:id/expenses/:transactionId
+ * Remove transaction from project (untag)
+ */
+router.delete('/projects/:id/expenses/:transactionId',
+  auth,
+  [
+    param('id').isMongoId().withMessage('Invalid project ID'),
+    param('transactionId').isMongoId().withMessage('Invalid transaction ID')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { ProjectBudget } = require('../models');
+      
+      // Get project and verify ownership
+      const project = await ProjectBudget.findOne({
+        _id: req.params.id,
+        userId: req.user._id
+      });
+      
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: 'Project not found'
+        });
+      }
+      
+      // Remove transaction from project
+      const transaction = await project.removeUnplannedExpense(req.params.transactionId);
+      
+      res.json({
+        success: true,
+        data: {
+          transactionId: transaction._id,
+          projectId: project._id
+        },
+        message: 'Transaction removed from project successfully'
+      });
+    } catch (error) {
+      logger.error('Error removing transaction from project:', error);
+      
+      if (error.message.includes('not found') || error.message.includes('not associated')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to remove transaction from project',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * PUT /api/budgets/projects/:id/expenses/:transactionId/move
+ * Move unplanned expense to planned category
+ */
+router.put('/projects/:id/expenses/:transactionId/move',
+  auth,
+  [
+    param('id').isMongoId().withMessage('Invalid project ID'),
+    param('transactionId').custom((value) => {
+      // Allow installment group IDs (starting with 'installment-group-') or valid MongoDB ObjectIds
+      if (value.startsWith('installment-group-') || /^[0-9a-fA-F]{24}$/.test(value)) {
+        return true;
+      }
+      throw new Error('Invalid transaction ID');
+    }).withMessage('Invalid transaction ID'),
+    body('categoryId').isMongoId().withMessage('Invalid category ID'),
+    body('subCategoryId').isMongoId().withMessage('Invalid subcategory ID')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { ProjectBudget, Transaction } = require('../models');
+      
+      // Get project and verify ownership
+      const project = await ProjectBudget.findOne({
+        _id: req.params.id,
+        userId: req.user._id
+      });
+      
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: 'Project not found'
+        });
+      }
+      
+      const { transactionId } = req.params;
+      const { categoryId, subCategoryId } = req.body;
+      
+      // Check if this is an installment group or regular transaction
+      if (transactionId.startsWith('installment-group-')) {
+        // Handle installment group - move all individual installments
+        // Extract identifier and original amount from the group ID
+        // Format: installment-group-{cleanIdentifier}--{originalAmount} (identifier has trailing dashes removed)
+        const groupIdMatch = transactionId.match(/^installment-group-(.+?)--([0-9.-]+)$/);
+        if (!groupIdMatch) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid installment group ID format'
+          });
+        }
+        
+        const cleanIdentifier = groupIdMatch[1]; // Clean identifier (no trailing dashes)
+        const originalAmount = parseFloat(groupIdMatch[2]);
+        
+        // Find all related installment transactions
+        // Note: We need to match against the original identifier which may have trailing dashes
+        const installmentTransactions = await Transaction.find({
+          userId: req.user._id,
+          tags: project.projectTag,
+          identifier: { $regex: `^${cleanIdentifier}-*$` }, // Match the clean identifier with optional trailing dashes
+          'rawData.type': 'installments',
+          'rawData.originalAmount': originalAmount
+        });
+        
+        if (installmentTransactions.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: 'No installment transactions found for this group'
+          });
+        }
+        
+        // Use the new project expenses service to move the installment group
+        const result = await projectExpensesService.moveInstallmentGroupToPlanned(
+          req.params.id,
+          transactionId,
+          categoryId,
+          subCategoryId
+        );
+        
+        const results = result.transactions.map(tx => ({
+          transactionId: tx._id,
+          convertedAmount: result.totalConvertedAmount / result.transactionCount
+        }));
+        const totalConvertedAmount = result.totalConvertedAmount;
+        
+        // Get the updated target budget
+        const targetBudget = project.categoryBudgets.find(budget =>
+          budget.categoryId.toString() === categoryId.toString() &&
+          budget.subCategoryId.toString() === subCategoryId.toString()
+        );
+        
+        res.json({
+          success: true,
+          data: {
+            groupId: transactionId,
+            installmentCount: results.length,
+            totalConvertedAmount,
+            installmentResults: results,
+            targetCategory: {
+              categoryId,
+              subCategoryId,
+              newActualAmount: targetBudget ? targetBudget.actualAmount : 0
+            }
+          },
+          message: `Installment group with ${results.length} transactions moved to planned category successfully`
+        });
+        
+      } else {
+        // Handle regular transaction using the new service
+        const result = await projectExpensesService.moveExpenseToPlanned(
+          req.params.id,
+          transactionId,
+          categoryId,
+          subCategoryId
+        );
+        
+        res.json({
+          success: true,
+          data: {
+            transactionId: result.transaction._id,
+            convertedAmount: result.convertedAmount,
+            targetCategory: {
+              categoryId,
+              subCategoryId,
+              newActualAmount: result.targetBudget.actualAmount
+            }
+          },
+          message: 'Expense moved to planned category successfully'
+        });
+      }
+      
+    } catch (error) {
+      logger.error('Error moving expense to planned category:', error);
+      
+      if (error.message.includes('not found') || error.message.includes('not associated')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to move expense to planned category',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/budgets/projects/:id/expenses/breakdown
+ * Get comprehensive expense breakdown for project
+ */
+router.get('/projects/:id/expenses/breakdown',
+  auth,
+  [
+    param('id').isMongoId().withMessage('Invalid project ID')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { ProjectBudget } = require('../models');
+      
+      // Get project and verify ownership
+      const project = await ProjectBudget.findOne({
+        _id: req.params.id,
+        userId: req.user._id
+      }).populate('categoryBudgets.categoryId', 'name')
+        .populate('categoryBudgets.subCategoryId', 'name');
+      
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: 'Project not found'
+        });
+      }
+      
+      // Get comprehensive project overview including planned expenses with grouping
+      const projectOverviewService = require('../services/budget/projectOverviewService');
+      const overview = await projectOverviewService.getProjectOverview(project);
+      
+      res.json({
+        success: true,
+        data: {
+          projectId: project._id,
+          projectName: project.name,
+          currency: project.currency,
+          totalBudget: overview.totalBudget,
+          totalPaid: overview.totalPaid,
+          totalPlannedPaid: overview.totalPlannedPaid,
+          totalUnplannedPaid: overview.totalUnplannedPaid,
+          isOverBudget: overview.isOverBudget,
+          progress: overview.progress,
+          plannedCategories: overview.categoryBreakdown,
+          plannedExpensesGrouped: overview.plannedExpensesGrouped, // Grouped planned expenses with installment handling
+          unplannedExpenses: overview.unplannedExpenses,
+          unplannedExpensesCount: overview.unplannedExpensesCount
+        }
+      });
+    } catch (error) {
+      logger.error('Error fetching project expense breakdown:', error);
+      
+      if (error.message.includes('not found')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch project expense breakdown',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/budgets/projects/:id/expenses/bulk-move
+ * Move multiple unplanned expenses to planned category
+ */
+router.post('/projects/:id/expenses/bulk-move',
+  auth,
+  [
+    param('id').isMongoId().withMessage('Invalid project ID'),
+    body('transactionIds').isArray({ min: 1 }).withMessage('Transaction IDs must be a non-empty array'),
+    body('transactionIds.*').isMongoId().withMessage('Each transaction ID must be valid'),
+    body('categoryId').isMongoId().withMessage('Invalid category ID'),
+    body('subCategoryId').isMongoId().withMessage('Invalid subcategory ID')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const { ProjectBudget } = require('../models');
+      
+      // Get project and verify ownership
+      const project = await ProjectBudget.findOne({
+        _id: req.params.id,
+        userId: req.user._id
+      });
+      
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: 'Project not found'
+        });
+      }
+      
+      const { transactionIds, categoryId, subCategoryId } = req.body;
+      const results = [];
+      const errors = [];
+      let totalConvertedAmount = 0;
+      
+      // Move each transaction
+      for (const transactionId of transactionIds) {
+        try {
+          const result = await project.moveExpenseToPlanned(transactionId, categoryId, subCategoryId);
+          results.push({
+            transactionId: result.transaction._id,
+            convertedAmount: result.convertedAmount,
+            success: true
+          });
+          totalConvertedAmount += result.convertedAmount;
+        } catch (error) {
+          errors.push({
+            transactionId,
+            error: error.message
+          });
+        }
+      }
+      
+      res.json({
+        success: true,
+        data: {
+          projectId: project._id,
+          targetCategory: {
+            categoryId,
+            subCategoryId
+          },
+          successfulMoves: results.length,
+          totalRequested: transactionIds.length,
+          totalConvertedAmount,
+          results,
+          errors
+        },
+        message: `Successfully moved ${results.length} out of ${transactionIds.length} expenses to planned category`
+      });
+    } catch (error) {
+      logger.error('Error bulk moving expenses to planned category:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to bulk move expenses to planned category',
         error: error.message
       });
     }

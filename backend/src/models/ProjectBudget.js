@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const currencyExchangeService = require('../services/currencyExchangeService');
 
 const projectBudgetSchema = new mongoose.Schema({
   userId: {
@@ -13,10 +14,10 @@ const projectBudgetSchema = new mongoose.Schema({
     trim: true,
     maxlength: 100
   },
-  description: {
+  type: {
     type: String,
-    trim: true,
-    maxlength: 500
+    enum: ['vacation', 'home_renovation', 'investment'],
+    required: true
   },
   
   // Timeline
@@ -67,6 +68,11 @@ const projectBudgetSchema = new mongoose.Schema({
       type: Number,
       default: null,
       min: 0
+    },
+    currency: {
+      type: String,
+      required: true,
+      default: 'ILS'
     }
   }],
   
@@ -87,21 +93,23 @@ const projectBudgetSchema = new mongoose.Schema({
       required: true,
       min: 0
     },
-    actualAmount: {
-      type: Number,
-      default: 0
+    // Track transactions explicitly allocated to this planned budget item
+    allocatedTransactions: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Transaction'
+    }],
+    currency: {
+      type: String,
+      required: true,
+      default: 'ILS'
+    },
+    description: {
+      type: String,
+      trim: true,
+      maxlength: 200
     }
   }],
   
-  // Totals (computed from categoryBudgets and transactions)
-  totalBudget: {
-    type: Number,
-    default: 0
-  },
-  totalSpent: {
-    type: Number,
-    default: 0
-  },
   
   // Settings
   impactsOtherBudgets: {
@@ -147,31 +155,7 @@ projectBudgetSchema.index({ userId: 1, status: 1 });
 // Index for date-based queries
 projectBudgetSchema.index({ startDate: 1, endDate: 1 });
 
-// Virtual for total funding available
-projectBudgetSchema.virtual('totalFunding').get(function() {
-  return this.fundingSources.reduce((sum, source) => sum + source.expectedAmount, 0);
-});
 
-// Virtual for total funding currently available
-projectBudgetSchema.virtual('totalAvailableFunding').get(function() {
-  return this.fundingSources.reduce((sum, source) => sum + source.availableAmount, 0);
-});
-
-// Virtual for project progress percentage
-projectBudgetSchema.virtual('progressPercentage').get(function() {
-  if (this.totalBudget === 0) return 0;
-  return Math.min((this.totalSpent / this.totalBudget) * 100, 100);
-});
-
-// Virtual for remaining budget
-projectBudgetSchema.virtual('remainingBudget').get(function() {
-  return Math.max(this.totalBudget - this.totalSpent, 0);
-});
-
-// Virtual for budget variance
-projectBudgetSchema.virtual('budgetVariance').get(function() {
-  return this.totalSpent - this.totalBudget;
-});
 
 // Virtual for days remaining
 projectBudgetSchema.virtual('daysRemaining').get(function() {
@@ -190,11 +174,8 @@ projectBudgetSchema.virtual('durationDays').get(function() {
 projectBudgetSchema.set('toJSON', { virtuals: true });
 projectBudgetSchema.set('toObject', { virtuals: true });
 
-// Pre-save middleware to update totals
+// Pre-save middleware
 projectBudgetSchema.pre('save', function(next) {
-  // Calculate total budget from category budgets
-  this.totalBudget = this.categoryBudgets.reduce((sum, budget) => sum + budget.budgetedAmount, 0);
-  
   // Update impactsOtherBudgets based on funding sources
   this.impactsOtherBudgets = this.fundingSources.some(source => source.type === 'ongoing_funds');
   
@@ -248,7 +229,6 @@ projectBudgetSchema.methods.createProjectTag = async function() {
     userId: this.userId,
     type: 'project',
     projectMetadata: {
-      description: this.description,
       startDate: this.startDate,
       endDate: this.endDate,
       status: this.status
@@ -261,40 +241,10 @@ projectBudgetSchema.methods.createProjectTag = async function() {
   return tag;
 };
 
-// Method to update actual amounts from tagged transactions
+// DEPRECATED: Actual amounts are now calculated dynamically from allocatedTransactions
+// This method is kept for backward compatibility but no longer updates stored amounts
 projectBudgetSchema.methods.updateActualAmounts = async function() {
-  if (!this.projectTag) return this;
-  
-  const { Transaction } = require('./');
-  
-  // Reset actual amounts
-  this.categoryBudgets.forEach(budget => {
-    budget.actualAmount = 0;
-  });
-  
-  // Get all transactions tagged with this project
-  const transactions = await Transaction.find({
-    userId: this.userId,
-    tags: this.projectTag,
-    processedDate: { $gte: this.startDate, $lte: this.endDate }
-  });
-  
-  // Calculate actual amounts by category/subcategory
-  for (const transaction of transactions) {
-    const budget = this.categoryBudgets.find(b => 
-      b.categoryId.toString() === transaction.category.toString() &&
-      b.subCategoryId.toString() === transaction.subCategory.toString()
-    );
-    
-    if (budget) {
-      budget.actualAmount += Math.abs(transaction.amount);
-    }
-  }
-  
-  // Update total spent
-  this.totalSpent = this.categoryBudgets.reduce((sum, budget) => sum + budget.actualAmount, 0);
-  
-  await this.save();
+  console.warn('updateActualAmounts is deprecated. Actual amounts are now calculated dynamically from allocatedTransactions.');
   return this;
 };
 
@@ -305,7 +255,8 @@ projectBudgetSchema.methods.addFundingSource = function(sourceData) {
     description: sourceData.description,
     expectedAmount: sourceData.expectedAmount,
     availableAmount: sourceData.availableAmount || 0,
-    limit: sourceData.limit || null
+    limit: sourceData.limit || null,
+    currency: sourceData.currency || this.currency || 'ILS'
   });
   
   return this;
@@ -328,50 +279,78 @@ projectBudgetSchema.methods.addCategoryBudget = function(categoryId, subCategory
       categoryId,
       subCategoryId,
       budgetedAmount: amount,
-      actualAmount: 0
+      allocatedTransactions: []
     });
   }
   
   return this;
 };
 
-// Method to get project overview
-projectBudgetSchema.methods.getProjectOverview = function() {
-  const categoryBreakdown = this.categoryBudgets.map(budget => {
-    const variance = budget.actualAmount - budget.budgetedAmount;
-    const variancePercentage = budget.budgetedAmount > 0 
-      ? (variance / budget.budgetedAmount) * 100 
-      : 0;
-    
-    return {
-      categoryId: budget.categoryId,
-      subCategoryId: budget.subCategoryId,
-      budgeted: budget.budgetedAmount,
-      actual: budget.actualAmount,
-      variance,
-      variancePercentage,
-      status: variance > 0 ? 'over' : variance < 0 ? 'under' : 'exact'
-    };
+
+
+
+// Method to add transaction as unplanned expense (tag to project)
+projectBudgetSchema.methods.addUnplannedExpense = async function(transactionId) {
+  const { Transaction } = require('./');
+  
+  // Validate transaction ownership and type
+  const transaction = await Transaction.findOne({
+    _id: transactionId,
+    userId: this.userId,
+    type: 'expense' // Only expense transactions can be tagged to projects
   });
   
-  return {
-    name: this.name,
-    status: this.status,
-    progress: this.progressPercentage,
-    totalBudget: this.totalBudget,
-    totalSpent: this.totalSpent,
-    remainingBudget: this.remainingBudget,
-    totalFunding: this.totalFunding,
-    daysRemaining: this.daysRemaining,
-    categoryBreakdown,
-    fundingSources: this.fundingSources
-  };
+  if (!transaction) {
+    throw new Error('Transaction not found or not an expense transaction');
+  }
+  
+  // Ensure project has a tag
+  if (!this.projectTag) {
+    await this.createProjectTag();
+  }
+  
+  // Add project tag to transaction
+  await transaction.addTags([this.projectTag]);
+  
+  return transaction;
+};
+
+// Method to remove transaction from project (untag)
+projectBudgetSchema.methods.removeUnplannedExpense = async function(transactionId) {
+  const { Transaction } = require('./');
+  
+  const transaction = await Transaction.findOne({
+    _id: transactionId,
+    userId: this.userId,
+    tags: this.projectTag
+  });
+  
+  if (!transaction) {
+    throw new Error('Transaction not found or not associated with this project');
+  }
+  
+  // Remove project tag from transaction
+  await transaction.removeTags([this.projectTag]);
+  
+  // If transaction was allocated to a planned category, remove it from allocatedTransactions
+  const plannedBudget = this.categoryBudgets.find(budget =>
+    budget.categoryId.toString() === transaction.category.toString() &&
+    budget.subCategoryId.toString() === transaction.subCategory.toString()
+  );
+  
+  if (plannedBudget && plannedBudget.allocatedTransactions.includes(transactionId)) {
+    plannedBudget.allocatedTransactions = plannedBudget.allocatedTransactions.filter(
+      id => id.toString() !== transactionId.toString()
+    );
+    await this.save();
+  }
+  
+  return transaction;
 };
 
 // Method to mark project as completed
 projectBudgetSchema.methods.markCompleted = async function() {
   this.status = 'completed';
-  await this.updateActualAmounts(); // Final update
   await this.save();
   
   // Update project tag metadata

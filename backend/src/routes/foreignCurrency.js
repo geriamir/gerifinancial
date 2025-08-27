@@ -3,6 +3,7 @@ const { body, query, param, validationResult } = require('express-validator');
 const { ForeignCurrencyAccount, CurrencyExchange, Transaction } = require('../models');
 const authMiddleware = require('../middleware/auth');
 const logger = require('../utils/logger');
+const currencyExchangeService = require('../services/currencyExchangeService');
 
 const router = express.Router();
 
@@ -394,6 +395,62 @@ router.get('/convert', [
     logger.error('Error converting currency:', error);
     res.status(500).json({
       error: 'Failed to convert currency',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @route   POST /api/foreign-currency/exchange-rates/refresh
+ * @desc    Refresh exchange rates from external APIs
+ * @access  Private
+ */
+router.post('/exchange-rates/refresh', async (req, res) => {
+  try {
+    logger.info(`User ${req.user.id} triggered exchange rate refresh`);
+    
+    const updateResults = await currencyExchangeService.updateAllActivePairs();
+    
+    res.json({
+      success: true,
+      data: updateResults,
+      message: `Refreshed ${updateResults.updated} exchange rates, ${updateResults.failed} failed`
+    });
+  } catch (error) {
+    logger.error('Error refreshing exchange rates:', error);
+    res.status(500).json({
+      error: 'Failed to refresh exchange rates',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * @route   POST /api/foreign-currency/exchange-rates/refresh/:fromCurrency/:toCurrency
+ * @desc    Refresh specific exchange rate from external APIs
+ * @access  Private
+ */
+router.post('/exchange-rates/refresh/:fromCurrency/:toCurrency', [
+  param('fromCurrency').matches(/^[A-Z]{3}$/).withMessage('From currency must be a valid 3-letter uppercase ISO code'),
+  param('toCurrency').matches(/^[A-Z]{3}$/).withMessage('To currency must be a valid 3-letter uppercase ISO code'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { fromCurrency, toCurrency } = req.params;
+    
+    logger.info(`User ${req.user.id} triggered exchange rate refresh for ${fromCurrency}/${toCurrency}`);
+    
+    const exchangeRate = await currencyExchangeService.updateExchangeRate(fromCurrency, toCurrency);
+    
+    res.json({
+      success: true,
+      data: exchangeRate,
+      message: `Refreshed exchange rate: ${fromCurrency}/${toCurrency} = ${exchangeRate.rate}`
+    });
+  } catch (error) {
+    logger.error(`Error refreshing exchange rate for ${req.params.fromCurrency}/${req.params.toCurrency}:`, error);
+    res.status(500).json({
+      error: 'Failed to refresh exchange rate',
       message: error.message
     });
   }

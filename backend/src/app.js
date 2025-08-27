@@ -10,6 +10,7 @@ ensureLogsDir();
 const scrapingSchedulerService = require('./services/scrapingSchedulerService');
 const stockPriceService = require('./services/rsu/stockPriceService');
 const vestingService = require('./services/rsu/vestingService');
+const currencyExchangeService = require('./services/currencyExchangeService');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -60,6 +61,13 @@ if (config.env === 'test') {
           logger.info('Vesting service initialized');
         } catch (error) {
           logger.error('Failed to initialize vesting service:', error);
+        }
+
+        try {
+          await currencyExchangeService.initialize();
+          logger.info('Currency exchange service initialized');
+        } catch (error) {
+          logger.error('Failed to initialize currency exchange service:', error);
         }
       }
     })

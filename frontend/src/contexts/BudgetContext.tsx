@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { budgetsApi, MonthlyBudget, ProjectBudget, BudgetSummary, CreateMonthlyBudgetData, CreateProjectBudgetData } from '../services/api/budgets';
+import { budgetsApi, MonthlyBudget, BudgetSummary, CreateMonthlyBudgetData, CreateProjectBudgetData } from '../services/api/budgets';
+import { ProjectBudget } from '../types/projects';
 
 interface BudgetContextType {
   // State

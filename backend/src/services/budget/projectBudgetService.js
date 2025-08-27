@@ -1,4 +1,6 @@
 const { ProjectBudget, Tag } = require('../../models');
+const projectTemplateService = require('./projectTemplateService');
+const projectOverviewService = require('./projectOverviewService');
 const logger = require('../../utils/logger');
 
 class ProjectBudgetService {
@@ -11,14 +13,27 @@ class ProjectBudgetService {
    */
   async createProjectBudget(userId, projectData) {
     try {
+      // Generate category budgets from template if project type is provided
+      let categoryBudgets = projectData.categoryBudgets || [];
+      
+      if (projectData.type && categoryBudgets.length === 0) {
+        logger.info(`Creating project with template for type: ${projectData.type}`);
+        categoryBudgets = await projectTemplateService.createProjectCategoryBudgets(
+          userId, 
+          projectData.type, 
+          projectData.currency || 'ILS'
+        );
+      }
+
       const project = new ProjectBudget({
         userId,
         name: projectData.name,
+        type: projectData.type || 'vacation', // Store project type
         description: projectData.description || '',
         startDate: projectData.startDate,
         endDate: projectData.endDate,
         fundingSources: projectData.fundingSources || [],
-        categoryBudgets: projectData.categoryBudgets || [],
+        categoryBudgets: categoryBudgets,
         currency: projectData.currency || 'ILS',
         priority: projectData.priority || 'medium',
         notes: projectData.notes || ''
@@ -29,8 +44,16 @@ class ProjectBudgetService {
       // Create project tag
       await project.createProjectTag();
 
-      logger.info(`Created project budget for user ${userId}: ${projectData.name}`);
-      return project;
+      logger.info(`Created project budget for user ${userId}: ${projectData.name} with ${categoryBudgets.length} category budgets`);
+      
+      // Get overview with calculated totals before returning
+      const overview = await projectOverviewService.getProjectOverview(project);
+      
+      // Return enriched project data with calculated totals
+      return {
+        ...project.toObject(),
+        ...overview
+      };
     } catch (error) {
       logger.error('Error creating project budget:', error);
       throw error;
@@ -38,7 +61,7 @@ class ProjectBudgetService {
   }
 
   /**
-   * Get project budget details
+   * Get project budget details with calculated totals
    */
   async getProjectBudget(projectId) {
     try {
@@ -51,7 +74,14 @@ class ProjectBudgetService {
         throw new Error('Project budget not found');
       }
 
-      return project;
+      // Get overview with calculated totals
+      const overview = await projectOverviewService.getProjectOverview(project);
+      
+      // Return enriched project data with calculated totals
+      return {
+        ...project.toObject(),
+        ...overview
+      };
     } catch (error) {
       logger.error('Error fetching project budget:', error);
       throw error;
@@ -63,7 +93,11 @@ class ProjectBudgetService {
    */
   async updateProjectBudget(projectId, updates) {
     try {
-      const project = await ProjectBudget.findById(projectId);
+      const project = await ProjectBudget.findById(projectId)
+        .populate('projectTag', 'name')
+        .populate('categoryBudgets.categoryId', 'name type')
+        .populate('categoryBudgets.subCategoryId', 'name');
+        
       if (!project) {
         throw new Error('Project budget not found');
       }
@@ -78,7 +112,14 @@ class ProjectBudgetService {
       await project.save();
       logger.info(`Updated project budget: ${projectId}`);
       
-      return project;
+      // Get overview with calculated totals
+      const overview = await projectOverviewService.getProjectOverview(project);
+      
+      // Return enriched project data with calculated totals
+      return {
+        ...project.toObject(),
+        ...overview
+      };
     } catch (error) {
       logger.error('Error updating project budget:', error);
       throw error;
@@ -123,8 +164,7 @@ class ProjectBudgetService {
         throw new Error('Project not found');
       }
 
-      await project.updateActualAmounts();
-      return project.getProjectOverview();
+      return projectOverviewService.getProjectOverview(project);
     } catch (error) {
       logger.error('Error getting project progress:', error);
       throw error;
@@ -156,14 +196,20 @@ class ProjectBudgetService {
         .populate('categoryBudgets.subCategoryId', 'name')
         .sort({ startDate: -1 });
 
-      // Update actual amounts for each project
-      for (const project of projects) {
-        await project.updateActualAmounts();
-      }
+      // Get overview with calculated totals for each project
+      const projectsWithOverview = await Promise.all(
+        projects.map(async (project) => {
+          const overview = await projectOverviewService.getProjectOverview(project);
+          return {
+            ...project.toObject(),
+            ...overview
+          };
+        })
+      );
 
       return {
-        projects,
-        total: projects.length
+        projects: projectsWithOverview,
+        total: projectsWithOverview.length
       };
     } catch (error) {
       logger.error('Error getting project budgets:', error);
@@ -178,11 +224,7 @@ class ProjectBudgetService {
     try {
       const activeProjects = await ProjectBudget.findActive(userId);
 
-      // Update actual amounts for each project
-      for (const project of activeProjects) {
-        await project.updateActualAmounts();
-      }
-
+      // Actual amounts are now calculated dynamically in projectOverviewService
       return activeProjects;
     } catch (error) {
       logger.error('Error getting active project budgets:', error);
@@ -225,11 +267,7 @@ class ProjectBudgetService {
       .populate('categoryBudgets.subCategoryId', 'name')
       .sort({ startDate: -1 });
 
-      // Update actual amounts for each project
-      for (const project of projects) {
-        await project.updateActualAmounts();
-      }
-
+      // Actual amounts are now calculated dynamically in projectOverviewService
       return projects;
     } catch (error) {
       logger.error('Error getting project budgets for year:', error);
@@ -274,8 +312,19 @@ class ProjectBudgetService {
         ProjectBudget.find({ userId, status: 'completed' })
       ]);
 
-      const totalActiveProjectBudget = activeProjects.reduce((sum, p) => sum + p.totalBudget, 0);
-      const totalSpentOnActiveProjects = activeProjects.reduce((sum, p) => sum + p.totalActualAmount, 0);
+      // Get calculated totals for active projects
+      const activeProjectsWithOverview = await Promise.all(
+        activeProjects.map(async (project) => {
+          const overview = await projectOverviewService.getProjectOverview(project);
+          return {
+            ...project.toObject(),
+            ...overview
+          };
+        })
+      );
+
+      const totalActiveProjectBudget = activeProjectsWithOverview.reduce((sum, p) => sum + p.totalBudget, 0);
+      const totalSpentOnActiveProjects = activeProjectsWithOverview.reduce((sum, p) => sum + p.totalActualAmount, 0);
 
       return {
         activeProjects: activeProjects.length,
@@ -283,8 +332,8 @@ class ProjectBudgetService {
         completedProjects: completedProjects.length,
         totalActiveProjectBudget,
         totalSpentOnActiveProjects,
-        averageProjectProgress: activeProjects.length > 0 
-          ? activeProjects.reduce((sum, p) => sum + p.progressPercentage, 0) / activeProjects.length 
+        averageProjectProgress: activeProjectsWithOverview.length > 0 
+          ? activeProjectsWithOverview.reduce((sum, p) => sum + p.progressPercentage, 0) / activeProjectsWithOverview.length 
           : 0
       };
     } catch (error) {

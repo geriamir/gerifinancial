@@ -353,7 +353,7 @@ class TransactionService {
       .sort({ [sortField]: -1 })
       .skip(skip)
       .limit(limit)
-      .populate('category subCategory');
+      .populate('category subCategory tags');
 
     const hasMore = total > skip + transactions.length;
 

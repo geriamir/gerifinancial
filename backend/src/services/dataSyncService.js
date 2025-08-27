@@ -6,10 +6,15 @@ const portfolioService = require('./portfolioService');
 const logger = require('../utils/logger');
 
 class DataSyncService {
+  /**
+   * Syncs bank account data by scraping and processing transactions, portfolios, and investments.
+   * @param {BankAccount} bankAccount - The bank account to sync data for.
+   * @param {Object} [options={}] - Additional options for the sync process.
+   */
   async syncBankAccountData(bankAccount, options = {}) {
     try {
-      logger.info(`Starting comprehensive data sync for bank account ${bankAccount._id}...`);
-      
+      logger.info(`Starting comprehensive data sync for bank account ${bankAccount._id} (${bankAccount.name}) starting from ${bankAccount.lastScraped ? bankAccount.lastScraped.toISOString() : 'initial scrape'}...`);
+
       // Single scraping session that gets transactions, portfolios, and legacy investments
       const scrapingResult = await bankScraperService.scrapeTransactions(bankAccount, options);
       
@@ -81,7 +86,7 @@ class DataSyncService {
         }
       }
       
-      logger.info(`Data sync completed for account ${bankAccount._id}:`, {
+      logger.info(`Data sync completed for account ${bankAccount._id} (${bankAccount.name}):`, {
         newTransactions: transactionResults.newTransactions,
         newInvestments: investmentResults.newInvestments,
         updatedInvestments: investmentResults.updatedInvestments,

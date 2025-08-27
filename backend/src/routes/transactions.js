@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const { Category, SubCategory, Transaction } = require('../models');
+const { Category, SubCategory, Transaction, Tag } = require('../models');
 const transactionService = require('../services/transactionService');
 const categoryAIService = require('../services/categoryAIService');
+const tagService = require('../services/tagService');
 
 // Get transactions with pagination and filtering
 router.get('/', auth, async (req, res) => {
@@ -23,7 +24,8 @@ router.get('/', auth, async (req, res) => {
     } = req.query;
 
     // Use 'filter' parameter if 'category' is not provided (backward compatibility)
-    const finalCategory = category || filter;
+    // Treat empty strings as undefined to avoid filtering issues
+    const finalCategory = (category && category.trim()) || (filter && filter.trim()) || undefined;
 
     const validTypes = ['Expense', 'Income', 'Transfer'];
     const query = {
@@ -358,6 +360,79 @@ router.post('/:transactionId/suggest-category', auth, async (req, res) => {
   } catch (error) {
     console.error('Error getting AI category suggestion:', error);
     res.status(500).json({ error: 'Failed to get category suggestion' });
+  }
+});
+
+// ===== TAG MANAGEMENT ENDPOINTS =====
+
+// Get all tags for the user
+router.get('/tags', auth, async (req, res) => {
+  try {
+    const tags = await tagService.getUserTags(req.user._id);
+    res.json(tags);
+  } catch (error) {
+    console.error('Error fetching tags:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create or get existing tag
+router.post('/tags', auth, async (req, res) => {
+  try {
+    const { name, color = '#1976d2' } = req.body;
+    const tag = await tagService.createOrGetTag(req.user._id, name, color);
+    res.json(tag);
+  } catch (error) {
+    console.error('Error creating tag:', error);
+    if (error.code === 11000) {
+      res.status(400).json({ error: 'Tag with this name already exists' });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
+  }
+});
+
+// Add tags to transaction
+router.post('/:transactionId/tags', auth, async (req, res) => {
+  try {
+    const { tagNames } = req.body;
+    const result = await tagService.addTagsToTransaction(
+      req.user._id,
+      req.params.transactionId,
+      tagNames
+    );
+    
+    const response = {
+      ...result.transaction.toObject(),
+      installmentInfo: result.installmentInfo
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error adding tags to transaction:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Remove tags from transaction
+router.delete('/:transactionId/tags', auth, async (req, res) => {
+  try {
+    const { tagIds } = req.body;
+    const result = await tagService.removeTagsFromTransaction(
+      req.user._id,
+      req.params.transactionId,
+      tagIds
+    );
+
+    const response = {
+      ...result.transaction.toObject(),
+      installmentInfo: result.installmentInfo
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error removing tags from transaction:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
