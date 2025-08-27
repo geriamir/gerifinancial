@@ -69,7 +69,7 @@ export const addPlannedExpense = (
 ): CategoryBudget[] => {
   const defaultBudget: CategoryBudget = {
     categoryId: '',
-    subCategoryId: undefined, // Use undefined instead of empty string to avoid MongoDB validation error
+    subCategoryId: '',
     budgetedAmount: 0,
     actualAmount: 0,
     description: 'New Expense Item',

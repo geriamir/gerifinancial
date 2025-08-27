@@ -158,8 +158,6 @@ const Projects: React.FC = () => {
     // Helper functions for local editing values (moved after null checks)
     const startEditingFunding = (index: number) => {
       const source = (specificProject.fundingSources || [])[index];
-      console.log('startEditingFunding - source:', source);
-      console.log('startEditingFunding - current editingValues:', editingValues);
       
       const newEditingValues = {
         ...editingValues,
@@ -168,7 +166,6 @@ const Projects: React.FC = () => {
           currency: source.currency || specificProject.currency || 'ILS'
         }
       };
-      console.log('startEditingFunding - new editingValues:', newEditingValues);
       setEditingValues(newEditingValues);
       setEditingFunding(index);
     };
@@ -199,10 +196,6 @@ const Projects: React.FC = () => {
     };
 
     const updateEditingValue = (key: string, field: string, value: any) => {
-      console.log('updateEditingValue called:', { key, field, value });
-      console.log('Current editingValues before update:', JSON.stringify(editingValues, null, 2));
-      console.log('Current item before update:', editingValues[key]);
-      console.log('Current currency before update:', editingValues[key]?.currency);
       
       const newEditingValues = {
         ...editingValues,
@@ -212,9 +205,6 @@ const Projects: React.FC = () => {
         }
       };
       
-      console.log('New editingValues after update:', JSON.stringify(newEditingValues, null, 2));
-      console.log('New item after update:', newEditingValues[key]);
-      console.log('New currency after update:', newEditingValues[key]?.currency);
       setEditingValues(newEditingValues);
     };
 

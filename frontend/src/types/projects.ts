@@ -69,7 +69,7 @@ export interface FundingSource {
 // Category Budget Allocation
 export interface CategoryBudget {
   categoryId: string;
-  subCategoryId?: string; // Made optional to handle cases where no subcategory is selected
+  subCategoryId: string;
   budgetedAmount: number;
   actualAmount: number;
   description?: string; // User-defined description for this budget item
