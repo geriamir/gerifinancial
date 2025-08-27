@@ -15,7 +15,6 @@ import {
   CardContent,
   Alert,
   Chip,
-  Divider,
   Paper
 } from '@mui/material';
 import { 
@@ -59,7 +58,6 @@ const Projects: React.FC = () => {
   // Local state for editing values to prevent save-on-every-keystroke
   const [editingValues, setEditingValues] = useState<any>({});
   
-
   // Categories state
   const [categories, setCategories] = useState<Array<{
     _id: string;
@@ -72,7 +70,7 @@ const Projects: React.FC = () => {
     }>;
   }>>([]);
   const [, setCategoriesLoading] = useState(false);
-  const [travelCategory, setTravelCategory] = useState<{
+  const [, setTravelCategory] = useState<{
     _id: string;
     name: string;
     type: 'Income' | 'Expense' | 'Transfer';

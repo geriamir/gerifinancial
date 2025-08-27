@@ -5,13 +5,11 @@ import {
   Card,
   CardContent,
   Button,
-  Divider,
   Alert
 } from '@mui/material';
 import {
   Add
 } from '@mui/icons-material';
-import { formatCurrency } from '../../types/foreignCurrency';
 import { CategoryBreakdownItem, UnplannedExpense, CategoryBudget } from '../../types/projects';
 import ProjectExpensesViewToggle from '../project/ProjectExpensesViewToggle';
 import ProjectExpensesTableView from '../project/ProjectExpensesTableView';
@@ -55,22 +53,13 @@ const ProjectExpensesList: React.FC<ProjectExpensesListProps> = ({
   projectCurrency,
   projectType,
   availableCategories,
-  onEditPlannedExpense,
-  onDeletePlannedExpense,
   onAddPlannedExpense,
   onRemoveFromProject,
-  onExpensesMoved,
-  loading = false
-}) => {
+  onExpensesMoved}) => {
+
   const [movingExpense, setMovingExpense] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<ViewType>('table');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-
-  // Calculate totals using enhanced CategoryBreakdownItem structure
-  const totalPlannedBudget = plannedExpenses.reduce((sum, exp) => sum + exp.budgeted, 0);
-  const totalPlannedActual = plannedExpenses.reduce((sum, exp) => sum + exp.actual, 0);
-  const totalUnplannedAmount = unplannedExpenses.reduce((sum, exp) => sum + exp.convertedAmount, 0);
-  const totalExpenses = totalPlannedActual + totalUnplannedAmount;
 
   const handleAddExpense = (expense: Partial<CategoryBudget>) => {
     onAddPlannedExpense(expense);
