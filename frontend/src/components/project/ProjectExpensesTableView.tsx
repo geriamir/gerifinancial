@@ -5,7 +5,6 @@ import {
   TableBody,
   TableCell,
   TableContainer,
-  TableHead,
   TableRow,
   Paper,
   Collapse,
@@ -14,9 +13,7 @@ import {
   Chip,
   Button,
   CircularProgress,
-  LinearProgress,
-  Tooltip
-} from '@mui/material';
+  LinearProgress} from '@mui/material';
 import {
   ExpandLess,
   ExpandMore,
@@ -26,7 +23,6 @@ import {
   Warning,
   Info
 } from '@mui/icons-material';
-import { formatCurrency } from '../../types/foreignCurrency';
 import { CategoryBreakdownItem, UnplannedExpense } from '../../types/projects';
 import {
   formatCompactCurrency,
@@ -123,7 +119,6 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
           {Object.values(groupedBySubcategory).map((group) => {
             const totalBudgeted = group.budgetItems.reduce((sum, item) => sum + item.budgeted, 0);
             const totalActual = group.budgetItems.reduce((sum, item) => sum + item.actual, 0);
-            const totalExpenseCount = group.budgetItems.reduce((sum, item) => sum + item.expenseCount, 0);
             const isExpanded = expandedSubcategories.has(group.subcategory._id);
 
             return (

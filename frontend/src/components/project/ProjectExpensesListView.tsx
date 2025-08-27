@@ -29,7 +29,6 @@ import {
   Receipt,
   AccountBalance
 } from '@mui/icons-material';
-import { formatCurrency } from '../../types/foreignCurrency';
 import { CategoryBreakdownItem, UnplannedExpense } from '../../types/projects';
 import {
   formatCompactCurrency,
@@ -112,7 +111,6 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
         {Object.values(groupedBySubcategory).map((group, groupIndex) => {
           const totalBudgeted = group.budgetItems.reduce((sum, item) => sum + item.budgeted, 0);
           const totalActual = group.budgetItems.reduce((sum, item) => sum + item.actual, 0);
-          const totalExpenseCount = group.budgetItems.reduce((sum, item) => sum + item.expenseCount, 0);
           const isExpanded = expandedSubcategories.has(group.subcategory._id);
 
           return (

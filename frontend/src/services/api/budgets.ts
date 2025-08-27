@@ -1,6 +1,6 @@
 import { AxiosResponse } from 'axios';
 import api from './base';
-import { ProjectBudget, CategoryBreakdownItem } from '../../types/projects';
+import { ProjectBudget } from '../../types/projects';
 
 
 export interface MonthlyBudget {

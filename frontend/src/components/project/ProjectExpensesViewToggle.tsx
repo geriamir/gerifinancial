@@ -3,15 +3,10 @@ import {
   Box,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
-  Typography
-} from '@mui/material';
+  Tooltip} from '@mui/material';
 import {
   TableChart,
-  List,
-  ExpandMore,
-  AccountTree
-} from '@mui/icons-material';
+  List} from '@mui/icons-material';
 import { VIEW_MODES, CompactViewMode } from './ProjectExpensesCompactUtils';
 
 interface ProjectExpensesViewToggleProps {
@@ -29,7 +24,7 @@ const ProjectExpensesViewToggle: React.FC<ProjectExpensesViewToggleProps> = ({
   onViewChange
 }) => {
   const handleViewChange = (
-    event: React.MouseEvent<HTMLElement>,
+    _event: React.MouseEvent<HTMLElement>,
     newView: CompactViewMode['id'] | null
   ) => {
     if (newView !== null) {
