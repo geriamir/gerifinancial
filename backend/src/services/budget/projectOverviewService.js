@@ -604,7 +604,7 @@ class ProjectOverviewService {
     
     // Calculate progress including unplanned expenses
     const progressWithUnplanned = totalsInProjectCurrency.totalBudgetInProjectCurrency > 0 
-      ? Math.min((totalPaidWithUnplanned / totalsInProjectCurrency.totalBudgetInProjectCurrency) * 100, 100) 
+      ? Math.min(Math.round((totalPaidWithUnplanned / totalsInProjectCurrency.totalBudgetInProjectCurrency) * 100), 100) 
       : 0;
     
     // Determine if over budget

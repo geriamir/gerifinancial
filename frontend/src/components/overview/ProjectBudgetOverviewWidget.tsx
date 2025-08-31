@@ -14,10 +14,7 @@ import {
   Button,
   Chip,
   LinearProgress,
-  Grid,
-  Stack,
-  IconButton,
-  Tooltip
+  Stack
 } from '@mui/material';
 import {
   Folder as ProjectIcon,

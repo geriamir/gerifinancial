@@ -110,6 +110,7 @@ class UnplannedExpense {
     return {
       transactionId: this.transactionId,
       transaction: this.transaction,
+      amount: this.transaction.amount, // Add the transaction amount for compatibility
       originalAmount: this.originalAmount,
       originalCurrency: this.originalCurrency,
       convertedAmount: this.convertedAmount,

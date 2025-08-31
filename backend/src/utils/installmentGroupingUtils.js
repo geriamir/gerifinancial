@@ -14,7 +14,7 @@ class InstallmentGroupingUtils {
     return transaction.rawData?.type === 'installments' && 
            transaction.identifier && 
            transaction.rawData?.originalAmount && 
-           transaction.rawData?.installments?.total;
+           (transaction.rawData?.installments?.total || transaction.rawData?.totalInstallments);
   }
   
   /**
