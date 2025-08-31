@@ -1,4 +1,5 @@
 const { Transaction, Category, SubCategory, TransactionPattern, User, BankAccount } = require('../models');
+const { TransactionType } = require('../constants/enums');
 const recurrenceDetectionService = require('../services/budget/recurrenceDetectionService');
 const budgetService = require('../services/budget/budgetService');
 
@@ -36,7 +37,7 @@ describe('Pattern Detection Integration Tests', () => {
     taxCategory = new Category({
       userId: testUser._id,
       name: 'Tax',
-      type: 'Expense',
+      type: TransactionType.EXPENSE,
       description: 'Government taxes'
     });
     await taxCategory.save();
@@ -51,7 +52,7 @@ describe('Pattern Detection Integration Tests', () => {
     utilitiesCategory = new Category({
       userId: testUser._id,
       name: 'Utilities',
-      type: 'Expense',
+      type: TransactionType.EXPENSE,
       description: 'Utility bills'
     });
     await utilitiesCategory.save();
@@ -66,7 +67,7 @@ describe('Pattern Detection Integration Tests', () => {
     insuranceCategory = new Category({
       userId: testUser._id,
       name: 'Insurance',
-      type: 'Expense',
+      type: TransactionType.EXPENSE,
       description: 'Insurance payments'
     });
     await insuranceCategory.save();
@@ -86,6 +87,7 @@ describe('Pattern Detection Integration Tests', () => {
     identifier: `test-${Date.now()}-${Math.random()}`,
     date: data.transactionDate || data.processedDate,
     currency: 'ILS',
+    type: TransactionType.EXPENSE, // Add required transaction type using enum
     rawData: { test: 'data' },
     ...data
   });
@@ -469,7 +471,21 @@ describe('Pattern Detection Integration Tests', () => {
         createTransaction({
           description: 'Monthly Gym Membership',
           amount: -80,
+          processedDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 4, 1), // 4 months ago
+          category: utilitiesCategory._id,
+          subCategory: internetSubCategory._id,
+        }),
+        createTransaction({
+          description: 'Monthly Gym Membership',
+          amount: -80,
           processedDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 3, 1), // 3 months ago
+          category: utilitiesCategory._id,
+          subCategory: internetSubCategory._id,
+        }),
+        createTransaction({
+          description: 'Monthly Gym Membership',
+          amount: -80,
+          processedDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 1), // 2 months ago
           category: utilitiesCategory._id,
           subCategory: internetSubCategory._id,
         }),

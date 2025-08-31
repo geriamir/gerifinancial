@@ -77,11 +77,16 @@ describe('BankAccount Model', () => {
       
       // Should be either today (if before 3 AM) or tomorrow
       const now = new Date();
+      const expectedDate = new Date(now);
+      
       if (now.getHours() >= 3) {
-        expect(nextTime.getDate()).toBe(now.getDate() + 1);
-      } else {
-        expect(nextTime.getDate()).toBe(now.getDate());
+        // Add 1 day, handling month boundaries properly
+        expectedDate.setDate(now.getDate() + 1);
       }
+      
+      expect(nextTime.getDate()).toBe(expectedDate.getDate());
+      expect(nextTime.getMonth()).toBe(expectedDate.getMonth());
+      expect(nextTime.getFullYear()).toBe(expectedDate.getFullYear());
     });
 
     it('should calculate next weekly scraping time correctly', async () => {

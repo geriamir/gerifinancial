@@ -193,6 +193,11 @@ transactionSchema.methods.addTags = async function(tagIds) {
   const uniqueTagIds = [...new Set([...this.tags.map(t => t.toString()), ...newTagIds.map(t => t.toString())])];
   this.tags = uniqueTagIds;
   
+  // Ensure rawData exists for validation
+  if (!this.rawData) {
+    this.rawData = {};
+  }
+  
   // Update tag usage statistics
   await Tag.updateMany(
     { _id: { $in: newTagIds } },
@@ -209,6 +214,12 @@ transactionSchema.methods.addTags = async function(tagIds) {
 transactionSchema.methods.removeTags = async function(tagIds) {
   const tagsToRemove = Array.isArray(tagIds) ? tagIds : [tagIds];
   this.tags = this.tags.filter(tagId => !tagsToRemove.map(t => t.toString()).includes(tagId.toString()));
+  
+  // Ensure rawData exists for validation
+  if (!this.rawData) {
+    this.rawData = {};
+  }
+  
   await this.save();
   return this;
 };

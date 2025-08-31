@@ -1,4 +1,5 @@
 const { Transaction, ProjectBudget } = require('../../models');
+const { TransactionType } = require('../../constants/enums');
 const currencyExchangeService = require('../currencyExchangeService');
 const logger = require('../../utils/logger');
 
@@ -73,6 +74,12 @@ class ProjectExpensesService {
       // Update the transaction's category/subcategory to match the target
       transaction.category = targetCategoryId;
       transaction.subCategory = targetSubCategoryId;
+      
+      // Ensure rawData exists for validation
+      if (!transaction.rawData) {
+        transaction.rawData = {};
+      }
+      
       await transaction.save();
 
       // Add transaction to the allocated transactions list if not already there
@@ -173,6 +180,12 @@ class ProjectExpensesService {
         // Update the transaction's category/subcategory
         transaction.category = targetCategoryId;
         transaction.subCategory = targetSubCategoryId;
+        
+        // Ensure rawData exists for validation
+        if (!transaction.rawData) {
+          transaction.rawData = {};
+        }
+        
         await transaction.save();
 
         // Add transaction to the allocated transactions list if not already there
@@ -217,7 +230,7 @@ class ProjectExpensesService {
       const transaction = await Transaction.findOne({
         _id: transactionId,
         userId: project.userId,
-        type: 'expense' // Only expense transactions can be tagged to projects
+        type: TransactionType.EXPENSE // Only expense transactions can be tagged to projects
       });
 
       if (!transaction) {

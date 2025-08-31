@@ -21,6 +21,7 @@ import {
   CalendarToday as CalendarIcon,
   Description as DescriptionIcon,
   LocalOffer as TagIcon,
+  Folder as ProjectIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import type { Transaction, Tag } from '../../services/api/types/transactions';

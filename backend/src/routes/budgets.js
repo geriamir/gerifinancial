@@ -575,6 +575,7 @@ router.put('/projects/:id',
     param('id').isMongoId().withMessage('Invalid project ID'),
     body('name').optional().isString().isLength({ min: 1, max: 100 }).withMessage('Name must be 1-100 characters'),
     body('description').optional().isString().isLength({ max: 500 }).withMessage('Description must be under 500 characters'),
+    body('startDate').optional().isISO8601().withMessage('Start date must be valid ISO8601 date'),
     body('endDate').optional().isISO8601().withMessage('End date must be valid ISO8601 date'),
     body('status').optional().isIn(['planning', 'active', 'completed', 'cancelled']).withMessage('Invalid status'),
     body('fundingSources').optional().isArray().withMessage('Funding sources must be an array'),
@@ -585,6 +586,30 @@ router.put('/projects/:id',
   handleValidationErrors,
   async (req, res) => {
     try {
+      // Validate date logic if both dates are provided
+      if (req.body.startDate && req.body.endDate) {
+        const startDate = new Date(req.body.startDate);
+        const endDate = new Date(req.body.endDate);
+        
+        if (endDate <= startDate) {
+          return res.status(400).json({
+            success: false,
+            message: 'End date must be after start date'
+          });
+        }
+      } else if (req.body.endDate) {
+        // If only endDate is provided, check against existing startDate
+        const existingProject = await projectBudgetService.getProjectBudget(req.params.id);
+        const endDate = new Date(req.body.endDate);
+        
+        if (endDate <= existingProject.startDate) {
+          return res.status(400).json({
+            success: false,
+            message: 'End date must be after start date'
+          });
+        }
+      }
+      
       const project = await projectBudgetService.updateProjectBudget(req.params.id, req.body);
       
       res.json({
@@ -597,6 +622,13 @@ router.put('/projects/:id',
       
       if (error.message.includes('not found')) {
         return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      if (error.message.includes('End date must be after start date')) {
+        return res.status(400).json({
           success: false,
           message: error.message
         });
@@ -713,8 +745,11 @@ router.post('/projects/:id/expenses/tag',
         });
       }
       
-      // Add transaction as unplanned expense
-      const transaction = await project.addUnplannedExpense(req.body.transactionId);
+      // Add transaction as unplanned expense using the service
+      const transaction = await projectExpensesService.addUnplannedExpense(
+        project._id,
+        req.body.transactionId
+      );
       
       res.json({
         success: true,
@@ -780,7 +815,10 @@ router.post('/projects/:id/expenses/bulk-tag',
       // Tag each transaction
       for (const transactionId of transactionIds) {
         try {
-          const transaction = await project.addUnplannedExpense(transactionId);
+          const transaction = await projectExpensesService.addUnplannedExpense(
+            project._id,
+            transactionId
+          );
           results.push({
             transactionId: transaction._id,
             success: true
@@ -1131,10 +1169,15 @@ router.post('/projects/:id/expenses/bulk-move',
       const errors = [];
       let totalConvertedAmount = 0;
       
-      // Move each transaction
+      // Move each transaction using the service
       for (const transactionId of transactionIds) {
         try {
-          const result = await project.moveExpenseToPlanned(transactionId, categoryId, subCategoryId);
+          const result = await projectExpensesService.moveExpenseToPlanned(
+            req.params.id,
+            transactionId,
+            categoryId,
+            subCategoryId
+          );
           results.push({
             transactionId: result.transaction._id,
             convertedAmount: result.convertedAmount,

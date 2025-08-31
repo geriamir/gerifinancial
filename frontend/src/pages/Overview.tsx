@@ -32,6 +32,7 @@ import FinancialSummaryCards from '../components/overview/FinancialSummaryCards'
 import ActionItemsList from '../components/overview/ActionItemsList';
 import RecentActivityTimeline from '../components/overview/RecentActivityTimeline';
 import RSUOverviewWidget from '../components/overview/RSUOverviewWidget';
+import ProjectBudgetOverviewWidget from '../components/overview/ProjectBudgetOverviewWidget';
 
 const Overview: React.FC = () => {
   const navigate = useNavigate();
@@ -154,9 +155,9 @@ const Overview: React.FC = () => {
               <RSUOverviewWidget maxUpcomingVesting={4} />
             </Box>
             
-            {/* Reserved space for future widgets */}
+            {/* Project Budget Overview Widget */}
             <Box sx={{ flex: { md: '0 0 40%' } }}>
-              {/* Placeholder for future widgets like spending insights, budget alerts, etc. */}
+              <ProjectBudgetOverviewWidget maxProjects={4} />
             </Box>
           </Box>
         </Box>

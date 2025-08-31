@@ -190,11 +190,25 @@ class ProjectBudgetService {
         ];
       }
 
-      const projects = await ProjectBudget.find(query)
+      // Get total count for pagination
+      const total = await ProjectBudget.countDocuments(query);
+
+      // Apply pagination
+      let mongoQuery = ProjectBudget.find(query)
         .populate('projectTag', 'name')
         .populate('categoryBudgets.categoryId', 'name type')
         .populate('categoryBudgets.subCategoryId', 'name')
         .sort({ startDate: -1 });
+
+      if (filters.offset) {
+        mongoQuery = mongoQuery.skip(filters.offset);
+      }
+
+      if (filters.limit) {
+        mongoQuery = mongoQuery.limit(filters.limit);
+      }
+
+      const projects = await mongoQuery;
 
       // Get overview with calculated totals for each project
       const projectsWithOverview = await Promise.all(
@@ -209,7 +223,7 @@ class ProjectBudgetService {
 
       return {
         projects: projectsWithOverview,
-        total: projectsWithOverview.length
+        total
       };
     } catch (error) {
       logger.error('Error getting project budgets:', error);
@@ -323,8 +337,8 @@ class ProjectBudgetService {
         })
       );
 
-      const totalActiveProjectBudget = activeProjectsWithOverview.reduce((sum, p) => sum + p.totalBudget, 0);
-      const totalSpentOnActiveProjects = activeProjectsWithOverview.reduce((sum, p) => sum + p.totalActualAmount, 0);
+      const totalActiveProjectBudget = activeProjectsWithOverview.reduce((sum, p) => sum + (p.totalBudget || 0), 0);
+      const totalSpentOnActiveProjects = activeProjectsWithOverview.reduce((sum, p) => sum + (p.totalPaid || 0), 0);
 
       return {
         activeProjects: activeProjects.length,
@@ -333,7 +347,7 @@ class ProjectBudgetService {
         totalActiveProjectBudget,
         totalSpentOnActiveProjects,
         averageProjectProgress: activeProjectsWithOverview.length > 0 
-          ? activeProjectsWithOverview.reduce((sum, p) => sum + p.progressPercentage, 0) / activeProjectsWithOverview.length 
+          ? activeProjectsWithOverview.reduce((sum, p) => sum + (p.progress || 0), 0) / activeProjectsWithOverview.length 
           : 0
       };
     } catch (error) {

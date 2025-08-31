@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const currencyExchangeService = require('../services/currencyExchangeService');
+const { TransactionType } = require('../constants/enums');
 
 const projectBudgetSchema = new mongoose.Schema({
   userId: {
@@ -289,31 +290,6 @@ projectBudgetSchema.methods.addCategoryBudget = function(categoryId, subCategory
 
 
 
-// Method to add transaction as unplanned expense (tag to project)
-projectBudgetSchema.methods.addUnplannedExpense = async function(transactionId) {
-  const { Transaction } = require('./');
-  
-  // Validate transaction ownership and type
-  const transaction = await Transaction.findOne({
-    _id: transactionId,
-    userId: this.userId,
-    type: 'expense' // Only expense transactions can be tagged to projects
-  });
-  
-  if (!transaction) {
-    throw new Error('Transaction not found or not an expense transaction');
-  }
-  
-  // Ensure project has a tag
-  if (!this.projectTag) {
-    await this.createProjectTag();
-  }
-  
-  // Add project tag to transaction
-  await transaction.addTags([this.projectTag]);
-  
-  return transaction;
-};
 
 // Method to remove transaction from project (untag)
 projectBudgetSchema.methods.removeUnplannedExpense = async function(transactionId) {
