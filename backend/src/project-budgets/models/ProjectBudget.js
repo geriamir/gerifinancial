@@ -1,6 +1,4 @@
 const mongoose = require('mongoose');
-const currencyExchangeService = require('../../foreign-currency/services/currencyExchangeService');
-const { TransactionType } = require('../../banking/constants/enums');
 const Tag = require('../../banking/models/Tag');
 const Transaction = require('../../banking/models/Transaction');
 
