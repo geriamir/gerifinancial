@@ -1,4 +1,4 @@
-const logger = require('../utils/logger');
+const logger = require('../../shared/utils/logger');
 const { translate } = require('@vitalets/google-translate-api');
 const Translation = require('../models/Translation');
 
