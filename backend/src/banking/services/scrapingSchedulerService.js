@@ -1,8 +1,8 @@
 const cron = require('node-cron');
 const { BankAccount } = require('../models');
-const dataSyncService = require('./dataSyncService');
-const logger = require('../utils/logger');
-const rateLimiter = require('../utils/rateLimiter');
+const dataSyncService = require('../../shared/services/dataSyncService');
+const logger = require('../../shared/utils/logger');
+const rateLimiter = require('../../shared/utils/rateLimiter');
 
 class ScrapingSchedulerService {
   constructor() {
