@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
-const { CategorizationMethod, TransactionType, TransactionStatus } = require('../../shared/constants/enums');
-const Tag = require('../../shared/models/Tag');
+const { CategorizationMethod, TransactionType, TransactionStatus } = require('../constants/enums');
+const Tag = require('./Tag');
 
 const transactionSchema = new mongoose.Schema({
   identifier: {
