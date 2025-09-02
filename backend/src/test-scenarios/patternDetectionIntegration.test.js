@@ -1,7 +1,8 @@
-const { Transaction, Category, SubCategory, TransactionPattern, User, BankAccount } = require('../models');
-const { TransactionType } = require('../constants/enums');
-const recurrenceDetectionService = require('../services/budget/recurrenceDetectionService');
-const budgetService = require('../services/budget/budgetService');
+const { Transaction, Category, SubCategory, User, BankAccount } = require('../shared/models');
+const TransactionPattern = require('../monthly-budgets/models/TransactionPattern');
+const { TransactionType } = require('../shared/constants/enums');
+const recurrenceDetectionService = require('../monthly-budgets/services/recurrenceDetectionService');
+const budgetService = require('../monthly-budgets/services/budgetService');
 
 describe('Pattern Detection Integration Tests', () => {
   let testUser;

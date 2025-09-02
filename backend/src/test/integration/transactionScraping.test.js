@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
-const { Transaction, BankAccount } = require('../../models');
-const transactionService = require('../../services/transactionService');
-const { TransactionType } = require('../../constants/enums');
+const { Transaction, BankAccount } = require('../../shared/models');
+const transactionService = require('../../banking/services/transactionService');
+const { TransactionType } = require('../../shared/constants/enums');
 
 describe('Transaction Scraping Integration', () => {
   let testBankAccount;
