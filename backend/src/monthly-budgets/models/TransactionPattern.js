@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { ALL_PATTERN_TYPES } = require('../../shared/constants/patternTypes');
+const { ALL_PATTERN_TYPES } = require('../constants/patternTypes');
 const { ALL_APPROVAL_STATUSES, APPROVAL_STATUS } = require('../../shared/constants/statusTypes');
 
 const transactionPatternSchema = new mongoose.Schema({

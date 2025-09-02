@@ -1,5 +1,5 @@
 const { BankAccount, Investment } = require('../../shared/models');
-const dataSyncService = require('../../shared/services/dataSyncService');
+const dataSyncService = require('../../banking/services/dataSyncService');
 const logger = require('../../shared/utils/logger');
 
 class StartupDataSyncService {

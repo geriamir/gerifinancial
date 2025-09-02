@@ -1,9 +1,10 @@
-const { BankAccount, ForeignCurrencyAccount, CurrencyExchange } = require('../models');
-const bankScraperService = require('../../banking/services/bankScraperService');
-const transactionService = require('../../banking/services/transactionService');
+const { BankAccount, ForeignCurrencyAccount, CurrencyExchange, Transaction, Investment } = require('../../shared/models');
+const bankScraperService = require('./bankScraperService');
+const transactionService = require('./transactionService');
+const creditCardDetectionService = require('./creditCardDetectionService');
 const investmentService = require('../../investments/services/investmentService');
 const portfolioService = require('../../investments/services/portfolioService');
-const logger = require('../utils/logger');
+const logger = require('../../shared/utils/logger');
 
 class DataSyncService {
   /**
@@ -77,7 +78,6 @@ class DataSyncService {
       // Step 4: Post-categorization credit card detection
       if (syncSuccessful) {
         try {
-        const creditCardDetectionService = require('../../banking/services/creditCardDetectionService');
           await creditCardDetectionService.detectAndUpdateCreditCards(bankAccount.userId);
           logger.info(`Credit card detection completed for user ${bankAccount.userId}`);
         } catch (detectionError) {
@@ -148,8 +148,6 @@ class DataSyncService {
   // Get comprehensive sync status for a bank account
   async getSyncStatus(bankAccountId, userId) {
     try {
-      const { Transaction, Investment } = require('../models');
-      
       const bankAccount = await BankAccount.findOne({ _id: bankAccountId, userId });
       if (!bankAccount) {
         throw new Error('Bank account not found');
@@ -303,8 +301,6 @@ class DataSyncService {
       newTransactions: 0,
       errors: []
     };
-
-    const { Transaction } = require('../models');
 
     try {
       for (const fcAccount of foreignCurrencyAccounts) {

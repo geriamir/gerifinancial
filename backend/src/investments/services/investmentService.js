@@ -1,6 +1,6 @@
 const { Investment, InvestmentSnapshot, InvestmentTransaction } = require('../../shared/models');
 const bankScraperService = require('../../banking/services/bankScraperService');
-const INVESTMENT_CONSTANTS = require('../../shared/constants/investmentConstants');
+const INVESTMENT_CONSTANTS = require('../constants/investmentConstants');
 const logger = require('../../shared/utils/logger');
 
 class InvestmentService {

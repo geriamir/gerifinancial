@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const { BankAccount } = require('../models');
-const dataSyncService = require('../../shared/services/dataSyncService');
+const dataSyncService = require('./dataSyncService');
 const logger = require('../../shared/utils/logger');
 const rateLimiter = require('../../shared/utils/rateLimiter');
 

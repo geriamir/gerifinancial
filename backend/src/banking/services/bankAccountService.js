@@ -1,8 +1,7 @@
 const { BankAccount } = require('../../shared/models');
 const scrapingSchedulerService = require('./scrapingSchedulerService');
 const bankScraperService = require('./bankScraperService');
-const onboardingTransactionService = require('../../onboarding/services/onboardingTransactionService');
-const dataSyncService = require('../../shared/services/dataSyncService');
+const dataSyncService = require('./dataSyncService');
 const logger = require('../../shared/utils/logger');
 
 class BankAccountService {

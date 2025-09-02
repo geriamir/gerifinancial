@@ -1,9 +1,8 @@
 const express = require('express');
 const BankAccount = require('../models/BankAccount');
 const auth = require('../../shared/middleware/auth');
-const transactionService = require('../services/transactionService');
 const bankAccountService = require('../services/bankAccountService.js');
-const dataSyncService = require('../../shared/services/dataSyncService');
+const dataSyncService = require('../services/dataSyncService');
 const { encrypt } = require('../../shared/utils/encryption');
 
 const router = express.Router();

@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const INVESTMENT_CONSTANTS = require('../../shared/constants/investmentConstants');
+const INVESTMENT_CONSTANTS = require('../constants/investmentConstants');
 
 const holdingSchema = new mongoose.Schema({
   symbol: {

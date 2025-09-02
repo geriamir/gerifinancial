@@ -1,4 +1,4 @@
-const dataSyncService = require('../../shared/services/dataSyncService');
+const dataSyncService = require('../../banking/services/dataSyncService');
 const BankAccount = require('../../banking/models/BankAccount');
 const User = require('../../auth/models/User');
 const Transaction = require('../../banking/models/Transaction');
