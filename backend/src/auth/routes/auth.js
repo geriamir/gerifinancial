@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const config = require('../../shared/config/index');
 const auth = require('../../shared/middleware/auth');
-const { initializeUserCategories } = require('../../shared/services/userCategoryService');
+const { initializeUserCategories } = require('../../monthly-budgets/services/userCategoryService');
 
 const router = express.Router();
 

@@ -4,7 +4,7 @@ const auth = require('../../shared/middleware/auth');
 const { Category, SubCategory, Transaction, Tag } = require('../../shared/models');
 const transactionService = require('../services/transactionService');
 const categoryAIService = require('../services/categoryAIService');
-const tagService = require('../../shared/services/tagService');
+const tagService = require('../services/tagService');
 
 // Get transactions with pagination and filtering
 router.get('/', auth, async (req, res) => {

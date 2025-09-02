@@ -1,7 +1,7 @@
 const logger = require('../../shared/utils/logger');
 const natural = require('natural');
 const translationService = require('../../shared/services/translationService');
-const { enhancedKeywordMatcher } = require('../../shared/services/enhanced-keyword-matching');
+const { enhancedKeywordMatcher } = require('./enhanced-keyword-matching');
 const WordTokenizer = natural.WordTokenizer;
 const PorterStemmer = natural.PorterStemmer;
 

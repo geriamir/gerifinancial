@@ -1,5 +1,5 @@
 const natural = require('natural');
-const logger = require('../../utils/logger');
+const logger = require('../../../shared/utils/logger');
 
 /**
  * Enhanced Keyword Matcher - Main engine for robust keyword matching

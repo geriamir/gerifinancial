@@ -1,7 +1,6 @@
-const mongoose = require('mongoose');
 const { ProjectBudget, Tag, Transaction, Category, SubCategory, User } = require('../');
 const { createTestUser } = require('../../../test/testUtils');
-const { TransactionType } = require('../../constants/enums');
+require('../../../banking/constants/enums');
 
 describe('ProjectBudget Model', () => {
   let testUser;

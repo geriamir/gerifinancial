@@ -4,7 +4,7 @@ const BankClassificationService = require('./bankClassificationService');
 const { ObjectId } = require('mongodb');
 const bankScraperService = require('./bankScraperService');
 const categoryMappingService = require('./categoryMappingService');
-const { CategorizationMethod, TransactionStatus } = require('../../shared/constants/enums');
+const { CategorizationMethod, TransactionStatus } = require('../constants/enums');
 const logger = require('../../shared/utils/logger');
 
 const convertToObjectId = (id) => {

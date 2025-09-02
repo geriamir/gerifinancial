@@ -2,7 +2,7 @@ const recurrenceDetectionService = require('./recurrenceDetectionService');
 const TransactionPattern = require('../models/TransactionPattern');
 const BudgetService = require('./budgetService');
 const Transaction = require('../../banking/models/Transaction');
-const PatternMatchingUtils = require('../../shared/utils/patternMatching');
+const PatternMatchingUtils = require('../utils/patternMatching');
 
 /**
  * Smart Budget Service - Enhanced budget calculation with pattern awareness

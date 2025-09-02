@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { ALL_PATTERN_TYPES } = require('../constants/patternTypes');
-const { ALL_APPROVAL_STATUSES, APPROVAL_STATUS } = require('../../shared/constants/statusTypes');
+const { ALL_APPROVAL_STATUSES, APPROVAL_STATUS } = require('../constants/statusTypes');
 
 const transactionPatternSchema = new mongoose.Schema({
   userId: {
@@ -34,12 +34,12 @@ const transactionPatternSchema = new mongoose.Schema({
         required: true
       }
     },
-      categoryId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Category',
-        required: false,
-        default: null
-      },
+    categoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Category',
+      required: false,
+      default: null
+    },
     subCategoryId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'SubCategory',

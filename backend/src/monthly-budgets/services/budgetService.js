@@ -3,7 +3,7 @@ const logger = require('../../shared/utils/logger');
 const yearlyBudgetService = require('./yearlyBudgetService');
 const budgetCalculationService = require('./budgetCalculationService');
 const projectBudgetService = require('../../project-budgets/services/projectBudgetService');
-const { BUDGET_STATUS } = require('../../shared/constants/statusTypes');
+const { BUDGET_STATUS } = require('../../project-budgets/constants/statusTypes');
 
 class BudgetService {
   // ============================================

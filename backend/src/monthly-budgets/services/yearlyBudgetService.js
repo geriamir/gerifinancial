@@ -1,6 +1,6 @@
 const { YearlyBudget } = require('../../shared/models');
 const logger = require('../../shared/utils/logger');
-const { BUDGET_STATUS } = require('../../shared/constants/statusTypes');
+const { BUDGET_STATUS } = require('../../project-budgets/constants/statusTypes');
 
 class YearlyBudgetService {
   // ============================================

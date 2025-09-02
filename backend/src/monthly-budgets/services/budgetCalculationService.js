@@ -2,7 +2,7 @@ const { CategoryBudget, Transaction } = require('../../shared/models');
 const TransactionPattern = require('../models/TransactionPattern');
 const logger = require('../../shared/utils/logger');
 const averagingDenominatorService = require('./averagingDenominatorService');
-const PatternMatchingUtils = require('../../shared/utils/patternMatching');
+const PatternMatchingUtils = require('../utils/patternMatching');
 const { PATTERN_TYPES } = require('../constants/patternTypes');
 
 class BudgetCalculationService {

@@ -21,12 +21,6 @@ const PROJECT_STATUS = {
   CANCELLED: 'cancelled'
 };
 
-// Approval Status Types
-const APPROVAL_STATUS = {
-  PENDING: 'pending',
-  APPROVED: 'approved',
-  REJECTED: 'rejected'
-};
 
 // Bank Account Status Types
 const ACCOUNT_STATUS = {
@@ -39,13 +33,11 @@ const ACCOUNT_STATUS = {
 // All status arrays for validation
 const ALL_BUDGET_STATUSES = Object.values(BUDGET_STATUS);
 const ALL_PROJECT_STATUSES = Object.values(PROJECT_STATUS);
-const ALL_APPROVAL_STATUSES = Object.values(APPROVAL_STATUS);
 const ALL_ACCOUNT_STATUSES = Object.values(ACCOUNT_STATUS);
 
 // Validation functions
 const isValidBudgetStatus = (status) => ALL_BUDGET_STATUSES.includes(status);
 const isValidProjectStatus = (status) => ALL_PROJECT_STATUSES.includes(status);
-const isValidApprovalStatus = (status) => ALL_APPROVAL_STATUSES.includes(status);
 const isValidAccountStatus = (status) => ALL_ACCOUNT_STATUSES.includes(status);
 
 // Status descriptions for UI
@@ -56,32 +48,22 @@ const BUDGET_STATUS_DESCRIPTIONS = {
   [BUDGET_STATUS.CANCELLED]: 'Cancelled - Not in use'
 };
 
-const APPROVAL_STATUS_DESCRIPTIONS = {
-  [APPROVAL_STATUS.PENDING]: 'Pending - Awaiting approval',
-  [APPROVAL_STATUS.APPROVED]: 'Approved - Approved for use',
-  [APPROVAL_STATUS.REJECTED]: 'Rejected - Rejected and not in use'
-};
-
 module.exports = {
   // Status constants
   BUDGET_STATUS,
   PROJECT_STATUS,
-  APPROVAL_STATUS,
   ACCOUNT_STATUS,
   
   // Validation arrays
   ALL_BUDGET_STATUSES,
   ALL_PROJECT_STATUSES,
-  ALL_APPROVAL_STATUSES,
   ALL_ACCOUNT_STATUSES,
   
   // Validation functions
   isValidBudgetStatus,
   isValidProjectStatus,
-  isValidApprovalStatus,
   isValidAccountStatus,
   
   // Descriptions
-  BUDGET_STATUS_DESCRIPTIONS,
-  APPROVAL_STATUS_DESCRIPTIONS
+  BUDGET_STATUS_DESCRIPTIONS
 };

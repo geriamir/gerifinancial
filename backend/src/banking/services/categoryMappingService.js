@@ -1,8 +1,8 @@
-const ManualCategorized = require('../../shared/models/ManualCategorized');
+const ManualCategorized = require('../models/ManualCategorized');
 const { SubCategory, Category, Transaction } = require('../../shared/models');
 const categoryAIService = require('./categoryAIService');
-const { enhancedKeywordMatcher } = require('../../shared/services/enhanced-keyword-matching');
-const { CategorizationMethod, TransactionType } = require('../../shared/constants/enums');
+const { enhancedKeywordMatcher } = require('./enhanced-keyword-matching');
+const { CategorizationMethod, TransactionType } = require('../constants/enums');
 const logger = require('../../shared/utils/logger');
 
 class CategoryMappingService {

@@ -6,7 +6,7 @@ const projectBudgetService = require('../../project-budgets/services/projectBudg
 const projectExpensesService = require('../../project-budgets/services/projectExpensesService');
 const projectOverviewService = require('../../project-budgets/services/projectOverviewService');
 const smartBudgetService = require('../../monthly-budgets/services/smartBudgetService');
-const { defaultCategories } = require('../services/userCategoryService');
+const { defaultCategories } = require('../../monthly-budgets/services/userCategoryService');
 const { TransactionPattern } = require('../models');
 const logger = require('../utils/logger');
 

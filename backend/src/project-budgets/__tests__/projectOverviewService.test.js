@@ -1,6 +1,6 @@
 const projectOverviewService = require('../services/projectOverviewService');
 const { ProjectBudget, Tag, Transaction, Category, SubCategory, CurrencyExchange } = require('../../shared/models');
-const { TransactionType } = require('../../shared/constants/enums');
+const { TransactionType } = require('../../banking/constants/enums');
 const mongoose = require('mongoose');
 
 describe('ProjectOverviewService', () => {

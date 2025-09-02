@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 const { Transaction, Category, SubCategory, User } = require('../../../shared/models');
-const ManualCategorized = require('../../../shared/models/ManualCategorized');
+const { ManualCategorized } = require('../../../shared/models');
 const transactionService = require('../transactionService');
 const categoryMappingService = require('../categoryMappingService');
 const { createTestUser } = require('../../../test/testUtils');
-const { TransactionType, CategorizationMethod, TransactionStatus } = require('../../../shared/constants/enums');
+const { TransactionType, CategorizationMethod, TransactionStatus } = require('../../constants/enums');
 
 describe('Transaction Verification Flow', () => {
   let user;

@@ -1,6 +1,6 @@
 const currencyExchangeService = require('../../foreign-currency/services/currencyExchangeService');
 const unplannedExpenseService = require('./unplannedExpenseService');
-const installmentGroupingUtils = require('../../shared/utils/installmentGroupingUtils');
+const installmentGroupingUtils = require('../../banking/utils/installmentGroupingUtils');
 const { CurrencyExchange, Transaction, Category, SubCategory } = require('../../shared/models');
 
 /**

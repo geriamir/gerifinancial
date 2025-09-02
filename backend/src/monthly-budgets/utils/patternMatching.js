@@ -1,4 +1,4 @@
-const logger = require('./logger');
+const logger = require('../../shared/utils/logger');
 
 /**
  * Pattern Matching Utilities for Budget Planning

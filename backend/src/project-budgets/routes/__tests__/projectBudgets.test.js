@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const { createTestUser } = require('../../../test/testUtils');
 const app = require('../../../app');
 const { User, Category, SubCategory, Transaction, ProjectBudget, Tag } = require('../../../shared/models');
-const { TransactionType } = require('../../../shared/constants/enums');
+const { TransactionType } = require('../../../banking/constants/enums');
 
 let testUser;
 let authToken;
