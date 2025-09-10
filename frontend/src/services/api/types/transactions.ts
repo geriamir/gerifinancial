@@ -23,6 +23,17 @@ export interface Transaction {
   excludeFromBudgetCalculation?: boolean;
   exclusionReason?: string;
   excludedAt?: string;
+  // Project tagging fields  
+  tags?: string[] | Tag[]; // Array of tag IDs or populated Tag objects
+}
+
+export interface Tag {
+  _id: string;
+  name: string;
+  color?: string;
+  type: 'custom' | 'project';
+  usageCount?: number;
+  lastUsed?: string;
 }
 
 export interface GetTransactionsResponse {

@@ -1,6 +1,6 @@
 const app = require('./app');
-const config = require('./config');
-const startupInvestmentService = require('./services/startupInvestmentService');
+const config = require('./shared/config');
+const startupInvestmentService = require('./investments/services/startupInvestmentService');
 
 const server = app.listen(config.port, async () => {
   console.log(`Server is running on port ${config.port}`);

@@ -212,6 +212,7 @@ const AllTransactionsView: React.FC = () => {
         startDate={filters.startDate}
         endDate={filters.endDate}
         type={filters.type}
+        category={filters.category}
         search={filters.search}
         onFilterChange={updateFilters}
       />

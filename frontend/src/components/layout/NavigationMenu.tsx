@@ -24,7 +24,8 @@ import {
   AccountBalanceWallet as BudgetIcon,
   AccountBalance as RSUIcon,
   TrendingUp as InvestmentIcon,
-  CurrencyExchange as ForeignCurrencyIcon
+  CurrencyExchange as ForeignCurrencyIcon,
+  Assignment as ProjectIcon
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -38,6 +39,7 @@ const navigationItems: NavigationItem[] = [
   { title: 'Overview', path: '/', icon: <HomeIcon /> },
   { title: 'Transactions', path: '/transactions', icon: <TransactionsIcon /> },
   { title: 'Budgets', path: '/budgets', icon: <BudgetIcon /> },
+  { title: 'Projects', path: '/projects', icon: <ProjectIcon /> },
   { title: 'RSUs', path: '/rsus', icon: <RSUIcon /> },
   { title: 'Investments', path: '/investments', icon: <InvestmentIcon /> },
   { title: 'Foreign Currency', path: '/foreign-currency', icon: <ForeignCurrencyIcon /> }

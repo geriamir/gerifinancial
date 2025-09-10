@@ -320,6 +320,200 @@ interface BudgetStatusChipsProps {
 ### **Phase 5: Budget Subcategory Drill-Down Feature** ✅
 **Timeline**: Week 10-12 | **Priority**: High | **Status**: COMPLETED
 
+### **Phase 5.5: Enhanced Project Budget Dialog System** ✅
+**Timeline**: Week 13 | **Priority**: High | **Status**: COMPLETED - August 2025
+
+#### 5.5.1 Project Budget Enhancement Overview
+**Objective**: Create comprehensive planned expense management with intelligent category selection and vacation project optimizations
+**Components**: Enhanced dialog system with autocomplete, auto-focus, and proper data synchronization
+
+#### 5.5.2 Implementation Phases
+
+##### Phase 5.5.1: Core Dialog System ✅
+- [x] **AddPlannedExpenseDialog Component Creation**
+  - File: `frontend/src/components/project/AddPlannedExpenseDialog.tsx`
+  - Features: Comprehensive category/subcategory selection with form validation
+  - Integration: Material-UI Autocomplete with search functionality
+  - Validation: Required field validation and expense preview
+
+- [x] **MongoDB Validation Error Resolution**
+  - Issue: "ProjectBudget validation failed: categoryBudgets.5.subCategoryId: Cast to ObjectId failed"
+  - Solution: Updated `subCategoryId` to use `undefined` instead of empty strings
+  - Files: `frontend/src/types/projects.ts`, `frontend/src/utils/projectHelpers.ts`
+
+##### Phase 5.5.2: Vacation Project Optimizations ✅
+- [x] **Smart Category Pre-selection**
+  - Auto-detection: Finds Travel/Vacation categories automatically
+  - UI Optimization: Hides category selector for vacation projects
+  - Streamlined UX: Only subcategory selection needed for vacation projects
+  - Integration: Category pre-selection with Travel/Vacation/Trip keyword matching
+
+- [x] **Enhanced User Experience**
+  - Auto-focus: Description input automatically focused on dialog open
+  - Form Reset: Proper form reset maintaining vacation project settings
+  - Preview System: Live expense preview with category hierarchy display
+
+##### Phase 5.5.3: Autocomplete Enhancement ✅
+- [x] **Subcategory Autocomplete Implementation**
+  - Component: Replaced Select dropdown with Material-UI Autocomplete
+  - Search: Real-time search and filtering by subcategory name
+  - Accessibility: Keyboard navigation and screen reader support
+  - Features: Auto-highlight, clear on blur/escape, custom rendering
+
+- [x] **Advanced Autocomplete Features**
+  - No Subcategory Option: Special handling for empty subcategory selection
+  - Custom Rendering: Italicized display for "No subcategory" option
+  - Type Safety: Proper TypeScript integration with option equality comparison
+  - User Experience: Placeholder text and search instructions
+
+##### Phase 5.5.4: Data Synchronization ✅
+- [x] **Backend Data Refresh System**
+  - Issue Resolution: Fixed "undefined → undefined" category display
+  - Solution: Automatic project data refresh after adding planned expenses
+  - API Integration: Uses `budgetsApi.getProjectExpenseBreakdown()` for proper data
+  - Data Consistency: Ensures CategoryBreakdownItem[] contains full category objects
+
+- [x] **Proper Data Flow Architecture**
+  - Local Updates: Immediate UI updates for responsive user experience
+  - Backend Sync: Automatic refresh to get properly populated category names
+  - Error Handling: Graceful error handling with fallback behavior
+  - Performance: Efficient data refresh pattern matching existing flows
+
+##### Phase 5.5.5: Auto-Focus Implementation ✅
+- [x] **Description Input Auto-Focus**
+  - Implementation: useEffect with useRef for reliable auto-focus
+  - Material-UI Integration: Proper inputRef connection to TextField
+  - Timing: 100ms delay for dialog rendering completion
+  - User Experience: Immediate typing capability upon dialog open
+
+- [x] **Focus Management Optimization**
+  - Dialog Conflicts: Resolved Material-UI Dialog focus management issues
+  - Normal Navigation: Ensured users can navigate between all form inputs
+  - Focus Persistence: Auto-focus only on dialog open, not during navigation
+  - Accessibility: Maintained proper focus order and keyboard navigation
+
+#### 5.5.3 Technical Implementation Details
+
+##### Component Architecture
+```typescript
+// AddPlannedExpenseDialog.tsx
+interface AddPlannedExpenseDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onAdd: (expense: Partial<CategoryBudget>) => void;
+  availableCategories: Category[];
+  projectCurrency: string;
+  projectType?: string; // Enables vacation project optimizations
+}
+
+// Key Features:
+// - Vacation project optimization with Travel category auto-selection
+// - Autocomplete subcategory selection with search functionality
+// - Auto-focus description input with proper Material-UI integration
+// - Form validation and live expense preview
+// - Proper data synchronization with backend refresh
+```
+
+##### Data Synchronization Pattern
+```typescript
+// Projects.tsx - Enhanced onAddPlannedExpense
+onAddPlannedExpense={async (expenseData) => {
+  // 1. Immediate local update for responsive UI
+  const addedCategoryBudgets = addPlannedExpense(specificProject, expenseData);
+  updateProject(specificProject._id, { categoryBudgets: addedCategoryBudgets });
+  
+  // 2. Backend refresh for proper category/subcategory names
+  const response = await budgetsApi.getProjectExpenseBreakdown(specificProject._id);
+  const breakdown = response.data || response;
+  
+  // 3. Update with properly populated CategoryBreakdownItem[]
+  updateProject(specificProject._id, {
+    categoryBreakdown: breakdown.plannedCategories || breakdown.categoryBreakdown,
+    // ... other refreshed data
+  });
+}}
+```
+
+##### Autocomplete Implementation
+```typescript
+<Autocomplete
+  fullWidth
+  options={[
+    { _id: '', name: 'No subcategory' },
+    ...selectedCategory.subCategories
+  ]}
+  getOptionLabel={(option) => option.name}
+  renderInput={(params) => (
+    <TextField
+      {...params}
+      label="Subcategory"
+      placeholder="Search or select subcategory..."
+    />
+  )}
+  autoHighlight
+  clearOnBlur
+  clearOnEscape
+  isOptionEqualToValue={(option, value) => option._id === value._id}
+/>
+```
+
+#### 5.5.4 Integration Points
+
+##### Project Budget System Integration
+- **ProjectExpensesList.tsx**: Updated to use new dialog component
+- **Projects.tsx**: Enhanced onAddPlannedExpense with data refresh
+- **projectHelpers.ts**: Updated addPlannedExpense to handle undefined subcategories
+- **types/projects.ts**: Made subCategoryId optional in CategoryBudget interface
+
+##### API Integration
+- **budgetsApi.getProjectExpenseBreakdown()**: Used for data refresh after adding expenses
+- **categoriesApi.getUserCategories()**: Provides category/subcategory data for dialog
+- **Project Updates**: Seamless integration with existing project update system
+
+#### 5.5.5 User Experience Improvements
+
+##### Vacation Project Workflow
+```typescript
+// Optimized flow for vacation projects:
+1. Dialog opens with Travel category pre-selected (hidden from user)
+2. Only subcategory selection shown (e.g., "Flights", "Hotels", "Food")
+3. Description input auto-focused for immediate typing
+4. Form validation ensures required fields completed
+5. Live preview shows: "Flight tickets in Travel → Flights"
+6. Submit creates expense with proper category/subcategory association
+```
+
+##### General Project Workflow
+```typescript
+// Standard flow for other project types:
+1. Dialog opens with description input auto-focused
+2. Category selection required (dropdown with all expense categories)
+3. Subcategory selection with autocomplete search functionality
+4. Budget amount input with currency symbol
+5. Live preview shows full category hierarchy
+6. Data refresh ensures proper category names in expenses list
+```
+
+#### 5.5.6 Technical Achievements
+
+##### Problem Resolution
+- ✅ **MongoDB Validation Error**: Resolved ObjectId casting issues
+- ✅ **Focus Management**: Proper auto-focus without interference
+- ✅ **Data Consistency**: Fixed undefined category display issues
+- ✅ **User Experience**: Streamlined vacation project workflow
+
+##### Feature Enhancements
+- ✅ **Autocomplete Search**: Enhanced subcategory selection experience
+- ✅ **Form Validation**: Comprehensive validation with user feedback
+- ✅ **Live Preview**: Real-time expense preview with category hierarchy
+- ✅ **Auto-Focus**: Reliable description input focus on dialog open
+
+##### Architecture Improvements
+- ✅ **Data Synchronization**: Proper CategoryBudget to CategoryBreakdownItem flow
+- ✅ **Type Safety**: Enhanced TypeScript integration throughout
+- ✅ **Component Reusability**: Dialog component designed for future extensions
+- ✅ **Performance**: Efficient data refresh pattern with error handling
+
 #### 5.1 Feature Overview
 **Objective**: Create a detailed view for budget subcategories showing summary and transactions
 **Route**: `/budgets/subcategory/:year/:month/:categoryId/:subcategoryId`

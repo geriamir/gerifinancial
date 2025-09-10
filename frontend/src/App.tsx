@@ -9,6 +9,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { BudgetProvider } from './contexts/BudgetContext';
 import { RSUProvider } from './contexts/RSUContext';
 import { InvestmentProvider } from './contexts/InvestmentContext';
+import { ProjectProvider } from './contexts/ProjectContext';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import AuthLayout from './components/layout/AuthLayout';
@@ -20,6 +21,7 @@ import BudgetsPage from './pages/Budgets';
 import BudgetSubcategoryDetail from './pages/BudgetSubcategoryDetail';
 import RSUs from './pages/RSUs';
 import Investments from './pages/Investments';
+import Projects from './pages/Projects';
 import ForeignCurrency from './pages/ForeignCurrency';
 import OnboardingPage from './pages/Onboarding';
 import '@fontsource/roboto/300.css';
@@ -67,7 +69,9 @@ const App: React.FC = () => {
                   <BudgetProvider>
                     <RSUProvider>
                       <InvestmentProvider>
-                        <AuthLayout />
+                        <ProjectProvider>
+                          <AuthLayout />
+                        </ProjectProvider>
                       </InvestmentProvider>
                     </RSUProvider>
                   </BudgetProvider>
@@ -84,6 +88,8 @@ const App: React.FC = () => {
               <Route path="budgets/income/:year/:month/:categoryId" element={<BudgetSubcategoryDetail />} />
               <Route path="rsus" element={<RSUs />} />
               <Route path="investments" element={<Investments />} />
+              <Route path="projects" element={<Projects />} />
+              <Route path="projects/:projectId" element={<Projects />} />
               <Route path="foreign-currency" element={<ForeignCurrency />} />
               <Route path="foreign-currency/accounts/:accountNumber" element={<ForeignCurrency />} />
               <Route path="foreign-currency/accounts/:accountNumber/transactions" element={<ForeignCurrency />} />

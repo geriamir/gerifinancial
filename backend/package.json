@@ -28,7 +28,8 @@
     ],
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "src/routes/test.js"
+      "src/shared/routes/test.js",
+      "src/shared/services/test.js"
     ],
     "clearMocks": true,
     "verbose": true,

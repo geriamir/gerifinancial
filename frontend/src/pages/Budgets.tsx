@@ -12,6 +12,7 @@ import {
   Calculate as CalculatorIcon
 } from '@mui/icons-material';
 import { useBudget } from '../contexts/BudgetContext';
+import { useProject } from '../contexts/ProjectContext';
 import MonthlyBudgetEditor from '../components/budget/MonthlyBudgetEditor';
 import PatternDetectionDashboard from '../components/budget/PatternDetection/PatternDetectionDashboard';
 import MonthNavigation from '../components/budget/MonthNavigation';
@@ -25,7 +26,6 @@ import { BUDGET_STAGES, type BudgetStage } from '../constants/budgetStages';
 const BudgetsPage: React.FC = () => {
   const {
     currentMonthlyBudget,
-    projectBudgets,
     loading,
     error,
     currentYear,
@@ -34,6 +34,8 @@ const BudgetsPage: React.FC = () => {
     calculateMonthlyBudget,
     refreshBudgets
   } = useBudget();
+
+  const { projects: projectBudgets, loading: projectsLoading } = useProject();
 
   const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
   const [patternRefreshTrigger, setPatternRefreshTrigger] = useState(0);
@@ -160,10 +162,6 @@ const BudgetsPage: React.FC = () => {
     setBudgetEditorOpen(false);
   };
 
-  const handleNewProject = () => {
-    // TODO: Implement new project creation
-    console.log('New project clicked');
-  };
 
   if (error) {
     return (
@@ -337,8 +335,7 @@ const BudgetsPage: React.FC = () => {
       {/* Project Budgets Section */}
       <ProjectBudgetsList
         projectBudgets={projectBudgets}
-        loading={loading}
-        onNewProject={handleNewProject}
+        loading={loading || projectsLoading}
       />
 
       {/* Monthly Budget Editor Dialog */}

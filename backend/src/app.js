@@ -1,28 +1,29 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const config = require('./config');
-const logger = require('./utils/logger');
-const ensureLogsDir = require('./middleware/ensureLogsDir');
+const config = require('./shared/config');
+const logger = require('./shared/utils/logger');
+const ensureLogsDir = require('./shared/middleware/ensureLogsDir');
 
 // Ensure logs directory exists in production
 ensureLogsDir();
-const scrapingSchedulerService = require('./services/scrapingSchedulerService');
-const stockPriceService = require('./services/rsu/stockPriceService');
-const vestingService = require('./services/rsu/vestingService');
+const scrapingSchedulerService = require('./banking/services/scrapingSchedulerService');
+const stockPriceService = require('./rsu/services/stockPriceService');
+const vestingService = require('./rsu/services/vestingService');
+const currencyExchangeService = require('./foreign-currency/services/currencyExchangeService');
 
 // Import routes
-const authRoutes = require('./routes/auth');
-const bankAccountRoutes = require('./routes/bankAccounts');
-const transactionRoutes = require('./routes/transactions');
-const budgetRoutes = require('./routes/budgets');
-const categoryBudgetRoutes = require('./routes/categoryBudgets');
-const rsuRoutes = require('./routes/rsus');
-const investmentRoutes = require('./routes/investments');
-const portfolioRoutes = require('./routes/portfolios');
-const foreignCurrencyRoutes = require('./routes/foreignCurrency');
-const onboardingRoutes = require('./routes/onboarding');
-const testRoutes = require('./routes/test');
+const authRoutes = require('./auth/routes/auth');
+const bankAccountRoutes = require('./banking/routes/bankAccounts');
+const transactionRoutes = require('./banking/routes/transactions');
+const budgetRoutes = require('./shared/routes/budgets');
+const categoryBudgetRoutes = require('./monthly-budgets/routes/categoryBudgets');
+const rsuRoutes = require('./rsu/routes/rsus');
+const investmentRoutes = require('./investments/routes/investments');
+const portfolioRoutes = require('./investments/routes/portfolios');
+const foreignCurrencyRoutes = require('./foreign-currency/routes/foreignCurrency');
+const onboardingRoutes = require('./onboarding/routes/onboarding');
+const testRoutes = require('./shared/routes/test');
 
 // Create Express app
 const app = express();
@@ -61,6 +62,13 @@ if (config.env === 'test') {
         } catch (error) {
           logger.error('Failed to initialize vesting service:', error);
         }
+
+        try {
+          await currencyExchangeService.initialize();
+          logger.info('Currency exchange service initialized');
+        } catch (error) {
+          logger.error('Failed to initialize currency exchange service:', error);
+        }
       }
     })
     .catch(err => console.error('MongoDB connection error:', err));
@@ -90,7 +98,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/users', require('./routes/users'));
+app.use('/api/users', require('./auth/routes/users'));
 app.use('/api/bank-accounts', bankAccountRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/budgets', budgetRoutes);

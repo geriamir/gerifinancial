@@ -1,5 +1,7 @@
 import { AxiosResponse } from 'axios';
 import api from './base';
+import { ProjectBudget } from '../../types/projects';
+
 
 export interface MonthlyBudget {
   _id: string;
@@ -32,40 +34,6 @@ export interface MonthlyBudget {
   updatedAt: string;
 }
 
-export interface ProjectBudget {
-  _id: string;
-  userId: string;
-  name: string;
-  description?: string;
-  startDate: string;
-  endDate: string;
-  status: 'planning' | 'active' | 'completed' | 'on-hold';
-  fundingSources: Array<{
-    sourceType: 'salary' | 'bonus' | 'loan' | 'savings' | 'other';
-    categoryId?: string;
-    amount: number;
-    description?: string;
-    isReceived: boolean;
-  }>;
-  categoryBudgets: Array<{
-    categoryId: string;
-    subCategoryId: string;
-    budgetedAmount: number;
-    actualAmount: number;
-  }>;
-  projectTag?: string;
-  currency: string;
-  priority: 'low' | 'medium' | 'high';
-  notes?: string;
-  totalBudget: number;
-  totalReceived: number;
-  totalSpent: number;
-  remainingBudget: number;
-  progressPercentage: number;
-  daysRemaining: number;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export interface BudgetSummary {
   monthly: {
@@ -167,9 +135,12 @@ export const budgetsApi = {
     api.get('/budgets/projects', { params })
       .then((res: AxiosResponse) => res.data),
 
-  getProjectBudget: (id: string): Promise<ProjectBudget> =>
-    api.get<ProjectBudget>(`/budgets/projects/${id}`)
-      .then((res: AxiosResponse<ProjectBudget>) => res.data),
+  getProjectBudget: (id: string): Promise<{
+    success: boolean;
+    data: ProjectBudget;
+  }> =>
+    api.get(`/budgets/projects/${id}`)
+      .then((res: AxiosResponse) => res.data),
 
   createProjectBudget: (data: CreateProjectBudgetData): Promise<ProjectBudget> =>
     api.post<ProjectBudget>('/budgets/projects', data)
@@ -276,4 +247,75 @@ export const budgetsApi = {
     api.post(`/budgets/category/${categoryId}/subcategory/${subCategoryId || 'null'}/recalculate`, {
       monthsToAnalyze
     }).then((res: AxiosResponse) => res.data),
+
+  // Project Expense Management API calls
+  tagTransactionToProject: (projectId: string, transactionId: string): Promise<{
+    success: boolean;
+    message: string;
+    unplannedExpense: any;
+  }> =>
+    api.post(`/budgets/projects/${projectId}/expenses/tag`, { transactionId })
+      .then((res: AxiosResponse) => res.data),
+
+  bulkTagTransactionsToProject: (projectId: string, transactionIds: string[]): Promise<{
+    success: boolean;
+    message: string;
+    addedCount: number;
+    unplannedExpenses: any[];
+  }> =>
+    api.post(`/budgets/projects/${projectId}/expenses/bulk-tag`, { transactionIds })
+      .then((res: AxiosResponse) => res.data),
+
+  removeTransactionFromProject: (projectId: string, transactionId: string): Promise<{
+    success: boolean;
+    message: string;
+  }> =>
+    api.delete(`/budgets/projects/${projectId}/expenses/${transactionId}`)
+      .then((res: AxiosResponse) => res.data),
+
+  moveExpenseToPlanned: (projectId: string, transactionId: string, categoryId: string, subCategoryId: string): Promise<{
+    success: boolean;
+    message: string;
+    data: any;
+  }> =>
+    api.put(`/budgets/projects/${projectId}/expenses/${transactionId}/move`, {
+      categoryId,
+      subCategoryId
+    }).then((res: AxiosResponse) => res.data),
+
+
+  bulkMoveExpensesToPlanned: (projectId: string, moves: Array<{
+    transactionId: string;
+    categoryId: string;
+    subCategoryId: string;
+  }>): Promise<{
+    success: boolean;
+    message: string;
+    movedCount: number;
+    movedExpenses: any[];
+  }> =>
+    api.post(`/budgets/projects/${projectId}/expenses/bulk-move`, { moves })
+      .then((res: AxiosResponse) => res.data),
+
+  getProjectExpenseBreakdown: (projectId: string): Promise<{
+    success: boolean;
+    data: {
+      projectId: string;
+      projectName: string;
+      currency: string;
+      totalBudget: number;
+      totalPaid: number;
+      totalPlannedPaid: number;
+      totalUnplannedPaid: number;
+      isOverBudget: boolean;
+      progress: number;
+      plannedCategories: any[];
+      categoryBreakdown: any[];
+      plannedExpensesGrouped: any[];
+      unplannedExpenses: any[];
+      unplannedExpensesCount: number;
+    };
+  }> =>
+    api.get(`/budgets/projects/${projectId}/expenses/breakdown`)
+      .then((res: AxiosResponse) => res.data),
 };

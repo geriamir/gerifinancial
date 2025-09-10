@@ -12,15 +12,18 @@ import {
   IconButton,
   CircularProgress,
   Alert,
+  TextField,
+  Autocomplete,
 } from '@mui/material';
 import {
   Close as CloseIcon,
   AccountBalance as MoneyIcon,
   CalendarToday as CalendarIcon,
   Description as DescriptionIcon,
+  LocalOffer as TagIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import type { Transaction } from '../../services/api/types/transactions';
+import type { Transaction, Tag } from '../../services/api/types/transactions';
 import { formatCurrencyDisplay } from '../../utils/formatters';
 import { EnhancedCategorizationDialog } from './EnhancedCategorizationDialog';
 import { transactionsApi } from '../../services/api/transactions';
@@ -42,24 +45,134 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
   onTransactionUpdated,
 }) => {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingTags, setPendingTags] = useState<string[]>([]);
+  const [originalTags, setOriginalTags] = useState<string[]>([]);
   const { categories } = useCategories();
 
   useEffect(() => {
     if (!open) {
       setError(null);
       setUpdating(false);
+      setPendingTags([]);
+      setOriginalTags([]);
+    } else if (transaction) {
+      // Initialize pending tags with current transaction tags
+      const currentTagNames = transaction.tags?.map(tag => 
+        typeof tag === 'object' && tag !== null && '_id' in tag 
+          ? (tag as Tag).name 
+          : ''
+      ).filter(Boolean) || [];
+      setPendingTags([...currentTagNames]);
+      setOriginalTags([...currentTagNames]);
+    }
+  }, [open, transaction]);
+
+  useEffect(() => {
+    if (open) {
+      fetchTags();
     }
   }, [open]);
+
+  const fetchTags = async () => {
+    try {
+      setTagsLoading(true);
+      const tags = await transactionsApi.getTags();
+      setAllTags(tags);
+    } catch (err) {
+      console.error('Failed to fetch tags:', err);
+      setError('Failed to load tags');
+    } finally {
+      setTagsLoading(false);
+    }
+  };
+
+
+  const savePendingChanges = async () => {
+    if (!transaction) return;
+
+    const tagsToAdd = pendingTags.filter(tag => !originalTags.includes(tag));
+    const tagsToRemove = originalTags.filter(tag => !pendingTags.includes(tag));
+
+    if (tagsToAdd.length === 0 && tagsToRemove.length === 0) {
+      return; // No changes to save
+    }
+
+    try {
+      setUpdating(true);
+      setError(null);
+
+      let updatedTransaction = transaction;
+
+      // Remove tags first
+      if (tagsToRemove.length > 0) {
+        // Find tag IDs to remove
+        const tagIdsToRemove: string[] = [];
+        if (transaction.tags && Array.isArray(transaction.tags)) {
+          for (const tag of transaction.tags) {
+            if (typeof tag === 'object' && tag !== null && '_id' in tag) {
+              const tagObj = tag as Tag;
+              if (tagsToRemove.includes(tagObj.name)) {
+                tagIdsToRemove.push(tagObj._id);
+              }
+            }
+          }
+        }
+
+        if (tagIdsToRemove.length > 0) {
+          updatedTransaction = await transactionsApi.removeTagsFromTransaction(
+            transaction._id,
+            tagIdsToRemove
+          );
+        }
+      }
+
+      // Add new tags
+      if (tagsToAdd.length > 0) {
+        updatedTransaction = await transactionsApi.addTagsToTransaction(
+          updatedTransaction._id,
+          tagsToAdd
+        );
+      }
+
+      onTransactionUpdated?.(updatedTransaction);
+      
+      // Refresh tags list to include any newly created tags
+      await fetchTags();
+      
+      // Update original tags to reflect saved state
+      setOriginalTags([...pendingTags]);
+    } catch (err) {
+      console.error('Failed to save tag changes:', err);
+      setError('Failed to save tag changes');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const hasTagChanges = () => {
+    if (pendingTags.length !== originalTags.length) return true;
+    return !pendingTags.every(tag => originalTags.includes(tag));
+  };
 
   if (!transaction) {
     return null;
   }
 
+  const handleClose = async () => {
+    if (hasTagChanges()) {
+      await savePendingChanges();
+    }
+    onClose();
+  };
+
   const handleCategoryEdit = () => {
     setCategoryDialogOpen(true);
   };
+
 
 
   const handleCategoryUpdate = async (categoryId: string, subCategoryId: string, saveAsManual?: boolean, matchingFields?: any) => {
@@ -135,7 +248,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
             Transaction Details
           </Typography>
           <IconButton
-            onClick={onClose}
+            onClick={handleClose}
             sx={{ color: 'grey.500' }}
             aria-label="close"
           >
@@ -271,7 +384,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 </Box>
               </Box>
               
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 1 }}>
                 <CalendarIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
                 <Box>
                   <Typography variant="caption" color="text.secondary" display="block">
@@ -282,9 +395,127 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                   </Typography>
                 </Box>
               </Box>
+
+              {/* Tags Information - Always in edit mode */}
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 1 }}>
+                <TagIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Tags
+                  </Typography>
+                  {(() => {
+                    // Get all available tags for autocomplete
+                    const availableOptions = allTags.map(tag => tag.name);
+
+                    return (
+                      <Box onClick={(e) => e.stopPropagation()}>
+                        <Autocomplete
+                          multiple
+                          freeSolo
+                          size="small"
+                          sx={{ minWidth: 200 }}
+                          options={availableOptions}
+                          value={pendingTags}
+                          onChange={(event, newValue) => {
+                            if (event) {
+                              event.stopPropagation();
+                              (event.nativeEvent as any)?.stopImmediatePropagation?.();
+                              event.preventDefault();
+                            }
+                            // Handle tag changes
+                            setPendingTags(newValue as string[]);
+                          }}
+                          onOpen={(event) => {
+                            if (event) {
+                              event.stopPropagation();
+                              (event.nativeEvent as any)?.stopImmediatePropagation?.();
+                            }
+                          }}
+                          onClose={(event) => {
+                            if (event) {
+                              event.stopPropagation();
+                              (event.nativeEvent as any)?.stopImmediatePropagation?.();
+                            }
+                          }}
+                          clearOnBlur={false}
+                          selectOnFocus={true}
+                          handleHomeEndKeys={true}
+                          renderTags={(tagNames, getTagProps) =>
+                            tagNames.map((tagName, index) => {
+                              // Find the tag object to get color info
+                              const tagObj = allTags.find(tag => tag.name === tagName);
+                              
+                              // Remove "project:" prefix from project tags for display
+                              const displayName = tagObj?.type === 'project' && tagName.startsWith('project:') 
+                                ? tagName.substring(8) 
+                                : tagName;
+                              
+                              return (
+                                <Chip
+                                  {...getTagProps({ index })}
+                                  key={tagName}
+                                  label={displayName}
+                                  size="small"
+                                  color="primary"
+                                  variant="outlined"
+                                  disabled={updating}
+                                  sx={{
+                                    backgroundColor: tagObj?.color ? `${tagObj.color}15` : undefined,
+                                    borderColor: tagObj?.color || undefined,
+                                  }}
+                                />
+                              );
+                            })
+                          }
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              placeholder={pendingTags.length === 0 ? "Add tags..." : ""}
+                              variant="outlined"
+                              disabled={updating || tagsLoading}
+                              size="small"
+                              onKeyDown={(e) => {
+                                // Completely prevent all key event propagation
+                                e.stopPropagation();
+                                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+                              }}
+                              onKeyUp={(e) => {
+                                e.stopPropagation();
+                                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+                              }}
+                              onKeyPress={(e) => {
+                                e.stopPropagation();
+                                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+                              }}
+                              onInput={(e) => {
+                                e.stopPropagation();
+                                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+                              }}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+                              }}
+                              onFocus={(e) => {
+                                e.stopPropagation();
+                                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+                              }}
+                              onBlur={(e) => {
+                                e.stopPropagation();
+                                (e.nativeEvent as any)?.stopImmediatePropagation?.();
+                              }}
+                            />
+                          )}
+                          loading={tagsLoading}
+                          disabled={updating}
+                        />
+                      </Box>
+                    );
+                  })()}
+                </Box>
+              </Box>
               
               {(transaction.memo || transaction.rawData?.memo) && (
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mt: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
                   <DescriptionIcon sx={{ color: 'grey.600', fontSize: 20, mt: 0.25 }} />
                   <Box>
                     <Typography variant="caption" color="text.secondary" display="block">
@@ -298,6 +529,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
               )}
             </Paper>
 
+
             {/* Budget Exclusion Section - Only show for categorized expense transactions */}
             {transaction.category && (transaction.category.type === 'Expense' || transaction.category.type === 'Income') && (
               <Paper sx={{ p: 3, bgcolor: 'blue.50', border: '1px solid', borderColor: 'blue.200' }}>
@@ -307,12 +539,13 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 />
               </Paper>
             )}
+
           </Box>
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3 }}>
-          <Button onClick={onClose} variant="outlined">
-            Close
+          <Button onClick={handleClose} variant="outlined">
+            {hasTagChanges() ? 'Save' : 'Close'}
           </Button>
         </DialogActions>
       </Dialog>

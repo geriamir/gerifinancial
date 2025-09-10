@@ -2,6 +2,7 @@ import { AxiosResponse } from 'axios';
 import api from './base';
 import {
   Transaction,
+  Tag,
   GetTransactionsResponse,
   CategorizeTransactionRequest,
   CategorizeTransactionResponse,
@@ -82,5 +83,22 @@ export const transactionsApi = {
   // Uncategorized stats for dashboard
   getUncategorizedStats: (): Promise<UncategorizedStats> =>
     api.get<UncategorizedStats>('/transactions/uncategorized-stats')
-      .then((res: AxiosResponse<UncategorizedStats>) => res.data)
+      .then((res: AxiosResponse<UncategorizedStats>) => res.data),
+
+  // Tag management
+  getTags: (): Promise<Tag[]> =>
+    api.get<Tag[]>('/transactions/tags')
+      .then((res: AxiosResponse<Tag[]>) => res.data),
+
+  createTag: (name: string, color?: string): Promise<Tag> =>
+    api.post<Tag>('/transactions/tags', { name, color })
+      .then((res: AxiosResponse<Tag>) => res.data),
+
+  addTagsToTransaction: (transactionId: string, tagNames: string[]): Promise<Transaction> =>
+    api.post<Transaction>(`/transactions/${transactionId}/tags`, { tagNames })
+      .then((res: AxiosResponse<Transaction>) => res.data),
+
+  removeTagsFromTransaction: (transactionId: string, tagIds: string[]): Promise<Transaction> =>
+    api.delete<Transaction>(`/transactions/${transactionId}/tags`, { data: { tagIds } })
+      .then((res: AxiosResponse<Transaction>) => res.data)
 };

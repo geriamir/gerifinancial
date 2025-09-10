@@ -26,6 +26,19 @@ export const useCategoryQuickSearch = (
   }, [searchString]);
 
   const handleKeyPress = useCallback((event: KeyboardEvent) => {
+    // Don't handle keypress if user is typing in an input field
+    const target = event.target as HTMLElement;
+    if (target && (
+      target.tagName === 'INPUT' || 
+      target.tagName === 'TEXTAREA' || 
+      target.isContentEditable ||
+      target.closest('[role="combobox"]') || // MUI Autocomplete
+      target.closest('[role="textbox"]') ||   // MUI TextField
+      target.closest('.MuiInputBase-root')    // Any MUI input
+    )) {
+      return;
+    }
+
     // Only handle alphanumeric keys
     if (event.key.length === 1 && /^[a-zA-Z0-9]$/.test(event.key)) {
       const newSearchString = searchString + event.key.toLowerCase();

@@ -47,9 +47,10 @@ const transactionTypes: { value: TransactionType | undefined; label: string }[] 
 
 interface CategorySelectProps {
   onFilterChange: FilterPanelProps['onFilterChange'];
+  category?: string;
 }
 
-const CategorySelectBase: React.FC<CategorySelectProps> = ({ onFilterChange }) => {
+const CategorySelectBase: React.FC<CategorySelectProps> = ({ onFilterChange, category }) => {
   const { categories } = useCategories();
   const { announce } = useAnnouncer();
   const performance = usePerformanceMonitor('CategorySelect');
@@ -69,10 +70,14 @@ const CategorySelectBase: React.FC<CategorySelectProps> = ({ onFilterChange }) =
     try {
       await performance.measureOperation('categorySelect', async () => {
         if (controller.signal.aborted) return;
-        onFilterChange({ category: categoryId || undefined });
+        // Ensure empty strings are converted to undefined to avoid filtering issues
+        const finalCategoryId = categoryId && categoryId.trim() ? categoryId.trim() : undefined;
+        onFilterChange({ category: finalCategoryId });
         const selectedCategory = categories.find(c => c._id === categoryId);
         if (selectedCategory) {
           announce(`Selected category ${selectedCategory.name}`);
+        } else if (!finalCategoryId) {
+          announce('All categories selected');
         }
       });
     } finally {
@@ -113,7 +118,7 @@ const CategorySelectBase: React.FC<CategorySelectProps> = ({ onFilterChange }) =
         select
         size="small"
         label="Category"
-        defaultValue=""
+        value={category || ""}
         onChange={(e) => handleCategorySelect(e.target.value)}
         sx={{ minWidth: 120 }}
         aria-label="Filter by category"
@@ -150,6 +155,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   startDate = defaultStartDate,
   endDate = defaultEndDate,
   type = undefined,
+  category = undefined,
   search = '',
   onFilterChange,
 }) => {
@@ -377,7 +383,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             ))}
           </TextField>
         </Tooltip>
-        <CategorySelect onFilterChange={onFilterChange} />
+        <CategorySelect onFilterChange={onFilterChange} category={category} />
       </Stack>
       
       <TextField

@@ -1,0 +1,97 @@
+# Import Reference Standards for Backend Subsystems
+
+## Rule: Internal Subsystem Import Rules
+
+When working within the same subsystem, use direct imports instead of going through the main index file.
+
+**Bad Example:**
+```javascript
+// In banking/services/bankAccountService.js
+const { BankAccount } = require('../'); // Don't import from main index
+```
+
+**Good Example:**
+```javascript
+// In banking/services/bankAccountService.js
+const { BankAccount } = require('../models'); // Use internal models module
+const bankScraperService = require('./bankScraperService'); // Direct service import
+```
+
+## Rule: External Subsystem Import Rules
+
+When importing from other subsystems, always use the main subsystem index file.
+
+**Bad Example:**
+```javascript
+// In project-budgets/services/projectOverviewService.js
+const Transaction = require('../../banking/models/Transaction'); // Don't access internal modules
+```
+
+**Good Example:**
+```javascript
+// In project-budgets/services/projectOverviewService.js
+const { Transaction } = require('../../banking'); // Use main subsystem index
+const { CurrencyExchange } = require('../../foreign-currency'); // Use main subsystem index
+```
+
+## Rule: Subsystem Index File Purity
+
+Subsystem index files should only export items that belong to their own subsystem. Do not re-export items from other subsystems.
+
+**Bad Example:**
+```javascript
+// In monthly-budgets/index.js
+const { Category, SubCategory } = require('../banking'); // Don't re-export from other subsystems
+module.exports = {
+  Category, // This belongs to banking, not monthly-budgets
+  SubCategory, // This belongs to banking, not monthly-budgets
+  MonthlyBudget
+};
+```
+
+**Good Example:**
+```javascript
+// In monthly-budgets/index.js
+const MonthlyBudget = require('./models/MonthlyBudget'); // Only own models
+const budgetService = require('./services/budgetService'); // Only own services
+module.exports = {
+  MonthlyBudget, // This belongs to monthly-budgets
+  budgetService // This belongs to monthly-budgets
+};
+```
+
+## Rule: Internal Models Module Pattern
+
+Subsystems can create internal models/index.js files for grouping related imports within the subsystem.
+
+**Allowed Pattern:**
+```javascript
+// In banking/models/index.js (internal module)
+const Transaction = require('./Transaction');
+const BankAccount = require('./BankAccount');
+module.exports = { Transaction, BankAccount };
+
+// In banking/services/dataSyncService.js
+const { Transaction, BankAccount } = require('../models'); // Good - internal module
+```
+
+## Rule: Shared Utilities Exception
+
+The shared subsystem can be imported directly since it's designed for common utilities.
+
+**Allowed Pattern:**
+```javascript
+const logger = require('../../shared/utils/logger');
+const auth = require('../../shared/middleware/auth');
+const config = require('../../shared/config');
+```
+
+## Enforcement Guidelines
+
+1. **Review imports** when working on any backend service or route
+2. **Check subsystem boundaries** - ensure external imports go through main index
+3. **Verify index files** only export items belonging to their subsystem
+4. **Use direct imports** within the same subsystem for better encapsulation
+5. **Run tests** after import changes to ensure no circular dependencies
+
+These patterns maintain clean subsystem boundaries, proper encapsulation, and prevent circular dependency issues.

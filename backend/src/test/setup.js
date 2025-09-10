@@ -1,10 +1,10 @@
 // Mock services
-jest.mock('../services/categoryAIService', () => require('./mocks/categoryAIService'));
-jest.mock('../services/scrapingSchedulerService', () => require('./mocks/scrapingSchedulerService'));
+jest.mock('../banking/services/categoryAIService', () => require('./mocks/categoryAIService'));
+jest.mock('../banking/services/scrapingSchedulerService', () => require('./mocks/scrapingSchedulerService'));
 
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { User } = require('../models');
+const { User } = require('../auth');
 
 // Global test helpers
 global.createTestUser = async (userData = {}) => {
@@ -43,11 +43,10 @@ beforeAll(async () => {
   await mongoose.connect(mongoUri);
   console.log('Successfully connected to MongoDB');
 
-  // Load models to ensure they're registered
-  const models = require('../models');
+  // Load models to ensure they're registered - no longer needed with new modular structure
   
   // Initialize required services after models are loaded
-  const scrapingSchedulerService = require('../services/scrapingSchedulerService');
+  const scrapingSchedulerService = require('../banking/services/scrapingSchedulerService');
   
   // Initialize scheduler for tests (will find 0 active accounts in test environment)
   try {
@@ -92,7 +91,7 @@ afterEach(async () => {
 afterAll(async () => {
   try {
     // Clean up any running scheduler jobs first
-    const scrapingSchedulerService = require('../services/scrapingSchedulerService');
+    const scrapingSchedulerService = require('../banking/services/scrapingSchedulerService');
     scrapingSchedulerService.stopAll();
 
     // Force close any pending database operations
