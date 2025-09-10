@@ -1,5 +1,6 @@
 const projectTemplateService = require('../services/projectTemplateService');
-const { Category, SubCategory, User } = require('../../shared/models');
+const { Category, SubCategory } = require('../../banking');
+const { User } = require('../../auth');
 const mongoose = require('mongoose');
 
 describe('ProjectTemplateService', () => {

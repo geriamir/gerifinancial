@@ -1,4 +1,5 @@
-const { CategoryBudget, Category, SubCategory, Transaction } = require('../../shared/models');
+const { CategoryBudget } = require('../models');
+const { Category, SubCategory, Transaction } = require('../../banking');
 const logger = require('../../shared/utils/logger');
 
 class CategoryBudgetService {

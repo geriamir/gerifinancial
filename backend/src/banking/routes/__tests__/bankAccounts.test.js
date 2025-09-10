@@ -2,7 +2,7 @@ const request = require('supertest');
 const mongoose = require('mongoose');
 const { createTestUser } = require('../../../test/testUtils');
 const app = require('../../../app');
-const { User } = require('../../../shared/models');
+const { User } = require('../../../auth');
 const { BankAccount } = require('../../models');
 
 // Import valid credentials from mock (bankScraperService handles the mocking automatically based on NODE_ENV)

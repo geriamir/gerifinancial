@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { RSUGrant } = require('../../models');
+const { RSUGrant } = require('../models');
 
 describe('RSUGrant Model', () => {
   let mockGrant;

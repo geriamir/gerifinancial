@@ -1,5 +1,5 @@
 const stockPriceService = require('../stockPriceService');
-const { StockPrice } = require('../../../shared/models');
+const { StockPrice } = require('../../../investments');
 const { RSUGrant } = require('../../models');
 
 // Mock external fetch

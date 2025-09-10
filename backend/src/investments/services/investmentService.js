@@ -1,5 +1,5 @@
-const { Investment, InvestmentSnapshot, InvestmentTransaction } = require('../../shared/models');
-const bankScraperService = require('../../banking/services/bankScraperService');
+const { Investment, InvestmentSnapshot, InvestmentTransaction } = require('../models');
+const { bankScraperService } = require('../../banking');
 const INVESTMENT_CONSTANTS = require('../constants/investmentConstants');
 const logger = require('../../shared/utils/logger');
 

@@ -1,6 +1,6 @@
-const { Transaction, ProjectBudget } = require('../../shared/models');
-const { TransactionType } = require('../../banking/constants/enums');
-const currencyExchangeService = require('../../foreign-currency/services/currencyExchangeService');
+const { Transaction, TransactionType } = require('../../banking');
+const { ProjectBudget } = require('../models');
+const { currencyExchangeService } = require('../../foreign-currency');
 const logger = require('../../shared/utils/logger');
 
 class ProjectExpensesService {

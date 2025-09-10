@@ -1,5 +1,5 @@
-const { Tag } = require('../');
-const User = require('../../../auth/models/User');
+const { Tag } = require('../models');
+const { User } = require('../../auth');
 
 let testUser;
 

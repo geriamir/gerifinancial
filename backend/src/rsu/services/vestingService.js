@@ -1,4 +1,4 @@
-const { RSUGrant } = require('../../shared/models');
+const { RSUGrant } = require('../models');
 
 class VestingService {
   /**

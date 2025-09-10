@@ -11,8 +11,7 @@ const transactionExclusionSchema = new mongoose.Schema({
   transactionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Transaction',
-    required: true,
-    index: true
+    required: true
   },
   
   categoryId: {
@@ -82,7 +81,7 @@ transactionExclusionSchema.index({ categoryId: 1, subCategoryId: 1, isActive: 1 
 transactionExclusionSchema.index({ excludedAt: -1 });
 
 // Method to deactivate exclusion (soft delete)
-transactionExclusionSchema.methods.remove = async function() {
+transactionExclusionSchema.methods.deactivate = async function() {
   this.isActive = false;
   this.removedAt = new Date();
   await this.save();

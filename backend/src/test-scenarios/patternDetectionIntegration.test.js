@@ -1,8 +1,6 @@
-const { Transaction, Category, SubCategory, User, BankAccount } = require('../shared/models');
-const TransactionPattern = require('../monthly-budgets/models/TransactionPattern');
-const { TransactionType } = require('../banking/constants/enums');
-const recurrenceDetectionService = require('../monthly-budgets/services/recurrenceDetectionService');
-const budgetService = require('../monthly-budgets/services/budgetService');
+const { Transaction, TransactionType, Category, SubCategory, BankAccount } = require('../banking');
+const { User } = require('../auth');
+const { TransactionPattern, recurrenceDetectionService, budgetService } = require('../monthly-budgets');
 
 describe('Pattern Detection Integration Tests', () => {
   let testUser;
@@ -16,7 +14,7 @@ describe('Pattern Detection Integration Tests', () => {
 
   beforeAll(async () => {
     // Create test user using global helper
-    testUser = await createTestUser({
+    testUser = await global.createTestUser({
       email: 'pattern-test@example.com',
       name: 'Pattern Test User'
     });

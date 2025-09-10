@@ -2,7 +2,7 @@ const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { createTestUser } = require('../../../test/testUtils');
 const app = require('../../../app');
-const { User } = require('../../../shared/models');
+const { User } = require('../../models');
 const config = require('../../../shared/config');
 
 describe('Auth Routes', () => {

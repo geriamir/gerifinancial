@@ -1,9 +1,9 @@
-const { MonthlyBudget, CategoryBudget, Transaction, Category, SubCategory, TransactionExclusion } = require('../../shared/models');
+const { MonthlyBudget, CategoryBudget, Category, SubCategory } = require('../models');
+const { Transaction, TransactionExclusion } = require('../../banking');
 const logger = require('../../shared/utils/logger');
 const yearlyBudgetService = require('./yearlyBudgetService');
 const budgetCalculationService = require('./budgetCalculationService');
-const projectBudgetService = require('../../project-budgets/services/projectBudgetService');
-const { BUDGET_STATUS } = require('../../project-budgets/constants/statusTypes');
+const { projectBudgetService, BUDGET_STATUS } = require('../../project-budgets');
 
 class BudgetService {
   // ============================================

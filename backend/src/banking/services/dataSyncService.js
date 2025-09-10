@@ -1,9 +1,10 @@
-const { BankAccount, ForeignCurrencyAccount, CurrencyExchange, Transaction, Investment } = require('../../shared/models');
+const { BankAccount, Transaction } = require('../models');
+const { CurrencyExchange, ForeignCurrencyAccount } = require('../../foreign-currency');
+const { Investment } = require('../../investments');
 const bankScraperService = require('./bankScraperService');
 const transactionService = require('./transactionService');
 const creditCardDetectionService = require('./creditCardDetectionService');
-const investmentService = require('../../investments/services/investmentService');
-const portfolioService = require('../../investments/services/portfolioService');
+const { investmentService, portfolioService } = require('../../investments');
 const logger = require('../../shared/utils/logger');
 
 class DataSyncService {

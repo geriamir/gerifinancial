@@ -1,4 +1,4 @@
-const { BankAccount } = require('../../shared/models');
+const { BankAccount } = require('../models');
 const scrapingSchedulerService = require('./scrapingSchedulerService');
 const bankScraperService = require('./bankScraperService');
 const dataSyncService = require('./dataSyncService');

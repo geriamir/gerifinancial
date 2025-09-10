@@ -4,7 +4,7 @@ jest.mock('../banking/services/scrapingSchedulerService', () => require('./mocks
 
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { User } = require('../shared/models');
+const { User } = require('../auth');
 
 // Global test helpers
 global.createTestUser = async (userData = {}) => {
@@ -43,8 +43,7 @@ beforeAll(async () => {
   await mongoose.connect(mongoUri);
   console.log('Successfully connected to MongoDB');
 
-  // Load models to ensure they're registered
-  const models = require('../shared/models');
+  // Load models to ensure they're registered - no longer needed with new modular structure
   
   // Initialize required services after models are loaded
   const scrapingSchedulerService = require('../banking/services/scrapingSchedulerService');

@@ -1,5 +1,3 @@
-const mongoose = require('mongoose');
-
 // Mock node-cron BEFORE everything else
 const mockCronCallback = jest.fn();
 const mockStop = jest.fn();
@@ -29,7 +27,8 @@ jest.mock('../../../shared/utils/rateLimiter', () => ({
 
 const scrapingSchedulerService = require('../scrapingSchedulerService');
 const transactionService = require('../transactionService');
-const { BankAccount, User } = require('../../../shared/models');
+const { User } = require('../../../auth');
+const { BankAccount } = require('../../models');
 const logger = require('../../../shared/utils/logger');
 
 let testUser;

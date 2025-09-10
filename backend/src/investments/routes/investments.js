@@ -1,10 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const investmentService = require('../services/investmentService');
-const bankScraperService = require('../../banking/services/bankScraperService');
+const { BankAccount, bankScraperService, dataSyncService } = require('../../banking');
 const startupInvestmentService = require('../services/startupInvestmentService');
-const dataSyncService = require('../../banking/services/dataSyncService');
-const { BankAccount } = require('../../shared/models');
 const auth = require('../../shared/middleware/auth');
 const logger = require('../../shared/utils/logger');
 

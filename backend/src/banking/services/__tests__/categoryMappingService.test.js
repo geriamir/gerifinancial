@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const categoryMappingService = require('../categoryMappingService');
-const { Category, SubCategory, Transaction } = require('../../../shared/models');
-const { ManualCategorized } = require('../../../shared/models');
+const { Category, SubCategory, Transaction, ManualCategorized } = require('../../models');
 const { CategorizationMethod, TransactionType } = require('../../constants/enums');
 
 describe('CategoryMappingService', () => {

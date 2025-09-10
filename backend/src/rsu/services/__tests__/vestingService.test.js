@@ -1,6 +1,6 @@
 const vestingService = require('../vestingService');
 const { RSUGrant } = require('../../models');
-const { User } = require('../../../shared/models');
+const { User } = require('../../../auth');
 const { createTestUser } = require('../../../test/testUtils');
 
 describe('Vesting Service', () => {

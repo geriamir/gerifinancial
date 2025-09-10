@@ -1,5 +1,4 @@
-const ManualCategorized = require('../models/ManualCategorized');
-const { SubCategory, Category, Transaction } = require('../../shared/models');
+const { ManualCategorized, Transaction, Category, SubCategory } = require('../models');
 const categoryAIService = require('./categoryAIService');
 const { enhancedKeywordMatcher } = require('./enhanced-keyword-matching');
 const { CategorizationMethod, TransactionType } = require('../constants/enums');

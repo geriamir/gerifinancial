@@ -1,6 +1,7 @@
-const { ProjectBudget, Tag, Transaction, Category, SubCategory, User } = require('../');
-const { createTestUser } = require('../../../test/testUtils');
-require('../../../banking/constants/enums');
+const { ProjectBudget } = require('../models');
+const { Tag, Transaction, Category, SubCategory } = require('../../banking');
+const { User } = require('../../auth');
+const { createTestUser } = require('../../test/testUtils');
 
 describe('ProjectBudget Model', () => {
   let testUser;

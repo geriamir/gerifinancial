@@ -1,4 +1,5 @@
-const { RSUGrant, RSUSale, StockPrice } = require('../../shared/models');
+const { RSUGrant, RSUSale } = require('../models');
+const { StockPrice } = require('../../investments');
 const vestingService = require('./vestingService');
 const taxCalculationService = require('./taxCalculationService');
 const stockPriceService = require('./stockPriceService');

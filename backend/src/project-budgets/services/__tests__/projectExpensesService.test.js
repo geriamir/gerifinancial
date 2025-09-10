@@ -1,7 +1,8 @@
 const projectExpensesService = require('../projectExpensesService');
-const { ProjectBudget, Tag, Transaction, Category, SubCategory, User } = require('../../../shared/models');
+const { User } = require('../../../auth');
+const { Tag, TransactionType, Transaction, Category, SubCategory } = require('../../../banking');
+const { ProjectBudget } = require('../../models');
 const { createTestUser } = require('../../../test/testUtils');
-const { TransactionType } = require('../../../banking/constants/enums');
 const mongoose = require('mongoose');
 
 describe('ProjectExpensesService', () => {

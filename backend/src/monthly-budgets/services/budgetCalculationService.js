@@ -1,5 +1,5 @@
-const { CategoryBudget, Transaction } = require('../../shared/models');
-const TransactionPattern = require('../models/TransactionPattern');
+const { CategoryBudget, TransactionPattern } = require('../models');
+const { Transaction } = require('../../banking');
 const logger = require('../../shared/utils/logger');
 const averagingDenominatorService = require('./averagingDenominatorService');
 const PatternMatchingUtils = require('../utils/patternMatching');

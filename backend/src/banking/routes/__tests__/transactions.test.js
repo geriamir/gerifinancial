@@ -4,7 +4,8 @@ const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../../../app');
 const { createTestUser } = require('../../../test/testUtils');
-const { User, BankAccount, Category, SubCategory, Transaction } = require('../../../shared/models');
+const { User } = require('../../../auth');
+const { BankAccount, Category, SubCategory, Transaction } = require('../../models');
 const transactionService = require('../../services/transactionService');
 
 describe('Transaction Routes', () => {

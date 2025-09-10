@@ -1,5 +1,7 @@
 const projectBudgetService = require('../projectBudgetService');
-const { ProjectBudget, Tag, Transaction, Category, SubCategory, User } = require('../../../shared/models');
+const { User } = require('../../../auth');
+const { Tag, Transaction, Category, SubCategory } = require('../../../banking');
+const { ProjectBudget } = require('../../models');
 const { createTestUser } = require('../../../test/testUtils');
 const mongoose = require('mongoose');
 

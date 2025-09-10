@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { BankAccount } = require('../../../shared/models');
+const { BankAccount } = require('../../models');
 const bankAccountService = require('../bankAccountService');
 const scrapingSchedulerService = require('../scrapingSchedulerService');
 const bankScraperService = require('../bankScraperService');

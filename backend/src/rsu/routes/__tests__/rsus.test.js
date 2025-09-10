@@ -2,7 +2,8 @@ const request = require('supertest');
 const mongoose = require('mongoose');
 const { createTestUser } = require('../../../test/testUtils');
 const app = require('../../../app');
-const { User, RSUGrant, RSUSale } = require('../../../shared/models');
+const { User } = require('../../../auth');
+const { RSUGrant, RSUSale } = require('../../models');
 
 let testUser;
 let authToken;

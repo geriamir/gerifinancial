@@ -2,7 +2,7 @@ const rsuService = require('../rsuService');
 const taxCalculationService = require('../taxCalculationService');
 const vestingService = require('../vestingService');
 const { RSUGrant, RSUSale } = require('../../models');
-const { User } = require('../../../shared/models');
+const { User } = require('../../../auth');
 const { createTestUser } = require('../../../test/testUtils');
 
 // Mock external services

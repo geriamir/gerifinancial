@@ -1,6 +1,6 @@
 const taxCalculationService = require('../taxCalculationService');
 const { RSUGrant } = require('../../models');
-const { User } = require('../../../shared/models');
+const { User } = require('../../../auth');
 const { createTestUser } = require('../../../test/testUtils');
 
 describe('Tax Calculation Service', () => {

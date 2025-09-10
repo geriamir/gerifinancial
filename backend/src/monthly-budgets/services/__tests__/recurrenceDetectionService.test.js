@@ -1,10 +1,10 @@
 const recurrenceDetectionService = require('../recurrenceDetectionService');
 const TransactionPattern = require('../../models/TransactionPattern');
-const { Transaction } = require('../../../shared/models');
+const { Transaction } = require('../../../banking');
 const mongoose = require('mongoose');
 
 // Mock the models
-jest.mock('../../../shared/models', () => ({
+jest.mock('../../../banking', () => ({
   Transaction: {
     find: jest.fn()
   }

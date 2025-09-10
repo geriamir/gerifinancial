@@ -1,7 +1,6 @@
-const currencyExchangeService = require('../../foreign-currency/services/currencyExchangeService');
+const { CurrencyExchange, currencyExchangeService } = require('../../foreign-currency');
 const unplannedExpenseService = require('./unplannedExpenseService');
-const installmentGroupingUtils = require('../../banking/utils/installmentGroupingUtils');
-const { CurrencyExchange, Transaction, Category, SubCategory } = require('../../shared/models');
+const { Category, SubCategory, Transaction, installmentGroupingUtils } = require('../../banking');
 
 /**
  * Service for handling project budget overview calculations and recommendations

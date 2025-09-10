@@ -1,4 +1,4 @@
-const { Category, SubCategory } = require('../../shared/models');
+const { Category, SubCategory } = require('../../banking');
 const logger = require('../../shared/utils/logger');
 
 // Project templates as constants - starting with vacation only

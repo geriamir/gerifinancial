@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-const { ProjectBudget, Tag, Transaction, Category, SubCategory, User } = require('../');
+const { ProjectBudget } = require('../models');
+const { Tag, Transaction, Category, SubCategory } = require('../../banking');
 
 describe('ProjectBudget Model - Edge Cases and Missing Coverage', () => {
   let testUser;

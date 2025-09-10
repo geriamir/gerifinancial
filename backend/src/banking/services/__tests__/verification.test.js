@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
-const { Transaction, Category, SubCategory, User } = require('../../../shared/models');
-const { ManualCategorized } = require('../../../shared/models');
+const { User } = require('../../../auth');
+const { Transaction, Category, SubCategory, ManualCategorized } = require('../../models');
 const transactionService = require('../transactionService');
 const categoryMappingService = require('../categoryMappingService');
 const { createTestUser } = require('../../../test/testUtils');

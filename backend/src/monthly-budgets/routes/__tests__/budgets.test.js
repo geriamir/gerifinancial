@@ -2,7 +2,10 @@ const request = require('supertest');
 const mongoose = require('mongoose');
 const { createTestUser } = require('../../../test/testUtils');
 const app = require('../../../app');
-const { User, Category, SubCategory, Transaction, MonthlyBudget, ProjectBudget, Tag } = require('../../../shared/models');
+const { User } = require('../../../auth');
+const { Category, SubCategory, Transaction, Tag } = require('../../../banking');
+const { MonthlyBudget } = require('../../models');
+const { ProjectBudget } = require('../../../project-budgets');
 
 let testUser;
 let authToken;

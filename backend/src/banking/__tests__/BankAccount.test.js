@@ -1,12 +1,12 @@
 const mongoose = require('mongoose');
-const { BankAccount } = require('../');
-const encryption = require('../../utils/encryption');
+const { BankAccount } = require('../models');
+const encryption = require('../../shared/utils/encryption');
 
 // Mock dependencies
-jest.mock('../../../banking/services/bankAccountService');
+jest.mock('../services/bankAccountService');
 
 // Import valid credentials from mock scraper
-const { validCredentials } = require('../../../test/mocks/bankScraper');
+const { validCredentials } = require('../../test/mocks/bankScraper');
 
 describe('BankAccount Model', () => {
   let mockAccount;

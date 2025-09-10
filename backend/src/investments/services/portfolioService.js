@@ -1,4 +1,4 @@
-const { Portfolio, PortfolioSnapshot } = require('../../shared/models');
+const { Portfolio, PortfolioSnapshot } = require('../models');
 const logger = require('../../shared/utils/logger');
 
 class PortfolioService {

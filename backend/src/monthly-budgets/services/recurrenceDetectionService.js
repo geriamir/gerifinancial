@@ -1,5 +1,5 @@
-const { Transaction } = require('../../shared/models');
-const TransactionPattern = require('../models/TransactionPattern');
+const { Transaction } = require('../../banking');
+const { TransactionPattern } = require('../models');
 const logger = require('../../shared/utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const { PATTERN_TYPES } = require('../constants/patternTypes');

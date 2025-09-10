@@ -1,4 +1,5 @@
-const { StockPrice, RSUGrant } = require('../../shared/models');
+const { RSUGrant } = require('../models');
+const { StockPrice } = require('../../investments');
 const cron = require('node-cron');
 
 class StockPriceService {

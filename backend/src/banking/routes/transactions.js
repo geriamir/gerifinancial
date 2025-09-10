@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../../shared/middleware/auth');
-const { Category, SubCategory, Transaction, Tag } = require('../../shared/models');
+const { Category, SubCategory, Transaction, Tag } = require('../models');
 const transactionService = require('../services/transactionService');
 const categoryAIService = require('../services/categoryAIService');
 const tagService = require('../services/tagService');

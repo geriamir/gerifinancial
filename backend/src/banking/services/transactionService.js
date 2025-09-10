@@ -1,5 +1,4 @@
-const { Transaction, Category, SubCategory, BankAccount, Tag, CreditCard, ManualCategorized } = require('../../shared/models');
-const { ProjectBudget } = require('../../project-budgets/models');
+const { Transaction, BankAccount, Tag, CreditCard, ManualCategorized, Category, SubCategory } = require('../models');
 const BankClassificationService = require('./bankClassificationService');
 const { ObjectId } = require('mongodb');
 const bankScraperService = require('./bankScraperService');
@@ -497,37 +496,6 @@ class TransactionService {
     }
   }
 
-  /**
-   * Get transactions by project (using project tag)
-   */
-  async getTransactionsByProject(projectId, userId, options = {}) {
-    try {
-      // Get project and its tag
-      const project = await ProjectBudget.findOne({
-        _id: convertToObjectId(projectId),
-        userId: convertToObjectId(userId)
-      }).populate('projectTag');
-
-      if (!project) {
-        throw new Error('Project not found');
-      }
-
-      if (!project.projectTag) {
-        // Return empty result if project has no tag yet
-        return {
-          transactions: [],
-          total: 0,
-          hasMore: false
-        };
-      }
-
-      // Get transactions using the project tag
-      return this.getTransactionsByTag(project.projectTag._id, userId, options);
-    } catch (error) {
-      logger.error('Error getting transactions by project:', error);
-      throw error;
-    }
-  }
 
   /**
    * Get spending summary by tag
@@ -594,50 +562,6 @@ class TransactionService {
   // ============================================
 
   /**
-   * Allocate transaction to a specific budget
-   */
-  async allocateTransactionToBudget(transactionId, budgetType, budgetId, userId) {
-    try {
-      const transaction = await Transaction.findOne({
-        _id: convertToObjectId(transactionId),
-        userId: convertToObjectId(userId)
-      });
-
-      if (!transaction) {
-        throw new Error('Transaction not found');
-      }
-
-      // Handle different budget types
-      switch (budgetType) {
-        case 'project':
-          const project = await ProjectBudget.findOne({
-            _id: convertToObjectId(budgetId),
-            userId: convertToObjectId(userId)
-          });
-
-          if (!project) {
-            throw new Error('Project budget not found');
-          }
-
-          // Add project tag to transaction
-          if (project.projectTag) {
-            await this.addTagsToTransaction(transactionId, [project.projectTag], userId);
-          }
-          break;
-
-        default:
-          throw new Error('Invalid budget type');
-      }
-
-      logger.info(`Allocated transaction ${transactionId} to ${budgetType} budget ${budgetId}`);
-      return transaction;
-    } catch (error) {
-      logger.error('Error allocating transaction to budget:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Get monthly budget actuals from transactions
    */
   async getMonthlyBudgetActuals(userId, year, month) {
@@ -684,67 +608,6 @@ class TransactionService {
       return actuals;
     } catch (error) {
       logger.error('Error getting monthly budget actuals:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get project budget actuals from tagged transactions
-   */
-  async getProjectBudgetActuals(projectId, userId) {
-    try {
-      const project = await ProjectBudget.findOne({
-        _id: convertToObjectId(projectId),
-        userId: convertToObjectId(userId)
-      });
-
-      if (!project) {
-        throw new Error('Project not found');
-      }
-
-      if (!project.projectTag) {
-        return [];
-      }
-
-      const actuals = await Transaction.aggregate([
-        {
-          $match: {
-            userId: convertToObjectId(userId),
-            tags: project.projectTag,
-            processedDate: { $gte: project.startDate, $lte: project.endDate }
-          }
-        },
-        {
-          $group: {
-            _id: {
-              category: '$category',
-              subCategory: '$subCategory'
-            },
-            totalAmount: { $sum: { $abs: '$amount' } },
-            transactionCount: { $sum: 1 }
-          }
-        },
-        {
-          $lookup: {
-            from: 'categories',
-            localField: '_id.category',
-            foreignField: '_id',
-            as: 'categoryDetails'
-          }
-        },
-        {
-          $lookup: {
-            from: 'subcategories',
-            localField: '_id.subCategory',
-            foreignField: '_id',
-            as: 'subCategoryDetails'
-          }
-        }
-      ]);
-
-      return actuals;
-    } catch (error) {
-      logger.error('Error getting project budget actuals:', error);
       throw error;
     }
   }

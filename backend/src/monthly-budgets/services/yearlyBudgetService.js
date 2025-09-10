@@ -1,6 +1,6 @@
-const { YearlyBudget } = require('../../shared/models');
+const { YearlyBudget, MonthlyBudget } = require('../models');
 const logger = require('../../shared/utils/logger');
-const { BUDGET_STATUS } = require('../../project-budgets/constants/statusTypes');
+const { BUDGET_STATUS } = require('../../project-budgets');
 
 class YearlyBudgetService {
   // ============================================
@@ -127,8 +127,6 @@ class YearlyBudgetService {
    */
   async syncWithMonthlyBudgets(userId, year) {
     try {
-      const { MonthlyBudget } = require('../../shared/models');
-      
       // Get all monthly budgets for the year
       const monthlyBudgets = await MonthlyBudget.find({ userId, year });
       

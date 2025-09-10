@@ -1,5 +1,7 @@
 const projectOverviewService = require('../services/projectOverviewService');
-const { ProjectBudget, Tag, Transaction, Category, SubCategory, CurrencyExchange } = require('../../shared/models');
+const { ProjectBudget } = require('../models');
+const { Tag, Transaction, Category, SubCategory } = require('../../banking');
+const { CurrencyExchange } = require('../../foreign-currency');
 const { TransactionType } = require('../../banking/constants/enums');
 const mongoose = require('mongoose');
 

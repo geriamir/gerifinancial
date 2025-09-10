@@ -1,4 +1,5 @@
-const { BankAccount, Investment } = require('../../shared/models');
+const { BankAccount } = require('../../banking');
+const { Investment } = require('../models');
 const dataSyncService = require('../../banking/services/dataSyncService');
 const logger = require('../../shared/utils/logger');
 

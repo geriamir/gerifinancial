@@ -1,5 +1,4 @@
-const Category = require('../models/Category');
-const SubCategory = require('../models/SubCategory');
+const { Category, SubCategory } = require('../../banking');
 
 const defaultCategories = [
   // Income categories (flattened - no subcategories)

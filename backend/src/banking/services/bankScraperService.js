@@ -4,7 +4,7 @@ const scraperModule = ['test', 'e2e'].includes(process.env.NODE_ENV)
 
 const { createScraper } = scraperModule;
 const logger = require('../../shared/utils/logger');
-const { BankAccount } = require('../../shared/models');
+const { BankAccount } = require('../models');
 
 
 class BankScraperService {

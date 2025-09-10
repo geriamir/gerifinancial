@@ -1,10 +1,8 @@
 const express = require('express');
-const { body, param, query, validationResult } = require('express-validator');
+const { body, param, validationResult } = require('express-validator');
 const auth = require('../../shared/middleware/auth');
 const budgetService = require('../services/budgetService');
 const smartBudgetService = require('../services/smartBudgetService');
-const { defaultCategories } = require('../../shared/services/userCategoryService');
-const { TransactionPattern } = require('../../shared/models');
 const logger = require('../../shared/utils/logger');
 
 const router = express.Router();

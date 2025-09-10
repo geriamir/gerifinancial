@@ -1,4 +1,5 @@
-const { ProjectBudget, Tag } = require('../../shared/models');
+const { ProjectBudget } = require('../models');
+const { Tag } = require('../../banking');
 const projectTemplateService = require('./projectTemplateService');
 const projectOverviewService = require('./projectOverviewService');
 const logger = require('../../shared/utils/logger');
