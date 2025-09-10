@@ -3,6 +3,7 @@ const { BankAccount } = require('../models');
 const dataSyncService = require('./dataSyncService');
 const logger = require('../../shared/utils/logger');
 const rateLimiter = require('../../shared/utils/rateLimiter');
+const bankAccountService = require('./bankAccountService');
 
 class ScrapingSchedulerService {
   constructor() {
@@ -11,6 +12,44 @@ class ScrapingSchedulerService {
       maxRequests: 1,  // One request at a time
       perSeconds: 60   // per minute per bank
     });
+    
+    // Setup event listeners after other services are initialized
+    setImmediate(() => {
+      this.setupEventListeners();
+    });
+  }
+
+  /**
+   * Setup event listeners for bank account events
+   */
+  setupEventListeners() {
+    try {
+      const events = bankAccountService.events;
+
+      events.on('accountCreated', (bankAccount) => {
+        logger.info(`Handling accountCreated event for bank account: ${bankAccount._id}`);
+        this.scheduleAccount(bankAccount);
+      });
+
+      events.on('accountActivated', (bankAccount) => {
+        logger.info(`Handling accountActivated event for bank account: ${bankAccount._id}`);
+        this.scheduleAccount(bankAccount);
+      });
+
+      events.on('accountDeleted', ({ accountId }) => {
+        logger.info(`Handling accountDeleted event for bank account: ${accountId}`);
+        this.stopAccount(accountId);
+      });
+
+      events.on('accountDeactivated', ({ accountId }) => {
+        logger.info(`Handling accountDeactivated event for bank account: ${accountId}`);
+        this.stopAccount(accountId);
+      });
+
+      logger.info('ScrapingSchedulerService event listeners initialized');
+    } catch (error) {
+      logger.error('Failed to setup ScrapingSchedulerService event listeners:', error);
+    }
   }
 
   /**

@@ -1,8 +1,11 @@
 const { BankAccount } = require('../models');
-const scrapingSchedulerService = require('./scrapingSchedulerService');
 const bankScraperService = require('./bankScraperService');
 const dataSyncService = require('./dataSyncService');
 const logger = require('../../shared/utils/logger');
+const EventEmitter = require('events');
+
+// Create a shared event emitter for bank account events
+const bankAccountEvents = new EventEmitter();
 
 class BankAccountService {
   async create(userId, { bankId, name, username, password }) {
@@ -21,9 +24,9 @@ class BankAccountService {
 
     await bankAccount.save();
 
-    // Schedule scraping for active account
-    await scrapingSchedulerService.scheduleAccount(bankAccount);
-    logger.info(`Scheduled scraping for new bank account: ${bankAccount._id}`);
+    // Emit event for scheduling scraping for active account
+    bankAccountEvents.emit('accountCreated', bankAccount);
+    logger.info(`Emitted accountCreated event for new bank account: ${bankAccount._id}`);
 
     // Initiate immediate scraping for new account
     try {
@@ -50,8 +53,8 @@ class BankAccountService {
     if (!bankAccount) return null;
 
     if (bankAccount.status === 'active') {
-      await scrapingSchedulerService.stopAccount(accountId);
-      logger.info(`Stopped scraping for deleted bank account: ${accountId}`);
+      bankAccountEvents.emit('accountDeleted', { accountId, bankAccount });
+      logger.info(`Emitted accountDeleted event for bank account: ${accountId}`);
     }
 
     await BankAccount.deleteOne({ _id: accountId });
@@ -74,13 +77,13 @@ class BankAccountService {
 
       await bankAccount.save();
 
-      // Handle scheduling
+      // Handle scheduling via events
       if (!wasActive && status === 'active') {
-        await scrapingSchedulerService.scheduleAccount(bankAccount);
-        logger.info(`Scheduled scraping for activated bank account: ${accountId}`);
+        bankAccountEvents.emit('accountActivated', bankAccount);
+        logger.info(`Emitted accountActivated event for bank account: ${accountId}`);
       } else if (wasActive && status !== 'active') {
-        await scrapingSchedulerService.stopAccount(accountId);
-        logger.info(`Stopped scraping for deactivated bank account: ${accountId}`);
+        bankAccountEvents.emit('accountDeactivated', { accountId, bankAccount });
+        logger.info(`Emitted accountDeactivated event for bank account: ${accountId}`);
       }
 
       return bankAccount;
@@ -150,4 +153,7 @@ class BankAccountService {
   }
 }
 
-module.exports = new BankAccountService();
+const bankAccountServiceInstance = new BankAccountService();
+
+module.exports = bankAccountServiceInstance;
+module.exports.events = bankAccountEvents;

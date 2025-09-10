@@ -1,17 +1,10 @@
 const mongoose = require('mongoose');
 const { BankAccount } = require('../../models');
 const bankAccountService = require('../bankAccountService');
-const scrapingSchedulerService = require('../scrapingSchedulerService');
 const bankScraperService = require('../bankScraperService');
 const logger = require('../../../shared/utils/logger');
 
 // Mock dependencies
-jest.mock('../scrapingSchedulerService', () => ({
-  scheduleAccount: jest.fn(),
-  stopAccount: jest.fn(),
-  initialize: jest.fn(),
-  stopAll: jest.fn()
-}));
 jest.mock('../bankScraperService');
 jest.mock('../../../shared/utils/logger');
 
@@ -21,6 +14,7 @@ const { validCredentials } = require('../../../test/mocks/bankScraper');
 describe('BankAccountService', () => {
   let mockAccountData;
   let userId;
+  let eventListeners;
 
   beforeEach(async () => {
     userId = new mongoose.Types.ObjectId();
@@ -33,6 +27,25 @@ describe('BankAccountService', () => {
     
     // Reset all mocks
     jest.clearAllMocks();
+    
+    // Setup event listeners to capture emitted events
+    eventListeners = {
+      accountCreated: jest.fn(),
+      accountDeleted: jest.fn(),
+      accountActivated: jest.fn(),
+      accountDeactivated: jest.fn()
+    };
+    
+    // Listen for events
+    bankAccountService.events.on('accountCreated', eventListeners.accountCreated);
+    bankAccountService.events.on('accountDeleted', eventListeners.accountDeleted);
+    bankAccountService.events.on('accountActivated', eventListeners.accountActivated);
+    bankAccountService.events.on('accountDeactivated', eventListeners.accountDeactivated);
+  });
+
+  afterEach(() => {
+    // Clean up event listeners
+    bankAccountService.events.removeAllListeners();
   });
 
   describe('create', () => {
@@ -58,12 +71,12 @@ describe('BankAccountService', () => {
         }
       );
 
-      // Verify scraping was scheduled
-      expect(scrapingSchedulerService.scheduleAccount).toHaveBeenCalledWith(
+      // Verify accountCreated event was emitted
+      expect(eventListeners.accountCreated).toHaveBeenCalledWith(
         expect.objectContaining({ _id: account._id })
       );
       expect(logger.info).toHaveBeenCalledWith(
-        expect.stringContaining(`Scheduled scraping for new bank account: ${account._id}`)
+        expect.stringContaining(`Emitted accountCreated event for new bank account: ${account._id}`)
       );
     });
 
@@ -79,8 +92,8 @@ describe('BankAccountService', () => {
       const accounts = await BankAccount.find({ userId });
       expect(accounts).toHaveLength(0);
 
-      // Verify scraping was not scheduled
-      expect(scrapingSchedulerService.scheduleAccount).not.toHaveBeenCalled();
+      // Verify no event was emitted
+      expect(eventListeners.accountCreated).not.toHaveBeenCalled();
     });
   });
 
@@ -105,10 +118,12 @@ describe('BankAccountService', () => {
       const deletedAccount = await BankAccount.findById(account._id);
       expect(deletedAccount).toBeNull();
 
-      // Verify scraping was stopped
-      expect(scrapingSchedulerService.stopAccount).toHaveBeenCalledWith(account._id);
+      // Verify accountDeleted event was emitted
+      expect(eventListeners.accountDeleted).toHaveBeenCalledWith(
+        expect.objectContaining({ accountId: account._id })
+      );
       expect(logger.info).toHaveBeenCalledWith(
-        expect.stringContaining(`Stopped scraping for deleted bank account: ${account._id}`)
+        expect.stringContaining(`Emitted accountDeleted event for bank account: ${account._id}`)
       );
     });
 
@@ -127,8 +142,8 @@ describe('BankAccountService', () => {
 
       await bankAccountService.delete(account._id, userId);
 
-      // Verify scraping was not stopped
-      expect(scrapingSchedulerService.stopAccount).not.toHaveBeenCalled();
+      // Verify no event was emitted for inactive accounts
+      expect(eventListeners.accountDeleted).not.toHaveBeenCalled();
     });
 
     it('should return null if account not found', async () => {
@@ -136,7 +151,7 @@ describe('BankAccountService', () => {
       const result = await bankAccountService.delete(nonExistentId, userId);
 
       expect(result).toBeNull();
-      expect(scrapingSchedulerService.stopAccount).not.toHaveBeenCalled();
+      expect(eventListeners.accountDeleted).not.toHaveBeenCalled();
     });
   });
 
@@ -172,12 +187,12 @@ describe('BankAccountService', () => {
         expect.objectContaining({ _id: account._id })
       );
 
-      // Verify scraping was scheduled
-      expect(scrapingSchedulerService.scheduleAccount).toHaveBeenCalledWith(
+      // Verify accountActivated event was emitted
+      expect(eventListeners.accountActivated).toHaveBeenCalledWith(
         expect.objectContaining({ _id: account._id })
       );
       expect(logger.info).toHaveBeenCalledWith(
-        expect.stringContaining(`Scheduled scraping for activated bank account: ${account._id}`)
+        expect.stringContaining(`Emitted accountActivated event for bank account: ${account._id}`)
       );
     });
 
@@ -191,10 +206,12 @@ describe('BankAccountService', () => {
       // Verify status update
       expect(updatedAccount.status).toBe('disabled');
 
-      // Verify scraping was stopped
-      expect(scrapingSchedulerService.stopAccount).toHaveBeenCalledWith(account._id);
+      // Verify accountDeactivated event was emitted
+      expect(eventListeners.accountDeactivated).toHaveBeenCalledWith(
+        expect.objectContaining({ accountId: account._id })
+      );
       expect(logger.info).toHaveBeenCalledWith(
-        expect.stringContaining(`Stopped scraping for deactivated bank account: ${account._id}`)
+        expect.stringContaining(`Emitted accountDeactivated event for bank account: ${account._id}`)
       );
     });
 
@@ -212,8 +229,8 @@ describe('BankAccountService', () => {
       expect(errorAccount.lastError).toBeDefined();
       expect(errorAccount.lastError.message).toBe(errorMessage);
 
-      // Verify scraping was not scheduled
-      expect(scrapingSchedulerService.scheduleAccount).not.toHaveBeenCalled();
+      // Verify no events were emitted for error case
+      expect(eventListeners.accountActivated).not.toHaveBeenCalled();
     });
 
     it('should return null if account not found', async () => {
@@ -222,7 +239,7 @@ describe('BankAccountService', () => {
 
       expect(result).toBeNull();
       expect(bankScraperService.testConnection).not.toHaveBeenCalled();
-      expect(scrapingSchedulerService.scheduleAccount).not.toHaveBeenCalled();
+      expect(eventListeners.accountActivated).not.toHaveBeenCalled();
     });
   });
 });
