@@ -162,9 +162,7 @@ export const CreditCardMonthlyDetail: React.FC<CreditCardMonthlyDetailProps> = (
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle>
-        <Typography variant="h6">
-          Monthly Details - {cardName}
-        </Typography>
+        Monthly Details - {cardName}
         <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>Year</InputLabel>
