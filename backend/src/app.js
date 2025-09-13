@@ -15,6 +15,7 @@ const currencyExchangeService = require('./foreign-currency/services/currencyExc
 // Import routes
 const authRoutes = require('./auth/routes/auth');
 const bankAccountRoutes = require('./banking/routes/bankAccounts');
+const creditCardRoutes = require('./banking/routes/creditCards');
 const transactionRoutes = require('./banking/routes/transactions');
 const budgetRoutes = require('./shared/routes/budgets');
 const categoryBudgetRoutes = require('./monthly-budgets/routes/categoryBudgets');
@@ -100,6 +101,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', require('./auth/routes/users'));
 app.use('/api/bank-accounts', bankAccountRoutes);
+app.use('/api/credit-cards', creditCardRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/category-budgets', categoryBudgetRoutes);
