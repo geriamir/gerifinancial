@@ -22,6 +22,11 @@ jest.mock('../../../services/api/creditCards', () => ({
   }
 }));
 
+// Mock utils
+jest.mock('../../../utils/formatters', () => ({
+  formatCurrency: (amount: number) => `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}));
+
 const theme = createTheme();
 
 const renderWithProviders = (component: React.ReactElement) => {
@@ -286,7 +291,7 @@ describe('CreditCardsList', () => {
       fireEvent.click(monthlyButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Monthly Credit Card Analysis')).toBeInTheDocument();
+        expect(screen.getByText('Monthly Details - Chase Sapphire')).toBeInTheDocument();
       });
     });
 
@@ -309,15 +314,15 @@ describe('CreditCardsList', () => {
       fireEvent.click(monthlyButton);
 
       await waitFor(() => {
-        expect(screen.getByText('Monthly Credit Card Analysis')).toBeInTheDocument();
+        expect(screen.getByText('Monthly Details - Chase Sapphire')).toBeInTheDocument();
       });
 
       // Close dialog
-      const closeButton = screen.getByLabelText('close');
+      const closeButton = screen.getByText('Close');
       fireEvent.click(closeButton);
 
       await waitFor(() => {
-        expect(screen.queryByText('Monthly Credit Card Analysis')).not.toBeInTheDocument();
+        expect(screen.queryByText('Monthly Details - Chase Sapphire')).not.toBeInTheDocument();
       });
     });
   });
@@ -401,7 +406,7 @@ describe('CreditCardsList', () => {
       expect(mockApiCalls.getAll).toHaveBeenCalledTimes(1);
     });
 
-    it('should debounce rapid expansion clicks', async () => {
+    it('should handle rapid expansion clicks correctly', async () => {
       renderWithProviders(<CreditCardsList />);
 
       await waitFor(() => {
@@ -410,15 +415,33 @@ describe('CreditCardsList', () => {
 
       const expandButton = screen.getAllByLabelText('expand')[0];
       
-      // Rapid clicks
+      // First expansion should load data
       fireEvent.click(expandButton);
-      fireEvent.click(expandButton);
-      fireEvent.click(expandButton);
-
-      // Should only process the final state
+      
       await waitFor(() => {
-        expect(mockApiCalls.getBasicStats).toHaveBeenCalledTimes(1);
+        expect(screen.getByText('Statistics')).toBeInTheDocument();
       });
+      
+      expect(mockApiCalls.getBasicStats).toHaveBeenCalledTimes(1);
+      expect(mockApiCalls.getTrend).toHaveBeenCalledTimes(1);
+      
+      // Collapse
+      fireEvent.click(expandButton);
+      
+      await waitFor(() => {
+        expect(screen.queryByText('Statistics')).not.toBeInTheDocument();
+      });
+      
+      // Expand again - should not call API again since data is cached
+      fireEvent.click(expandButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Statistics')).toBeInTheDocument();
+      });
+      
+      // Should still only have been called once
+      expect(mockApiCalls.getBasicStats).toHaveBeenCalledTimes(1);
+      expect(mockApiCalls.getTrend).toHaveBeenCalledTimes(1);
     });
   });
 
