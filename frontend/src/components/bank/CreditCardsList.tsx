@@ -7,7 +7,6 @@ import {
   Stack,
   Paper,
   Chip,
-  Grid,
   IconButton,
   Collapse,
   Alert,
@@ -25,8 +24,7 @@ import { creditCardsApi } from '../../services/api/creditCards';
 import { 
   CreditCardWithStats, 
   CreditCardBasicStats, 
-  CreditCardTrend,
-  MonthlyTrendData 
+  CreditCardTrend
 } from '../../services/api/types/creditCard';
 import { CreditCardChart } from './CreditCardChart';
 import { CreditCardMonthlyDetail } from './CreditCardMonthlyDetail';

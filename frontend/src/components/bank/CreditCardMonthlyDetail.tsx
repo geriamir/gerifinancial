@@ -38,7 +38,7 @@ import { CreditCardMonthlyStats, CategoryBreakdown } from '../../services/api/ty
 import { formatCurrency } from '../../utils/formatters';
 import TransactionsList from '../transactions/TransactionsList';
 import TransactionDetailDialog from '../transactions/TransactionDetailDialog';
-import type { TransactionFilters, Transaction } from '../../services/api/types/transactions';
+import type { Transaction } from '../../services/api/types/transactions';
 
 interface CreditCardMonthlyDetailProps {
   open: boolean;
@@ -188,7 +188,7 @@ export const CreditCardMonthlyDetail: React.FC<CreditCardMonthlyDetailProps> = (
 
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
-  const fetchMonthlyStats = async () => {
+  const fetchMonthlyStats = useCallback(async () => {
     if (!cardId) return;
     
     setLoading(true);
@@ -207,13 +207,13 @@ export const CreditCardMonthlyDetail: React.FC<CreditCardMonthlyDetailProps> = (
     } finally {
       setLoading(false);
     }
-  };
+  }, [cardId, selectedYear, selectedMonth]);
 
   useEffect(() => {
     if (open && cardId) {
       fetchMonthlyStats();
     }
-  }, [open, cardId, selectedYear, selectedMonth]);
+  }, [open, cardId, fetchMonthlyStats]);
 
   const handleYearChange = (year: number) => {
     setSelectedYear(year);

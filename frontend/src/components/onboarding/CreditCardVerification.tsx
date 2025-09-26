@@ -128,7 +128,7 @@ export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
         interval = null;
       }
     };
-  }, [analysisComplete]); // Include analysisComplete to stop polling when done
+  }, [pollScrapingStatus, analysisComplete]); // Include pollScrapingStatus dependency
 
   const handleConnectMoreCards = () => {
     // Go back to credit card setup to connect more accounts
