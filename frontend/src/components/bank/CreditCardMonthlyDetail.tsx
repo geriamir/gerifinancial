@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -7,7 +7,6 @@ import {
   Button,
   Typography,
   Box,
-  Grid,
   Paper,
   List,
   ListItem,
@@ -32,8 +31,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  Legend
+  Tooltip
 } from 'recharts';
 import { creditCardsApi } from '../../services/api/creditCards';
 import { CreditCardMonthlyStats, CategoryBreakdown } from '../../services/api/types/creditCard';
@@ -74,8 +72,7 @@ const CreditCardTransactionsList: React.FC<CreditCardTransactionsListProps> = ({
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
-  useEffect(() => {
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     if (!cardId) return;
     
     setLoading(true);
@@ -98,10 +95,11 @@ const CreditCardTransactionsList: React.FC<CreditCardTransactionsListProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [cardId, year, month]);
 
-  fetchTransactions();
-}, [cardId, year, month]);
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
 
 const handleTransactionClick = (transaction: Transaction) => {
   setSelectedTransaction(transaction);

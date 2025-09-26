@@ -7,7 +7,7 @@ const convertToObjectId = (id) => {
     return typeof id === 'string' ? new ObjectId(id) : id;
   } catch (error) {
     logger.error('Invalid ObjectId:', id, error);
-    return null;
+    throw new Error(`Invalid ObjectId: ${id}`);
   }
 };
 
@@ -118,10 +118,6 @@ class CreditCardService {
 
       const cardObjectId = convertToObjectId(cardId);
       const userObjectId = convertToObjectId(userId);
-      
-      if (!cardObjectId || !userObjectId) {
-        return null;
-      }
 
       logger.info(`Getting credit card details for card ${cardId}, user ${userId}`);
 
@@ -161,10 +157,6 @@ class CreditCardService {
     try {
       const cardObjectId = convertToObjectId(cardId);
       const userObjectId = convertToObjectId(userId);
-      
-      if (!cardObjectId || !userObjectId) {
-        return null;
-      }
 
       // Check if credit card exists
       const creditCard = await CreditCard.findOne({
@@ -324,10 +316,6 @@ class CreditCardService {
 
       const cardObjectId = convertToObjectId(cardId);
       const userObjectId = convertToObjectId(userId);
-      
-      if (!cardObjectId || !userObjectId) {
-        return null;
-      }
 
       // Check if credit card exists
       const creditCard = await CreditCard.findOne({
@@ -485,10 +473,6 @@ class CreditCardService {
 
       const cardObjectId = convertToObjectId(cardId);
       const userObjectId = convertToObjectId(userId);
-      
-      if (!cardObjectId || !userObjectId) {
-        return null;
-      }
 
       // Check if credit card exists and belongs to user
       const creditCard = await CreditCard.findOne({

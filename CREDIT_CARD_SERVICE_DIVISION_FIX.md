@@ -233,11 +233,47 @@ return {
 **Risk Level**: 🟢 **LOW** (Calculation improvements, no breaking changes)  
 **Testing**: ✅ **RECOMMENDED** (Verify improved averages with various spending patterns)
 
+## 🛠️ **Additional Fix: Consistent Error Handling**
+
+### **Issue**: Inconsistent ObjectId Error Handling
+The `convertToObjectId` function was logging errors and returning `null`, but calling code wasn't properly handling `null` values, potentially causing MongoDB query issues.
+
+### **Solution**: Consistent Error Throwing
+```javascript
+// BEFORE (inconsistent):
+const convertToObjectId = (id) => {
+  try {
+    return typeof id === 'string' ? new ObjectId(id) : id;
+  } catch (error) {
+    logger.error('Invalid ObjectId:', id, error);
+    return null; // ❌ Silent failure
+  }
+};
+
+// AFTER (consistent):
+const convertToObjectId = (id) => {
+  try {
+    return typeof id === 'string' ? new ObjectId(id) : id;
+  } catch (error) {
+    logger.error('Invalid ObjectId:', id, error);
+    throw new Error(`Invalid ObjectId: ${id}`); // ✅ Explicit error
+  }
+};
+```
+
+### **Benefits**:
+- **Explicit error handling**: Invalid ObjectIds cause immediate, clear failures
+- **No silent null propagation**: Prevents unexpected MongoDB query failures
+- **Better debugging**: Stack traces show exactly where ObjectId conversion fails
+- **Consistent behavior**: All callers get the same error handling pattern
+
 ## 🔗 **Integration**
 
 This fix complements the other recent fixes:
 - **Credit Card Duplicate Transactions Fix**: Ensures accurate transaction data
 - **Investment Route Fix**: Proper API endpoint handling  
 - **TypeScript Improvements**: Better type safety across the application
+- **React useEffect Pattern Fix**: Better performance and maintainability
+- **Consistent Error Handling**: Proper ObjectId validation and error propagation
 
-Together, these fixes improve the overall reliability and accuracy of the financial tracking system.
+Together, these fixes improve the overall reliability, accuracy, and maintainability of the financial tracking system.
