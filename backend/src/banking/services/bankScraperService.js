@@ -174,12 +174,11 @@ class BankScraperService {
         // Extract investment transactions from portfolios
         const investmentTransactions = this.extractInvestmentTransactions(scraperResult.portfolios || []);
 
-        // Extract foreign currency accounts from both dedicated foreign currency accounts and regular accounts with foreign currency transactions
+        // Extract foreign currency accounts only from dedicated foreign currency accounts
         const foreignCurrencyAccountsFromDedicated = this.extractForeignCurrencyAccountsFromDedicated(scraperResult.foreignCurrencyAccounts || []);
-        const foreignCurrencyAccountsFromRegular = this.extractForeignCurrencyAccounts(scraperResult.accounts || []);
         
-        // Combine both sources of foreign currency accounts
-        const foreignCurrencyAccounts = [...foreignCurrencyAccountsFromDedicated, ...foreignCurrencyAccountsFromRegular];
+        // Use only dedicated foreign currency accounts to prevent duplicates
+        const foreignCurrencyAccounts = foreignCurrencyAccountsFromDedicated;
 
         // Return accounts, portfolios (new structure), investments (legacy), investment transactions, and foreign currency accounts
         return {
