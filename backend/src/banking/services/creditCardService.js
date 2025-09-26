@@ -242,13 +242,60 @@ class CreditCardService {
         totalTransactions: 0
       };
 
+      // Calculate actual months with data instead of fixed 6
+      const actualMonthsWithData = await Transaction.aggregate([
+        {
+          $match: {
+            creditCardId: cardObjectId,
+            userId: userObjectId,
+            processedDate: { $gte: sixMonthsAgo }
+          }
+        },
+        {
+          $lookup: {
+            from: 'categories',
+            localField: 'category',
+            foreignField: '_id',
+            as: 'categoryDetails'
+          }
+        },
+        {
+          $match: {
+            $or: [
+              { 'categoryDetails.type': { $ne: 'Transfer' } },
+              { category: null }
+            ]
+          }
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: '$processedDate' },
+              month: { $month: '$processedDate' }
+            }
+          }
+        },
+        {
+          $count: "monthsWithData"
+        }
+      ]);
+
+      const monthsWithData = actualMonthsWithData.length > 0 ? actualMonthsWithData[0].monthsWithData : 0;
+      
+      // Calculate average monthly spending with proper zero handling
+      let avgMonthlySpending = 0;
+      if (result.last6MonthsTotal > 0 && monthsWithData > 0) {
+        avgMonthlySpending = Math.round(result.last6MonthsTotal / monthsWithData);
+      }
+
       return {
         cardId: cardId.toString(),
         last6MonthsTotal: result.last6MonthsTotal,
-        avgMonthlySpending: Math.round(result.last6MonthsTotal / 6),
+        avgMonthlySpending: avgMonthlySpending,
         totalTransactions: result.totalTransactions,
         periodStart: sixMonthsAgo.toISOString(),
         periodEnd: new Date().toISOString(),
+        monthsWithData: monthsWithData, // Add this for transparency
         // Additional fields for detailed view
         totalSpentAllTime: allTime.totalSpentAllTime,
         name: creditCard.displayName
@@ -666,13 +713,17 @@ class CreditCardService {
       }
 
       const totalPeriodAmount = months.reduce((sum, month) => sum + month.totalAmount, 0);
-      const avgMonthlyAmount = Math.round(totalPeriodAmount / 6);
+      
+      // Calculate average based on months with actual data, not fixed 6
+      const monthsWithData = months.filter(month => month.totalAmount > 0).length;
+      const avgMonthlyAmount = monthsWithData > 0 ? Math.round(totalPeriodAmount / monthsWithData) : 0;
 
       return {
         cardId: cardId.toString(),
         months,
         totalPeriodAmount,
-        avgMonthlyAmount
+        avgMonthlyAmount,
+        monthsWithData // Add this for transparency
       };
 
     } catch (error) {

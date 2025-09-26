@@ -1,12 +1,16 @@
-# Credit Card Foreign Currency Duplicate Transaction Fix
+# Credit Card Foreign Currency Duplicate Transaction Fix + Investment Route Fix
 
 **Date**: January 26, 2025  
-**Issue**: Credit card scraping was creating duplicate transactions when a transaction was scraped in EUR but the actual amount was already in ILS  
-**Status**: ✅ **FIXED**
+**Issues**: 
+1. Credit card scraping was creating duplicate transactions when a transaction was scraped in EUR but the actual amount was already in ILS
+2. Investment API throwing ObjectId casting error when accessing `/transactions` endpoint  
+**Status**: ✅ **BOTH ISSUES FIXED**
 
 ---
 
 ## 🚨 **Problem Description**
+
+### **Issue 1: Credit Card Foreign Currency Duplicates**
 
 When scraping credit card transactions, the system was incorrectly creating both:
 1. **Regular ILS transaction** - The actual transaction in the correct currency (ILS)
@@ -16,6 +20,13 @@ This resulted in **duplicate transactions** where:
 - One transaction showed the correct ILS amount
 - Another transaction showed an incorrect EUR conversion
 - Users saw inflated spending amounts due to duplicates
+
+### **Issue 2: Investment API Route Conflict**
+
+The Investment API was throwing `Cast to ObjectId failed for value "transactions"` errors because:
+1. **Route conflict**: `/api/investments/transactions` was matching the `/:id` route instead of the `/transactions` route
+2. **Express routing**: The `/:id` route was defined before specific routes like `/transactions`
+3. **Result**: "transactions" was being passed as an `investmentId` parameter, causing ObjectId casting failures
 
 ---
 
@@ -51,10 +62,26 @@ const foreignCurrencyAccountsFromDedicated = this.extractForeignCurrencyAccounts
 const foreignCurrencyAccounts = foreignCurrencyAccountsFromDedicated;
 ```
 
+### **Investment Route Fix:**
+```javascript
+// BEFORE (causing route conflicts):
+router.get('/:id', ...);           // This matched /transactions first
+router.get('/transactions', ...);  // This was never reached
+
+// AFTER (fixed route order):
+router.get('/transactions', ...);     // Specific routes first
+router.get('/portfolio/summary', ...); // All specific routes
+router.get('/cost-basis/:symbol', ...);
+// ... other specific routes ...
+router.get('/:id', ...);              // Parameterized route LAST
+```
+
 ### **Key Changes:**
 1. **Removed** `extractForeignCurrencyAccounts()` call on regular accounts
 2. **Only process** dedicated foreign currency accounts from `scraperResult.foreignCurrencyAccounts`
 3. **Prevent** creation of foreign currency transactions from regular ILS transactions
+4. **Reordered routes** - All specific routes now come before the parameterized `/:id` route
+5. **Fixed API routing** - `/api/investments/transactions` now works correctly
 
 ---
 

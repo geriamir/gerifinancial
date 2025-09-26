@@ -71,6 +71,8 @@ export interface CreditCardTrend {
   avgMonthlyAmount: number;
 }
 
+import type { Transaction } from './transactions';
+
 export interface CreditCardTransactionFilters {
   startDate?: Date;
   endDate?: Date;
@@ -86,7 +88,7 @@ export interface CreditCardTransactionFilters {
 }
 
 export interface CreditCardTransactionsResult {
-  transactions: any[]; // Using any[] for now, can be replaced with proper Transaction type
+  transactions: Transaction[];
   totalCount: number;
   currentPage: number;
   totalPages: number;
