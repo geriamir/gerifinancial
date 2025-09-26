@@ -522,15 +522,21 @@ class CreditCardService {
 
       // Category filtering
       if (category) {
-        const categoryObjectId = convertToObjectId(category);
-        if (categoryObjectId) {
+        try {
+          const categoryObjectId = convertToObjectId(category);
           query.category = categoryObjectId;
+        } catch (error) {
+          // If category is not a valid ObjectId, skip the filter
+          logger.warn(`Invalid category ObjectId: ${category}, skipping filter`);
         }
       }
       if (subCategory) {
-        const subCategoryObjectId = convertToObjectId(subCategory);
-        if (subCategoryObjectId) {
+        try {
+          const subCategoryObjectId = convertToObjectId(subCategory);
           query.subCategory = subCategoryObjectId;
+        } catch (error) {
+          // If subCategory is not a valid ObjectId, skip the filter
+          logger.warn(`Invalid subCategory ObjectId: ${subCategory}, skipping filter`);
         }
       }
 

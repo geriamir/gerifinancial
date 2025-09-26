@@ -316,7 +316,8 @@ describe('CreditCardService', () => {
       expect(result).toMatchObject({
         cardId: creditCard._id.toString(),
         totalPeriodAmount: 300,
-        avgMonthlyAmount: 50
+        avgMonthlyAmount: 150, // 300 / 2 months with data = 150 (accurate calculation)
+        monthsWithData: 2 // Add this to verify the new field
       });
       
       expect(result.months).toHaveLength(6);
