@@ -281,8 +281,8 @@ export const CreditCardMonthlyDetail: React.FC<CreditCardMonthlyDetailProps> = (
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
-      <DialogTitle>
+    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth aria-labelledby="credit-card-monthly-dialog-title">
+      <DialogTitle id="credit-card-monthly-dialog-title">
         Monthly Details - {cardName}
         <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
           <FormControl size="small" sx={{ minWidth: 120 }}>
