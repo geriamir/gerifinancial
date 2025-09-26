@@ -1,13 +1,13 @@
 const mongoose = require('mongoose');
-const config = require('../config');
+const config = require('../shared/config');
+const { User } = require('../auth/models');
 const { 
-  User, 
   BankAccount, 
   Transaction, 
   Category, 
-  SubCategory
-} = require('../models');
-const ManualCategorized = require('../models/ManualCategorized');
+  SubCategory,
+  ManualCategorized
+} = require('../banking/models');
 
 /**
  * Script to remove all users and their associated data

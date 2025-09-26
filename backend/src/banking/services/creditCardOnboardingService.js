@@ -77,6 +77,7 @@ class CreditCardOnboardingService {
    */
   async matchMonthlyPayments(userId, creditCards, monthsBack = 6) {
     try {
+      console.log(`🔍 CREDIT CARD SERVICE: Matching monthly payments for ${creditCards.length} credit cards, user ${userId}`);
       logger.info(`Matching monthly payments for ${creditCards.length} credit cards, user ${userId}`);
       
       const startDate = new Date();
@@ -199,12 +200,28 @@ class CreditCardOnboardingService {
       const cardTotals = [];
       
       for (const creditCard of creditCards) {
-        // Get transactions from this credit card's bank account
+        // Get transactions from this credit card's bank account, excluding Transfer transactions
         const monthlyTotals = await Transaction.aggregate([
           {
             $match: {
               accountId: creditCard.bankAccountId,
               date: { $gte: startDate }
+            }
+          },
+          {
+            $lookup: {
+              from: 'categories',
+              localField: 'category',
+              foreignField: '_id',
+              as: 'categoryDetails'
+            }
+          },
+          {
+            $match: {
+              $or: [
+                { 'categoryDetails.type': { $ne: 'Transfer' } },
+                { category: null }
+              ]
             }
           },
           {
@@ -254,9 +271,18 @@ class CreditCardOnboardingService {
     const matchingResults = [];
     const tolerancePercentage = 0.05; // 5% tolerance for amount matching
     
+    // Debug logging: Show what we're comparing
+    logger.info('=== CREDIT CARD PAYMENT MATCHING DEBUG ===');
+    logger.info('Credit Card Payments from Checking Accounts:', JSON.stringify(creditCardPayments, null, 2));
+    logger.info('Credit Card Monthly Totals (spending):', JSON.stringify(creditCardMonthlyTotals, null, 2));
+    logger.info('============================================');
+    
     for (const cardData of creditCardMonthlyTotals) {
       const { creditCard, monthlyTotals } = cardData;
       const matches = [];
+      
+      logger.info(`\n--- Matching for Credit Card: ${creditCard.displayName || creditCard.cardNumber} ---`);
+      logger.info(`Credit card monthly spending:`, monthlyTotals);
       
       for (const cardMonth of monthlyTotals) {
         // Find corresponding payment in checking account
@@ -264,22 +290,34 @@ class CreditCardOnboardingService {
           payment.monthString === cardMonth.monthString
         );
         
+        logger.info(`  Month ${cardMonth.monthString}: Credit card spent ${cardMonth.totalAmount}`);
+        
         if (paymentMonth) {
           // Check if amounts match within tolerance
           const amountDifference = Math.abs(paymentMonth.totalAmount - cardMonth.totalAmount);
           const toleranceAmount = cardMonth.totalAmount * tolerancePercentage;
           
+          logger.info(`    Found payment: ${paymentMonth.totalAmount}, difference: ${amountDifference}, tolerance: ${toleranceAmount}`);
+          
           if (amountDifference <= toleranceAmount) {
+            const confidence = amountDifference <= (toleranceAmount / 2) ? 'high' : 'medium';
+            logger.info(`    ✅ MATCH! Confidence: ${confidence}`);
             matches.push({
               month: cardMonth.monthString,
               creditCardAmount: cardMonth.totalAmount,
               paymentAmount: paymentMonth.totalAmount,
               difference: amountDifference,
-              confidence: amountDifference <= (toleranceAmount / 2) ? 'high' : 'medium'
+              confidence
             });
+          } else {
+            logger.info(`    ❌ No match - difference ${amountDifference} exceeds tolerance ${toleranceAmount}`);
           }
+        } else {
+          logger.info(`    ❌ No payment found for month ${cardMonth.monthString}`);
         }
       }
+      
+      logger.info(`Total matches for ${creditCard.displayName}: ${matches.length}/${monthlyTotals.length}`);
       
       // Calculate overall confidence based on match percentage
       const totalMonths = monthlyTotals.length;

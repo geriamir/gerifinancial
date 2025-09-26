@@ -18,7 +18,9 @@ import {
   Select,
   MenuItem,
   FormControl,
-  InputLabel
+  InputLabel,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   PieChart,
@@ -36,6 +38,9 @@ import {
 import { creditCardsApi } from '../../services/api/creditCards';
 import { CreditCardMonthlyStats, CategoryBreakdown } from '../../services/api/types/creditCard';
 import { formatCurrency } from '../../utils/formatters';
+import TransactionsList from '../transactions/TransactionsList';
+import TransactionDetailDialog from '../transactions/TransactionDetailDialog';
+import type { TransactionFilters, Transaction } from '../../services/api/types/transactions';
 
 interface CreditCardMonthlyDetailProps {
   open: boolean;
@@ -51,6 +56,110 @@ const COLORS = [
 
 const getRandomColor = (index: number) => COLORS[index % COLORS.length];
 
+// Component to fetch and display credit card transactions
+interface CreditCardTransactionsListProps {
+  cardId: string;
+  year: number;
+  month: number;
+}
+
+const CreditCardTransactionsList: React.FC<CreditCardTransactionsListProps> = ({
+  cardId,
+  year,
+  month
+}) => {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+
+  useEffect(() => {
+  const fetchTransactions = async () => {
+    if (!cardId) return;
+    
+    setLoading(true);
+    setError('');
+    try {
+      // Calculate start and end dates for the month
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0);
+      
+      const response = await creditCardsApi.getTransactions(cardId, {
+        startDate,
+        endDate,
+        limit: 1000 // Load all transactions for the month (set high limit)
+      });
+      
+      setTransactions(response.transactions);
+    } catch (err) {
+      setError('Failed to load transactions');
+      console.error('Error fetching credit card transactions:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchTransactions();
+}, [cardId, year, month]);
+
+const handleTransactionClick = (transaction: Transaction) => {
+  setSelectedTransaction(transaction);
+  setDetailDialogOpen(true);
+};
+
+const handleTransactionUpdated = (updatedTransaction: Transaction) => {
+  setTransactions(prev => 
+    prev.map(t => t._id === updatedTransaction._id ? updatedTransaction : t)
+  );
+  setSelectedTransaction(updatedTransaction);
+};
+
+const handleCloseDetailDialog = () => {
+  setDetailDialogOpen(false);
+  setSelectedTransaction(null);
+};
+
+if (loading) {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+      <CircularProgress />
+    </Box>
+  );
+}
+
+if (error) {
+  return (
+    <Alert severity="error" sx={{ mt: 2 }}>
+      {error}
+    </Alert>
+  );
+}
+
+if (transactions.length === 0) {
+  return (
+    <Alert severity="info" sx={{ mt: 2 }}>
+      No transactions found for this period.
+    </Alert>
+  );
+}
+
+return (
+  <>
+    <TransactionsList 
+      transactions={transactions} 
+      onRowClick={handleTransactionClick}
+    />
+    <TransactionDetailDialog
+      open={detailDialogOpen}
+      transaction={selectedTransaction}
+      onClose={handleCloseDetailDialog}
+      onTransactionUpdated={handleTransactionUpdated}
+    />
+  </>
+);
+};
+
 export const CreditCardMonthlyDetail: React.FC<CreditCardMonthlyDetailProps> = ({
   open,
   onClose,
@@ -62,6 +171,7 @@ export const CreditCardMonthlyDetail: React.FC<CreditCardMonthlyDetailProps> = (
   const [error, setError] = useState('');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [activeTab, setActiveTab] = useState(0);
 
   const months = [
     { value: 1, label: 'January' },
@@ -87,6 +197,11 @@ export const CreditCardMonthlyDetail: React.FC<CreditCardMonthlyDetailProps> = (
     setError('');
     try {
       const data = await creditCardsApi.getMonthlyStats(cardId, selectedYear, selectedMonth);
+      console.log('API Response:', data);
+      console.log('Category Breakdown:', data.categoryBreakdown);
+      if (data.categoryBreakdown && data.categoryBreakdown.length > 0) {
+        console.log('First item:', data.categoryBreakdown[0]);
+      }
       setMonthlyStats(data);
     } catch (err) {
       setError('Failed to load monthly statistics');
@@ -111,18 +226,24 @@ export const CreditCardMonthlyDetail: React.FC<CreditCardMonthlyDetailProps> = (
   };
 
   const preparePieData = (categoryBreakdown: CategoryBreakdown[]) => {
+    if (!categoryBreakdown || !Array.isArray(categoryBreakdown)) {
+      return [];
+    }
     return categoryBreakdown.slice(0, 8).map((item, index) => ({
-      name: item.subCategory || item.category,
-      value: item.totalAmount,
+      name: item.subCategoryName || item.categoryName || item.subCategory || item.category || 'Uncategorized',
+      value: item.totalAmount || 0,
       color: getRandomColor(index),
-      percentage: item.percentage
+      percentage: item.percentage || 0
     }));
   };
 
   const prepareBarData = (categoryBreakdown: CategoryBreakdown[]) => {
+    if (!categoryBreakdown || !Array.isArray(categoryBreakdown)) {
+      return [];
+    }
     return categoryBreakdown.slice(0, 10).map(item => {
-      const displayName = item.subCategory || item.category;
-      const truncatedName = displayName.length > 15 ? displayName.substring(0, 15) + '...' : displayName;
+      const displayName = item.subCategoryName || item.categoryName || item.subCategory || item.category;
+      const truncatedName = displayName && displayName.length > 15 ? displayName.substring(0, 15) + '...' : displayName || 'Unknown';
       return {
         name: truncatedName,
         amount: item.totalAmount,
@@ -208,6 +329,7 @@ export const CreditCardMonthlyDetail: React.FC<CreditCardMonthlyDetailProps> = (
         
         {monthlyStats && !loading && (
           <Box>
+            {/* Summary Card */}
             <Paper sx={{ p: 2, mb: 3 }}>
               <Typography variant="h6" gutterBottom>
                 {monthlyStats.monthName} {monthlyStats.year} Summary
@@ -232,7 +354,21 @@ export const CreditCardMonthlyDetail: React.FC<CreditCardMonthlyDetailProps> = (
               </Box>
             </Paper>
 
-            {monthlyStats.categoryBreakdown.length > 0 && (
+            {/* Tabs */}
+            <Paper sx={{ mb: 3 }}>
+              <Tabs 
+                value={activeTab} 
+                onChange={(_, newValue) => setActiveTab(newValue)}
+                indicatorColor="primary"
+                textColor="primary"
+              >
+                <Tab label="Analytics" />
+                <Tab label="Transactions" />
+              </Tabs>
+            </Paper>
+
+            {/* Tab Content */}
+            {activeTab === 0 && monthlyStats.categoryBreakdown && monthlyStats.categoryBreakdown.length > 0 && (
               <>
                 <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' } }}>
                   <Box sx={{ flex: 1 }}>
@@ -300,7 +436,7 @@ export const CreditCardMonthlyDetail: React.FC<CreditCardMonthlyDetailProps> = (
                   <List>
                     {monthlyStats.categoryBreakdown.map((item, index) => (
                       <ListItem 
-                        key={`${item.category}-${item.subCategory || 'main'}`}
+                        key={`${item.categoryName}-${item.subCategoryName || 'main'}`}
                         sx={{ 
                           border: 1, 
                           borderColor: 'divider', 
@@ -312,33 +448,46 @@ export const CreditCardMonthlyDetail: React.FC<CreditCardMonthlyDetailProps> = (
                           primary={
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <Typography variant="body1">
-                                {item.subCategory || item.category}
+                                {item.subCategoryName || item.categoryName || item.subCategory || item.category || 'Uncategorized'}
                               </Typography>
                               <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                                 <Chip 
-                                  label={`${item.transactionCount} transactions`}
+                                  label={`${item.transactionCount || 0} transactions`}
                                   size="small"
                                   variant="outlined"
                                 />
                                 <Chip 
-                                  label={`${item.percentage.toFixed(1)}%`}
+                                  label={`${(item.percentage || 0).toFixed(1)}%`}
                                   size="small"
                                   color="primary"
                                   variant="outlined"
                                 />
                                 <Typography variant="h6" color="primary">
-                                  {formatCurrency(item.totalAmount)}
+                                  {formatCurrency(item.totalAmount || 0)}
                                 </Typography>
                               </Box>
                             </Box>
                           }
-                          secondary={item.subCategory ? `Category: ${item.category}` : ''}
+                          secondary={(item.subCategoryName || item.subCategory) ? `Category: ${item.categoryName || item.category || 'Unknown'}` : ''}
                         />
                       </ListItem>
                     ))}
                   </List>
                 </Paper>
               </>
+            )}
+
+            {activeTab === 1 && (
+              <Paper sx={{ p: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Transactions for {monthlyStats.monthName} {monthlyStats.year}
+                </Typography>
+                <CreditCardTransactionsList 
+                  cardId={cardId}
+                  year={selectedYear}
+                  month={selectedMonth}
+                />
+              </Paper>
             )}
           </Box>
         )}

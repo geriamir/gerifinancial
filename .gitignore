@@ -18,6 +18,9 @@ dist
 .env.test.local
 .env.production.local
 
+# Docker local development overrides
+docker-compose.override.yml
+
 # logs
 npm-debug.log*
 yarn-debug.log*

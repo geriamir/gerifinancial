@@ -51,6 +51,25 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
     }
   }, [isAuthenticated, user, authLoading]);
 
+  // Also check onboarding status when location changes (helps with race conditions)
+  useEffect(() => {
+    const recheckOnboardingStatus = async () => {
+      if (!isAuthenticated || !user || authLoading) return;
+
+      try {
+        const status = await onboardingApi.getStatus();
+        setOnboardingStatus(status);
+      } catch (error) {
+        console.error('Failed to recheck onboarding status:', error);
+      }
+    };
+
+    // Recheck status when navigating to/from onboarding page
+    if (isAuthenticated && user && !authLoading) {
+      recheckOnboardingStatus();
+    }
+  }, [location.pathname, isAuthenticated, user, authLoading]);
+
   // Show loading while checking auth and onboarding status
   if (authLoading || loading) {
     return (

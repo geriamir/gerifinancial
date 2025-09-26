@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import {
   Box,
   Typography,
@@ -42,25 +42,64 @@ export const OnboardingComplete: React.FC<OnboardingStepProps> = ({
     return summary;
   }, [checkingAccount, transactionData, creditCardData]);
 
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusUpdated, setStatusUpdated] = useState(false);
+
   useEffect(() => {
     // Mark the completion step as complete when component mounts
     // This is crucial for updating the backend onboarding status
-    if (onComplete) {
-      onComplete('complete', {
-        completionDate: new Date(),
-        setupSummary: getSetupSummary()
-      });
+    const updateStatus = async () => {
+      if (onComplete && !statusUpdated) {
+        setIsUpdatingStatus(true);
+        try {
+          await onComplete('complete', {
+            completionDate: new Date(),
+            setupSummary: getSetupSummary()
+          });
+          setStatusUpdated(true);
+        } catch (error) {
+          console.error('Failed to update onboarding status:', error);
+        } finally {
+          setIsUpdatingStatus(false);
+        }
+      }
+    };
+
+    updateStatus();
+  }, [onComplete, getSetupSummary, statusUpdated]);
+
+  useEffect(() => {
+    // Auto-redirect to dashboard after 10 seconds, but only after status is updated
+    if (statusUpdated) {
+      const timer = setTimeout(() => {
+        navigate('/');
+      }, 10000);
+
+      return () => clearTimeout(timer);
     }
+  }, [navigate, statusUpdated]);
 
-    // Auto-redirect to dashboard after 10 seconds
-    const timer = setTimeout(() => {
-      navigate('/');
-    }, 10000);
-
-    return () => clearTimeout(timer);
-  }, [navigate, onComplete, getSetupSummary]);
-
-  const handleGoToDashboard = () => {
+  const handleGoToDashboard = async () => {
+    // Ensure status is updated before navigating
+    if (!statusUpdated && !isUpdatingStatus) {
+      setIsUpdatingStatus(true);
+      try {
+        if (onComplete) {
+          await onComplete('complete', {
+            completionDate: new Date(),
+            setupSummary: getSetupSummary()
+          });
+        }
+        setStatusUpdated(true);
+      } catch (error) {
+        console.error('Failed to update onboarding status:', error);
+        // Navigate anyway, as the user experience is more important
+      } finally {
+        setIsUpdatingStatus(false);
+      }
+    }
+    
+    // Navigate to dashboard
     navigate('/');
   };
 

@@ -1,4 +1,5 @@
 const { BankAccount, Transaction } = require('../models');
+const { TransactionType } = require('../constants/enums');
 const { CurrencyExchange, ForeignCurrencyAccount } = require('../../foreign-currency');
 const { Investment } = require('../../investments');
 const bankScraperService = require('./bankScraperService');
@@ -42,13 +43,8 @@ class DataSyncService {
       }
 
       // Process investment transactions if available
-      let transactionProcessingResult = { newTransactions: 0, duplicatesSkipped: 0, errors: [] };
       if (scrapingResult.investmentTransactions && scrapingResult.investmentTransactions.length > 0) {
         logger.info(`Processing ${scrapingResult.investmentTransactions.length} investment transactions for bank account ${bankAccount._id}`);
-        transactionProcessingResult = await investmentService.processPortfolioTransactions(
-          scrapingResult.investmentTransactions, 
-          bankAccount
-        );
       }
 
       // Process foreign currency accounts if available
@@ -366,7 +362,7 @@ class DataSyncService {
                   date: new Date(transaction.date),
                   description: transaction.description,
                   memo: transaction.memo,
-                  type: transaction.amount > 0 ? 'income' : 'expense',
+                  type: transaction.amount > 0 ? TransactionType.INCOME : TransactionType.EXPENSE,
                   rawData: {
                     ...transaction.rawData,
                     originalAmount: transaction.originalAmount,

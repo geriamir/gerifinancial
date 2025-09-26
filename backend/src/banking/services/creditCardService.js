@@ -61,6 +61,22 @@ class CreditCardService {
             }
           },
           {
+            $lookup: {
+              from: 'categories',
+              localField: 'category',
+              foreignField: '_id',
+              as: 'categoryDetails'
+            }
+          },
+          {
+            $match: {
+              $or: [
+                { 'categoryDetails.type': { $ne: 'Transfer' } },
+                { category: null }
+              ]
+            }
+          },
+          {
             $group: {
               _id: null,
               totalSpent: { $sum: { $abs: '$amount' } }
@@ -170,6 +186,22 @@ class CreditCardService {
             creditCardId: cardObjectId,
             userId: userObjectId,
             processedDate: { $gte: sixMonthsAgo }
+          }
+        },
+        {
+          $lookup: {
+            from: 'categories',
+            localField: 'category',
+            foreignField: '_id',
+            as: 'categoryDetails'
+          }
+        },
+        {
+          $match: {
+            $or: [
+              { 'categoryDetails.type': { $ne: 'Transfer' } },
+              { category: null }
+            ]
           }
         },
         {
@@ -294,6 +326,11 @@ class CreditCardService {
           }
         },
         {
+          $match: {
+            'categoryDetails.type': { $ne: 'Transfer' } // Exclude Transfer transactions
+          }
+        },
+        {
           $group: {
             _id: {
               categoryId: '$category',
@@ -318,6 +355,22 @@ class CreditCardService {
             creditCardId: cardObjectId,
             userId: userObjectId,
             processedDate: { $gte: startDate, $lte: endDate }
+          }
+        },
+        {
+          $lookup: {
+            from: 'categories',
+            localField: 'category',
+            foreignField: '_id',
+            as: 'categoryDetails'
+          }
+        },
+        {
+          $match: {
+            $or: [
+              { 'categoryDetails.type': { $ne: 'Transfer' } },
+              { category: null }
+            ]
           }
         },
         {
@@ -455,7 +508,7 @@ class CreditCardService {
         query.description = { $regex: search, $options: 'i' };
       }
 
-      // Get transactions with pagination
+      // Get transactions with pagination, excluding Transfer transactions
       const [transactions, total] = await Promise.all([
         Transaction.find(query)
           .populate('category', 'name type')
@@ -464,8 +517,30 @@ class CreditCardService {
           .sort({ processedDate: -1 })
           .skip(actualSkip)
           .limit(limit)
-          .lean(),
-        Transaction.countDocuments(query)
+          .lean()
+          .then(results => results.filter(tx => 
+            !tx.category || tx.category.type !== 'Transfer'
+          )),
+        Transaction.aggregate([
+          { $match: query },
+          {
+            $lookup: {
+              from: 'categories',
+              localField: 'category',
+              foreignField: '_id',
+              as: 'categoryDetails'
+            }
+          },
+          {
+            $match: {
+              $or: [
+                { 'categoryDetails.type': { $ne: 'Transfer' } },
+                { category: null }
+              ]
+            }
+          },
+          { $count: "total" }
+        ]).then(result => result.length > 0 ? result[0].total : 0)
       ]);
 
       const currentPage = Math.floor(actualSkip / limit) + 1;
@@ -538,6 +613,22 @@ class CreditCardService {
             creditCardId: cardObjectId,
             userId: userObjectId,
             processedDate: { $gte: sixMonthsAgo }
+          }
+        },
+        {
+          $lookup: {
+            from: 'categories',
+            localField: 'category',
+            foreignField: '_id',
+            as: 'categoryDetails'
+          }
+        },
+        {
+          $match: {
+            $or: [
+              { 'categoryDetails.type': { $ne: 'Transfer' } },
+              { category: null }
+            ]
           }
         },
         {

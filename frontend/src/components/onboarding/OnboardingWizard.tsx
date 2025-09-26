@@ -30,7 +30,7 @@ export interface OnboardingStep {
 }
 
 export interface OnboardingStepProps {
-  onComplete: (nextStep?: OnboardingStep['id'], data?: any) => void;
+  onComplete: (nextStep?: OnboardingStep['id'], data?: any) => Promise<void>;
   onSkip?: () => void;
   onBack?: () => void;
   stepData?: any;

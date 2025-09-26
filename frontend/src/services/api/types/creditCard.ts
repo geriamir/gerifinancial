@@ -33,11 +33,17 @@ export interface CreditCardBasicStats {
 
 export interface CategoryBreakdown {
   _id: string;
-  category: string;
-  subCategory?: string;
+  categoryId: string;
+  categoryName: string;
+  subCategoryId?: string;
+  subCategoryName?: string;
   totalAmount: number;
   transactionCount: number;
   percentage: number;
+  averageAmount: number;
+  // Legacy fields for backward compatibility
+  category?: string;
+  subCategory?: string;
 }
 
 export interface CreditCardMonthlyStats {

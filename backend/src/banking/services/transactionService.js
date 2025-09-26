@@ -95,21 +95,6 @@ class TransactionService {
             continue;
           }
 
-          // // Look for similar transaction on same date
-          // const existingTransaction = await Transaction.findOne({
-          //   accountId: bankAccount._id,
-          //   date: transactionDate,
-          //   description: transaction.description,
-          //   amount: transaction.chargedAmount,
-          //   'rawData.memo': transaction.rawData?.memo || null
-          // });
-
-          // if (existingTransaction) {
-          //   logger.warn(`Similar transaction found: ${transaction.identifier}, date: ${transactionDate}, description: ${transaction.description}`);
-          //   results.duplicates++;
-          //   continue;
-          // }
-
           // Create transaction without type initially
           // For credit card providers, include the specific account identifier for later credit card matching
           const rawData = {

@@ -16,8 +16,7 @@ const foreignCurrencyAccountSchema = new mongoose.Schema({
   // Account number for this foreign currency account
   accountNumber: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
   currency: {
     type: String,
@@ -144,11 +143,11 @@ foreignCurrencyAccountSchema.methods.updateTransactionStats = async function(tra
 
 // Static method to find or create foreign currency account
 foreignCurrencyAccountSchema.statics.findOrCreate = async function(userId, bankAccountId, accountNumber, currency, accountData = {}) {
+  // Search only by the compound unique key (userId, bankAccountId, currency)
   let account = await this.findOne({
     userId,
     bankAccountId,
-    currency: currency.toUpperCase(),
-    accountNumber
+    currency: currency.toUpperCase()
   });
 
   if (!account) {
@@ -177,6 +176,12 @@ foreignCurrencyAccountSchema.statics.findOrCreate = async function(userId, bankA
     account.lastTransactionDate = accountData.lastTransactionDate || account.lastTransactionDate;
     account.scrapingMetadata.lastScraped = new Date();
     account.scrapingMetadata.rawData = accountData.rawAccountData || account.scrapingMetadata.rawData;
+    
+    // Update account number if it's different (keep the most recent one)
+    if (accountNumber && accountNumber !== account.accountNumber) {
+      logger.debug(`Updating account number from ${account.accountNumber} to ${accountNumber} for ${account.displayName}`);
+      account.accountNumber = accountNumber;
+    }
     
     await account.save();
     logger.debug(`Updated foreign currency account: ${account.displayName}`);
