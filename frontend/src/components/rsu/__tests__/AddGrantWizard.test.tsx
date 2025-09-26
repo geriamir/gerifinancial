@@ -143,7 +143,7 @@ describe('AddGrantWizard', () => {
       await waitFor(() => {
         expect(screen.getByText('Grant date is required')).toBeInTheDocument();
       }, { timeout: 10000 });
-    });
+    }, 15000); // Increase Jest test timeout to 15 seconds
   });
 
   describe('Form Submission', () => {

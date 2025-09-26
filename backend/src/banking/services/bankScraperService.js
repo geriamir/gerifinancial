@@ -14,6 +14,27 @@ class BankScraperService {
     this.DEFAULT_TIMEOUT = 210000; // 3 minutes
   }
 
+  // Helper method to normalize currency symbols to ISO codes
+  normalizeCurrency(currency) {
+    if (!currency) return 'ILS'; // Default to ILS if no currency provided
+    
+    const currencyMap = {
+      '₪': 'ILS',
+      'ils': 'ILS',
+      '$': 'USD',
+      'usd': 'USD',
+      '€': 'EUR',
+      'eur': 'EUR',
+      '£': 'GBP',
+      'gbp': 'GBP',
+      '¥': 'JPY',
+      'jpy': 'JPY'
+    };
+    
+    const normalizedKey = currency.toLowerCase();
+    return currencyMap[currency] || currencyMap[normalizedKey] || currency.toUpperCase();
+  }
+
   createScraper(bankAccount, options = {}) {
     // Get smart start date from bank account (uses lastScraped if available, otherwise 6 months back)
     const scraperOptions = bankAccount.getScraperOptions();
@@ -153,12 +174,11 @@ class BankScraperService {
         // Extract investment transactions from portfolios
         const investmentTransactions = this.extractInvestmentTransactions(scraperResult.portfolios || []);
 
-        // Extract foreign currency accounts from both dedicated foreign currency accounts and regular accounts with foreign currency transactions
+        // Extract foreign currency accounts only from dedicated foreign currency accounts
         const foreignCurrencyAccountsFromDedicated = this.extractForeignCurrencyAccountsFromDedicated(scraperResult.foreignCurrencyAccounts || []);
-        const foreignCurrencyAccountsFromRegular = this.extractForeignCurrencyAccounts(scraperResult.accounts || []);
         
-        // Combine both sources of foreign currency accounts
-        const foreignCurrencyAccounts = [...foreignCurrencyAccountsFromDedicated, ...foreignCurrencyAccountsFromRegular];
+        // Use only dedicated foreign currency accounts to prevent duplicates
+        const foreignCurrencyAccounts = foreignCurrencyAccountsFromDedicated;
 
         // Return accounts, portfolios (new structure), investments (legacy), investment transactions, and foreign currency accounts
         return {
@@ -313,17 +333,18 @@ class BankScraperService {
       }
 
       // Process dedicated foreign currency account
+      const normalizedCurrency = this.normalizeCurrency(foreignAccount.currency);
       const processedAccount = {
         originalAccountNumber: foreignAccount.accountNumber,
-        currency: foreignAccount.currency,
+        currency: normalizedCurrency,
         accountType: foreignAccount.type === 'foreignCurrency' ? 'checking' : (foreignAccount.type || 'checking'),
         balance: foreignAccount.balance || 0,
         transactionCount: (foreignAccount.txns || []).length,
         transactions: (foreignAccount.txns || []).map(txn => ({
-          identifier: txn.identifier || `${txn.date}_${txn.chargedAmount}_${foreignAccount.currency}`,
+          identifier: txn.identifier || `${txn.date}_${txn.chargedAmount}_${normalizedCurrency}`,
           date: txn.date,
           amount: txn.chargedAmount || txn.originalAmount || 0,
-          currency: foreignAccount.currency,
+          currency: normalizedCurrency,
           originalAmount: txn.originalAmount || txn.chargedAmount, // Amount in original currency
           exchangeRate: txn.originalCurrency && txn.originalAmount && txn.chargedAmount ? 
             Math.abs(txn.chargedAmount / txn.originalAmount) : null,
@@ -370,6 +391,7 @@ class BankScraperService {
 
         // If foreign currencies found, create foreign currency account entries
         currenciesFound.forEach(currency => {
+          const normalizedCurrency = this.normalizeCurrency(currency);
           const foreignCurrencyTransactions = account.txns.filter(txn => 
             txn.originalCurrency === currency || 
             (txn.currency === currency && currency !== 'ILS')
@@ -378,15 +400,15 @@ class BankScraperService {
           if (foreignCurrencyTransactions.length > 0) {
             foreignCurrencyAccounts.push({
               originalAccountNumber: account.accountNumber,
-              currency: currency,
+              currency: normalizedCurrency,
               accountType: account.type || 'checking',
               balance: this.calculateForeignCurrencyBalance(foreignCurrencyTransactions),
               transactionCount: foreignCurrencyTransactions.length,
               transactions: foreignCurrencyTransactions.map(txn => ({
-                identifier: txn.identifier || `${txn.date}_${txn.chargedAmount}_${currency}`,
+                identifier: txn.identifier || `${txn.date}_${txn.chargedAmount}_${normalizedCurrency}`,
                 date: txn.date,
                 amount: txn.originalAmount || txn.chargedAmount,
-                currency: currency,
+                currency: normalizedCurrency,
                 originalAmount: txn.chargedAmount, // Amount in ILS
                 exchangeRate: txn.originalAmount ? Math.abs(txn.chargedAmount / txn.originalAmount) : null,
                 description: txn.description,
@@ -402,22 +424,23 @@ class BankScraperService {
 
       // Also check if the account itself has a non-ILS currency
       if (account.currency && account.currency !== 'ILS') {
+        const normalizedAccountCurrency = this.normalizeCurrency(account.currency);
         const existingForeignAccount = foreignCurrencyAccounts.find(
-          fca => fca.originalAccountNumber === account.accountNumber && fca.currency === account.currency
+          fca => fca.originalAccountNumber === account.accountNumber && fca.currency === normalizedAccountCurrency
         );
 
         if (!existingForeignAccount) {
           foreignCurrencyAccounts.push({
             originalAccountNumber: account.accountNumber,
-            currency: account.currency,
+            currency: normalizedAccountCurrency,
             accountType: account.type || 'checking',
             balance: account.balance || 0,
             transactionCount: (account.txns || []).length,
             transactions: (account.txns || []).map(txn => ({
-              identifier: txn.identifier || `${txn.date}_${txn.chargedAmount}_${account.currency}`,
+              identifier: txn.identifier || `${txn.date}_${txn.chargedAmount}_${normalizedAccountCurrency}`,
               date: txn.date,
               amount: txn.chargedAmount,
-              currency: account.currency,
+              currency: normalizedAccountCurrency,
               description: txn.description,
               memo: txn.memo,
               rawData: txn

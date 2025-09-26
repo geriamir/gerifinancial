@@ -104,12 +104,23 @@ const TransactionImport: React.FC<TransactionImportProps> = ({ onComplete, bankA
 
   // Single effect to handle all polling logic
   useEffect(() => {
+    let isMounted = true;
+    
     // Initial status check
-    pollStatus();
+    if (isMounted) {
+      pollStatus();
+    }
 
     // Set up polling interval if needed
-    if (isPolling && !intervalRef.current) {
-      intervalRef.current = setInterval(pollStatus, 15000); // Poll every 15 seconds
+    if (isPolling && !intervalRef.current && isMounted) {
+      intervalRef.current = setInterval(() => {
+        if (isMounted && isPolling) {
+          pollStatus();
+        } else if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      }, 15000); // Poll every 15 seconds
     } else if (!isPolling && intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -117,6 +128,7 @@ const TransactionImport: React.FC<TransactionImportProps> = ({ onComplete, bankA
 
     // Cleanup on unmount
     return () => {
+      isMounted = false;
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;

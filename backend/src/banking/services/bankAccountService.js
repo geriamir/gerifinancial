@@ -1,11 +1,7 @@
 const { BankAccount } = require('../models');
 const bankScraperService = require('./bankScraperService');
-const dataSyncService = require('./dataSyncService');
 const logger = require('../../shared/utils/logger');
-const EventEmitter = require('events');
-
-// Create a shared event emitter for bank account events
-const bankAccountEvents = new EventEmitter();
+const bankAccountEvents = require('./bankAccountEvents');
 
 class BankAccountService {
   async create(userId, { bankId, name, username, password }) {
@@ -33,6 +29,8 @@ class BankAccountService {
       // Fire and forget - don't wait for scraping to complete
       setImmediate(async () => {
         try {
+          // Lazy load dataSyncService to avoid circular dependency
+          const dataSyncService = require('./dataSyncService');
           await dataSyncService.syncBankAccountData(bankAccount);
           logger.info(`Initial scraping completed for new bank account: ${bankAccount._id}`);
         } catch (error) {

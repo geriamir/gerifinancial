@@ -23,16 +23,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get investment by ID
-router.get('/:id', async (req, res) => {
-  try {
-    const investment = await investmentService.getInvestmentById(req.params.id, req.user.id);
-    res.json({ investment });
-  } catch (error) {
-    logger.error('Error fetching investment:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+// === SPECIFIC ROUTES (must be before /:id to avoid conflicts) ===
 
 // Get portfolio summary
 router.get('/portfolio/summary', async (req, res) => {
@@ -41,6 +32,189 @@ router.get('/portfolio/summary', async (req, res) => {
     res.json({ portfolio: summary });
   } catch (error) {
     logger.error('Error fetching portfolio summary:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get portfolio trends
+router.get('/portfolio/trends', async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const trends = await investmentService.getPortfolioTrends(
+      req.user.id, 
+      parseInt(days)
+    );
+    res.json({ trends });
+  } catch (error) {
+    logger.error('Error fetching portfolio trends:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get performance metrics
+router.get('/portfolio/performance', async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const performance = await investmentService.getPerformanceMetrics(
+      req.user.id, 
+      parseInt(days)
+    );
+    res.json({ performance });
+  } catch (error) {
+    logger.error('Error fetching performance metrics:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all investment transactions for user
+router.get('/transactions', async (req, res) => {
+  try {
+    const {
+      investmentId,
+      symbol,
+      transactionType,
+      startDate,
+      endDate,
+      limit = 100,
+      offset = 0
+    } = req.query;
+
+    const options = {
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    };
+
+    if (investmentId) options.investmentId = investmentId;
+    if (symbol) options.symbol = symbol;
+    if (transactionType) options.transactionType = transactionType;
+    if (startDate) options.startDate = new Date(startDate);
+    if (endDate) options.endDate = new Date(endDate);
+
+    const result = await investmentService.getInvestmentTransactions(req.user.id, options);
+    res.json(result);
+  } catch (error) {
+    logger.error('Error fetching investment transactions:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get transactions by symbol
+router.get('/transactions/symbol/:symbol', async (req, res) => {
+  try {
+    const { startDate, endDate, limit = 50 } = req.query;
+    
+    const options = {
+      limit: parseInt(limit)
+    };
+
+    if (startDate) options.startDate = new Date(startDate);
+    if (endDate) options.endDate = new Date(endDate);
+
+    const transactions = await investmentService.getTransactionsBySymbol(
+      req.user.id, 
+      req.params.symbol.toUpperCase(), 
+      options
+    );
+    
+    res.json({ transactions });
+  } catch (error) {
+    logger.error('Error fetching transactions by symbol:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get investment transaction summary
+router.get('/transactions/summary', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    const options = {};
+    if (startDate) options.startDate = new Date(startDate);
+    if (endDate) options.endDate = new Date(endDate);
+
+    const summary = await investmentService.getInvestmentTransactionSummary(req.user.id, options);
+    res.json({ summary });
+  } catch (error) {
+    logger.error('Error fetching investment transaction summary:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get cost basis for a symbol
+router.get('/cost-basis/:symbol', async (req, res) => {
+  try {
+    const costBasis = await investmentService.getCostBasisBySymbol(
+      req.user.id, 
+      req.params.symbol.toUpperCase()
+    );
+    res.json({ costBasis });
+  } catch (error) {
+    logger.error('Error calculating cost basis:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get holdings history for a specific symbol
+router.get('/holdings/:symbol/history', async (req, res) => {
+  try {
+    const { days = 90 } = req.query;
+    const history = await investmentService.getHoldingsHistory(
+      req.user.id,
+      req.params.symbol,
+      parseInt(days)
+    );
+    res.json({ history });
+  } catch (error) {
+    logger.error('Error fetching holdings history:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get investments by bank account
+router.get('/by-bank/:bankAccountId', async (req, res) => {
+  try {
+    const investments = await investmentService.getInvestmentsByBankAccount(
+      req.user.id, 
+      req.params.bankAccountId
+    );
+    res.json({ investments });
+  } catch (error) {
+    logger.error('Error fetching investments by bank account:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get sync status for a bank account
+router.get('/sync/status/:bankAccountId', async (req, res) => {
+  try {
+    const status = await dataSyncService.getSyncStatus(req.params.bankAccountId, req.user.id);
+    res.json({ status });
+  } catch (error) {
+    logger.error('Error fetching sync status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get current scraping status
+router.get('/startup/status', async (req, res) => {
+  try {
+    const status = startupInvestmentService.getScrapingStatus();
+    res.json({ status });
+  } catch (error) {
+    logger.error('Error fetching startup scraping status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === PARAMETERIZED ROUTE (must be last to avoid conflicts) ===
+
+// Get investment by ID
+router.get('/:id', async (req, res) => {
+  try {
+    const investment = await investmentService.getInvestmentById(req.params.id, req.user.id);
+    res.json({ investment });
+  } catch (error) {
+    logger.error('Error fetching investment:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -174,101 +348,6 @@ router.get('/:id/history', async (req, res) => {
   }
 });
 
-// Get portfolio trends
-router.get('/portfolio/trends', async (req, res) => {
-  try {
-    const { days = 30 } = req.query;
-    const trends = await investmentService.getPortfolioTrends(
-      req.user.id, 
-      parseInt(days)
-    );
-    res.json({ trends });
-  } catch (error) {
-    logger.error('Error fetching portfolio trends:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get performance metrics
-router.get('/portfolio/performance', async (req, res) => {
-  try {
-    const { days = 30 } = req.query;
-    const performance = await investmentService.getPerformanceMetrics(
-      req.user.id, 
-      parseInt(days)
-    );
-    res.json({ performance });
-  } catch (error) {
-    logger.error('Error fetching performance metrics:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get holdings history for a specific symbol
-router.get('/holdings/:symbol/history', async (req, res) => {
-  try {
-    const { days = 90 } = req.query;
-    const history = await investmentService.getHoldingsHistory(
-      req.user.id,
-      req.params.symbol,
-      parseInt(days)
-    );
-    res.json({ history });
-  } catch (error) {
-    logger.error('Error fetching holdings history:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Create manual snapshot (for testing or manual updates)
-router.post('/:id/snapshot', async (req, res) => {
-  try {
-    const investment = await investmentService.getInvestmentById(req.params.id, req.user.id);
-    const snapshot = await investmentService.createDailySnapshot(investment);
-    res.json({ 
-      message: 'Snapshot created successfully',
-      snapshot 
-    });
-  } catch (error) {
-    logger.error('Error creating manual snapshot:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// === NEW INVESTMENT TRANSACTION ENDPOINTS ===
-
-// Get all investment transactions for user
-router.get('/transactions', async (req, res) => {
-  try {
-    const {
-      investmentId,
-      symbol,
-      transactionType,
-      startDate,
-      endDate,
-      limit = 100,
-      offset = 0
-    } = req.query;
-
-    const options = {
-      limit: parseInt(limit),
-      offset: parseInt(offset)
-    };
-
-    if (investmentId) options.investmentId = investmentId;
-    if (symbol) options.symbol = symbol;
-    if (transactionType) options.transactionType = transactionType;
-    if (startDate) options.startDate = new Date(startDate);
-    if (endDate) options.endDate = new Date(endDate);
-
-    const result = await investmentService.getInvestmentTransactions(req.user.id, options);
-    res.json(result);
-  } catch (error) {
-    logger.error('Error fetching investment transactions:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Get transactions for a specific investment
 router.get('/:id/transactions', async (req, res) => {
   try {
@@ -291,62 +370,6 @@ router.get('/:id/transactions', async (req, res) => {
   }
 });
 
-// Get transactions by symbol
-router.get('/transactions/symbol/:symbol', async (req, res) => {
-  try {
-    const { startDate, endDate, limit = 50 } = req.query;
-    
-    const options = {
-      limit: parseInt(limit)
-    };
-
-    if (startDate) options.startDate = new Date(startDate);
-    if (endDate) options.endDate = new Date(endDate);
-
-    const transactions = await investmentService.getTransactionsBySymbol(
-      req.user.id, 
-      req.params.symbol.toUpperCase(), 
-      options
-    );
-    
-    res.json({ transactions });
-  } catch (error) {
-    logger.error('Error fetching transactions by symbol:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get investment transaction summary
-router.get('/transactions/summary', async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    
-    const options = {};
-    if (startDate) options.startDate = new Date(startDate);
-    if (endDate) options.endDate = new Date(endDate);
-
-    const summary = await investmentService.getInvestmentTransactionSummary(req.user.id, options);
-    res.json({ summary });
-  } catch (error) {
-    logger.error('Error fetching investment transaction summary:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get cost basis for a symbol
-router.get('/cost-basis/:symbol', async (req, res) => {
-  try {
-    const costBasis = await investmentService.getCostBasisBySymbol(
-      req.user.id, 
-      req.params.symbol.toUpperCase()
-    );
-    res.json({ costBasis });
-  } catch (error) {
-    logger.error('Error calculating cost basis:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Get performance metrics based on transactions for specific investment
 router.get('/:id/performance', async (req, res) => {
   try {
@@ -354,6 +377,21 @@ router.get('/:id/performance', async (req, res) => {
     res.json({ performance });
   } catch (error) {
     logger.error('Error calculating investment performance:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create manual snapshot (for testing or manual updates)
+router.post('/:id/snapshot', async (req, res) => {
+  try {
+    const investment = await investmentService.getInvestmentById(req.params.id, req.user.id);
+    const snapshot = await investmentService.createDailySnapshot(investment);
+    res.json({ 
+      message: 'Snapshot created successfully',
+      snapshot 
+    });
+  } catch (error) {
+    logger.error('Error creating manual snapshot:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -407,19 +445,6 @@ router.post('/resync-history/:bankAccountId', async (req, res) => {
     res.json(result);
   } catch (error) {
     logger.error('Error resyncing historical transactions:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Startup service management endpoints
-
-// Get current scraping status
-router.get('/startup/status', async (req, res) => {
-  try {
-    const status = startupInvestmentService.getScrapingStatus();
-    res.json({ status });
-  } catch (error) {
-    logger.error('Error fetching startup scraping status:', error);
     res.status(500).json({ error: error.message });
   }
 });

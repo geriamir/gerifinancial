@@ -1,6 +1,9 @@
 // Export bank account types
 export * from './bankAccount';
 
+// Export credit card types
+export * from './creditCard';
+
 // Export transaction types
 export * from './transaction';
 

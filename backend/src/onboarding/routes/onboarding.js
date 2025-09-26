@@ -120,10 +120,12 @@ router.post('/create-credit-cards', auth, async (req, res) => {
     );
     
     // Perform payment matching analysis
+    console.log(`🔍 About to perform payment matching for user ${userId} with ${creditCards.length} credit cards`);
     const matchingResults = await creditCardOnboardingService.matchMonthlyPayments(
       userId,
       creditCards
     );
+    console.log(`✅ Payment matching completed. Results:`, matchingResults);
     
     res.json({
       success: true,

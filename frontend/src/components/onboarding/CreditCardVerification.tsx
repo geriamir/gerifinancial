@@ -87,18 +87,34 @@ export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
   // Start polling when component mounts
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
+    let isMounted = true;
 
     const initializeComponent = async () => {
       try {
+        if (!isMounted) return;
+        
         // Initial status check
         await pollScrapingStatus();
 
-        // Poll every 15 seconds while scraping is active
-        interval = setInterval(pollScrapingStatus, 15000);
+        if (!isMounted) return;
+
+        // Only start polling if analysis is not complete and component is still mounted
+        if (!analysisComplete) {
+          interval = setInterval(() => {
+            if (isMounted && !analysisComplete) {
+              pollScrapingStatus();
+            } else if (interval) {
+              clearInterval(interval);
+              interval = null;
+            }
+          }, 15000);
+        }
       } catch (error) {
-        console.error('Error initializing verification component:', error);
-        setError('Failed to initialize credit card verification');
-        setLoading(false);
+        if (isMounted) {
+          console.error('Error initializing verification component:', error);
+          setError('Failed to initialize credit card verification');
+          setLoading(false);
+        }
       }
     };
 
@@ -106,13 +122,13 @@ export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
 
     // Cleanup function
     return () => {
+      isMounted = false;
       if (interval) {
         clearInterval(interval);
+        interval = null;
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // Note: pollScrapingStatus is intentionally omitted from dependencies to prevent infinite loops
-  // since it depends on state that gets updated within the polling function
+  }, [pollScrapingStatus, analysisComplete]); // Include pollScrapingStatus dependency
 
   const handleConnectMoreCards = () => {
     // Go back to credit card setup to connect more accounts

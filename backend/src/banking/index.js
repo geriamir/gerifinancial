@@ -11,6 +11,7 @@ const creditCardOnboardingService = require('./services/creditCardOnboardingServ
 const bankClassificationService = require('./services/bankClassificationService');
 const bankAccountService = require('./services/bankAccountService');
 const transactionService = require('./services/transactionService');
+const creditCardService = require('./services/creditCardService');
 
 // Constants (used by other subsystems)
 const { TransactionType } = require('./constants/enums');
@@ -37,6 +38,7 @@ module.exports = {
   bankClassificationService,
   bankAccountService,
   transactionService,
+  creditCardService,
   
   // Constants
   TransactionType,

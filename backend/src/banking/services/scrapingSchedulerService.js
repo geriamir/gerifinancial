@@ -3,7 +3,7 @@ const { BankAccount } = require('../models');
 const dataSyncService = require('./dataSyncService');
 const logger = require('../../shared/utils/logger');
 const rateLimiter = require('../../shared/utils/rateLimiter');
-const bankAccountService = require('./bankAccountService');
+const bankAccountEvents = require('./bankAccountEvents');
 
 class ScrapingSchedulerService {
   constructor() {
@@ -24,24 +24,22 @@ class ScrapingSchedulerService {
    */
   setupEventListeners() {
     try {
-      const events = bankAccountService.events;
-
-      events.on('accountCreated', (bankAccount) => {
+      bankAccountEvents.on('accountCreated', (bankAccount) => {
         logger.info(`Handling accountCreated event for bank account: ${bankAccount._id}`);
         this.scheduleAccount(bankAccount);
       });
 
-      events.on('accountActivated', (bankAccount) => {
+      bankAccountEvents.on('accountActivated', (bankAccount) => {
         logger.info(`Handling accountActivated event for bank account: ${bankAccount._id}`);
         this.scheduleAccount(bankAccount);
       });
 
-      events.on('accountDeleted', ({ accountId }) => {
+      bankAccountEvents.on('accountDeleted', ({ accountId }) => {
         logger.info(`Handling accountDeleted event for bank account: ${accountId}`);
         this.stopAccount(accountId);
       });
 
-      events.on('accountDeactivated', ({ accountId }) => {
+      bankAccountEvents.on('accountDeactivated', ({ accountId }) => {
         logger.info(`Handling accountDeactivated event for bank account: ${accountId}`);
         this.stopAccount(accountId);
       });
