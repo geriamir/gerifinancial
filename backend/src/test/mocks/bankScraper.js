@@ -112,6 +112,71 @@ module.exports = {
           errorType: 'InvalidCredentials',
           errorMessage: 'Invalid credentials provided'
         };
+      },
+
+      // Support checking methods for strategy pattern
+      doesSupportTransactions: () => true,
+      doesSupportPortfolios: () => true,
+      doesSupportForeignCurrencyAccounts: () => true,
+
+      // Mock portfolio scraping
+      scrapePortfolios: async (credentials) => {
+        if (!credentials || !credentials.username || !credentials.password) {
+          return {
+            success: false,
+            errorType: 'InvalidCredentials',
+            errorMessage: 'Missing credentials'
+          };
+        }
+
+        if (credentials.username === validCredentials.username && 
+            credentials.password === validCredentials.password) {
+          return {
+            success: true,
+            portfolios: [{
+              portfolioId: 'mock-portfolio-1',
+              portfolioName: 'Test Portfolio',
+              totalValue: 50000,
+              transactions: []
+            }]
+          };
+        }
+        
+        return {
+          success: false,
+          errorType: 'InvalidCredentials',
+          errorMessage: 'Invalid credentials provided'
+        };
+      },
+
+      // Mock foreign currency scraping
+      scrapeForeignCurrencyAccounts: async (credentials) => {
+        if (!credentials || !credentials.username || !credentials.password) {
+          return {
+            success: false,
+            errorType: 'InvalidCredentials',
+            errorMessage: 'Missing credentials'
+          };
+        }
+
+        if (credentials.username === validCredentials.username && 
+            credentials.password === validCredentials.password) {
+          return {
+            success: true,
+            foreignCurrencyAccounts: [{
+              accountNumber: 'USD-123456',
+              currency: 'USD',
+              balance: 1000,
+              txns: []
+            }]
+          };
+        }
+        
+        return {
+          success: false,
+          errorType: 'InvalidCredentials',
+          errorMessage: 'Invalid credentials provided'
+        };
       }
     };
   },

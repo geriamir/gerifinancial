@@ -1,7 +1,7 @@
 const { Investment, InvestmentSnapshot, InvestmentTransaction } = require('../models');
-const { bankScraperService } = require('../../banking');
 const INVESTMENT_CONSTANTS = require('../constants/investmentConstants');
 const logger = require('../../shared/utils/logger');
+const { bankScraperService } = require('../../banking');
 
 class InvestmentService {
   // Process investments from a portfolio (new structure from israeli-bank-scrapers)
@@ -109,7 +109,7 @@ class InvestmentService {
       return results;
     }
 
-    // Process and validate investment data using the scraper service
+    // Lazy import to avoid circular dependency during initialization
     const processedInvestments = bankScraperService.processInvestmentData(scrapedInvestments);
     
     for (const investmentData of processedInvestments) {
@@ -755,74 +755,6 @@ class InvestmentService {
     }
   }
 
-  // Check if historical transaction data exists and trigger resync if needed
-  async checkAndResyncHistoricalTransactions(bankAccount, forceResync = false) {
-    try {
-      const investments = await Investment.findByUser(bankAccount.userId, { 
-        bankAccountId: bankAccount._id 
-      });
-
-      if (!investments || investments.length === 0) {
-        logger.info(`No investments found for bank account ${bankAccount._id}, skipping transaction resync`);
-        return { message: 'No investments to sync transactions for' };
-      }
-
-      let needsResync = forceResync;
-
-      if (!forceResync) {
-        // Check if we have transaction data for investments
-        for (const investment of investments) {
-          const transactionCount = await InvestmentTransaction.countDocuments({
-            userId: bankAccount.userId,
-            investmentId: investment._id
-          });
-
-          // If investment exists but has no transactions, we need historical data
-          if (transactionCount === 0) {
-            needsResync = true;
-            logger.info(`Investment ${investment.accountName} has no transaction history, will resync`);
-            break;
-          }
-        }
-      }
-
-      if (needsResync) {
-        logger.info(`Resyncing historical transaction data for bank account ${bankAccount._id}`);
-        
-        // Scrape with extended date range for historical transactions (6 months back)
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-        
-        const scrapingResult = await bankScraperService.scrapeTransactions(bankAccount, {
-          startDate: sixMonthsAgo,
-          verbose: true
-        });
-
-        if (scrapingResult.investmentTransactions && scrapingResult.investmentTransactions.length > 0) {
-          const transactionResult = await this.processPortfolioTransactions(
-            scrapingResult.investmentTransactions, 
-            bankAccount
-          );
-          
-          return {
-            message: 'Historical transaction resync completed',
-            result: transactionResult
-          };
-        } else {
-          return {
-            message: 'No historical transactions found during resync'
-          };
-        }
-      } else {
-        return {
-          message: 'Investment transactions are up to date, no resync needed'
-        };
-      }
-    } catch (error) {
-      logger.error(`Error during historical transaction resync: ${error.message}`);
-      throw error;
-    }
-  }
 }
 
 module.exports = new InvestmentService();

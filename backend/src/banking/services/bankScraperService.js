@@ -97,128 +97,8 @@ class BankScraperService {
     this.handleScraperError(error, 'Login', bankAccount._id);
   }
 
-  async scrapeTransactions(bankAccount, options = {}) {
-    const scraper = this.createScraper(bankAccount, options);
-    let attempts = 0;
-    let error = null;
-
-    logger.info(`Starting scraping for bank account ${bankAccount._id} (${bankAccount.name})...`);
-    
-    // Initialize scraping status
-    await this.updateScrapingStatus(bankAccount._id, {
-      isActive: true,
-      status: 'connecting',
-      progress: 10,
-      message: 'Connecting to bank...',
-      startedAt: new Date(),
-      lastUpdatedAt: new Date(),
-      transactionsImported: 0,
-      transactionsCategorized: 0
-    });
-
-    while (attempts < this.MAX_RETRIES) {
-      try {
-        // Update status: scraping
-        await this.updateScrapingStatus(bankAccount._id, {
-          status: 'scraping',
-          progress: 30,
-          message: 'Downloading transactions...',
-          lastUpdatedAt: new Date()
-        });
-
-        const scraperResult = await scraper.scrape(bankAccount.getScraperOptions().credentials);
-
-        if (!scraperResult.success) {
-          const errorType = scraperResult.errorType || 'Unknown';
-          const errorMessage = scraperResult.errorMessage || 'No additional error details';
-          throw new Error(`Scraping failed: ${errorType} - ${errorMessage}`);
-        }
-
-        // Calculate transaction count for status update
-        const totalTransactions = (scraperResult.accounts || []).reduce((total, account) => {
-          return total + (account.txns ? account.txns.length : 0);
-        }, 0);
-
-        // Update status: processing
-        await this.updateScrapingStatus(bankAccount._id, {
-          status: 'categorizing',
-          progress: 80,
-          message: `Processing ${totalTransactions} transactions...`,
-          lastUpdatedAt: new Date(),
-          transactionsImported: totalTransactions
-        });
-
-        logger.info(`Successfully scraped bank account ${bankAccount._id} (${bankAccount.name}) - ${scraperResult.accounts?.length || 0} accounts found`);
-        
-        // Log if portfolios are available (new structure)
-        if (scraperResult.portfolios && scraperResult.portfolios.length > 0) {
-          logger.info(`Successfully scraped accounts and ${scraperResult.portfolios.length} portfolios for bank account ${bankAccount._id}`);
-        }
-        // Log if legacy investments are available
-        else if (scraperResult.investments && scraperResult.investments.length > 0) {
-          logger.info(`Successfully scraped accounts and ${scraperResult.investments.length} legacy investment accounts for bank account ${bankAccount._id}`);
-        } else {
-          logger.info(`Successfully scraped accounts for bank account ${bankAccount._id}`);
-        }
-
-        // Update status: processing (don't mark as complete yet - categorization happens later)
-        await this.updateScrapingStatus(bankAccount._id, {
-          status: 'categorizing',
-          progress: 90,
-          message: `Downloaded ${totalTransactions} transactions, categorizing...`,
-          lastUpdatedAt: new Date(),
-          transactionsImported: totalTransactions,
-          transactionsCategorized: 0 // Not categorized yet
-        });
-
-        // Extract investment transactions from portfolios
-        const investmentTransactions = this.extractInvestmentTransactions(scraperResult.portfolios || []);
-
-        // Extract foreign currency accounts only from dedicated foreign currency accounts
-        const foreignCurrencyAccountsFromDedicated = this.extractForeignCurrencyAccountsFromDedicated(scraperResult.foreignCurrencyAccounts || []);
-        
-        // Use only dedicated foreign currency accounts to prevent duplicates
-        const foreignCurrencyAccounts = foreignCurrencyAccountsFromDedicated;
-
-        // Return accounts, portfolios (new structure), investments (legacy), investment transactions, and foreign currency accounts
-        return {
-          accounts: scraperResult.accounts || [],
-          portfolios: scraperResult.portfolios || [],
-          investments: scraperResult.investments || [],
-          investmentTransactions: investmentTransactions,
-          foreignCurrencyAccounts: foreignCurrencyAccounts
-        };
-      } catch (err) {
-        error = err;
-        attempts++;
-
-        if (attempts < this.MAX_RETRIES) {
-          logger.info(`Scraping attempt ${attempts} failed for bank account ${bankAccount._id} with error ${error}, retrying in ${this.RETRY_DELAY}ms...`);
-          
-          // Update status: retrying
-          await this.updateScrapingStatus(bankAccount._id, {
-            status: 'connecting',
-            progress: 20,
-            message: `Retrying connection (attempt ${attempts + 1}/${this.MAX_RETRIES})...`,
-            lastUpdatedAt: new Date()
-          });
-
-          await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY));
-        }
-      }
-    }
-
-    // Update status: error
-    await this.updateScrapingStatus(bankAccount._id, {
-      status: 'error',
-      progress: 0,
-      message: error.message,
-      lastUpdatedAt: new Date(),
-      isActive: false
-    });
-
-    this.handleScraperError(error, 'Transaction scraping', bankAccount._id);
-  }
+  // REMOVED: Old comprehensive scrapeTransactions method
+  // Use dataSyncService.syncBankAccountData() or isolated sync methods instead
 
   // Helper method to validate investment data structure
   validateInvestmentData(investment) {
@@ -464,6 +344,54 @@ class BankScraperService {
       const amount = txn.originalAmount || txn.chargedAmount || 0;
       return balance + amount;
     }, 0);
+  }
+
+  // NEW: Process foreign currency accounts from dedicated scraping method
+  processForeignCurrencyAccounts(foreignCurrencyAccounts) {
+    if (!foreignCurrencyAccounts || !Array.isArray(foreignCurrencyAccounts)) {
+      return [];
+    }
+
+    const processedAccounts = [];
+
+    foreignCurrencyAccounts.forEach(foreignAccount => {
+      if (!foreignAccount.accountNumber || !foreignAccount.currency) {
+        logger.warn(`Skipping invalid foreign currency account:`, foreignAccount);
+        return;
+      }
+
+      // Process foreign currency account from dedicated scraping method
+      const normalizedCurrency = this.normalizeCurrency(foreignAccount.currency);
+      const processedAccount = {
+        originalAccountNumber: foreignAccount.accountNumber,
+        currency: normalizedCurrency,
+        accountType: foreignAccount.type || 'checking',
+        balance: foreignAccount.balance || 0,
+        transactionCount: (foreignAccount.txns || []).length,
+        transactions: (foreignAccount.txns || []).map(txn => ({
+          identifier: txn.identifier || `${txn.date}_${txn.chargedAmount}_${normalizedCurrency}`,
+          date: txn.date,
+          amount: txn.chargedAmount || txn.originalAmount || 0,
+          currency: normalizedCurrency,
+          originalAmount: txn.originalAmount || txn.chargedAmount, // Amount in original currency
+          exchangeRate: txn.originalCurrency && txn.originalAmount && txn.chargedAmount ? 
+            Math.abs(txn.chargedAmount / txn.originalAmount) : null,
+          description: txn.description,
+          memo: txn.memo,
+          rawData: txn
+        })),
+        rawAccountData: foreignAccount,
+        source: 'dedicated' // Mark as coming from dedicated foreign currency scraping
+      };
+
+      processedAccounts.push(processedAccount);
+    });
+
+    if (processedAccounts.length > 0) {
+      logger.info(`Processed ${processedAccounts.length} foreign currency accounts with currencies: ${[...new Set(processedAccounts.map(fca => fca.currency))].join(', ')}`);
+    }
+
+    return processedAccounts;
   }
 
   async validateCredentials(bankId, credentials) {

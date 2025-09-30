@@ -1,5 +1,6 @@
 const { BankAccount } = require('../models');
 const bankScraperService = require('./bankScraperService');
+const queuedDataSyncService = require('./queuedDataSyncService');
 const logger = require('../../shared/utils/logger');
 const bankAccountEvents = require('./bankAccountEvents');
 
@@ -20,28 +21,9 @@ class BankAccountService {
 
     await bankAccount.save();
 
-    // Emit event for scheduling scraping for active account
+    // Emit event for scheduling and initial scraping for active account
     bankAccountEvents.emit('accountCreated', bankAccount);
     logger.info(`Emitted accountCreated event for new bank account: ${bankAccount._id}`);
-
-    // Initiate immediate scraping for new account
-    try {
-      // Fire and forget - don't wait for scraping to complete
-      setImmediate(async () => {
-        try {
-          // Lazy load dataSyncService to avoid circular dependency
-          const dataSyncService = require('./dataSyncService');
-          await dataSyncService.syncBankAccountData(bankAccount);
-          logger.info(`Initial scraping completed for new bank account: ${bankAccount._id}`);
-        } catch (error) {
-          logger.warn(`Initial scraping failed for new bank account ${bankAccount._id}: ${error.message}`);
-        }
-      });
-      logger.info(`Initiated immediate scraping for new bank account: ${bankAccount._id}`);
-    } catch (error) {
-      logger.warn(`Failed to initiate immediate scraping for bank account ${bankAccount._id}: ${error.message}`);
-      // Don't throw error - bank account creation should still succeed
-    }
 
     return bankAccount;
   }
@@ -146,6 +128,124 @@ class BankAccountService {
       }
     } catch (error) {
       logger.error(`Error getting scraping status for user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  // ===== QUEUE-BASED SCRAPING METHODS =====
+
+  /**
+   * Queue scraping jobs for a single bank account
+   */
+  async queueAccountScraping(accountId, userId, options = {}) {
+    // Verify ownership
+    const bankAccount = await BankAccount.findOne({ _id: accountId, userId });
+    if (!bankAccount) {
+      throw new Error('Bank account not found');
+    }
+
+    try {
+      const result = await queuedDataSyncService.queueBankAccountSync(accountId, options);
+      
+      logger.info(`Queued scraping for account ${bankAccount.name} (${accountId})`);
+      
+      return {
+        message: 'Scraping jobs queued successfully',
+        accountId,
+        accountName: bankAccount.name,
+        queuedJobs: result.queuedJobs,
+        totalJobs: result.totalJobs,
+        priority: result.priority
+      };
+    } catch (error) {
+      logger.error(`Failed to queue scraping for account ${accountId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Queue scraping jobs for all user's accounts
+   */
+  async queueAllAccountsScraping(userId, options = {}) {
+    try {
+      const result = await queuedDataSyncService.queueMultipleAccountsSync(
+        { userId },
+        { 
+          delayBetweenAccounts: 1000, // 1 second delay between accounts
+          ...options 
+        }
+      );
+
+      logger.info(`Queued scraping for ${result.successfulAccounts}/${result.totalAccounts} accounts for user ${userId}`);
+
+      return {
+        message: 'Scraping jobs queued successfully',
+        totalAccounts: result.totalAccounts,
+        successfullyQueued: result.successfulAccounts,
+        failedToQueue: result.failedAccounts,
+        totalJobs: result.totalJobs,
+        accounts: result.queuedAccounts.map(account => ({
+          accountId: account.bankAccountId,
+          accountName: account.accountName,
+          queuedJobs: account.queuedJobs?.length || 0,
+          error: account.error
+        }))
+      };
+    } catch (error) {
+      logger.error(`Failed to queue scraping for user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Queue a specific strategy for a specific account
+   */
+  async queueStrategyForAccount(accountId, userId, strategyName, options = {}) {
+    // Verify ownership
+    const bankAccount = await BankAccount.findOne({ _id: accountId, userId });
+    if (!bankAccount) {
+      throw new Error('Bank account not found');
+    }
+
+    try {
+      const result = await queuedDataSyncService.queueStrategySync(accountId, strategyName, options);
+      
+      logger.info(`Queued ${strategyName} strategy for account ${bankAccount.name} (${accountId})`);
+      
+      return {
+        message: `${strategyName} scraping job queued successfully`,
+        jobId: result.jobId,
+        accountId,
+        accountName: bankAccount.name,
+        strategyName,
+        priority: result.priority
+      };
+    } catch (error) {
+      logger.error(`Failed to queue ${strategyName} strategy for account ${accountId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get queue statistics
+   */
+  async getQueueStats() {
+    try {
+      return await queuedDataSyncService.getQueueStats();
+    } catch (error) {
+      logger.error('Failed to get queue stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get queue health status
+   */
+  async getQueueHealth() {
+    try {
+      return await queuedDataSyncService.getHealthStatus();
+    } catch (error) {
+      logger.error('Failed to get queue health:', error);
       throw error;
     }
   }

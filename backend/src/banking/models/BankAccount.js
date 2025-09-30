@@ -32,6 +32,25 @@ const bankAccountSchema = new mongoose.Schema({
       required: true
     }
   },
+  // Per-strategy sync tracking
+  strategySync: {
+    'checking-accounts': {
+      lastScraped: { type: Date, default: null },
+      lastAttempted: { type: Date, default: null },
+      status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
+    },
+    'investment-portfolios': {
+      lastScraped: { type: Date, default: null },
+      lastAttempted: { type: Date, default: null },
+      status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
+    },
+    'foreign-currency': {
+      lastScraped: { type: Date, default: null },
+      lastAttempted: { type: Date, default: null },
+      status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
+    }
+  },
+  // Global last scraped for backward compatibility and general status
   lastScraped: {
     type: Date,
     default: null
@@ -159,16 +178,17 @@ bankAccountSchema.pre('save', function(next) {
   }
 });
 
-// Method to get scraper options
-bankAccountSchema.methods.getScraperOptions = function() {
-  // Smart start date logic:
-  // - If lastScraped exists, use it (incremental scraping)
-  // - If no lastScraped, use 6 months back (first scrape)
+// Method to get scraper options for a specific strategy
+bankAccountSchema.methods.getScraperOptionsForStrategy = function(strategyName) {
+  // Strategy-specific start date logic
   let startDate;
-  if (this.lastScraped) {
-    startDate = this.lastScraped;
+  const strategyData = this.strategySync?.[strategyName];
+  
+  if (strategyData?.lastScraped) {
+    // Use strategy-specific last scraped date for incremental scraping
+    startDate = strategyData.lastScraped;
   } else {
-    // First scrape: go back 6 months
+    // First scrape for this strategy: go back 6 months
     startDate = new Date();
     startDate.setMonth(startDate.getMonth() - 6);
   }
@@ -185,6 +205,77 @@ bankAccountSchema.methods.getScraperOptions = function() {
   };
 
   return options;
+};
+
+// Legacy method for backward compatibility
+bankAccountSchema.methods.getScraperOptions = function() {
+  // Use the most recent strategy sync date or fallback to 6 months
+  let startDate;
+  if (this.lastScraped) {
+    startDate = this.lastScraped;
+  } else {
+    startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - 6);
+  }
+
+  const options = {
+    companyId: this.bankId,
+    credentials: {
+      username: this.credentials.username,
+      password: decrypt(this.credentials.password)
+    },
+    startDate: startDate,
+    showBrowser: true,
+    verbose: true
+  };
+
+  return options;
+};
+
+// Update strategy sync status
+bankAccountSchema.methods.updateStrategySync = function(strategyName, success, error = null) {
+  if (!this.strategySync) {
+    this.strategySync = {};
+  }
+  
+  if (!this.strategySync[strategyName]) {
+    this.strategySync[strategyName] = {
+      lastScraped: null,
+      lastAttempted: null,
+      status: 'never'
+    };
+  }
+
+  const now = new Date();
+  this.strategySync[strategyName].lastAttempted = now;
+  
+  if (success) {
+    this.strategySync[strategyName].lastScraped = now;
+    this.strategySync[strategyName].status = 'success';
+    
+    // Update global lastScraped to most recent successful strategy sync
+    this.lastScraped = now;
+  } else {
+    this.strategySync[strategyName].status = 'failed';
+    if (error) {
+      this.lastError = {
+        message: `${strategyName}: ${error}`,
+        date: now
+      };
+    }
+  }
+};
+
+// Check if strategy needs sync based on schedule
+bankAccountSchema.methods.strategyNeedsSync = function(strategyName, hoursThreshold = 24) {
+  const strategyData = this.strategySync?.[strategyName];
+  
+  if (!strategyData || !strategyData.lastScraped) {
+    return true; // Never synced
+  }
+  
+  const hoursSinceLastSync = (Date.now() - strategyData.lastScraped.getTime()) / (1000 * 60 * 60);
+  return hoursSinceLastSync >= hoursThreshold;
 };
 
 // Get next scraping time based on schedule

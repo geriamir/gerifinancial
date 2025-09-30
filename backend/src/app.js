@@ -5,8 +5,33 @@ const config = require('./shared/config');
 const logger = require('./shared/utils/logger');
 const ensureLogsDir = require('./shared/middleware/ensureLogsDir');
 
+const { CheckingAccountsSyncStrategy } = require('./banking/services/sync-strategies');
+
 // Ensure logs directory exists in production
 ensureLogsDir();
+
+// Global strategy registry to avoid circular dependencies
+global.syncStrategies = null;
+
+// Initialize sync strategies registry
+function initializeSyncStrategies() {
+  if (global.syncStrategies) return global.syncStrategies;
+
+  // Import strategies from their respective subsystems
+  const PortfoliosSyncStrategy = require('./investments/services/sync/PortfoliosSyncStrategy');
+  const ForeignCurrencySyncStrategy = require('./foreign-currency/services/sync/ForeignCurrencySyncStrategy');
+
+  // Create strategy instances with keys matching scrapingJobProcessors expectations
+  global.syncStrategies = {
+    'checking-accounts': new CheckingAccountsSyncStrategy(),
+    'investment-portfolios': new PortfoliosSyncStrategy(),
+    'foreign-currency': new ForeignCurrencySyncStrategy()
+  };
+
+  logger.info('Sync strategies initialized and registered globally');
+  return global.syncStrategies;
+}
+
 const scrapingSchedulerService = require('./banking/services/scrapingSchedulerService');
 const stockPriceService = require('./rsu/services/stockPriceService');
 const vestingService = require('./rsu/services/vestingService');
@@ -40,6 +65,14 @@ if (config.env === 'test') {
   })
     .then(async () => {
       console.log('Connected to MongoDB');
+
+      // Initialize sync strategies first to avoid circular dependencies
+      try {
+        initializeSyncStrategies();
+        logger.info('Sync strategies initialized successfully');
+      } catch (error) {
+        logger.error('Failed to initialize sync strategies:', error);
+      }
 
       // Only initialize schedulers in production and E2E environments
       if (process.env.NODE_ENV !== 'test' || process.env.NODE_ENV === 'e2e') {

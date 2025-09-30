@@ -17,27 +17,8 @@ const convertToObjectId = (id) => {
 
 class TransactionService {
 
-  async scrapeTransactions(bankAccount, options = {}) {
-    try {
-      const accounts = await bankScraperService.scrapeTransactions(bankAccount, options);
-      return await this.processScrapedTransactions(accounts, bankAccount);
-    } catch (error) {
-      bankAccount.status = 'error';
-      bankAccount.lastError = {
-        message: error.message,
-        date: new Date()
-      };
-      await bankAccount.save();
-      
-      return {
-        newTransactions: 0,
-        duplicates: 0,
-        errors: [{
-          error: error.message
-        }]
-      };
-    }
-  }
+  // REMOVED: scrapeTransactions method
+  // Use dataSyncService.syncRegularAccountsIsolated() instead
 
   async processScrapedTransactions(scrapedAccounts, bankAccount) {
     const results = {
