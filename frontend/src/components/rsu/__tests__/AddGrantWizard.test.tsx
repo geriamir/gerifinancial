@@ -135,14 +135,21 @@ describe('AddGrantWizard', () => {
 
       // Fill only stock symbol to test next validation step
       const stockSymbolInput = screen.getByLabelText(/stock symbol/i);
+      await user.clear(stockSymbolInput);
       await user.type(stockSymbolInput, 'MSFT');
+
+      // Wait for the input to be updated
+      await waitFor(() => {
+        expect(stockSymbolInput).toHaveValue('MSFT');
+      });
 
       const nextButton = screen.getByText('Next');
       await user.click(nextButton);
 
+      // The validation should show "Grant date is required" since stock symbol is filled
       await waitFor(() => {
         expect(screen.getByText('Grant date is required')).toBeInTheDocument();
-      }, { timeout: 10000 });
+      }, { timeout: 5000 });
     }, 15000); // Increase Jest test timeout to 15 seconds
   });
 
