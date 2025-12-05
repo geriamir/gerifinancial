@@ -33,7 +33,7 @@ window.ResizeObserver = jest.fn().mockImplementation(() => ({
 }));
 
 // Mock useSSE hook for testing
-jest.mock('./hooks/useSSE', () => ({
+jest.mock('hooks/useSSE', () => ({
   useSSE: jest.fn(() => ({
     connected: false,
     error: null,
