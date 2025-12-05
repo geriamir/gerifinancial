@@ -32,6 +32,14 @@ declare global {
       createTestUser(options?: Partial<TestUserOptions>): Chainable<string>;
 
       /**
+       * Create an onboarding user (without completing onboarding)
+       * @example
+       * cy.createOnboardingUser()
+       * cy.createOnboardingUser({ email: 'custom@example.com' })
+       */
+      createOnboardingUser(options?: Partial<TestUserOptions>): Chainable<string>;
+
+      /**
        * Clear test data from MongoDB and localStorage
        * @example
        * cy.clearTestData()

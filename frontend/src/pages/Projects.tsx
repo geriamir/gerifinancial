@@ -693,31 +693,24 @@ const Projects: React.FC = () => {
                   updateProject(specificProject._id, { categoryBudgets: deletedCategoryBudgets });
                 }}
                 onAddPlannedExpense={async (expenseData) => {
-                  const addedCategoryBudgets = addPlannedExpense(specificProject, expenseData);
-                  updateProject(specificProject._id, { categoryBudgets: addedCategoryBudgets });
-                  
-                  // Refresh the project data from the backend to get properly populated categoryBreakdown
                   try {
-                    const response = await budgetsApi.getProjectExpenseBreakdown(specificProject._id);
-                    console.log('Project expense breakdown response after adding planned expense:', response);
-                    
-                    // The API returns { success: true, data: { projectId, projectName, categoryBreakdown, ... } }
-                    const breakdown = response.data || response;
-                    
-                    // Update the project in the context with the refreshed data
-                    updateProject(specificProject._id, {
-                      categoryBreakdown: breakdown.plannedCategories || breakdown.categoryBreakdown,
-                      unplannedExpenses: breakdown.unplannedExpenses,
-                      totalPaid: breakdown.totalPaid,
-                      totalPlannedPaid: breakdown.totalPlannedPaid,
-                      totalUnplannedPaid: breakdown.totalUnplannedPaid,
-                      progress: breakdown.progress,
-                      isOverBudget: breakdown.isOverBudget,
-                      remainingBudget: breakdown.totalBudget - breakdown.totalPaid
+                    // Call the dedicated API endpoint to add the planned expense
+                    const response = await budgetsApi.addPlannedExpense(specificProject._id, expenseData as {
+                      categoryId: string;
+                      subCategoryId?: string;
+                      budgetedAmount: number;
+                      description?: string;
+                      currency?: string;
                     });
+                    
+                    // The response contains { project: { ...all fields including overview data } }
+                    // Update the entire project with all fields from the response
+                    const updatedProject = response.data.project;
+                    
+                    // Update ALL fields to ensure complete sync
+                    updateProject(specificProject._id, updatedProject);
                   } catch (error) {
-                    console.error('Failed to refresh project data after adding planned expense:', error);
-                    // The expense has already been added successfully on the backend
+                    console.error('Failed to add planned expense:', error);
                   }
                 }}
                 onRemoveFromProject={handleRemoveExpenseFromProject}

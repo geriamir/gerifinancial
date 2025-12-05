@@ -19,18 +19,24 @@ import {
   TrendingUp as TrendingUpIcon
 } from '@mui/icons-material';
 import { OnboardingStepProps } from './OnboardingWizard';
+import { OnboardingStatus } from '../../services/api/onboarding';
 import { useNavigate } from 'react-router-dom';
 
-export const OnboardingComplete: React.FC<OnboardingStepProps> = ({
-  onComplete,
-  stepData
+export interface OnboardingCompleteProps extends OnboardingStepProps {
+  onboardingStatus?: OnboardingStatus;
+}
+
+export const OnboardingComplete: React.FC<OnboardingCompleteProps> = ({
+  onboardingStatus,
+  onComplete
 }) => {
   const navigate = useNavigate();
 
-  const checkingAccount = stepData?.checkingaccount || stepData?.checkingAccount;
-  const transactionData = stepData?.transactionimport || stepData?.transactionImport;
-  const creditCardData = stepData?.creditcards || stepData?.creditCards;
-  const analysisData = stepData?.creditcarddetection || stepData?.creditCardAnalysis;
+  // Use onboarding status from props
+  const checkingAccount = onboardingStatus?.checkingAccount;
+  const transactionData = onboardingStatus?.transactionImport;
+  const creditCardData = onboardingStatus?.creditCardSetup.creditCardAccounts;
+  const analysisData = onboardingStatus?.creditCardDetection;
 
   const getSetupSummary = useCallback(() => {
     const summary = {
@@ -42,31 +48,12 @@ export const OnboardingComplete: React.FC<OnboardingStepProps> = ({
     return summary;
   }, [checkingAccount, transactionData, creditCardData]);
 
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusUpdated, setStatusUpdated] = useState(false);
 
   useEffect(() => {
-    // Mark the completion step as complete when component mounts
-    // This is crucial for updating the backend onboarding status
-    const updateStatus = async () => {
-      if (onComplete && !statusUpdated) {
-        setIsUpdatingStatus(true);
-        try {
-          await onComplete('complete', {
-            completionDate: new Date(),
-            setupSummary: getSetupSummary()
-          });
-          setStatusUpdated(true);
-        } catch (error) {
-          console.error('Failed to update onboarding status:', error);
-        } finally {
-          setIsUpdatingStatus(false);
-        }
-      }
-    };
-
-    updateStatus();
-  }, [onComplete, getSetupSummary, statusUpdated]);
+    // Mark completion - the wizard's hook handles status updates automatically
+    setStatusUpdated(true);
+  }, []);
 
   useEffect(() => {
     // Auto-redirect to dashboard after 10 seconds, but only after status is updated
@@ -79,26 +66,7 @@ export const OnboardingComplete: React.FC<OnboardingStepProps> = ({
     }
   }, [navigate, statusUpdated]);
 
-  const handleGoToDashboard = async () => {
-    // Ensure status is updated before navigating
-    if (!statusUpdated && !isUpdatingStatus) {
-      setIsUpdatingStatus(true);
-      try {
-        if (onComplete) {
-          await onComplete('complete', {
-            completionDate: new Date(),
-            setupSummary: getSetupSummary()
-          });
-        }
-        setStatusUpdated(true);
-      } catch (error) {
-        console.error('Failed to update onboarding status:', error);
-        // Navigate anyway, as the user experience is more important
-      } finally {
-        setIsUpdatingStatus(false);
-      }
-    }
-    
+  const handleGoToDashboard = () => {
     // Navigate to dashboard
     navigate('/');
   };
@@ -164,8 +132,8 @@ export const OnboardingComplete: React.FC<OnboardingStepProps> = ({
               <ListItemText
                 primary="Main Checking Account"
                 secondary={
-                  checkingAccount 
-                    ? `${checkingAccount.name} connected successfully`
+                  checkingAccount?.accountId
+                    ? `${checkingAccount.accountId.displayName} connected successfully`
                     : 'Connected and ready'
                 }
               />

@@ -72,9 +72,20 @@ const generateTransaction = (baseDate, index, userId, accountId) => {
 };
 
 const getMongoClient = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27777/gerifinancial-e2e';
+  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/gerifinancial-e2e';
   console.log('Connecting to MongoDB:', uri);
-  return await MongoClient.connect(uri);
+  
+  try {
+    const client = await MongoClient.connect(uri, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
+    });
+    console.log('MongoDB connected successfully');
+    return client;
+  } catch (error) {
+    console.error('MongoDB connection failed:', error.message);
+    throw error;
+  }
 };
 
 module.exports = {

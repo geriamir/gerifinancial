@@ -118,10 +118,13 @@ const PatternDetectionDashboard: React.FC<PatternDetectionDashboardProps> = ({
       const response = await patternsApi.bulkApprovePatterns(selectedPatterns);
       
       if (response.success) {
-        // Remove approved patterns from the list
-        setPatterns(prev => prev.filter(p => !selectedPatterns.includes(p.id)));
-        setSelectedPatterns([]);
         console.log(`Bulk approved ${response.data.totalApproved} patterns`);
+        
+        // Clear selection
+        setSelectedPatterns([]);
+        
+        // Reload patterns from server to ensure UI matches backend state
+        await loadPendingPatterns();
       }
     } catch (err) {
       console.error('Error bulk approving patterns:', err);

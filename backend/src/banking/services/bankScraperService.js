@@ -453,7 +453,17 @@ class BankScraperService {
         updateData[`scrapingStatus.${key}`] = statusUpdate[key];
       });
       
-      await BankAccount.findByIdAndUpdate(bankAccountId, { $set: updateData });
+      const result = await BankAccount.findByIdAndUpdate(
+        bankAccountId, 
+        { $set: updateData },
+        { new: false, runValidators: false }
+      );
+      
+      if (!result) {
+        logger.warn(`Bank account ${bankAccountId} not found when updating scraping status - account may have been deleted`);
+        return;
+      }
+      
       logger.debug(`Updated scraping status for bank account ${bankAccountId}:`, statusUpdate);
     } catch (error) {
       logger.error(`Failed to update scraping status for bank account ${bankAccountId}:`, error);

@@ -121,6 +121,16 @@ export const budgetsApi = {
     api.post('/budgets/patterns/reject-remaining-and-proceed', { year, month, monthsToAnalyze })
       .then((res: AxiosResponse) => res.data),
 
+  // Get pending patterns for current user
+  getPendingPatterns: (): Promise<{ success: boolean; data: any[]; count: number }> =>
+    api.get('/budgets/patterns/pending')
+      .then((res: AxiosResponse) => res.data),
+
+  // Get approved patterns for current user
+  getApprovedPatterns: (): Promise<{ success: boolean; data: any[]; count: number }> =>
+    api.get('/budgets/patterns/approved')
+      .then((res: AxiosResponse) => res.data),
+
   getMonthlyBudgetActual: (year: number, month: number) =>
     api.get(`/budgets/monthly/${year}/${month}/actual`)
       .then((res: AxiosResponse) => res.data),
@@ -317,5 +327,22 @@ export const budgetsApi = {
     };
   }> =>
     api.get(`/budgets/projects/${projectId}/expenses/breakdown`)
+      .then((res: AxiosResponse) => res.data),
+
+  addPlannedExpense: (projectId: string, expenseData: {
+    categoryId: string;
+    subCategoryId?: string;
+    budgetedAmount: number;
+    description?: string;
+    currency?: string;
+  }): Promise<{
+    success: boolean;
+    data: {
+      project: ProjectBudget;
+      plannedExpense: any;
+    };
+    message: string;
+  }> =>
+    api.post(`/budgets/projects/${projectId}/planned-expenses`, expenseData)
       .then((res: AxiosResponse) => res.data),
 };

@@ -37,6 +37,30 @@ Cypress.Commands.add('createTestUser', (options = {}) => {
     });
 });
 
+// Create onboarding user (without completing onboarding)
+Cypress.Commands.add('createOnboardingUser', (options = {}) => {
+  const defaultOptions = {
+    email: 'onboarding@example.com',
+    password: 'password123',
+    name: 'Onboarding User',
+    ...options
+  };
+
+  return cy.request('POST', `${Cypress.env('apiUrl')}/api/auth/register`, defaultOptions)
+    .then((response) => {
+      const token = response.body.token;
+      const userId = response.body.user?.id || response.body.userId;
+      Cypress.env('testUserId', userId);
+      
+      cy.log('Created onboarding user:', userId);
+      
+      // New users automatically get onboarding structure with defaults:
+      // isComplete: false, currentStep: 'checking-account'
+      // This matches what happens in the real app
+      return token;
+    });
+});
+
 export interface TestUserOptions {
   email: string;
   password: string;
@@ -82,7 +106,7 @@ Cypress.Commands.add('createBankAccount', (token: string, options: Partial<BankA
 
 // Clear test data command - now uses MongoDB task
 Cypress.Commands.add('clearTestData', () => {
-  cy.task('db:clearTestData', null, { timeout: 10000 }).then(() => {
+  cy.task('db:clearTestData', null, { timeout: 30000 }).then(() => {
     localStorage.clear();
   });
 });

@@ -12,7 +12,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-gerifinancial}
     volumes:
-      - mongodb_data:/data/db
+      - ./data/mongodb:/data/db
       - ./mongo-init:/docker-entrypoint-initdb.d
     networks:
       - gerifinancial_network
@@ -25,7 +25,7 @@ services:
       - "${REDIS_PORT:-6379}:6379"
     command: redis-server --appendonly yes
     volumes:
-      - redis_data:/data
+      - ./data/redis:/data
     networks:
       - gerifinancial_network
     healthcheck:
@@ -33,12 +33,6 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
-
-volumes:
-  mongodb_data:
-    driver: local
-  redis_data:
-    driver: local
 
 networks:
   gerifinancial_network:

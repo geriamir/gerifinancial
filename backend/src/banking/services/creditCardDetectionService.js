@@ -451,15 +451,10 @@ class CreditCardDetectionService {
       }
 
       // Get monthly spending totals for each connected credit card
-      console.log(`🔍 COVERAGE ANALYSIS: Getting monthly totals for ${connectedCreditCards.length} connected credit cards`);
       const creditCardMonthlyTotals = await this.getCreditCardMonthlyTotals(connectedCreditCards, startDate);
-      console.log(`📊 COVERAGE ANALYSIS: Found ${creditCardMonthlyTotals.length} monthly spending records`);
-      console.log(`📊 COVERAGE ANALYSIS: Monthly totals data:`, JSON.stringify(creditCardMonthlyTotals, null, 2));
       
       // Match credit card payments to credit card monthly spending
-      console.log(`🔗 COVERAGE ANALYSIS: Starting payment matching...`);
       const matchingResults = await this.matchPaymentsToCards(creditCardPayments, creditCardMonthlyTotals);
-      console.log(`✅ COVERAGE ANALYSIS: Matching completed - ${matchingResults.coveredCount}/${creditCardPayments.length} payments matched`);
       
       const coverageAnalysis = {
         totalCreditCardPayments: creditCardPayments.length,

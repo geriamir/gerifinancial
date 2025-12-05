@@ -123,19 +123,24 @@ class DataSyncService {
       
       if (transactionResults && transactionResults.mostRecentTransactionDate) {
         lastScrapedDate = transactionResults.mostRecentTransactionDate;
-        logger.info(`Using most recent transaction date ${lastScrapedDate.toISOString()} as lastScraped for account ${freshBankAccount._id}`);
+        logger.info(`Using most recent transaction date ${lastScrapedDate.toISOString()} as base for lastScraped for account ${freshBankAccount._id}`);
+        
+        // Add 1 day to ensure we don't miss any transactions on the boundary
+        // This is safer than adding 1 minute, which can still cause overlaps
+        // Multi-field duplicate detection will catch any duplicates from the overlap
+        lastScrapedDate.setDate(lastScrapedDate.getDate() + 1);
+        lastScrapedDate.setHours(0, 0, 0, 0); // Set to start of next day
+        
+        logger.info(`Set lastScraped to start of next day (${lastScrapedDate.toISOString()}) to prevent boundary gaps`);
       } else {
         logger.info(`No recent transaction date found, using current time as lastScraped for account ${freshBankAccount._id}`);
       }
-
-      // Adding 1 minute to avoid duplicate transactions
-      lastScrapedDate.setMinutes(lastScrapedDate.getMinutes() + 1);
 
       freshBankAccount.lastScraped = lastScrapedDate;
       freshBankAccount.status = 'active';
       freshBankAccount.lastError = null; // Clear any previous errors
       await freshBankAccount.save();
-      logger.info(`Updated lastScraped for account ${freshBankAccount._id} to ${freshBankAccount.lastScraped}`);
+      logger.info(`Updated lastScraped for account ${freshBankAccount._id} to ${freshBankAccount.lastScraped.toISOString()}`);
     }
   }
 

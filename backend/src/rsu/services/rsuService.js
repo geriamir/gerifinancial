@@ -70,7 +70,7 @@ class RSUService {
         totalValue: grantData.totalValue,
         totalShares: grantData.totalShares,
         pricePerShare: pricePerShare,
-        currentPrice: stockPrice.price,
+        // currentPrice removed - will be calculated at runtime from StockPrice collection
         vestingSchedule,
         vestingPlan,
         notes: grantData.notes || ''
@@ -100,11 +100,12 @@ class RSUService {
     try {
       const grants = await RSUGrant.getUserGrants(userId, filters);
       
-      // Populate current stock prices with most recent priceDate
+      // Populate current stock prices - calculated at runtime
       const grantPromises = grants.map(async (grant) => {
         const stockPrice = await StockPrice.findOne({ symbol: grant.stockSymbol })
-          .sort({ priceDate: -1 }); // Get the record with the most recent priceDate
+          .sort({ date: -1 }); // Get the record with the most recent date
         if (stockPrice) {
+          // Set current price and value as runtime properties (not saved to DB)
           grant.currentPrice = stockPrice.price;
           grant.currentValue = grant.totalShares * stockPrice.price;
         }

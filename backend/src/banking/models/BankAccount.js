@@ -200,8 +200,8 @@ bankAccountSchema.methods.getScraperOptionsForStrategy = function(strategyName) 
       password: decrypt(this.credentials.password)
     },
     startDate: startDate,
-    showBrowser: true,
-    verbose: true
+    showBrowser: false,
+    verbose: false
   };
 
   return options;
@@ -225,8 +225,8 @@ bankAccountSchema.methods.getScraperOptions = function() {
       password: decrypt(this.credentials.password)
     },
     startDate: startDate,
-    showBrowser: true,
-    verbose: true
+    showBrowser: false,
+    verbose: false
   };
 
   return options;

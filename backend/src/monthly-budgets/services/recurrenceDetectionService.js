@@ -3,15 +3,17 @@ const { TransactionPattern } = require('../models');
 const logger = require('../../shared/utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const { PATTERN_TYPES } = require('../constants/patternTypes');
+const mongoose = require('mongoose');
+const { ObjectId } = mongoose.Types;
 
 class RecurrenceDetectionService {
   /**
    * Detect recurrence patterns in user transactions
    * @param {string} userId - User ID
-   * @param {number} monthsToAnalyze - Number of months to analyze (default 6)
+   * @param {number} monthsToAnalyze - Number of months to analyze (default 7)
    * @returns {Array} Array of detected patterns
    */
-  async detectPatterns(userId, monthsToAnalyze = 6) {
+  async detectPatterns(userId, monthsToAnalyze = 7) {
     try {
       logger.info(`Starting pattern detection for user ${userId} with ${monthsToAnalyze} months of data`);
 
@@ -46,6 +48,9 @@ class RecurrenceDetectionService {
       const detectedPatterns = [];
       
       for (const group of transactionGroups) {
+        if (group.subCategoryId === new ObjectId('6914a3efbf3d186bd6e77ddb').toString()) {
+          console.log('Analyzing group for transaction:', group);
+        }
         if (group.transactions.length < 2) continue; // Need at least 2 occurrences
         
         const pattern = this.analyzeTransactionPattern(group, monthsToAnalyze);
@@ -129,6 +134,11 @@ class RecurrenceDetectionService {
       
       if (matchingGroup) {
         // Add to existing group
+        
+        if (transactionSubCatId === new ObjectId('6914a3efbf3d186bd6e77ddb').toString()) {
+          console.log('Added to existing group for transaction:', transaction);
+        }
+        
         matchingGroup.transactions.push(transaction);
         matchingGroup.totalAmount += amount;
         matchingGroup.averageAmount = matchingGroup.totalAmount / matchingGroup.transactions.length;
@@ -195,8 +205,12 @@ class RecurrenceDetectionService {
   analyzeTransactionPattern(group, analysisMonths) {
     const { transactions } = group;
     
+    const shouldDebug = group.subCategoryId === new ObjectId('6914a3efbf3d186bd6e77ddb').toString();
     // Apply single-transaction-per-period constraint
-    if (!this.validateSingleTransactionPerPeriod(transactions, group.commonDescription.includes('גז'))) {
+    if (!this.validateSingleTransactionPerPeriod(transactions, shouldDebug)) {
+      if (group.subCategoryId === new ObjectId('6914a3efbf3d186bd6e77ddb').toString()) {  
+        console.log('Rejected due to multiple transactions in same period for group:', group);
+      }
       return null; // Reject if multiple transactions in same period
     }
 
@@ -209,10 +223,17 @@ class RecurrenceDetectionService {
       return monthlyPattern;
     }
     
+    if (group.subCategoryId === new ObjectId('6914a3efbf3d186bd6e77ddb').toString()) {  
+      console.log('Monthly pattern not found, checking bi-monthly for transaction group:', group);
+    }
     // Check for bi-monthly pattern (every 2 months)
     const biMonthlyPattern = this.checkBiMonthlyPattern(monthOccurrences, analysisMonths);
     if (biMonthlyPattern) {
       return biMonthlyPattern;
+    }
+
+    if (group.subCategoryId === new ObjectId('6914a3efbf3d186bd6e77ddb').toString()) {  
+      console.log('Bi-monthly pattern not found, checking quarterly for transaction group:', group);
     }
     
     // Check for quarterly pattern (every 3 months)
@@ -236,9 +257,18 @@ class RecurrenceDetectionService {
    * @param {Array} transactions - Array of transactions
    * @returns {boolean} True if constraint is satisfied
    */
-  validateSingleTransactionPerPeriod(transactions) {
+  validateSingleTransactionPerPeriod(transactions, shouldDebug = false) {
+
+    if (shouldDebug || transactions[0].subCategory?._id === new ObjectId('6914a3efbf3d186bd6e77ddb')) {  
+      logger.info('Validating single-transaction-per-period for transaction group with transactions:', transactions);
+    }
+
     if (transactions.length < 2) {
       return false;
+    }
+
+    if (shouldDebug || transactions[0].subCategory?._id === new ObjectId('6914a3efbf3d186bd6e77ddb')) {  
+      logger.info('Validating single-transaction-per-period for transaction group with transactions:', transactions);
     }
 
     // Group transactions by month-year to check for multiple transactions in same month
@@ -257,17 +287,34 @@ class RecurrenceDetectionService {
     // Check that each month has exactly 1 transaction
     for (const [monthYear, monthTransactions] of Object.entries(monthlyGroups)) {
       if (monthTransactions.length > 1) {
+        if (transactions[0].subCategory?._id === new ObjectId('6914a3efbf3d186bd6e77ddb')) {  
+          logger.info('Multiple transactions found in same month-year:', monthYear, monthTransactions);
+        }
         logger.debug(`Rejecting pattern: Multiple transactions (${monthTransactions.length}) found in ${monthYear}`);
         return false; // Multiple transactions in same month = not truly recurring
       }
     }
     
     // Additional validation: check spacing consistency
-    const monthYears = Object.keys(monthlyGroups).sort();
+    // Sort month-years numerically by converting to absolute month numbers
+    const monthYears = Object.keys(monthlyGroups).sort((a, b) => {
+      const [yearA, monthA] = a.split('-').map(Number);
+      const [yearB, monthB] = b.split('-').map(Number);
+      const absoluteMonthA = yearA * 12 + monthA;
+      const absoluteMonthB = yearB * 12 + monthB;
+      return absoluteMonthA - absoluteMonthB;
+    });
     
     if (monthYears.length >= 3) {
       // For 3+ occurrences, check if spacing is consistent
-      return this.validateSpacingConsistency(monthYears);
+      if (shouldDebug || transactions[0].subCategory?._id === new ObjectId('6914a3efbf3d186bd6e77ddb')) {  
+        logger.info('Validating spacing consistency for transaction group with month-years:', monthYears);
+      }
+      const isSpacingConsistent = this.validateSpacingConsistency(monthYears);
+      if (shouldDebug || transactions[0].subCategory?._id === new ObjectId('6914a3efbf3d186bd6e77ddb')) {  
+        logger.info('Spacing consistency result:', isSpacingConsistent);
+      }
+      return isSpacingConsistent;
     }
     
     return true; // Passed single-transaction-per-month constraint
@@ -347,6 +394,7 @@ class RecurrenceDetectionService {
     }
     
     // Check if months are consecutive or mostly consecutive
+    // Sort chronologically (handles cases like [10, 6, 8] which should be [6, 8, 10])
     const sortedMonths = [...monthOccurrences].sort((a, b) => a - b);
     const isConsecutive = this.checkConsecutivePattern(sortedMonths, analysisMonths);
     
@@ -420,47 +468,53 @@ class RecurrenceDetectionService {
   checkBiMonthlyPattern(monthOccurrences, analysisMonths) {
     if (monthOccurrences.length < 2) return null;
     
-    const expectedOccurrences = Math.floor(analysisMonths / 2);
+    // For bi-monthly patterns, we expect roughly half the analysis period
+    // But be more lenient - allow 2-4 occurrences for 6 month analysis
+    const minOccurrences = 2;
+    const maxOccurrences = Math.ceil(analysisMonths / 2) + 1; // Add 1 for flexibility
     const actualOccurrences = monthOccurrences.length;
-    
-    // Allow for some variance (±1 occurrence)
-    if (Math.abs(actualOccurrences - expectedOccurrences) > 1) {
+
+    if (actualOccurrences < minOccurrences || actualOccurrences > maxOccurrences) {
+      logger.info(`Bi-monthly rejected: ${actualOccurrences} occurrences outside range [${minOccurrences}, ${maxOccurrences}]`);
       return null;
     }
     
-    // For year boundary handling, we need to check patterns differently
-    // Create a sequence that handles year boundaries
-    const monthSequence = [...monthOccurrences];
+    // Sort months to check gaps
+    const sortedMonths = [...monthOccurrences].sort((a, b) => a - b);
     
-    // Check if this could be a bi-monthly pattern by examining gaps
-    let isConsistent = true;
-    
-    if (monthSequence.length === 2) {
-      // For 2 months, check if they could be bi-monthly
-      const [first, second] = monthSequence.sort((a, b) => a - b);
-      const gap = second - first;
-      // Allow gaps: 2 (normal), 10 (Nov->Jan), 11 (Oct->Dec->Feb pattern)
-      isConsistent = gap === 2 || gap === 10 || gap === 11;
-    } else {
-      // For 3+ months, check sequential gaps
-      const sortedMonths = [...monthOccurrences].sort((a, b) => a - b);
-      
-      for (let i = 1; i < sortedMonths.length; i++) {
-        const gap = sortedMonths[i] - sortedMonths[i - 1];
-        // Allow gap of 2 months (with some flexibility for year boundaries)
-        if (gap !== 2 && gap !== 10 && gap !== 11) { // Handle year boundary cases
-          isConsistent = false;
-          break;
-        }
+    // Check if all gaps between consecutive months are exactly 2
+    let allGapsAreTwo = true;
+    for (let i = 1; i < sortedMonths.length; i++) {
+      const gap = sortedMonths[i] - sortedMonths[i - 1];
+      if (gap !== 2) {
+        allGapsAreTwo = false;
+        logger.debug(`Bi-monthly gap check: months ${sortedMonths[i-1]} to ${sortedMonths[i]} = ${gap} months (expected 2)`);
+        break;
       }
     }
     
-    if (!isConsistent) return null;
+    if (!allGapsAreTwo) {
+      logger.debug(`Bi-monthly rejected: gaps are not consistent (months: ${sortedMonths.join(', ')})`);
+      return null;
+    }
     
-    // Return only the months that actually occurred for testing consistency
+    // Return only the months that actually occurred for pattern matching
     const scheduledMonths = [...new Set(monthOccurrences)].sort((a, b) => a - b);
     
-    const confidence = this.calculatePatternConfidence(actualOccurrences, expectedOccurrences, isConsistent);
+    // Calculate confidence based on occurrence count and consistency
+    let confidence = 0.75; // Base confidence for bi-monthly patterns
+    
+    // Boost confidence for more occurrences
+    if (actualOccurrences >= 3) {
+      confidence += 0.1;
+    }
+    if (actualOccurrences >= 4) {
+      confidence += 0.05;
+    }
+    
+    confidence = Math.min(0.95, confidence);
+    
+    logger.info(`Bi-monthly pattern detected: months [${scheduledMonths.join(', ')}], confidence: ${confidence}`);
     
     return {
       type: PATTERN_TYPES.BI_MONTHLY,

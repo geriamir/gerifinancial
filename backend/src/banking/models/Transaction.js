@@ -150,6 +150,30 @@ const transactionSchema = new mongoose.Schema({
     default: null
   },
   
+  // Credit card matching for onboarding
+  // Marks which credit card this payment transaction is associated with
+  matchedCreditCard: {
+    creditCardId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CreditCard',
+      default: null
+    },
+    displayName: {
+      type: String,
+      default: null
+    },
+    matchConfidence: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: null
+    },
+    matchedAt: {
+      type: Date,
+      default: null
+    }
+  },
+  
   rawData: {
     type: mongoose.Schema.Types.Mixed,
     required: true,

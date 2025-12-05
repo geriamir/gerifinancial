@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import {
   Box,
   Typography,
   Button,
   Card,
   CardContent,
-  Alert,
   CircularProgress,
   Chip,
   List,
@@ -20,95 +19,45 @@ import {
   Receipt as ReceiptIcon
 } from '@mui/icons-material';
 import { OnboardingStepProps } from './OnboardingWizard';
-import { onboardingApi } from '../../services/api/onboarding';
 
-interface CreditCardAnalysis {
-  hasCreditCardActivity: boolean;
-  transactionCount: number;
-  recommendation: 'connect' | 'optional' | 'skip';
-  recommendationReason: string;
-  recentTransactions: Array<{
-    date: string;
-    description: string;
-    amount: number;
-  }>;
-  analyzedAt: string;
+export interface CreditCardDetectionProps extends OnboardingStepProps {
+  detection?: {
+    analyzed: boolean;
+    analyzedAt: string | null;
+    transactionCount: number;
+    recommendation: 'connect' | 'optional' | 'skip' | null;
+    sampleTransactions: Array<{
+      date: string;
+      description: string;
+      amount: number;
+    }>;
+  };
+  onProceed?: () => Promise<void>;
+  onSkip?: () => Promise<void>;
 }
 
-export const CreditCardDetection: React.FC<OnboardingStepProps> = ({
+export const CreditCardDetection: React.FC<CreditCardDetectionProps> = ({
+  detection,
   onComplete,
+  onProceed,
   onSkip
 }) => {
-  const [analysis, setAnalysis] = useState<CreditCardAnalysis | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  // Prevent duplicate API calls
-  const isAnalyzing = useRef(false);
+  // Use detection data from props (provided by wizard's onboarding status)
+  const loading = !detection || !detection.analyzed;
 
-  useEffect(() => {
-    if (!isAnalyzing.current) {
-      analyzeCreditCardUsage();
-    }
-  }, []);
-
-  const analyzeCreditCardUsage = async () => {
-    // Prevent duplicate calls
-    if (isAnalyzing.current) {
-      return;
-    }
-    
-    try {
-      isAnalyzing.current = true;
-      setLoading(true);
-      setError(null);
-      
-      const analysisResult = await onboardingApi.analyzeCreditCards(1); // 1 month back
-      setAnalysis(analysisResult);
-    } catch (err) {
-      console.error('Credit card analysis failed:', err);
-      setError('Failed to analyze credit card usage');
-      
-      // Fallback to mock data for development
-      if (process.env.NODE_ENV === 'development') {
-        const mockAnalysis: CreditCardAnalysis = {
-          hasCreditCardActivity: Math.random() > 0.5,
-          transactionCount: Math.floor(Math.random() * 50) + 10,
-          recommendation: Math.random() > 0.5 ? 'connect' : 'skip',
-          recommendationReason: 'Regular credit card activity detected',
-          recentTransactions: [
-            { date: '2024-08-15', description: 'Credit Card Payment', amount: 1200 },
-            { date: '2024-07-15', description: 'Visa Cal Payment', amount: 1850 }
-          ],
-          analyzedAt: new Date().toISOString()
-        };
-        setAnalysis(mockAnalysis);
-      }
-    } finally {
-      setLoading(false);
-      isAnalyzing.current = false;
+  const handleConnectCreditCards = async () => {
+    if (onProceed) {
+      await onProceed();
+    } else if (onComplete) {
+      onComplete();
     }
   };
 
-  const handleConnectCreditCards = () => {
-    onComplete('credit-card-setup', {
-      hasCreditCardActivity: analysis?.hasCreditCardActivity,
-      transactionCount: analysis?.transactionCount,
-      recommendation: analysis?.recommendation,
-      analysisDate: new Date()
-    });
-  };
-
-  const handleSkipCreditCards = () => {
+  const handleSkipCreditCards = async () => {
     if (onSkip) {
-      onSkip();
-    } else {
-      onComplete('complete', {
-        hasCreditCardActivity: false,
-        transactionCount: 0,
-        recommendation: 'skip',
-        analysisDate: new Date()
-      });
+      await onSkip();
+    } else if (onComplete) {
+      onComplete();
     }
   };
 
@@ -126,32 +75,16 @@ export const CreditCardDetection: React.FC<OnboardingStepProps> = ({
     );
   }
 
-  if (error) {
-    return (
-      <Box>
-        <Alert severity="error" sx={{ mb: 3 }}>
-          <Typography variant="subtitle2">Analysis Failed</Typography>
-          <Typography variant="body2">{error}</Typography>
-        </Alert>
-        
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
-          <Button onClick={analyzeCreditCardUsage} variant="outlined">
-            Try Again
-          </Button>
-          <Button onClick={handleSkipCreditCards} variant="text">
-            Skip Credit Card Setup
-          </Button>
-        </Box>
-      </Box>
-    );
-  }
-
-  if (!analysis) {
+  if (!detection) {
     return null;
   }
 
+  const recommendation = detection.recommendation || 'skip';
+  const transactionCount = detection.transactionCount || 0;
+  const sampleTransactions = detection.sampleTransactions || [];
+
   // Render based on recommendation
-  if (analysis.recommendation === 'connect') {
+  if (recommendation === 'connect') {
     return (
       <Box>
         <Box sx={{ textAlign: 'center', mb: 3 }}>
@@ -175,24 +108,24 @@ export const CreditCardDetection: React.FC<OnboardingStepProps> = ({
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
               <Chip
                 icon={<ReceiptIcon />}
-                label={`${analysis.transactionCount} credit card transactions`}
+                label={`${transactionCount} credit card transaction${transactionCount !== 1 ? 's' : ''}`}
                 color="primary"
                 variant="filled"
               />
             </Box>
 
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {analysis.recommendationReason}
+              We detected regular credit card payments in your account.
             </Typography>
 
-            {/* All Credit Card Transactions from Last Month */}
-            {analysis.recentTransactions && analysis.recentTransactions.length > 0 && (
+            {/* Sample Credit Card Transactions */}
+            {sampleTransactions.length > 0 && (
               <Box sx={{ mt: 2 }}>
                 <Typography variant="subtitle2" gutterBottom>
-                  All Credit Card Transactions from Last Month
+                  Sample Credit Card Transactions
                 </Typography>
                 <List dense sx={{ maxHeight: 300, overflow: 'auto' }}>
-                  {analysis.recentTransactions.map((transaction, index) => (
+                  {sampleTransactions.map((transaction, index) => (
                     <ListItem key={index} sx={{ px: 0 }}>
                       <ListItemIcon>
                         <CreditCardIcon color="primary" />
@@ -204,9 +137,9 @@ export const CreditCardDetection: React.FC<OnboardingStepProps> = ({
                     </ListItem>
                   ))}
                 </List>
-                {analysis.recentTransactions.length > 10 && (
+                {sampleTransactions.length > 0 && (
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                    Showing all {analysis.recentTransactions.length} transactions from the last month
+                    Showing {sampleTransactions.length} sample transaction{sampleTransactions.length !== 1 ? 's' : ''}
                   </Typography>
                 )}
               </Box>
@@ -249,17 +182,19 @@ export const CreditCardDetection: React.FC<OnboardingStepProps> = ({
     );
   }
 
-  // No significant credit card activity
+  // No significant credit card activity (optional or skip)
   return (
     <Box>
       <Box sx={{ textAlign: 'center', mb: 3 }}>
         <InfoIcon color="info" sx={{ fontSize: 64, mb: 2 }} />
         <Typography variant="h5" component="h2" gutterBottom>
-          No Credit Card Activity Detected
+          {transactionCount > 0 ? 'Limited Credit Card Activity' : 'No Credit Card Activity Detected'}
         </Typography>
         <Typography variant="body1" color="text.secondary" gutterBottom>
-          We didn't find significant credit card transactions in your recent banking history. 
-          You can skip credit card setup for now and add them later if needed.
+          {transactionCount > 0 
+            ? 'We found some credit card transactions, but they appear minimal. You can skip credit card setup for now and add them later if needed.'
+            : 'We did not find significant credit card transactions in your recent banking history. You can skip credit card setup for now and add them later if needed.'
+          }
         </Typography>
       </Box>
 
@@ -273,15 +208,14 @@ export const CreditCardDetection: React.FC<OnboardingStepProps> = ({
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
             <Chip
               icon={<ReceiptIcon />}
-              label={`${analysis.transactionCount} transactions found`}
+              label={`${transactionCount} transaction${transactionCount !== 1 ? 's' : ''} found`}
               color="default"
               variant="outlined"
             />
           </Box>
 
           <Typography variant="body2" color="text.secondary">
-            {analysis.recommendationReason || 
-             'Based on your transaction history, credit card setup appears optional.'}
+            Based on your transaction history, credit card setup appears optional.
           </Typography>
         </CardContent>
       </Card>

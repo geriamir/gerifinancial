@@ -291,6 +291,57 @@ class ProjectBudgetService {
   }
 
   /**
+   * Add a planned expense to a project
+   */
+  async addPlannedExpense(projectId, expenseData) {
+    try {
+      const project = await ProjectBudget.findById(projectId)
+        .populate('categoryBudgets.categoryId', 'name type')
+        .populate('categoryBudgets.subCategoryId', 'name');
+        
+      if (!project) {
+        throw new Error('Project budget not found');
+      }
+
+      // Create the new category budget entry
+      const newBudget = {
+        categoryId: expenseData.categoryId,
+        subCategoryId: expenseData.subCategoryId || '',
+        budgetedAmount: expenseData.budgetedAmount || 0,
+        actualAmount: 0,
+        description: expenseData.description || '',
+        currency: expenseData.currency || project.currency,
+        allocatedTransactions: []
+      };
+
+      // Add to project's categoryBudgets array
+      project.categoryBudgets.push(newBudget);
+      await project.save();
+
+      logger.info(`Added planned expense to project ${projectId}`);
+
+      // Re-fetch the project with proper population to get category/subcategory names
+      const updatedProject = await ProjectBudget.findById(projectId)
+        .populate('categoryBudgets.categoryId', 'name type')
+        .populate('categoryBudgets.subCategoryId', 'name');
+
+      // Get updated project overview with populated data
+      const overview = await projectOverviewService.getProjectOverview(updatedProject);
+
+      return {
+        project: {
+          ...updatedProject.toObject(),
+          ...overview
+        },
+        plannedExpense: newBudget
+      };
+    } catch (error) {
+      logger.error('Error adding planned expense:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Mark project as completed
    */
   async markProjectCompleted(projectId, completionNotes = '') {

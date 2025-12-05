@@ -1,18 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import {
   Box,
   Typography,
   Button,
   Card,
   CardContent,
-  Alert,
   CircularProgress,
   Chip,
   List,
   ListItem,
   ListItemText,
   ListItemIcon,
-  LinearProgress,
+  Alert,
   Divider
 } from '@mui/material';
 import {
@@ -23,283 +22,125 @@ import {
   Add as AddIcon
 } from '@mui/icons-material';
 import { OnboardingStepProps } from './OnboardingWizard';
-import { 
-  onboardingApi, 
-  TransactionImportStatus, 
-  CoverageAnalysis 
-} from '../../services/api/onboarding';
+import { formatCurrencyDisplay } from '../../utils/formatters';
 
-export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
+export interface CreditCardVerificationProps extends OnboardingStepProps {
+  onAddMoreCards?: () => void;
+  onCompleteOnboarding?: () => void;
+  matching?: {
+    completed: boolean;
+    completedAt: string | null;
+    totalCreditCardPayments: number;
+    coveredPayments: number;
+    uncoveredPayments: number;
+    coveragePercentage: number;
+    matchedPayments: Array<{
+      payment: {
+        id: string;
+        date: string;
+        description: string;
+        amount: number;
+      };
+      matchedCreditCard: {
+        id: string;
+        displayName: string;
+        cardNumber: string;
+        lastFourDigits: string;
+        provider: string;
+      };
+      matchedMonth: string;
+      matchConfidence: number;
+    }>;
+    uncoveredSampleTransactions?: Array<{
+      date: string;
+      description: string;
+      amount: number;
+    }>;
+    connectedCreditCards?: Array<{
+      id: string;
+      displayName: string;
+      provider: string;
+    }>;
+  };
+}
+
+export const CreditCardVerification: React.FC<CreditCardVerificationProps> = ({
+  matching,
   onComplete,
-  stepData
+  onAddMoreCards,
+  onCompleteOnboarding
 }) => {
-  const [scrapingStatus, setScrapingStatus] = useState<TransactionImportStatus | null>(null);
-  const [coverageAnalysis, setCoverageAnalysis] = useState<CoverageAnalysis | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [analysisComplete, setAnalysisComplete] = useState(false);
+  // Debug logging
+  console.log('[CreditCardVerification] Rendering with matching data:', matching);
+  console.log('[CreditCardVerification] matching.matchedPayments type:', typeof matching?.matchedPayments);
+  console.log('[CreditCardVerification] matching.matchedPayments isArray:', Array.isArray(matching?.matchedPayments));
+  console.log('[CreditCardVerification] matching.matchedPayments length:', matching?.matchedPayments?.length);
+  console.log('[CreditCardVerification] Full matching object:', JSON.stringify(matching, null, 2));
+  
+  // Use matching data from props (provided by wizard's polling)
+  const isProcessing = !matching || !matching.completed;
+  const isFullyCovered = matching && matching.coveragePercentage >= 80;
 
-
-  // Poll for scraping status
-  const pollScrapingStatus = useCallback(async () => {
+  const handleCompleteOnboarding = async () => {
     try {
-      const status = await onboardingApi.getScrapingStatus();
-      setScrapingStatus(status);
-
-      // If scraping is complete, has imported transactions, AND has categorized them, then analyze coverage
-      if (status.status === 'complete' && 
-          status.hasImportedTransactions && 
-          status.transactionsCategorized > 0 &&
-          !analysisComplete) {
-        
-        // Add a small delay to ensure all backend processing is fully complete
-        setTimeout(async () => {
-          await performCoverageAnalysis();
-        }, 2000);
+      // Call the actual complete onboarding endpoint
+      if (onCompleteOnboarding) {
+        await onCompleteOnboarding();
+      }
+      // Then refetch to update the UI
+      if (onComplete) {
+        onComplete();
       }
     } catch (error) {
-      console.error('Error polling scraping status:', error);
-      // If there's an error getting status, set a basic error state
-      if (!scrapingStatus) {
-        setError('Unable to get import status. Please try refreshing the page.');
-        setLoading(false);
-      }
-    }
-  }, [analysisComplete, scrapingStatus]);
-
-  // Perform coverage analysis once scraping is complete
-  const performCoverageAnalysis = async () => {
-    try {
-      setLoading(true);
-      
-      // Analyze coverage of credit card transactions
-      const coverageData = await onboardingApi.analyzeCoverage();
-      setCoverageAnalysis(coverageData);
-      setAnalysisComplete(true);
-    } catch (error) {
-      console.error('Coverage analysis failed:', error);
-      setError('Failed to analyze credit card coverage');
-    } finally {
-      setLoading(false);
+      console.error('Failed to complete onboarding:', error);
     }
   };
-
-  // Start polling when component mounts
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    let isMounted = true;
-
-    const initializeComponent = async () => {
-      try {
-        if (!isMounted) return;
-        
-        // Initial status check
-        await pollScrapingStatus();
-
-        if (!isMounted) return;
-
-        // Only start polling if analysis is not complete and component is still mounted
-        if (!analysisComplete) {
-          interval = setInterval(() => {
-            if (isMounted && !analysisComplete) {
-              pollScrapingStatus();
-            } else if (interval) {
-              clearInterval(interval);
-              interval = null;
-            }
-          }, 15000);
-        }
-      } catch (error) {
-        if (isMounted) {
-          console.error('Error initializing verification component:', error);
-          setError('Failed to initialize credit card verification');
-          setLoading(false);
-        }
-      }
-    };
-
-    initializeComponent();
-
-    // Cleanup function
-    return () => {
-      isMounted = false;
-      if (interval) {
-        clearInterval(interval);
-        interval = null;
-      }
-    };
-  }, [pollScrapingStatus, analysisComplete]); // Include pollScrapingStatus dependency
 
   const handleConnectMoreCards = () => {
-    // Go back to credit card setup to connect more accounts
-    onComplete('credit-card-setup', {
-      ...stepData,
-      needsMoreCards: true,
-      currentCoverage: coverageAnalysis
-    });
+    // Navigate back to credit card setup step
+    if (onAddMoreCards) {
+      onAddMoreCards();
+    }
   };
 
-  const handleCompleteOnboarding = () => {
-    onComplete('complete', {
-      ...stepData,
-      creditCardCoverage: coverageAnalysis,
-      verificationComplete: true
-    });
-  };
-
-  const handleRetryAnalysis = () => {
-    setError(null);
-    setAnalysisComplete(false);
-    setCoverageAnalysis(null);
-    setLoading(true);
-    pollScrapingStatus();
-  };
-
-  if (error && !scrapingStatus) {
-    return (
-      <Box>
-        <Alert severity="error" sx={{ mb: 3 }}>
-          <Typography variant="subtitle2">Verification Failed</Typography>
-          <Typography variant="body2">{error}</Typography>
-        </Alert>
-        
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
-          <Button onClick={handleRetryAnalysis} variant="outlined">
-            Try Again
-          </Button>
-          <Button onClick={handleCompleteOnboarding} variant="text">
-            Skip Verification
-          </Button>
-        </Box>
-      </Box>
-    );
-  }
-
-  // Still waiting for scraping to complete
-  if (!analysisComplete || !coverageAnalysis) {
-    return (
-      <Box>
-        <Box sx={{ textAlign: 'center', mb: 3 }}>
-          <ScheduleIcon color="primary" sx={{ fontSize: 64, mb: 2 }} />
-          <Typography variant="h5" component="h2" gutterBottom>
-            Verifying Credit Card Coverage
-          </Typography>
-          <Typography variant="body1" color="text.secondary" gutterBottom>
-            We're importing transactions from your new credit card account and analyzing 
-            which transactions are now covered.
-          </Typography>
-        </Box>
-
-        {/* Scraping Progress */}
-        {scrapingStatus && (
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Import Progress
-              </Typography>
-              
-              <Box sx={{ mb: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2">{scrapingStatus.message}</Typography>
-                  <Typography variant="body2">{scrapingStatus.progress}%</Typography>
-                </Box>
-                <LinearProgress variant="determinate" value={scrapingStatus.progress} />
-              </Box>
-
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                <Chip
-                  icon={<ReceiptIcon />}
-                  label={`${scrapingStatus.transactionsImported} imported`}
-                  color="primary"
-                  variant="outlined"
-                />
-                <Chip
-                  icon={<CheckIcon />}
-                  label={`${scrapingStatus.transactionsCategorized} categorized`}
-                  color="success"
-                  variant="outlined"
-                />
-              </Box>
-            </CardContent>
-          </Card>
-        )}
-
-        {loading && (
-          <Box sx={{ textAlign: 'center', py: 2 }}>
-            <CircularProgress />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {scrapingStatus?.status === 'complete' 
-                ? 'Analyzing transaction coverage...' 
-                : 'Waiting for transaction import...'}
-            </Typography>
-          </Box>
-        )}
-
-        <Box sx={{ mt: 4, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
-          <Typography variant="subtitle2" gutterBottom>
-            ⏳ What's happening now?
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            1. Importing transactions from your new credit card account<br/>
-            2. Categorizing and processing the new transaction data<br/>
-            3. Analyzing which previous credit card payments are now covered<br/>
-            4. Checking if additional accounts are needed
-          </Typography>
-        </Box>
-      </Box>
-    );
-  }
-
-  // Coverage analysis is complete - show results
-  const isFullyCovered = coverageAnalysis.recommendation === 'complete';
-  const needsMoreCards = coverageAnalysis.recommendation === 'connect_more';
-  const isProcessing = coverageAnalysis.recommendation === 'processing';
-
-  // If still processing, show a different view
+  // Still processing
   if (isProcessing) {
     return (
       <Box>
         <Box sx={{ textAlign: 'center', mb: 3 }}>
           <ScheduleIcon color="primary" sx={{ fontSize: 64, mb: 2 }} />
           <Typography variant="h5" component="h2" gutterBottom>
-            Transaction Processing in Progress
+            Matching Credit Card Payments
           </Typography>
           <Typography variant="body1" color="text.secondary" gutterBottom>
-            {coverageAnalysis.recommendationReason}
+            We're analyzing your transactions to match credit card payments with your connected cards.
+            This usually takes a few moments.
           </Typography>
         </Box>
 
-        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
-          <Button 
-            variant="contained" 
-            size="large"
-            onClick={handleRetryAnalysis}
-          >
-            Check Again
-          </Button>
-          <Button 
-            variant="outlined" 
-            size="large"
-            onClick={handleCompleteOnboarding}
-          >
-            Complete Anyway
-          </Button>
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <CircularProgress size={60} sx={{ mb: 2 }} />
+          <Typography variant="body2" color="text.secondary">
+            Analyzing transaction patterns...
+          </Typography>
         </Box>
 
         <Box sx={{ mt: 4, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
           <Typography variant="subtitle2" gutterBottom>
-            ℹ️ Processing Status
+            ⏳ What's happening now?
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Your transactions are still being categorized by our AI system. 
-            This usually takes a few minutes after import. You can wait for processing 
-            to complete or continue with setup.
+            • Analyzing credit card transactions from your imported data<br/>
+            • Matching payments to connected credit card accounts<br/>
+            • Calculating coverage percentage<br/>
+            • Verifying transaction accuracy
           </Typography>
         </Box>
       </Box>
     );
   }
 
+  // Matching complete - show results
   return (
     <Box>
       <Box sx={{ textAlign: 'center', mb: 3 }}>
@@ -309,37 +150,40 @@ export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
           <WarningIcon color="warning" sx={{ fontSize: 64, mb: 2 }} />
         )}
         <Typography variant="h5" component="h2" gutterBottom>
-          {isFullyCovered ? 'Credit Card Coverage Complete!' : 'Additional Cards Needed'}
+          {isFullyCovered ? 'Credit Card Verification Complete!' : 'Partial Coverage Detected'}
         </Typography>
         <Typography variant="body1" color="text.secondary" gutterBottom>
-          {coverageAnalysis.recommendationReason}
+          {isFullyCovered 
+            ? 'Your credit card payments have been successfully matched with your connected accounts.'
+            : 'Some credit card payments could not be matched with your connected accounts.'
+          }
         </Typography>
       </Box>
 
-      {/* Coverage Summary */}
+      {/* Matching Summary */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom>
-            Coverage Analysis Results
+            Matching Results
           </Typography>
           
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
             <Chip
               icon={<ReceiptIcon />}
-              label={`${coverageAnalysis.totalCreditCardPayments} total payments`}
+              label={`${matching.totalCreditCardPayments} total payments`}
               color="default"
               variant="outlined"
             />
             <Chip
               icon={<CheckIcon />}
-              label={`${coverageAnalysis.coveredPayments} covered (${coverageAnalysis.coveragePercentage}%)`}
+              label={`${matching.coveredPayments} matched (${matching.coveragePercentage}%)`}
               color="success"
               variant="filled"
             />
-            {coverageAnalysis.uncoveredPayments > 0 && (
+            {matching.uncoveredPayments > 0 && (
               <Chip
                 icon={<WarningIcon />}
-                label={`${coverageAnalysis.uncoveredPayments} uncovered`}
+                label={`${matching.uncoveredPayments} unmatched`}
                 color="warning"
                 variant="filled"
               />
@@ -354,7 +198,7 @@ export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
             </Typography>
             <List dense sx={{ maxHeight: 400, overflow: 'auto' }}>
               {/* Show matched payments first */}
-              {coverageAnalysis.matchedPayments && coverageAnalysis.matchedPayments.map((match, index) => (
+              {matching.matchedPayments && Array.isArray(matching.matchedPayments) && matching.matchedPayments.map((match, index) => (
                 <ListItem key={`matched-${index}`} sx={{ px: 0 }}>
                   <ListItemIcon>
                     <CheckIcon color="success" />
@@ -372,7 +216,7 @@ export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
                           variant="filled"
                         />
                         <Chip
-                          size="small" 
+                          size="small"
                           label={`${match.matchConfidence}% match`}
                           color="success"
                           variant="outlined"
@@ -381,15 +225,15 @@ export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
                     }
                     secondary={
                       <Typography variant="caption" color="text.secondary">
-                        {new Date(match.payment.date).toLocaleDateString()} • ₪{match.payment.amount.toLocaleString()} • {match.matchedCreditCard.provider}
+                        {new Date(match.payment.date).toLocaleDateString()} • {formatCurrencyDisplay(match.payment.amount)} • {match.matchedCreditCard.provider}
                       </Typography>
                     }
                   />
                 </ListItem>
               ))}
-              
+
               {/* Show unmatched payments */}
-              {coverageAnalysis.uncoveredSampleTransactions && coverageAnalysis.uncoveredSampleTransactions.map((transaction, index) => (
+              {matching.uncoveredSampleTransactions && Array.isArray(matching.uncoveredSampleTransactions) && matching.uncoveredSampleTransactions.map((transaction, index) => (
                 <ListItem key={`unmatched-${index}`} sx={{ px: 0 }}>
                   <ListItemIcon>
                     <WarningIcon color="warning" />
@@ -410,7 +254,7 @@ export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
                     }
                     secondary={
                       <Typography variant="caption" color="text.secondary">
-                        {new Date(transaction.date).toLocaleDateString()} • ₪{transaction.amount.toLocaleString()} • Needs credit card connection
+                        {new Date(transaction.date).toLocaleDateString()} • {formatCurrencyDisplay(transaction.amount)} • Needs credit card connection
                       </Typography>
                     }
                   />
@@ -421,20 +265,39 @@ export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
         </CardContent>
       </Card>
 
+      {/* Success or Partial Coverage Alert */}
+      {isFullyCovered ? (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2">Excellent Coverage!</Typography>
+          <Typography variant="body2">
+            {matching.coveragePercentage}% of your credit card payments have been matched. 
+            Your financial overview is complete and ready to use.
+          </Typography>
+        </Alert>
+      ) : (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2">Partial Coverage</Typography>
+          <Typography variant="body2">
+            {matching.coveragePercentage}% of credit card payments matched. Some payments couldn't be linked 
+            to your connected cards. You can add more cards later from your dashboard if needed.
+          </Typography>
+        </Alert>
+      )}
+
       {/* Action Buttons */}
       <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
-        {needsMoreCards ? (
+        {!isFullyCovered ? (
           <>
-            <Button 
-              variant="contained" 
+            <Button
+              variant="contained"
               size="large"
               onClick={handleConnectMoreCards}
               startIcon={<AddIcon />}
             >
               Connect More Credit Cards
             </Button>
-            <Button 
-              variant="outlined" 
+            <Button
+              variant="outlined"
               size="large"
               onClick={handleCompleteOnboarding}
             >
@@ -442,8 +305,8 @@ export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
             </Button>
           </>
         ) : (
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             size="large"
             onClick={handleCompleteOnboarding}
             startIcon={<CheckIcon />}
@@ -456,10 +319,10 @@ export const CreditCardVerification: React.FC<OnboardingStepProps> = ({
       {/* Information Section */}
       <Box sx={{ mt: 4, p: 2, bgcolor: isFullyCovered ? 'success.light' : 'warning.light', borderRadius: 1 }}>
         <Typography variant="subtitle2" gutterBottom>
-          {isFullyCovered ? '✅ Perfect Coverage!' : '⚠️ Partial Coverage'}
+          {isFullyCovered ? '✅ Perfect Coverage!' : '⚠ Partial Coverage'}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          {isFullyCovered 
+          {isFullyCovered
             ? 'All your credit card transactions are now covered by connected accounts. Your financial overview is complete!'
             : 'Some credit card transactions are still not covered by your connected accounts. You can connect additional credit card providers or complete setup as-is.'}
         </Typography>

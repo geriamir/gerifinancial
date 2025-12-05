@@ -522,8 +522,14 @@ class ProjectOverviewService {
     const plannedExpensesGrouped = await this.getPlannedExpensesGrouped(project);
     
     // Create enhanced category breakdown that combines budget info with grouped transactions
+    // Filter out empty budgets (no budgeted amount and no allocated transactions)
     const categoryBreakdown = await Promise.all(
-      project.categoryBudgets.map(async (budget) => {
+      project.categoryBudgets
+        .filter(budget => 
+          budget.budgetedAmount > 0 || 
+          (budget.allocatedTransactions && budget.allocatedTransactions.length > 0)
+        )
+        .map(async (budget) => {
         // Calculate actual amount dynamically from allocated transactions
         const actualAmount = await this.calculateActualAmountForBudget(budget, project.currency);
         const variance = actualAmount - budget.budgetedAmount;

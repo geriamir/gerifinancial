@@ -20,6 +20,44 @@ class TransactionService {
   // REMOVED: scrapeTransactions method
   // Use dataSyncService.syncRegularAccountsIsolated() instead
 
+  /**
+   * Check if a transaction is a duplicate using multi-field matching
+   * More reliable than single identifier field
+   * @param {Object} transactionData - Transaction data to check
+   * @returns {Promise<Object|null>} - Existing transaction if duplicate found, null otherwise
+   */
+  async findPotentialDuplicate(transactionData) {
+    const { accountId, userId, date, amount, description } = transactionData;
+    
+    // Create date range for same day (handles timezone variations and exact time differences)
+    const transactionDate = new Date(date);
+    const startOfDay = new Date(transactionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(transactionDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+    
+    try {
+      // Query for exact match on account, user, date (within same day), amount, and description
+      // This uses the existing index: { accountId: 1, date: 1, amount: 1, description: 1 }
+      const duplicate = await Transaction.findOne({
+        accountId: convertToObjectId(accountId),
+        userId: convertToObjectId(userId),
+        date: {
+          $gte: startOfDay,
+          $lte: endOfDay
+        },
+        amount: amount,
+        description: description
+      });
+      
+      return duplicate;
+    } catch (error) {
+      logger.error('Error checking for duplicate transaction:', error);
+      // Return null on error to allow transaction creation (fail open)
+      return null;
+    }
+  }
+
   async processScrapedTransactions(scrapedAccounts, bankAccount) {
     const results = {
       newTransactions: 0,
@@ -76,6 +114,21 @@ class TransactionService {
             continue;
           }
 
+          // Check for duplicate using multi-field matching (more reliable than identifier alone)
+          const existingTransaction = await this.findPotentialDuplicate({
+            accountId: bankAccount._id,
+            userId: bankAccount.userId,
+            date: transactionDate,
+            amount: transaction.chargedAmount,
+            description: transaction.description
+          });
+
+          if (existingTransaction) {
+            logger.info(`Duplicate transaction detected via multi-field match: ${transaction.description}, date: ${transactionDate}, amount: ${transaction.chargedAmount}, existing ID: ${existingTransaction._id}`);
+            results.duplicates++;
+            continue; // Skip this transaction
+          }
+
           // Create transaction without type initially
           // For credit card providers, include the specific account identifier for later credit card matching
           const rawData = {
@@ -103,14 +156,17 @@ class TransactionService {
           });
           
           results.newTransactions++;
+          logger.debug(`Created new transaction: ${savedTx.description}, date: ${savedTx.date}, amount: ${savedTx.amount}, ID: ${savedTx._id}`);
           
           // Attempt auto-categorization which will also set the transaction type
           await categoryMappingService.attemptAutoCategorization(savedTx);
         } catch (error) {
+          // Still catch MongoDB unique constraint errors as a fallback
           if (error.code === 11000) {
-            logger.warn(`Duplicate transaction detected: ${transaction.identifier}`, error);
+            logger.warn(`Duplicate transaction detected via MongoDB constraint: ${transaction.identifier}`, error);
             results.duplicates++;
           } else {
+            logger.error(`Error processing transaction: ${transaction.description}`, error);
             results.errors.push({
               identifier: transaction.identifier,
               error: error.message

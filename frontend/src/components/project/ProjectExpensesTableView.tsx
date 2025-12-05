@@ -66,6 +66,26 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
     return subcategoryIds;
   });
 
+  // Auto-expand new subcategories when plannedExpenses changes
+  React.useEffect(() => {
+    const currentSubcategoryIds = new Set<string>();
+    plannedExpenses.forEach(expense => {
+      if (expense.subCategoryId?._id) {
+        currentSubcategoryIds.add(expense.subCategoryId._id);
+      }
+    });
+    
+    // Check if there are any new subcategories that aren't in the expanded set
+    const hasNewSubcategories = Array.from(currentSubcategoryIds).some(
+      id => !expandedSubcategories.has(id)
+    );
+    
+    // If there are new subcategories, expand them
+    if (hasNewSubcategories) {
+      setExpandedSubcategories(currentSubcategoryIds);
+    }
+  }, [plannedExpenses]);
+
   // Initialize with all unplanned expenses expanded by default
   const [expandedUnplanned, setExpandedUnplanned] = useState<Set<string>>(() => {
     return new Set(unplannedExpenses.map(expense => expense.transactionId));
@@ -117,8 +137,11 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
         <TableBody>
           {/* Planned Expenses */}
           {Object.values(groupedBySubcategory).map((group) => {
-            const totalBudgeted = group.budgetItems.reduce((sum, item) => sum + item.budgeted, 0);
-            const totalActual = group.budgetItems.reduce((sum, item) => sum + item.actual, 0);
+            // Use converted amounts in project currency for totals
+            const totalBudgeted = group.budgetItems.reduce((sum, item) => 
+              sum + (item.budgetedInProjectCurrency ?? item.budgeted), 0);
+            const totalActual = group.budgetItems.reduce((sum, item) => 
+              sum + (item.actualInProjectCurrency ?? item.actual), 0);
             const isExpanded = expandedSubcategories.has(group.subcategory._id);
 
             return (
@@ -173,7 +196,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                       <Table size="small" sx={{ '& .MuiTableCell-root': { py: COMPACT_SPACING.small, px: 0 } }}>
                         <TableBody>
                           {group.budgetItems.map((budgetItem, budgetIndex) => (
-                            <React.Fragment key={budgetItem.budgetId}>
+                            <React.Fragment key={budgetItem.budgetId || `budget-${group.subcategory._id}-${budgetIndex}`}>
                               {/* Budget Item Header Row (if has description or multiple budget items) */}
                               {(budgetItem.description || group.budgetItems.length > 1) && (
                                 <TableRow>

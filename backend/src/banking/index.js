@@ -13,6 +13,7 @@ const bankClassificationService = require('./services/bankClassificationService'
 const bankAccountService = require('./services/bankAccountService');
 const transactionService = require('./services/transactionService');
 const creditCardService = require('./services/creditCardService');
+const scrapingEvents = require('./services/scrapingEvents');
 
 // Sync strategies (used by other subsystems)
 const { BaseSyncStrategy, CheckingAccountsSyncStrategy } = require('./services/sync-strategies');
@@ -44,6 +45,7 @@ module.exports = {
   bankAccountService,
   transactionService,
   creditCardService,
+  scrapingEvents,
   
   // Sync strategies
   BaseSyncStrategy,

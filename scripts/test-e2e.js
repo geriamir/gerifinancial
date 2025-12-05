@@ -31,7 +31,7 @@ async function runTests() {
     // Start both servers
     servers = concurrently([
       { 
-        command: 'cross-env NODE_ENV=test NODE_OPTIONS=--no-deprecation npm run dev',
+        command: 'cross-env NODE_ENV=e2e NODE_OPTIONS=--no-deprecation npm run dev',
         name: 'servers',
         cwd: path.resolve(__dirname, '..')
       }

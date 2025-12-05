@@ -71,7 +71,20 @@ module.exports = {
           throw new Error('Missing credentials');
         }
 
-        // Always verify credentials
+        // In e2e mode, still reject specifically invalid credentials for error testing
+        // but accept most other credentials
+        const isE2E = process.env.NODE_ENV === 'e2e';
+        
+        if (isE2E) {
+          // Special case: reject explicitly invalid credentials for error testing
+          if (credentials.username === 'invalid' && credentials.password === 'invalid') {
+            throw new Error('Invalid bank credentials');
+          }
+          // Accept all other credentials in e2e mode
+          return true;
+        }
+
+        // In unit test mode, verify against specific test credentials
         if (credentials.username === validCredentials.username && 
             credentials.password === validCredentials.password) {
           return true;
@@ -95,8 +108,11 @@ module.exports = {
           };
         }
 
-        if (credentials.username === validCredentials.username && 
-            credentials.password === validCredentials.password) {
+        const isE2E = process.env.NODE_ENV === 'e2e';
+        
+        // In e2e mode, accept any credentials and return mock data
+        if (isE2E || (credentials.username === validCredentials.username && 
+            credentials.password === validCredentials.password)) {
           return {
             success: true,
             accounts: [{

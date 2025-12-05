@@ -3,13 +3,21 @@ const router = express.Router();
 const auth = require('../../shared/middleware/auth');
 const logger = require('../../shared/utils/logger');
 
+// Import account-specific onboarding routes (these have their own auth middleware)
+const onboardingAccountRoutes = require('./onboardingAccounts');
+
+// Mount account-specific routes - they already have auth middleware applied
+router.use('/', onboardingAccountRoutes);
+
 // Import onboarding services
-const creditCardDetectionService = require('../../banking/services/creditCardDetectionService');
-const creditCardOnboardingService = require('../../banking/services/creditCardOnboardingService');
-const BankClassificationService = require('../../banking/services/bankClassificationService');
+const { 
+  creditCardDetectionService, 
+  creditCardOnboardingService, 
+  BankClassificationService, 
+  bankAccountService,
+  CreditCard 
+} = require('../../banking');
 const onboardingTransactionService = require('../services/onboardingTransactionService');
-const bankAccountService = require('../../banking/services/bankAccountService');
-const CreditCard = require('../../banking/models/CreditCard');
 
 /**
  * @route   POST /api/onboarding/analyze-credit-cards
@@ -433,10 +441,33 @@ router.get('/import-status/:sessionId', auth, async (req, res) => {
 router.post('/analyze-coverage', auth, async (req, res) => {
   try {
     const userId = req.user._id || req.user.userId;
+    const { bankAccountId } = req.body; // Get the specific credit card account being verified
     
-    logger.info(`Coverage analysis requested for user ${userId}`);
+    logger.info(`Coverage analysis requested for user ${userId}${bankAccountId ? ` for account ${bankAccountId}` : ''}`);
     
-    // Use credit card detection service to analyze coverage
+    // If a specific bank account is provided, check if it's still scraping
+    if (bankAccountId) {
+      const BankAccount = require('../../banking/models/BankAccount');
+      const account = await BankAccount.findOne({
+        _id: bankAccountId,
+        userId
+      });
+      
+      if (account && account.scrapingStatus && account.scrapingStatus.isActive) {
+        logger.info(`Bank account ${bankAccountId} is still scraping for user ${userId}`);
+        return res.json({
+          success: true,
+          data: {
+            status: 'pending',
+            message: 'Credit card account is still being imported. Please wait...',
+            progress: account.scrapingStatus.progress || 0,
+            recommendation: 'processing'
+          }
+        });
+      }
+    }
+    
+    // All scraping complete, perform coverage analysis
     const coverageAnalysis = await creditCardDetectionService.analyzeCreditCardCoverage(userId);
     
     res.json({

@@ -65,7 +65,14 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
       
       if (response) {
         console.log('Loaded more transactions:', response.transactions.length, 'hasMore:', response.hasMore);
-        setFetchedTransactions(prev => [...prev, ...response.transactions]);
+        
+        // Deduplicate transactions by _id to prevent duplicates on scroll
+        setFetchedTransactions(prev => {
+          const existingIds = new Set(prev.map(t => t._id));
+          const newTransactions = response.transactions.filter(t => !existingIds.has(t._id));
+          return [...prev, ...newTransactions];
+        });
+        
         setHasMore(response.hasMore);
         setCurrentPage(nextPage);
       }
