@@ -48,9 +48,6 @@ class RecurrenceDetectionService {
       const detectedPatterns = [];
       
       for (const group of transactionGroups) {
-        if (group.subCategoryId === new ObjectId('6914a3efbf3d186bd6e77ddb').toString()) {
-          console.log('Analyzing group for transaction:', group);
-        }
         if (group.transactions.length < 2) continue; // Need at least 2 occurrences
         
         const pattern = this.analyzeTransactionPattern(group, monthsToAnalyze);
@@ -134,11 +131,6 @@ class RecurrenceDetectionService {
       
       if (matchingGroup) {
         // Add to existing group
-        
-        if (transactionSubCatId === new ObjectId('6914a3efbf3d186bd6e77ddb').toString()) {
-          console.log('Added to existing group for transaction:', transaction);
-        }
-        
         matchingGroup.transactions.push(transaction);
         matchingGroup.totalAmount += amount;
         matchingGroup.averageAmount = matchingGroup.totalAmount / matchingGroup.transactions.length;
@@ -205,12 +197,8 @@ class RecurrenceDetectionService {
   analyzeTransactionPattern(group, analysisMonths) {
     const { transactions } = group;
     
-    const shouldDebug = group.subCategoryId === new ObjectId('6914a3efbf3d186bd6e77ddb').toString();
     // Apply single-transaction-per-period constraint
-    if (!this.validateSingleTransactionPerPeriod(transactions, shouldDebug)) {
-      if (group.subCategoryId === new ObjectId('6914a3efbf3d186bd6e77ddb').toString()) {  
-        console.log('Rejected due to multiple transactions in same period for group:', group);
-      }
+    if (!this.validateSingleTransactionPerPeriod(transactions)) {
       return null; // Reject if multiple transactions in same period
     }
 
@@ -223,19 +211,12 @@ class RecurrenceDetectionService {
       return monthlyPattern;
     }
     
-    if (group.subCategoryId === new ObjectId('6914a3efbf3d186bd6e77ddb').toString()) {  
-      console.log('Monthly pattern not found, checking bi-monthly for transaction group:', group);
-    }
     // Check for bi-monthly pattern (every 2 months)
     const biMonthlyPattern = this.checkBiMonthlyPattern(monthOccurrences, analysisMonths);
     if (biMonthlyPattern) {
       return biMonthlyPattern;
     }
 
-    if (group.subCategoryId === new ObjectId('6914a3efbf3d186bd6e77ddb').toString()) {  
-      console.log('Bi-monthly pattern not found, checking quarterly for transaction group:', group);
-    }
-    
     // Check for quarterly pattern (every 3 months)
     const quarterlyPattern = this.checkQuarterlyPattern(monthOccurrences, analysisMonths);
     if (quarterlyPattern) {
@@ -257,18 +238,9 @@ class RecurrenceDetectionService {
    * @param {Array} transactions - Array of transactions
    * @returns {boolean} True if constraint is satisfied
    */
-  validateSingleTransactionPerPeriod(transactions, shouldDebug = false) {
-
-    if (shouldDebug || transactions[0].subCategory?._id === new ObjectId('6914a3efbf3d186bd6e77ddb')) {  
-      logger.info('Validating single-transaction-per-period for transaction group with transactions:', transactions);
-    }
-
+  validateSingleTransactionPerPeriod(transactions) {
     if (transactions.length < 2) {
       return false;
-    }
-
-    if (shouldDebug || transactions[0].subCategory?._id === new ObjectId('6914a3efbf3d186bd6e77ddb')) {  
-      logger.info('Validating single-transaction-per-period for transaction group with transactions:', transactions);
     }
 
     // Group transactions by month-year to check for multiple transactions in same month
@@ -287,9 +259,6 @@ class RecurrenceDetectionService {
     // Check that each month has exactly 1 transaction
     for (const [monthYear, monthTransactions] of Object.entries(monthlyGroups)) {
       if (monthTransactions.length > 1) {
-        if (transactions[0].subCategory?._id === new ObjectId('6914a3efbf3d186bd6e77ddb')) {  
-          logger.info('Multiple transactions found in same month-year:', monthYear, monthTransactions);
-        }
         logger.debug(`Rejecting pattern: Multiple transactions (${monthTransactions.length}) found in ${monthYear}`);
         return false; // Multiple transactions in same month = not truly recurring
       }
@@ -307,13 +276,7 @@ class RecurrenceDetectionService {
     
     if (monthYears.length >= 3) {
       // For 3+ occurrences, check if spacing is consistent
-      if (shouldDebug || transactions[0].subCategory?._id === new ObjectId('6914a3efbf3d186bd6e77ddb')) {  
-        logger.info('Validating spacing consistency for transaction group with month-years:', monthYears);
-      }
       const isSpacingConsistent = this.validateSpacingConsistency(monthYears);
-      if (shouldDebug || transactions[0].subCategory?._id === new ObjectId('6914a3efbf3d186bd6e77ddb')) {  
-        logger.info('Spacing consistency result:', isSpacingConsistent);
-      }
       return isSpacingConsistent;
     }
     
