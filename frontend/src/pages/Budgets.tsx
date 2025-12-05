@@ -40,7 +40,6 @@ const BudgetsPage: React.FC = () => {
   const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
   const [patternRefreshTrigger, setPatternRefreshTrigger] = useState(0);
   const [budgetStage, setBudgetStage] = useState<BudgetStage>(BUDGET_STAGES.INITIAL);
-  const [pendingPatternsCount, setPendingPatternsCount] = useState<number>(0);
   const [patternsChecked, setPatternsChecked] = useState(false);
 
   // Check for pending patterns on mount and when budget changes
@@ -54,7 +53,6 @@ const BudgetsPage: React.FC = () => {
       try {
         const response = await budgetsApi.getPendingPatterns();
         const count = response.count || 0;
-        setPendingPatternsCount(count);
         setPatternsChecked(true);
         
         // Update budget stage based on server state
@@ -145,11 +143,9 @@ const BudgetsPage: React.FC = () => {
       if (smartResult.step === 'pattern-detection-complete') {
         // New patterns were detected - show them to user
         console.log('🎯 BudgetsPage: New patterns detected:', smartResult.detectedPatterns?.length || 0);
-        console.log('🎯 BudgetsPage: Pattern details:', smartResult.detectedPatterns);
+        // Update pending patterns count immediately from the result
         
         // Update pending patterns count immediately from the result
-        const detectedCount = smartResult.detectedPatterns?.length || 0;
-        setPendingPatternsCount(detectedCount);
         setPatternsChecked(true);
         
         // Set stage to patterns detected
@@ -234,7 +230,6 @@ const BudgetsPage: React.FC = () => {
   // Show different content based on budget stage
   // Check if we have a real budget with actual data (not just {success: true, data: null})
   const hasBudget = currentMonthlyBudget && 
-                    currentMonthlyBudget !== null && 
                     (currentMonthlyBudget._id || 
                      ((currentMonthlyBudget as any).data && (currentMonthlyBudget as any).data._id));
   
