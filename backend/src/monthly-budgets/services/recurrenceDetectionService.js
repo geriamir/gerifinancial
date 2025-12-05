@@ -3,8 +3,6 @@ const { TransactionPattern } = require('../models');
 const logger = require('../../shared/utils/logger');
 const { v4: uuidv4 } = require('uuid');
 const { PATTERN_TYPES } = require('../constants/patternTypes');
-const mongoose = require('mongoose');
-const { ObjectId } = mongoose.Types;
 
 class RecurrenceDetectionService {
   /**
