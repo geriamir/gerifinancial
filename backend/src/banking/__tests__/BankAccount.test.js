@@ -125,8 +125,8 @@ describe('BankAccount Model', () => {
           password: validCredentials.password
         },
         startDate: expect.any(Date),
-        showBrowser: true,
-        verbose: true
+        showBrowser: false,
+        verbose: false
       });
     });
   });

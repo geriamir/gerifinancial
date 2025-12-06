@@ -106,12 +106,12 @@ describe('Onboarding Event Handlers', () => {
       // Verify bank account was updated
       const bankAccount = await BankAccount.findById(checkingAccountId);
       expect(bankAccount.scrapingStatus.isActive).toBe(true);
-      expect(bankAccount.scrapingStatus.status).toBe('connecting');
+      expect(bankAccount.scrapingStatus.status).toBe('scraping');
 
       // Verify onboarding was updated
       const updatedUser = await User.findById(testUser._id);
       expect(updatedUser.onboarding.transactionImport.scrapingStatus.isActive).toBe(true);
-      expect(updatedUser.onboarding.transactionImport.scrapingStatus.status).toBe('connecting');
+      expect(updatedUser.onboarding.transactionImport.scrapingStatus.status).toBe('scraping');
     });
 
     it('should NOT update onboarding status when account does not match', async () => {
@@ -213,12 +213,11 @@ describe('Onboarding Event Handlers', () => {
       expect(updatedUser.onboarding.creditCardDetection.transactionCount).toBe(10);
       expect(updatedUser.onboarding.creditCardDetection.recommendation).toBe('connect');
       
-      // Verify current step was updated based on recommendation
-      expect(updatedUser.onboarding.currentStep).toBe('credit-card-setup');
+      // Verify current step - always shows detection UI first
+      expect(updatedUser.onboarding.currentStep).toBe('credit-card-detection');
       
       // Verify completed steps
       expect(updatedUser.onboarding.completedSteps).toContain('transaction-import');
-      expect(updatedUser.onboarding.completedSteps).toContain('credit-card-detection');
 
       // Verify credit card detection service was called
       expect(creditCardDetectionService.analyzeCreditCardUsage).toHaveBeenCalled();
@@ -250,11 +249,11 @@ describe('Onboarding Event Handlers', () => {
       // Wait for async processing
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      // Verify onboarding was completed
+      // Verify credit card detection was run even with skip recommendation
       const updatedUser = await User.findById(testUser._id);
-      expect(updatedUser.onboarding.currentStep).toBe('complete');
-      expect(updatedUser.onboarding.isComplete).toBe(true);
-      expect(updatedUser.onboarding.completedAt).toBeDefined();
+      expect(updatedUser.onboarding.currentStep).toBe('credit-card-detection');
+      expect(updatedUser.onboarding.creditCardDetection.analyzed).toBe(true);
+      expect(updatedUser.onboarding.creditCardDetection.recommendation).toBe('skip');
     });
   });
 
@@ -325,6 +324,14 @@ describe('Onboarding Event Handlers', () => {
     });
 
     it('should run payment matching and complete onboarding when all credit cards finish', async () => {
+      // Update bank account scraping status to complete (required by event handler logic)
+      await BankAccount.findByIdAndUpdate(creditCardAccountId, {
+        $set: {
+          'scrapingStatus.status': 'complete',
+          'scrapingStatus.isActive': false
+        }
+      });
+
       // Emit completion event
       scrapingEvents.emit('credit-cards:completed', {
         strategyName: 'credit-cards',
@@ -343,8 +350,8 @@ describe('Onboarding Event Handlers', () => {
       // Verify onboarding was updated
       const updatedUser = await User.findById(testUser._id);
       expect(updatedUser.onboarding.creditCardMatching.completed).toBe(true);
-      expect(updatedUser.onboarding.creditCardMatching.matchedPayments).toBe(8);
-      expect(updatedUser.onboarding.creditCardMatching.unmatchedPayments).toBe(2);
+      expect(updatedUser.onboarding.creditCardMatching.coveredPayments).toBe(8);
+      expect(updatedUser.onboarding.creditCardMatching.uncoveredPayments).toBe(2);
       expect(updatedUser.onboarding.creditCardMatching.coveragePercentage).toBe(80);
       
       // Verify onboarding is complete

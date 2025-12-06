@@ -365,9 +365,11 @@ describe('Onboarding Accounts API', () => {
         },
         creditCardMatching: {
           completed: false,
-          matchedPayments: 0,
-          unmatchedPayments: 0,
-          coveragePercentage: 0
+          totalCreditCardPayments: 0,
+          coveredPayments: 0,
+          uncoveredPayments: 0,
+          coveragePercentage: 0,
+          matchedPayments: []
         },
         completedSteps: ['checking-account', 'transaction-import', 'credit-card-detection']
       };

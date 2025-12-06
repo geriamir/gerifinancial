@@ -444,9 +444,17 @@ class RecurrenceDetectionService {
     const sortedMonths = [...monthOccurrences].sort((a, b) => a - b);
     
     // Check if all gaps between consecutive months are exactly 2
+    // Need to handle year boundary (e.g., Nov=11 to Jan=1 is a 2-month gap)
     let allGapsAreTwo = true;
     for (let i = 1; i < sortedMonths.length; i++) {
-      const gap = sortedMonths[i] - sortedMonths[i - 1];
+      let gap = sortedMonths[i] - sortedMonths[i - 1];
+      
+      // Handle year wraparound: if gap is 10 or more, it might be a year boundary
+      // For example: Nov (11) to Jan (1) = 1 - 11 = -10, but wrapping around it's 2 months
+      if (gap >= 10) {
+        gap = 12 - gap; // Calculate the wraparound gap
+      }
+      
       if (gap !== 2) {
         allGapsAreTwo = false;
         logger.debug(`Bi-monthly gap check: months ${sortedMonths[i-1]} to ${sortedMonths[i]} = ${gap} months (expected 2)`);

@@ -27,7 +27,7 @@ class TransactionService {
    * @returns {Promise<Object|null>} - Existing transaction if duplicate found, null otherwise
    */
   async findPotentialDuplicate(transactionData) {
-    const { accountId, userId, date, amount, description } = transactionData;
+    const { accountId, userId, date, amount, description, memo } = transactionData;
     
     // Create date range for same day (handles timezone variations and exact time differences)
     const transactionDate = new Date(date);
@@ -37,9 +37,9 @@ class TransactionService {
     endOfDay.setUTCHours(23, 59, 59, 999);
     
     try {
-      // Query for exact match on account, user, date (within same day), amount, and description
+      // Query for exact match on account, user, date (within same day), amount, description, and memo
       // This uses the existing index: { accountId: 1, date: 1, amount: 1, description: 1 }
-      const duplicate = await Transaction.findOne({
+      const query = {
         accountId: convertToObjectId(accountId),
         userId: convertToObjectId(userId),
         date: {
@@ -48,7 +48,24 @@ class TransactionService {
         },
         amount: amount,
         description: description
-      });
+      };
+      
+      // Include memo in duplicate check if provided
+      // Memo can be in either the memo field or rawData.memo field
+      if (memo) {
+        query.$or = [
+          { 'rawData.memo': memo },
+          { memo: memo }
+        ];
+      } else {
+        // If no memo provided, only match transactions that also have no memo
+        query.$and = [
+          { $or: [{ 'rawData.memo': { $exists: false } }, { 'rawData.memo': null }] },
+          { $or: [{ memo: { $exists: false } }, { memo: null }] }
+        ];
+      }
+      
+      const duplicate = await Transaction.findOne(query);
       
       return duplicate;
     } catch (error) {
@@ -120,7 +137,8 @@ class TransactionService {
             userId: bankAccount.userId,
             date: transactionDate,
             amount: transaction.chargedAmount,
-            description: transaction.description
+            description: transaction.description,
+            memo: transaction.rawData?.memo || transaction.memo || null
           });
 
           if (existingTransaction) {
