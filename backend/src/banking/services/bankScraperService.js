@@ -355,7 +355,7 @@ class BankScraperService {
     const processedAccounts = [];
 
     foreignCurrencyAccounts.forEach(foreignAccount => {
-      if (!foreignAccount.accountNumber || !foreignAccount.currency) {
+      if (!foreignAccount || !foreignAccount.accountNumber || !foreignAccount.currency) {
         logger.warn(`Skipping invalid foreign currency account:`, foreignAccount);
         return;
       }
