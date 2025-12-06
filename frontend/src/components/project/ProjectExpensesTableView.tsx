@@ -84,7 +84,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
     if (hasNewSubcategories) {
       setExpandedSubcategories(currentSubcategoryIds);
     }
-  }, [plannedExpenses]);
+  }, [plannedExpenses, expandedSubcategories]);
 
   // Initialize with all unplanned expenses expanded by default
   const [expandedUnplanned, setExpandedUnplanned] = useState<Set<string>>(() => {

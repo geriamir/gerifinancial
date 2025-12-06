@@ -79,9 +79,9 @@ const BudgetsPage: React.FC = () => {
       checkPendingPatterns();
     } else {
       setPatternsChecked(true);
-      setBudgetStage(BUDGET_STAGES.BUDGET_CREATED);
+      setBudgetStage(hasRealBudget ? BUDGET_STAGES.BUDGET_CREATED : BUDGET_STAGES.INITIAL);
     }
-  }, [currentMonthlyBudget, patternRefreshTrigger]);
+  }, [currentMonthlyBudget, patternRefreshTrigger, budgetStage]);
 
   // Handle period navigation
   const handlePrevMonth = () => {

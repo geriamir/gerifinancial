@@ -30,7 +30,7 @@ import ProjectBudgetsList from '../components/budget/ProjectBudgetsList';
 import ProjectOverviewVisualization from '../components/budget/ProjectOverviewVisualization';
 import ProjectExpensesList from '../components/budget/ProjectExpensesList';
 import { getBudgetStatus } from '../utils/budgetUtils';
-import { updatePlannedExpense, deletePlannedExpense, addPlannedExpense } from '../utils/projectHelpers';
+import { updatePlannedExpense, deletePlannedExpense } from '../utils/projectHelpers';
 import { useProject } from '../contexts/ProjectContext';
 import { FundingSource } from '../types/projects';
 import { SUPPORTED_CURRENCIES, formatCurrency, getCurrencySymbol } from '../types/foreignCurrency';
