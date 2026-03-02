@@ -536,8 +536,8 @@ class VestingService {
                        this.getAvailableVestingPlans().find(p => p.isDefault);
 
     // Analyze current schedule
-    const vestedSchedule = grant.vestingSchedule.filter(v => v.vestDate <= now);
-    const unvestedSchedule = grant.vestingSchedule.filter(v => v.vestDate > now);
+    const vestedSchedule = grant.vestingSchedule.filter(v => v.vested);
+    const unvestedSchedule = grant.vestingSchedule.filter(v => !v.vested);
     const unvestedShares = unvestedSchedule.reduce((sum, v) => sum + v.shares, 0);
 
     if (unvestedShares === 0) {

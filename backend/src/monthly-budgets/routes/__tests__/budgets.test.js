@@ -466,13 +466,14 @@ describe('Budget API Endpoints', () => {
       });
       await monthlyBudget.save();
 
-      // Create active project
+      const now = new Date();
+      // Create active project with dates spanning current date
       const project = new ProjectBudget({
         userId: testUser._id,
         name: 'Active Project',
         type: 'home_renovation',
-        startDate: new Date('2025-01-01'),
-        endDate: new Date('2025-12-31'),
+        startDate: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+        endDate: new Date(now.getFullYear(), now.getMonth() + 6, 1),
         status: 'active',
         fundingSources: [],
         categoryBudgets: [{
