@@ -23,6 +23,7 @@ Cypress.Commands.add('createTestUser', (options = {}) => {
       Cypress.env('testUserId', response.body.userId);
       
       // Set onboarding as complete for test users to skip onboarding flow
+      // Update both legacy (onboardingStatus) and new (onboarding) fields
       return cy.request({
         method: 'POST',
         url: `${Cypress.env('apiUrl')}/api/users/onboarding-status`,
@@ -33,6 +34,12 @@ Cypress.Commands.add('createTestUser', (options = {}) => {
           hasCheckingAccount: true,
           hasCreditCards: false
         }
+      }).then(() => {
+        return cy.request({
+          method: 'POST',
+          url: `${Cypress.env('apiUrl')}/api/onboarding/complete-onboarding`,
+          headers: { Authorization: `Bearer ${token}` }
+        });
       }).then(() => token);
     });
 });
