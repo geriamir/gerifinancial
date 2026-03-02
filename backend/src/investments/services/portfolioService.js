@@ -1,4 +1,5 @@
 const { Portfolio, PortfolioSnapshot } = require('../models');
+const { Investment } = require('../models');
 const logger = require('../../shared/utils/logger');
 
 class PortfolioService {
@@ -231,6 +232,53 @@ class PortfolioService {
     
     await existingPortfolio.save();
     return existingPortfolio;
+  }
+
+  /**
+   * Close portfolios and investments that were not returned by the latest scrape.
+   * When a bank no longer returns portfolio data, those portfolios are marked as 'closed'.
+   */
+  async closeStalePortfolios(scrapedPortfolios, bankAccount) {
+    const results = { closedPortfolios: 0, closedInvestments: 0 };
+
+    try {
+      // Build set of scraped portfolio IDs
+      const scrapedPortfolioIds = new Set(
+        (scrapedPortfolios || [])
+          .map(p => p.portfolioId || p.paperId?.toString() || p.accountNumber)
+          .filter(Boolean)
+      );
+
+      // Find all active portfolios for this bank account
+      const activePortfolios = await Portfolio.find({
+        userId: bankAccount.userId,
+        bankAccountId: bankAccount._id,
+        status: 'active'
+      });
+
+      for (const portfolio of activePortfolios) {
+        if (!scrapedPortfolioIds.has(portfolio.portfolioId)) {
+          // This portfolio was not in the scrape results — mark as closed
+          portfolio.status = 'closed';
+          portfolio.lastUpdated = new Date();
+          await portfolio.save();
+          results.closedPortfolios++;
+
+          // Also close all investments under this portfolio
+          const closedInvestments = await Investment.updateMany(
+            { portfolioId: portfolio._id, status: 'active' },
+            { $set: { status: 'closed', lastUpdated: new Date() } }
+          );
+          results.closedInvestments += closedInvestments.modifiedCount || 0;
+
+          logger.info(`Closed stale portfolio ${portfolio.portfolioId} and ${closedInvestments.modifiedCount || 0} investments for account ${bankAccount._id}`);
+        }
+      }
+    } catch (error) {
+      logger.error(`Error closing stale portfolios for account ${bankAccount._id}: ${error.message}`);
+    }
+
+    return results;
   }
 
   async getUserPortfolios(userId, options = {}) {

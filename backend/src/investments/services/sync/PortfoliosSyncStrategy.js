@@ -58,6 +58,12 @@ class PortfoliosSyncStrategy extends BaseSyncStrategy {
       }
     }
     
+    // Close portfolios/investments that were not returned by the scraper
+    const closedResults = await portfolioService.closeStalePortfolios(portfolios, bankAccount);
+    if (closedResults.closedPortfolios > 0 || closedResults.closedInvestments > 0) {
+      logger.info(`Closed ${closedResults.closedPortfolios} stale portfolios and ${closedResults.closedInvestments} stale investments for account ${bankAccount._id}`);
+    }
+    
     // Process investment transactions
     let investmentTransactionResults = { newTransactions: 0, errors: [] };
     
