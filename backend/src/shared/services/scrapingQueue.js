@@ -84,6 +84,10 @@ class ScrapingQueueService {
       }
 
       this.isInitialized = true;
+
+      // Clean up stale jobs from previous server runs
+      await this.cleanupStaleJobs();
+
       logger.info('Scraping queue service initialized successfully');
 
     } catch (error) {
@@ -120,7 +124,10 @@ class ScrapingQueueService {
         return this.processJob(job);
       }, {
         connection: this.redisConfig,
-        concurrency: config.concurrency
+        concurrency: config.concurrency,
+        lockDuration: 300000,     // 5 min lock — matches job timeout
+        stalledInterval: 60000,   // Check for stalled jobs every 60s
+        maxStalledCount: 1        // Fail job after 1 stall (don't retry stale crashes)
       });
 
       // Setup worker event listeners
@@ -333,6 +340,41 @@ class ScrapingQueueService {
     if (queue) {
       await queue.resume();
       logger.info(`Resumed queue: ${queueName}`);
+    }
+  }
+
+  /**
+   * Clean up stale jobs left over from a previous server crash.
+   * Moves orphaned active jobs back to waiting or fails them.
+   */
+  async cleanupStaleJobs() {
+    for (const [queueName, queue] of this.queues) {
+      try {
+        const active = await queue.getActive();
+        if (active.length > 0) {
+          logger.warn(`🧹 Found ${active.length} stale active jobs in ${queueName} from previous run — failing them`);
+          for (const job of active) {
+            try {
+              await job.moveToFailed(
+                new Error('Server restarted while job was active'),
+                job.token || '0',
+                false
+              );
+              logger.info(`🧹 Failed stale job ${job.id} in ${queueName}`);
+            } catch (err) {
+              // If moveToFailed fails (e.g. lock issue), try removing directly
+              try {
+                await job.remove();
+                logger.info(`🧹 Removed stale job ${job.id} in ${queueName}`);
+              } catch (removeErr) {
+                logger.warn(`🧹 Could not clean stale job ${job.id} in ${queueName}: ${removeErr.message}`);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        logger.error(`Error cleaning stale jobs in ${queueName}:`, error.message);
+      }
     }
   }
 
