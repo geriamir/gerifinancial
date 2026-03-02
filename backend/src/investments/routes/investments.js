@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const investmentService = require('../services/investmentService');
-const { BankAccount, bankScraperService, dataSyncService } = require('../../banking');
-const startupInvestmentService = require('../services/startupInvestmentService');
+const { dataSyncService, queuedDataSyncService } = require('../../banking');
 const auth = require('../../shared/middleware/auth');
 const logger = require('../../shared/utils/logger');
 
@@ -195,17 +194,6 @@ router.get('/sync/status/:bankAccountId', async (req, res) => {
   }
 });
 
-// Get current scraping status
-router.get('/startup/status', async (req, res) => {
-  try {
-    const status = startupInvestmentService.getScrapingStatus();
-    res.json({ status });
-  } catch (error) {
-    logger.error('Error fetching startup scraping status:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // === PARAMETERIZED ROUTE (must be last to avoid conflicts) ===
 
 // Get investment by ID
@@ -219,59 +207,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Sync investments for a specific bank account
-router.post('/sync/:bankAccountId', async (req, res) => {
-  try {
-    const bankAccount = await BankAccount.findOne({
-      _id: req.params.bankAccountId,
-      userId: req.user.id
-    });
 
-    if (!bankAccount) {
-      return res.status(404).json({ error: 'Bank account not found' });
-    }
-
-    // Use investment-only sync to avoid affecting transactions
-    const result = await dataSyncService.syncInvestmentsOnly(bankAccount, req.body.options || {});
-    
-    res.json({
-      message: 'Investment sync completed',
-      result: result.investments,
-      hasErrors: result.hasErrors
-    });
-  } catch (error) {
-    logger.error('Error syncing investments:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Sync all data (transactions + investments) for a bank account
-router.post('/sync-all/:bankAccountId', async (req, res) => {
-  try {
-    const bankAccount = await BankAccount.findOne({
-      _id: req.params.bankAccountId,
-      userId: req.user.id
-    });
-
-    if (!bankAccount) {
-      return res.status(404).json({ error: 'Bank account not found' });
-    }
-
-    const result = await dataSyncService.syncBankAccountData(bankAccount, req.body.options || {});
-    
-    res.json({
-      message: 'Complete data sync finished',
-      transactions: result.transactions,
-      investments: result.investments,
-      totalNewItems: result.totalNewItems,
-      totalUpdatedItems: result.totalUpdatedItems,
-      hasErrors: result.hasErrors
-    });
-  } catch (error) {
-    logger.error('Error syncing bank account data:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // Get sync status for a bank account
 router.get('/sync/status/:bankAccountId', async (req, res) => {
@@ -396,81 +332,48 @@ router.post('/:id/snapshot', async (req, res) => {
   }
 });
 
-// Resync historical transactions for a specific investment
-router.post('/:id/resync-history', async (req, res) => {
-  try {
-    const investment = await investmentService.getInvestmentById(req.params.id, req.user.id);
-    const bankAccount = await BankAccount.findOne({
-      _id: investment.bankAccountId,
-      userId: req.user.id
-    });
 
-    if (!bankAccount) {
-      return res.status(404).json({ error: 'Bank account not found' });
-    }
-
-    const { forceResync = false } = req.body;
-    
-    const result = await investmentService.checkAndResyncHistoricalTransactions(
-      bankAccount, 
-      forceResync
-    );
-    
-    res.json(result);
-  } catch (error) {
-    logger.error('Error resyncing historical transactions:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Resync historical transactions for all investments in a bank account
-router.post('/resync-history/:bankAccountId', async (req, res) => {
-  try {
-    const bankAccount = await BankAccount.findOne({
-      _id: req.params.bankAccountId,
-      userId: req.user.id
-    });
-
-    if (!bankAccount) {
-      return res.status(404).json({ error: 'Bank account not found' });
-    }
-
-    const { forceResync = false } = req.body;
-    
-    const result = await investmentService.checkAndResyncHistoricalTransactions(
-      bankAccount, 
-      forceResync
-    );
-    
-    res.json(result);
-  } catch (error) {
-    logger.error('Error resyncing historical transactions:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Manually trigger investment scraping for all accounts
+// Manually trigger comprehensive scraping for all accounts using queue system
 router.post('/startup/scrape-all', async (req, res) => {
   try {
-    const result = await startupInvestmentService.forceScrapeAllAccounts();
-    res.json({ result });
+    const result = await queuedDataSyncService.queueMultipleAccountsSync(
+      { status: 'active' }, // Filter for active accounts only
+      { 
+        priority: 'high', // High priority for manual triggers
+        delayBetweenAccounts: 5000 // 5 second delay between accounts
+      }
+    );
+    
+    res.json({ 
+      result: {
+        message: `Queued comprehensive sync for ${result.successfulAccounts}/${result.totalAccounts} accounts`,
+        totalAccounts: result.totalAccounts,
+        successfulAccounts: result.successfulAccounts,
+        failedAccounts: result.failedAccounts,
+        totalJobs: result.totalJobs,
+        queuedAt: new Date().toISOString()
+      }
+    });
   } catch (error) {
-    logger.error('Error triggering manual scrape:', error);
+    logger.error('Error triggering manual scrape via queue:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Manually check and scrape accounts (same as startup process)
-router.post('/startup/check-and-scrape', async (req, res) => {
+// Get queue status and stats
+router.get('/startup/queue-status', async (req, res) => {
   try {
-    // Run the same process as server startup
-    await startupInvestmentService.checkAndScrapeAccounts();
+    const stats = await queuedDataSyncService.getQueueStats();
+    const health = await queuedDataSyncService.getHealthStatus();
+    
     res.json({ 
-      message: 'Account data sync check and scraping process initiated',
-      status: startupInvestmentService.getScrapingStatus()
+      message: 'Queue system status',
+      stats,
+      health,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    logger.error('Error running check and scrape:', error);
+    logger.error('Error fetching queue status:', error);
     res.status(500).json({ error: error.message });
   }
 });

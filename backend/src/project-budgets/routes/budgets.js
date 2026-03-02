@@ -333,6 +333,49 @@ router.get('/projects/:id/progress',
 );
 
 /**
+ * POST /api/budgets/projects/:id/planned-expenses
+ * Add a new planned expense to the project
+ */
+router.post('/projects/:id/planned-expenses',
+  auth,
+  [
+    param('id').isMongoId().withMessage('Invalid project ID'),
+    body('categoryId').isMongoId().withMessage('Invalid category ID'),
+    body('subCategoryId').optional().isString().withMessage('Subcategory ID must be a string'),
+    body('budgetedAmount').isFloat({ min: 0 }).withMessage('Budgeted amount must be non-negative'),
+    body('description').optional().isString().withMessage('Description must be a string'),
+    body('currency').optional().isString().withMessage('Currency must be a string')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const result = await projectBudgetService.addPlannedExpense(req.params.id, req.body);
+      
+      res.status(201).json({
+        success: true,
+        data: result,
+        message: 'Planned expense added successfully'
+      });
+    } catch (error) {
+      logger.error('Error adding planned expense:', error);
+      
+      if (error.message.includes('not found')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Failed to add planned expense',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
  * POST /api/budgets/projects/:id/expenses/tag
  * Tag single transaction to project as unplanned expense
  */

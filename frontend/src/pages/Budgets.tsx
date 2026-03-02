@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
@@ -40,6 +40,48 @@ const BudgetsPage: React.FC = () => {
   const [budgetEditorOpen, setBudgetEditorOpen] = useState(false);
   const [patternRefreshTrigger, setPatternRefreshTrigger] = useState(0);
   const [budgetStage, setBudgetStage] = useState<BudgetStage>(BUDGET_STAGES.INITIAL);
+  const [patternsChecked, setPatternsChecked] = useState(false);
+
+  // Check for pending patterns on mount and when budget changes
+  useEffect(() => {
+    // Check if we have a real budget (not just an empty response wrapper)
+    const hasRealBudget = currentMonthlyBudget && 
+                          (currentMonthlyBudget._id || 
+                           ((currentMonthlyBudget as any).data && (currentMonthlyBudget as any).data._id));
+    
+    const checkPendingPatterns = async () => {
+      try {
+        const response = await budgetsApi.getPendingPatterns();
+        const count = response.count || 0;
+        setPatternsChecked(true);
+        
+        // Update budget stage based on server state
+        // BUT: Don't override if we're already in PATTERNS_DETECTED stage with a count
+        // (this prevents race conditions when patterns were just detected)
+        if (count > 0) {
+          setBudgetStage(BUDGET_STAGES.PATTERNS_DETECTED);
+        } else if (!hasRealBudget && budgetStage !== BUDGET_STAGES.PATTERNS_DETECTED) {
+          // Only reset to INITIAL if we're not already showing patterns
+          setBudgetStage(BUDGET_STAGES.INITIAL);
+        } else if (hasRealBudget) {
+          setBudgetStage(BUDGET_STAGES.BUDGET_CREATED);
+        }
+      } catch (error) {
+        console.error('Failed to check pending patterns:', error);
+        setPatternsChecked(true);
+        // Default to initial if we can't check - show the button
+        setBudgetStage(hasRealBudget ? BUDGET_STAGES.BUDGET_CREATED : BUDGET_STAGES.INITIAL);
+      }
+    };
+
+    // Only check if we don't have a real budget
+    if (!hasRealBudget) {
+      checkPendingPatterns();
+    } else {
+      setPatternsChecked(true);
+      setBudgetStage(hasRealBudget ? BUDGET_STAGES.BUDGET_CREATED : BUDGET_STAGES.INITIAL);
+    }
+  }, [currentMonthlyBudget, patternRefreshTrigger, budgetStage]);
 
   // Handle period navigation
   const handlePrevMonth = () => {
@@ -101,17 +143,20 @@ const BudgetsPage: React.FC = () => {
       if (smartResult.step === 'pattern-detection-complete') {
         // New patterns were detected - show them to user
         console.log('🎯 BudgetsPage: New patterns detected:', smartResult.detectedPatterns?.length || 0);
-        console.log('🎯 BudgetsPage: Pattern details:', smartResult.detectedPatterns);
+        // Update pending patterns count immediately from the result
+        
+        // Update pending patterns count immediately from the result
+        setPatternsChecked(true);
         
         // Set stage to patterns detected
         setBudgetStage(BUDGET_STAGES.PATTERNS_DETECTED);
         
-        // Force refresh to show the new patterns in the dashboard
-        await refreshBudgets();
-        
-        // Trigger pattern dashboard refresh
+        // Trigger pattern dashboard refresh (this will fetch the patterns from the backend)
         console.log('🔄 BudgetsPage: Setting refresh trigger from', patternRefreshTrigger, 'to', patternRefreshTrigger + 1);
         setPatternRefreshTrigger(prev => prev + 1);
+        
+        // DON'T call refreshBudgets() here - there's no budget to refresh yet!
+        // The pattern dashboard will fetch patterns independently
         return;
       }
       
@@ -183,8 +228,23 @@ const BudgetsPage: React.FC = () => {
   }
 
   // Show different content based on budget stage
-  // Handle API response format {success: true, data: null}
-  const hasBudget = currentMonthlyBudget && (currentMonthlyBudget._id || (currentMonthlyBudget as any).data);
+  // Check if we have a real budget with actual data (not just {success: true, data: null})
+  const hasBudget = currentMonthlyBudget && 
+                    (currentMonthlyBudget._id || 
+                     ((currentMonthlyBudget as any).data && (currentMonthlyBudget as any).data._id));
+  
+  // Debug logging
+  console.log('🔍 BudgetsPage render:', {
+    hasBudget,
+    budgetStage,
+    patternsChecked,
+    currentMonthlyBudget,
+    currentMonthlyBudgetKeys: currentMonthlyBudget ? Object.keys(currentMonthlyBudget) : [],
+    hasId: currentMonthlyBudget?._id,
+    hasDataId: (currentMonthlyBudget as any)?.data?._id,
+    loading
+  });
+  
   if (!hasBudget) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>

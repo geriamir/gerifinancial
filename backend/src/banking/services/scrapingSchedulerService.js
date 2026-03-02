@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { BankAccount } = require('../models');
 const dataSyncService = require('./dataSyncService');
+const queuedDataSyncService = require('./queuedDataSyncService');
 const logger = require('../../shared/utils/logger');
 const rateLimiter = require('../../shared/utils/rateLimiter');
 const bankAccountEvents = require('./bankAccountEvents');
@@ -26,7 +27,12 @@ class ScrapingSchedulerService {
     try {
       bankAccountEvents.on('accountCreated', (bankAccount) => {
         logger.info(`Handling accountCreated event for bank account: ${bankAccount._id}`);
+        
+        // Schedule regular scraping for the account
         this.scheduleAccount(bankAccount);
+        
+        // Initiate immediate first sync for new account
+        this.initiateFirstSync(bankAccount);
       });
 
       bankAccountEvents.on('accountActivated', (bankAccount) => {
@@ -67,6 +73,12 @@ class ScrapingSchedulerService {
       });
 
       logger.info(`Initialized scraping scheduler with ${accounts.length} accounts`);
+
+      // Perform initial startup check after a delay to let system stabilize
+      setTimeout(() => {
+        this.performStartupCheck(accounts);
+      }, 10000); // 10 second delay
+
     } catch (error) {
       logger.error('Failed to initialize scraping scheduler:', error);
       throw error;
@@ -123,6 +135,122 @@ class ScrapingSchedulerService {
       logger.info(`Stopped scraping job for account ${accountId}`);
     });
     this.jobs.clear();
+  }
+
+  /**
+   * Initiate first sync for a newly created account using queue system
+   */
+  async initiateFirstSync(bankAccount) {
+    try {
+      logger.info(`Initiating first sync for new bank account: ${bankAccount.name} (${bankAccount._id})`);
+
+      await this.rateLimiter.acquire(bankAccount.bankId);
+
+      const result = await queuedDataSyncService.queueBankAccountSync(
+        bankAccount._id,
+        { 
+          priority: 'high', // High priority for new accounts
+          newAccount: true,
+          reason: 'first_sync'
+        }
+      );
+
+      logger.info(`Queued first sync for new account ${bankAccount.name}: ${result.totalJobs} jobs with high priority`);
+
+    } catch (error) {
+      logger.error(`Failed to queue first sync for new account ${bankAccount._id}:`, error);
+    } finally {
+      this.rateLimiter.release(bankAccount.bankId);
+    }
+  }
+
+  /**
+   * Perform startup check to queue scraping for accounts that need it
+   */
+  async performStartupCheck(accounts) {
+    try {
+      logger.info('Starting startup scraping check for active accounts...');
+      
+      const accountsNeedingScraping = [];
+
+      // Check which accounts need scraping
+      for (const account of accounts) {
+        const needsScraping = await this.accountNeedsStartupScraping(account);
+        if (needsScraping) {
+          accountsNeedingScraping.push(account);
+        }
+      }
+
+      if (accountsNeedingScraping.length === 0) {
+        logger.info('All accounts are up to date, no startup scraping needed');
+        return;
+      }
+
+      logger.info(`${accountsNeedingScraping.length} accounts need startup scraping, queueing jobs...`);
+
+      // Queue sync jobs for accounts that need scraping
+      for (const account of accountsNeedingScraping) {
+        try {
+          await this.rateLimiter.acquire(account.bankId);
+          
+          const result = await queuedDataSyncService.queueBankAccountSync(
+            account._id,
+            { 
+              priority: 'normal',
+              startupSync: true,
+              reason: 'startup_check'
+            }
+          );
+          
+          logger.info(`Queued startup sync for account ${account.name}: ${result.totalJobs} jobs`);
+          
+          // Small delay between accounts
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+        } catch (error) {
+          logger.error(`Failed to queue startup sync for account ${account._id}:`, error);
+        } finally {
+          this.rateLimiter.release(account.bankId);
+        }
+      }
+
+      logger.info(`Startup scraping check completed: ${accountsNeedingScraping.length} accounts queued`);
+
+    } catch (error) {
+      logger.error('Error during startup scraping check:', error);
+    }
+  }
+
+  /**
+   * Check if an account needs scraping on startup (per-strategy check)
+   */
+  async accountNeedsStartupScraping(account) {
+    try {
+      const strategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
+      const strategiesNeedingSync = [];
+
+      // Check each strategy individually
+      for (const strategyName of strategies) {
+        const needsSync = account.strategyNeedsSync(strategyName, 24); // 24 hour threshold
+        if (needsSync) {
+          strategiesNeedingSync.push(strategyName);
+        }
+      }
+
+      if (strategiesNeedingSync.length > 0) {
+        logger.debug(`Account ${account.name} needs startup scraping for strategies: ${strategiesNeedingSync.join(', ')}`);
+        return true;
+      }
+
+      // All strategies are up to date
+      logger.debug(`Account ${account.name} is up to date for all strategies, no startup scraping needed`);
+      return false;
+
+    } catch (error) {
+      logger.error(`Error checking if account ${account._id} needs scraping:`, error);
+      // Default to needing scraping on error
+      return true;
+    }
   }
 }
 

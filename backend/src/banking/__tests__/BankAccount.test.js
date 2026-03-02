@@ -125,8 +125,8 @@ describe('BankAccount Model', () => {
           password: validCredentials.password
         },
         startDate: expect.any(Date),
-        showBrowser: true,
-        verbose: true
+        showBrowser: false,
+        verbose: false
       });
     });
   });
@@ -149,7 +149,9 @@ describe('BankAccount Model', () => {
       const account = await BankAccount.create(mockAccount);
       const json = account.toJSON();
 
-      expect(json.credentials).toBeUndefined();
+      expect(json.credentials).toBeDefined();
+      expect(json.credentials.username).toBe(mockAccount.credentials.username);
+      expect(json.credentials.password).toBeUndefined();
       expect(json.bankId).toBe(mockAccount.bankId);
       expect(json.name).toBe(mockAccount.name);
     });

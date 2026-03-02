@@ -1,5 +1,6 @@
-const { BankAccount } = require('../models');
+const { BankAccount, Transaction } = require('../models');
 const bankScraperService = require('./bankScraperService');
+const queuedDataSyncService = require('./queuedDataSyncService');
 const logger = require('../../shared/utils/logger');
 const bankAccountEvents = require('./bankAccountEvents');
 
@@ -20,28 +21,9 @@ class BankAccountService {
 
     await bankAccount.save();
 
-    // Emit event for scheduling scraping for active account
+    // Emit event for scheduling and initial scraping for active account
     bankAccountEvents.emit('accountCreated', bankAccount);
     logger.info(`Emitted accountCreated event for new bank account: ${bankAccount._id}`);
-
-    // Initiate immediate scraping for new account
-    try {
-      // Fire and forget - don't wait for scraping to complete
-      setImmediate(async () => {
-        try {
-          // Lazy load dataSyncService to avoid circular dependency
-          const dataSyncService = require('./dataSyncService');
-          await dataSyncService.syncBankAccountData(bankAccount);
-          logger.info(`Initial scraping completed for new bank account: ${bankAccount._id}`);
-        } catch (error) {
-          logger.warn(`Initial scraping failed for new bank account ${bankAccount._id}: ${error.message}`);
-        }
-      });
-      logger.info(`Initiated immediate scraping for new bank account: ${bankAccount._id}`);
-    } catch (error) {
-      logger.warn(`Failed to initiate immediate scraping for bank account ${bankAccount._id}: ${error.message}`);
-      // Don't throw error - bank account creation should still succeed
-    }
 
     return bankAccount;
   }
@@ -97,6 +79,72 @@ class BankAccountService {
     }
   }
 
+  async updateCredentials(accountId, userId, { username, password }) {
+    const bankAccount = await BankAccount.findOne({ _id: accountId, userId });
+    if (!bankAccount) {
+      throw new Error('Bank account not found');
+    }
+
+    // Validate new credentials before saving
+    await bankScraperService.validateCredentials(bankAccount.bankId, { username, password });
+
+    // Update credentials
+    bankAccount.credentials = {
+      username,
+      password // Will be encrypted by pre-save hook
+    };
+
+    // Clear any previous errors
+    bankAccount.lastError = null;
+
+    // If account was in error status, reactivate it
+    if (bankAccount.status === 'error') {
+      bankAccount.status = 'active';
+    }
+
+    await bankAccount.save();
+
+    logger.info(`Credentials updated successfully for bank account ${accountId}`);
+
+    // Automatically queue scraping to verify credentials and get latest data
+    try {
+      await queuedDataSyncService.queueBankAccountSync(accountId, { priority: 'high' });
+      logger.info(`Queued scraping job for account ${bankAccount.name} after credential update`);
+    } catch (error) {
+      logger.error(`Failed to queue scraping after credential update for account ${bankAccount.name}:`, error);
+      // Don't throw error - credential update was successful
+    }
+
+    return bankAccount;
+  }
+
+  async update(accountId, userId, updates) {
+    const bankAccount = await BankAccount.findOne({ _id: accountId, userId });
+    if (!bankAccount) {
+      throw new Error('Bank account not found');
+    }
+
+    const allowedUpdates = ['name', 'scrapingConfig'];
+    const updateKeys = Object.keys(updates);
+    
+    // Validate updates
+    const invalidUpdates = updateKeys.filter(key => !allowedUpdates.includes(key));
+    if (invalidUpdates.length > 0) {
+      throw new Error(`Invalid update fields: ${invalidUpdates.join(', ')}`);
+    }
+
+    // Apply updates
+    updateKeys.forEach(key => {
+      bankAccount[key] = updates[key];
+    });
+
+    await bankAccount.save();
+
+    logger.info(`Bank account ${accountId} updated successfully`);
+
+    return bankAccount;
+  }
+
   async getScrapingStatus(userId) {
     try {
       const bankAccounts = await BankAccount.find({ userId });
@@ -146,6 +194,182 @@ class BankAccountService {
       }
     } catch (error) {
       logger.error(`Error getting scraping status for user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  // ===== QUEUE-BASED SCRAPING METHODS =====
+
+  /**
+   * Queue scraping jobs for a single bank account
+   */
+  async queueAccountScraping(accountId, userId, options = {}) {
+    // Verify ownership
+    const bankAccount = await BankAccount.findOne({ _id: accountId, userId });
+    if (!bankAccount) {
+      throw new Error('Bank account not found');
+    }
+
+    try {
+      const result = await queuedDataSyncService.queueBankAccountSync(accountId, options);
+      
+      logger.info(`Queued scraping for account ${bankAccount.name} (${accountId})`);
+      
+      return {
+        message: 'Scraping jobs queued successfully',
+        accountId,
+        accountName: bankAccount.name,
+        queuedJobs: result.queuedJobs,
+        totalJobs: result.totalJobs,
+        priority: result.priority
+      };
+    } catch (error) {
+      logger.error(`Failed to queue scraping for account ${accountId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Queue scraping jobs for all user's accounts
+   */
+  async queueAllAccountsScraping(userId, options = {}) {
+    try {
+      const result = await queuedDataSyncService.queueMultipleAccountsSync(
+        { userId },
+        { 
+          delayBetweenAccounts: 1000, // 1 second delay between accounts
+          ...options 
+        }
+      );
+
+      logger.info(`Queued scraping for ${result.successfulAccounts}/${result.totalAccounts} accounts for user ${userId}`);
+
+      return {
+        message: 'Scraping jobs queued successfully',
+        totalAccounts: result.totalAccounts,
+        successfullyQueued: result.successfulAccounts,
+        failedToQueue: result.failedAccounts,
+        totalJobs: result.totalJobs,
+        accounts: result.queuedAccounts.map(account => ({
+          accountId: account.bankAccountId,
+          accountName: account.accountName,
+          queuedJobs: account.queuedJobs?.length || 0,
+          error: account.error
+        }))
+      };
+    } catch (error) {
+      logger.error(`Failed to queue scraping for user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Queue a specific strategy for a specific account
+   */
+  async queueStrategyForAccount(accountId, userId, strategyName, options = {}) {
+    // Verify ownership
+    const bankAccount = await BankAccount.findOne({ _id: accountId, userId });
+    if (!bankAccount) {
+      throw new Error('Bank account not found');
+    }
+
+    try {
+      const result = await queuedDataSyncService.queueStrategySync(accountId, strategyName, options);
+      
+      logger.info(`Queued ${strategyName} strategy for account ${bankAccount.name} (${accountId})`);
+      
+      return {
+        message: `${strategyName} scraping job queued successfully`,
+        jobId: result.jobId,
+        accountId,
+        accountName: bankAccount.name,
+        strategyName,
+        priority: result.priority
+      };
+    } catch (error) {
+      logger.error(`Failed to queue ${strategyName} strategy for account ${accountId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Recover missing transactions by recalculating lastScraped from actual data
+   * and queuing a new scrape from the correct date
+   */
+  async recoverMissingTransactions(accountId, userId) {
+    const bankAccount = await BankAccount.findOne({ _id: accountId, userId });
+    if (!bankAccount) {
+      throw new Error('Bank account not found');
+    }
+
+    // Find the actual latest transaction date for this account
+    const latestTransaction = await Transaction.findOne({ accountId })
+      .sort({ date: -1 })
+      .select('date')
+      .lean();
+
+    const oldLastScraped = bankAccount.lastScraped;
+    let newLastScraped;
+
+    if (latestTransaction) {
+      newLastScraped = new Date(latestTransaction.date);
+    } else {
+      // No transactions at all — reset to 6 months back
+      newLastScraped = new Date();
+      newLastScraped.setMonth(newLastScraped.getMonth() - 6);
+    }
+
+    // Update lastScraped on the account
+    bankAccount.lastScraped = newLastScraped;
+
+    // Also reset strategy-level lastScraped dates
+    if (bankAccount.strategySync) {
+      for (const strategy of Object.keys(bankAccount.strategySync.toObject ? bankAccount.strategySync.toObject() : bankAccount.strategySync)) {
+        if (bankAccount.strategySync[strategy]?.lastScraped) {
+          bankAccount.strategySync[strategy].lastScraped = newLastScraped;
+        }
+      }
+    }
+
+    await bankAccount.save();
+
+    logger.info(`Recovered lastScraped for account ${accountId}: ${oldLastScraped?.toISOString() || 'null'} → ${newLastScraped.toISOString()}`);
+
+    // Queue a new scrape from the corrected date
+    const scrapeResult = await queuedDataSyncService.queueBankAccountSync(accountId, { priority: 'high' });
+
+    return {
+      message: 'Recovery scrape started',
+      accountId,
+      accountName: bankAccount.name,
+      previousLastScraped: oldLastScraped,
+      correctedLastScraped: newLastScraped,
+      latestTransactionDate: latestTransaction?.date || null,
+      queuedJobs: scrapeResult.queuedJobs,
+      totalJobs: scrapeResult.totalJobs
+    };
+  }
+
+  /**
+   * Get queue statistics
+   */
+  async getQueueStats() {
+    try {
+      return await queuedDataSyncService.getQueueStats();
+    } catch (error) {
+      logger.error('Failed to get queue stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get queue health status
+   */
+  async getQueueHealth() {
+    try {
+      return await queuedDataSyncService.getHealthStatus();
+    } catch (error) {
+      logger.error('Failed to get queue health:', error);
       throw error;
     }
   }

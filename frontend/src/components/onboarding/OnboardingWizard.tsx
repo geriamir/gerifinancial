@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   Box,
   Stepper,
@@ -8,7 +8,8 @@ import {
   CardContent,
   Typography,
   LinearProgress,
-  Alert
+  Alert,
+  CircularProgress
 } from '@mui/material';
 import {
   CheckingAccountSetup,
@@ -18,111 +19,44 @@ import {
   CreditCardVerification,
   OnboardingComplete
 } from './index';
-import { useOnboarding } from '../../hooks/useOnboarding';
-
-export interface OnboardingStep {
-  id: 'checking-account' | 'transaction-import' | 'credit-card-detection' | 'credit-card-setup' | 'credit-card-verification' | 'complete';
-  title: string;
-  description: string;
-  component: React.ComponentType<OnboardingStepProps>;
-  isComplete: boolean;
-  isSkippable?: boolean;
-}
+import { useOnboarding, useOnboardingStep } from '../../hooks/useOnboarding';
 
 export interface OnboardingStepProps {
-  onComplete: (nextStep?: OnboardingStep['id'], data?: any) => Promise<void>;
+  onComplete?: () => void;
   onSkip?: () => void;
   onBack?: () => void;
   stepData?: any;
 }
 
-export interface OnboardingData {
-  checkingAccount?: {
-    bankId: string;
-    name: string;
-    accountId: string;
-  };
-  transactionImport?: {
-    transactionsImported: number;
-    categorized: number;
-    importDate: Date;
-  };
-  creditCardAnalysis?: {
-    hasCreditCardActivity: boolean;
-    transactionCount: number;
-    recommendation: 'connect' | 'optional' | 'skip';
-    analysisDate: Date;
-  };
-  creditCards?: Array<{
-    id: string;
-    displayName: string;
-    provider: string;
-  }>;
-}
-
 export const OnboardingWizard: React.FC = () => {
-  const [currentStepId, setCurrentStepId] = useState<OnboardingStep['id'] | null>(null);
-  const [stepTransitionData, setStepTransitionData] = useState<any>(null);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const {
-    completedSteps,
-    onboardingData,
+    status,
     loading,
     error,
-    updateOnboardingStatus,
-    loadOnboardingStatus,
-    clearError
+    addCheckingAccount,
+    addCreditCardAccount,
+    proceedToCreditCardSetup,
+    skipCreditCards,
+    completeOnboarding,
+    refetch
   } = useOnboarding();
 
-  // Determine current step based on completed steps
-  const determineCurrentStep = (completedStepSet: Set<string>): OnboardingStep['id'] => {
-    const stepOrder: OnboardingStep['id'][] = [
-      'checking-account',
-      'transaction-import', 
-      'credit-card-detection',
-      'credit-card-setup',
-      'credit-card-verification',
-      'complete'
-    ];
-
-    // If onboarding is complete, show complete step
-    if (completedStepSet.has('complete')) {
-      return 'complete';
+  // Handler to go back to credit card setup from verification
+  const handleAddMoreCards = async () => {
+    try {
+      await proceedToCreditCardSetup();
+    } catch (err) {
+      console.error('Failed to navigate back to credit card setup:', err);
     }
-
-    // Find the first incomplete step
-    for (const stepId of stepOrder) {
-      if (!completedStepSet.has(stepId)) {
-        return stepId;
-      }
-    }
-
-    // All steps completed but not marked as complete - should go to complete step
-    return 'complete';
   };
 
-  // Load onboarding status on mount
-  useEffect(() => {
-    const initializeOnboarding = async () => {
-      const status = await loadOnboardingStatus();
-      if (status) {
-        const currentStep = determineCurrentStep(new Set(status.completedSteps));
-        setCurrentStepId(currentStep);
-      } else {
-        // Fallback to first step if load fails
-        setCurrentStepId('checking-account');
-      }
-      setInitialLoadComplete(true);
-    };
+  const currentUI = useOnboardingStep(status);
 
-    initializeOnboarding();
-  }, [loadOnboardingStatus]);
-
-  // Don't render until initial load is complete
-  if (!initialLoadComplete || currentStepId === null) {
+  // Loading state
+  if (loading && !status) {
     return (
       <Box sx={{ maxWidth: 800, mx: 'auto', p: 3, textAlign: 'center' }}>
-        <LinearProgress sx={{ mb: 2 }} />
+        <CircularProgress sx={{ mb: 2 }} />
         <Typography variant="body1" color="text.secondary">
           Loading your onboarding progress...
         </Typography>
@@ -130,94 +64,145 @@ export const OnboardingWizard: React.FC = () => {
     );
   }
 
-  const steps: OnboardingStep[] = [
-    {
-      id: 'checking-account',
-      title: 'Connect Checking Account',
-      description: 'Connect your main checking account to start',
-      component: CheckingAccountSetup,
-      isComplete: completedSteps.has('checking-account')
+  // Error state
+  if (error && !status) {
+    return (
+      <Box sx={{ maxWidth: 800, mx: 'auto', p: 3 }}>
+        <Alert severity="error">
+          Failed to load onboarding status. Please refresh the page.
+        </Alert>
+      </Box>
+    );
+  }
+
+  if (!status) {
+    return null;
+  }
+
+  // Define steps for progress indicator
+  const steps = [
+    { 
+      id: 'checking-account', 
+      title: 'Connect Account', 
+      description: 'Link your checking account' 
     },
-    {
-      id: 'transaction-import',
-      title: 'Import Transactions',
-      description: 'Import 6 months of transaction history',
-      component: TransactionImport,
-      isComplete: completedSteps.has('transaction-import')
+    { 
+      id: 'transaction-import', 
+      title: 'Import Data', 
+      description: 'Import your transactions' 
     },
-    {
-      id: 'credit-card-detection',
-      title: 'Credit Card Analysis',
-      description: 'Analyze your credit card usage',
-      component: CreditCardDetection,
-      isComplete: completedSteps.has('credit-card-detection')
+    { 
+      id: 'credit-card-detection', 
+      title: 'Analyze Usage', 
+      description: 'Detect credit card usage' 
     },
-    {
-      id: 'credit-card-setup',
-      title: 'Connect Credit Cards',
-      description: 'Add your credit card accounts',
-      component: CreditCardSetup,
-      isComplete: completedSteps.has('credit-card-setup'),
-      isSkippable: true
+    { 
+      id: 'credit-card-setup', 
+      title: 'Credit Cards', 
+      description: 'Connect credit cards' 
     },
-    {
-      id: 'credit-card-verification',
-      title: 'Verify Coverage',
-      description: 'Verify your credit card coverage is complete',
-      component: CreditCardVerification,
-      isComplete: completedSteps.has('credit-card-verification')
+    { 
+      id: 'credit-card-matching', 
+      title: 'Match Payments', 
+      description: 'Link payments to cards' 
     },
-    {
-      id: 'complete',
-      title: 'Setup Complete',
-      description: 'Your financial overview is ready',
-      component: OnboardingComplete,
-      isComplete: completedSteps.has('complete')
+    { 
+      id: 'complete', 
+      title: 'Complete', 
+      description: 'Setup finished' 
     }
   ];
 
-  const currentStepIndex = steps.findIndex(step => step.id === currentStepId);
-  const currentStep = steps[currentStepIndex];
-
-  const handleStepComplete = async (nextStep?: OnboardingStep['id'], data?: any) => {
-    clearError();
-    
-    // Store transition data for the next step
-    if (data) {
-      setStepTransitionData(data);
-    }
-    
-    // Update backend onboarding status using the hook
-    await updateOnboardingStatus(currentStepId, data);
-    
-    // Navigate to next step
-    if (nextStep) {
-      setCurrentStepId(nextStep);
-    } else {
-      // Auto-advance to next step
-      const nextStepIndex = currentStepIndex + 1;
-      if (nextStepIndex < steps.length) {
-        setCurrentStepId(steps[nextStepIndex].id);
-      }
-    }
+  // Map current step to index
+  const stepMap: Record<string, number> = {
+    'checking-account': 0,
+    'transaction-import': 1,
+    'credit-card-detection': 2,
+    'credit-card-setup': 3,
+    'credit-card-matching': 4,
+    'complete': 5
   };
 
-  const handleStepSkip = () => {
-    if (currentStep.isSkippable) {
-      handleStepComplete();
+  const currentStepIndex = stepMap[status.currentStep] || 0;
+  const completedStepsCount = status.completedSteps.length;
+  const overallProgress = status.isComplete ? 100 : (completedStepsCount / steps.length) * 100;
+
+  // Render current step component based on UI state
+  const renderCurrentStep = () => {
+    const commonProps = {
+      onComplete: refetch,
+      stepData: status
+    };
+
+    switch (currentUI) {
+      case 'connect-checking':
+        return (
+          <CheckingAccountSetup
+            {...commonProps}
+            onConnect={addCheckingAccount}
+          />
+        );
+
+      case 'importing':
+      case 'waiting':
+        return (
+          <TransactionImport
+            {...commonProps}
+            importStatus={status.transactionImport}
+            scrapingStatus={status.transactionImport.scrapingStatus}
+          />
+        );
+
+      case 'analyzing':
+        return (
+          <CreditCardDetection
+            {...commonProps}
+            detection={status.creditCardDetection}
+            onProceed={proceedToCreditCardSetup}
+            onSkip={skipCreditCards}
+          />
+        );
+
+      case 'credit-card-setup':
+        return (
+          <CreditCardSetup
+            {...commonProps}
+            detection={status.creditCardDetection}
+            onConnect={addCreditCardAccount}
+            onSkip={skipCreditCards}
+          />
+        );
+
+      case 'matching':
+      case 'matching-complete':
+        return (
+          <CreditCardVerification
+            {...commonProps}
+            matching={status.creditCardMatching}
+            onAddMoreCards={handleAddMoreCards}
+            onCompleteOnboarding={completeOnboarding}
+          />
+        );
+
+      case 'complete':
+        return (
+          <OnboardingComplete
+            {...commonProps}
+            onboardingStatus={status}
+          />
+        );
+
+      default:
+        return (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <CircularProgress />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              Loading...
+            </Typography>
+          </Box>
+        );
     }
   };
-
-  const handleStepBack = () => {
-    const prevStepIndex = currentStepIndex - 1;
-    if (prevStepIndex >= 0) {
-      setCurrentStepId(steps[prevStepIndex].id);
-    }
-  };
-
-  // Calculate overall progress
-  // When on the complete step, show 100% progress for better UX
-  const overallProgress = currentStepId === 'complete' ? 100 : (completedSteps.size / steps.length) * 100;
 
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto', p: 3 }}>
@@ -229,7 +214,7 @@ export const OnboardingWizard: React.FC = () => {
         <Typography variant="subtitle1" color="text.secondary" gutterBottom>
           Let's set up your financial overview in a few simple steps
         </Typography>
-        
+
         {/* Overall Progress */}
         <Box sx={{ mt: 2, mb: 1 }}>
           <Typography variant="body2" color="text.secondary">
@@ -245,8 +230,8 @@ export const OnboardingWizard: React.FC = () => {
 
       {/* Error Display */}
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={clearError}>
-          {error}
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error.message || 'An error occurred. Please try again.'}
         </Alert>
       )}
 
@@ -254,23 +239,28 @@ export const OnboardingWizard: React.FC = () => {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Stepper activeStep={currentStepIndex} alternativeLabel>
-            {steps.map((step, index) => (
-              <Step 
-                key={step.id} 
-                completed={step.isComplete}
-              >
-                <StepLabel>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="body2" fontWeight={step.id === currentStepId ? 'bold' : 'normal'}>
-                      {step.title}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {step.description}
-                    </Typography>
-                  </Box>
-                </StepLabel>
-              </Step>
-            ))}
+            {steps.map((step, index) => {
+              const isCompleted = status.completedSteps.includes(step.id);
+              const isCurrent = status.currentStep === step.id;
+
+              return (
+                <Step key={step.id} completed={isCompleted}>
+                  <StepLabel>
+                    <Box sx={{ textAlign: 'center' }}>
+                      <Typography 
+                        variant="body2" 
+                        fontWeight={isCurrent ? 'bold' : 'normal'}
+                      >
+                        {step.title}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {step.description}
+                      </Typography>
+                    </Box>
+                  </StepLabel>
+                </Step>
+              );
+            })}
           </Stepper>
         </CardContent>
       </Card>
@@ -278,51 +268,10 @@ export const OnboardingWizard: React.FC = () => {
       {/* Current Step Content */}
       <Card>
         <CardContent>
-          {loading && (
-            <Box sx={{ mb: 2 }}>
-              <LinearProgress />
-            </Box>
-          )}
-          
-          <currentStep.component
-            onComplete={handleStepComplete}
-            onSkip={currentStep.isSkippable ? handleStepSkip : undefined}
-            onBack={currentStepIndex > 0 ? handleStepBack : undefined}
-            stepData={{
-              ...onboardingData,
-              // For transaction-import step, also pass the fresh transition data
-              ...(currentStepId === 'transaction-import' && stepTransitionData ? {
-                bankAccountId: stepTransitionData.accountId,
-                transitionData: stepTransitionData
-              } : {}),
-              // For credit-card-verification step, pass the transition data from credit card setup
-              ...(currentStepId === 'credit-card-verification' && stepTransitionData ? {
-                bankAccountId: stepTransitionData.bankAccountId,
-                provider: stepTransitionData.provider,
-                transitionData: stepTransitionData
-              } : {})
-            }}
-          />
+          {renderCurrentStep()}
         </CardContent>
       </Card>
 
-      {/* Debug Information (development only) */}
-      {process.env.NODE_ENV === 'development' && (
-        <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-          <Typography variant="caption" display="block">
-            <strong>Debug Info:</strong>
-          </Typography>
-          <Typography variant="caption" display="block">
-            Current Step: {currentStepId} ({currentStepIndex + 1}/{steps.length})
-          </Typography>
-          <Typography variant="caption" display="block">
-            Completed: {Array.from(completedSteps).join(', ')}
-          </Typography>
-          <Typography variant="caption" display="block">
-            Progress: {Math.round(overallProgress)}%
-          </Typography>
-        </Box>
-      )}
     </Box>
   );
 };

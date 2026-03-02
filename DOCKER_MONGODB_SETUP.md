@@ -8,6 +8,7 @@ This project uses Docker Compose to run MongoDB with proper separation between l
 - **`docker-compose.override.yml`** - Local development overrides (NOT committed to git) - contains local credentials
 - **`.env.example`** - Template for environment variables
 - **`.gitignore`** - Excludes sensitive files from git
+- **`data/`** - Local directory for MongoDB and Redis data persistence (NOT committed to git)
 
 ## Local Development Setup
 
@@ -84,6 +85,14 @@ MONGODB_URI=mongodb://admin:password123@localhost:27777/gerifinancial?authSource
 - ✅ Only `.env.example` is committed as a template
 - ✅ Production credentials are never committed to source control
 
+## Data Persistence
+
+**Important:** MongoDB and Redis data is now stored in local directories:
+- MongoDB: `./data/mongodb`
+- Redis: `./data/redis`
+
+This ensures your data persists even if Docker Desktop is removed or reinstalled. These directories are automatically excluded from git via `.gitignore`.
+
 ## Useful Commands
 
 ```bash
@@ -96,5 +105,14 @@ docker-compose logs mongodb
 # Access MongoDB shell
 docker exec -it gerifinancial_mongodb mongosh -u admin -p password123 --authenticationDatabase admin
 
-# Reset everything (removes data!)
-docker-compose down -v
+# Stop containers (data persists in ./data/)
+docker-compose down
+
+# Reset everything (WARNING: deletes ./data/ directory!)
+docker-compose down && rm -rf ./data
+
+# Backup MongoDB data
+mongodump --uri="mongodb://admin:password123@localhost:27777/gerifinancial?authSource=admin" --out=./backup
+
+# Restore MongoDB data
+mongorestore --uri="mongodb://admin:password123@localhost:27777/?authSource=admin" ./backup

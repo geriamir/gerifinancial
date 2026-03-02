@@ -5,9 +5,37 @@ const config = require('./shared/config');
 const logger = require('./shared/utils/logger');
 const ensureLogsDir = require('./shared/middleware/ensureLogsDir');
 
+const { CheckingAccountsSyncStrategy } = require('./banking/services/sync-strategies');
+
 // Ensure logs directory exists in production
 ensureLogsDir();
+
+// Global strategy registry to avoid circular dependencies
+global.syncStrategies = null;
+
+// Initialize sync strategies registry
+function initializeSyncStrategies() {
+  if (global.syncStrategies) return global.syncStrategies;
+
+  // Import strategies from their respective subsystems
+  const PortfoliosSyncStrategy = require('./investments/services/sync/PortfoliosSyncStrategy');
+  const ForeignCurrencySyncStrategy = require('./foreign-currency/services/sync/ForeignCurrencySyncStrategy');
+
+  // Create strategy instances with keys matching scrapingJobProcessors expectations
+  global.syncStrategies = {
+    'checking-accounts': new CheckingAccountsSyncStrategy(),
+    'investment-portfolios': new PortfoliosSyncStrategy(),
+    'foreign-currency': new ForeignCurrencySyncStrategy()
+  };
+
+  logger.info('Sync strategies initialized and registered globally');
+  return global.syncStrategies;
+}
+
 const scrapingSchedulerService = require('./banking/services/scrapingSchedulerService');
+const scrapingEventHandlers = require('./banking/services/scrapingEventHandlers');
+const onboardingEventHandlers = require('./onboarding/services/onboardingEventHandlers');
+const eventBridge = require('./shared/services/eventBridge');
 const stockPriceService = require('./rsu/services/stockPriceService');
 const vestingService = require('./rsu/services/vestingService');
 const currencyExchangeService = require('./foreign-currency/services/currencyExchangeService');
@@ -19,11 +47,13 @@ const creditCardRoutes = require('./banking/routes/creditCards');
 const transactionRoutes = require('./banking/routes/transactions');
 const budgetRoutes = require('./shared/routes/budgets');
 const categoryBudgetRoutes = require('./monthly-budgets/routes/categoryBudgets');
+const patternRoutes = require('./monthly-budgets/routes/patterns');
 const rsuRoutes = require('./rsu/routes/rsus');
 const investmentRoutes = require('./investments/routes/investments');
 const portfolioRoutes = require('./investments/routes/portfolios');
 const foreignCurrencyRoutes = require('./foreign-currency/routes/foreignCurrency');
 const onboardingRoutes = require('./onboarding/routes/onboarding');
+const eventsRoutes = require('./shared/routes/events');
 const testRoutes = require('./shared/routes/test');
 
 // Create Express app
@@ -40,6 +70,38 @@ if (config.env === 'test') {
   })
     .then(async () => {
       console.log('Connected to MongoDB');
+
+      // Initialize sync strategies first to avoid circular dependencies
+      try {
+        initializeSyncStrategies();
+        logger.info('Sync strategies initialized successfully');
+      } catch (error) {
+        logger.error('Failed to initialize sync strategies:', error);
+      }
+
+      // Initialize scraping event handlers for async post-processing
+      try {
+        scrapingEventHandlers.initialize();
+        logger.info('Scraping event handlers initialized successfully');
+      } catch (error) {
+        logger.error('Failed to initialize scraping event handlers:', error);
+      }
+
+      // Initialize onboarding event handlers for progress tracking
+      try {
+        onboardingEventHandlers.initialize();
+        logger.info('Onboarding event handlers initialized successfully');
+      } catch (error) {
+        logger.error('Failed to initialize onboarding event handlers:', error);
+      }
+
+      // Initialize event bridge for SSE real-time updates
+      try {
+        eventBridge.initialize();
+        logger.info('Event bridge initialized successfully');
+      } catch (error) {
+        logger.error('Failed to initialize event bridge:', error);
+      }
 
       // Only initialize schedulers in production and E2E environments
       if (process.env.NODE_ENV !== 'test' || process.env.NODE_ENV === 'e2e') {
@@ -104,12 +166,14 @@ app.use('/api/bank-accounts', bankAccountRoutes);
 app.use('/api/credit-cards', creditCardRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/budgets', budgetRoutes);
+app.use('/api/budgets/patterns', patternRoutes);
 app.use('/api/category-budgets', categoryBudgetRoutes);
 app.use('/api/rsus', rsuRoutes);
 app.use('/api/investments', investmentRoutes);
 app.use('/api/portfolios', portfolioRoutes);
 app.use('/api/foreign-currency', foreignCurrencyRoutes);
 app.use('/api/onboarding', onboardingRoutes);
+app.use('/api/events', eventsRoutes);
 
 // Test routes (enabled in test and e2e environments)
 if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'e2e') {

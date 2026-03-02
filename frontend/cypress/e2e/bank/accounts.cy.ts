@@ -109,7 +109,7 @@ describe('Bank Accounts Management', () => {
     // Select the 'Bank Hapoalim' option from the menu
     cy.get('[role="listbox"]').contains('Bank Hapoalim').click();
     cy.get('input[name="username"]').type('invalid');
-    cy.get('input[name="password"]').type('invalid123');
+    cy.get('input[name="password"]').type('invalid'); // Changed to match mock scraper expectation
     cy.get('input[name="name"]').type('Invalid Account');
 
     // Intercept the API call

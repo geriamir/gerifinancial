@@ -25,7 +25,6 @@ import {
 import { AxiosError } from 'axios';
 import { CREDIT_CARD_PROVIDERS } from '../../constants/banks';
 import { OnboardingStepProps } from './OnboardingWizard';
-import api from '../../services/api/base';
 
 interface CreatedCreditCard {
   id: string;
@@ -43,11 +42,28 @@ interface CreditCardCreationResult {
   };
 }
 
-export const CreditCardSetup: React.FC<OnboardingStepProps> = ({
+export interface CreditCardSetupProps extends OnboardingStepProps {
+  detection?: {
+    analyzed: boolean;
+    analyzedAt: string | null;
+    transactionCount: number;
+    recommendation: 'connect' | 'optional' | 'skip' | null;
+    sampleTransactions: Array<{
+      date: string;
+      description: string;
+      amount: number;
+    }>;
+  };
+  onConnect?: (bankId: string, credentials: any, displayName?: string) => Promise<any>;
+  onSkip?: () => Promise<void>;
+}
+
+export const CreditCardSetup: React.FC<CreditCardSetupProps> = ({
+  detection,
+  onConnect,
   onComplete,
   onSkip,
-  onBack,
-  stepData
+  onBack
 }) => {
   const [formData, setFormData] = useState({
     bankId: '',
@@ -58,7 +74,8 @@ export const CreditCardSetup: React.FC<OnboardingStepProps> = ({
   const [error, setError] = useState('');
   const [creationResult, setCreationResult] = useState<CreditCardCreationResult | null>(null);
 
-  const analysisData = stepData?.creditcarddetection || stepData?.creditCardAnalysis;
+  // Use detection prop for analysis data
+  const analysisData = detection;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -89,36 +106,35 @@ export const CreditCardSetup: React.FC<OnboardingStepProps> = ({
     }
 
     try {
-      // Create the bank account - this will automatically start scraping
-      const bankAccountResponse = await api.post('/bank-accounts', {
-        bankId: formData.bankId,
-        name: `${CREDIT_CARD_PROVIDERS.find(p => p.id === formData.bankId)?.name} Credit Cards`,
-        credentials: {
-          username: formData.username,
-          password: formData.password
-        }
-      });
+      // Use the onConnect method from wizard (uses new onboarding API)
+      if (onConnect) {
+        const displayName = `${CREDIT_CARD_PROVIDERS.find(p => p.id === formData.bankId)?.name} Credit Cards`;
+        await onConnect(
+          formData.bankId,
+          {
+            username: formData.username,
+            password: formData.password
+          },
+          displayName
+        );
 
-      // Bank account creation automatically initiates scraping via bankAccountService
-      // Just mark as successful completion - no separate scraping needed
-      setCreationResult({
-        creditCards: [],
-        matchingResults: {
-          totalCreditCards: 0,
-          matchedCards: 0,
-          matchingAccuracy: 100
-        }
-      });
-
-      // Auto-advance to verification step
-      setTimeout(() => {
-        onComplete('credit-card-verification', {
+        // Mark as successful - onConnect handles the API call and status update
+        setCreationResult({
           creditCards: [],
-          provider: formData.bankId,
-          bankAccountId: bankAccountResponse.data._id,
-          matchingAccuracy: 100
+          matchingResults: {
+            totalCreditCards: 0,
+            matchedCards: 0,
+            matchingAccuracy: 100
+          }
         });
-      }, 2000);
+
+        // Auto-advance after showing success
+        setTimeout(() => {
+          if (onComplete) {
+            onComplete();
+          }
+        }, 2000);
+      }
 
     } catch (err) {
       const errorMessage = err instanceof AxiosError
@@ -131,14 +147,11 @@ export const CreditCardSetup: React.FC<OnboardingStepProps> = ({
     }
   };
 
-  const handleSkipSetup = () => {
+  const handleSkipSetup = async () => {
     if (onSkip) {
-      onSkip();
-    } else {
-      onComplete('complete', {
-        creditCards: [],
-        skipped: true
-      });
+      await onSkip();
+    } else if (onComplete) {
+      onComplete();
     }
   };
 

@@ -14,7 +14,7 @@ import {
   Typography,
   Autocomplete
 } from '@mui/material';
-import { getCurrencySymbol } from '../../types/foreignCurrency';
+import { getCurrencySymbol, formatCurrency } from '../../types/foreignCurrency';
 import { CategoryBudget } from '../../types/projects';
 
 interface AddPlannedExpenseDialogProps {
@@ -89,7 +89,16 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
       return; // Could show error message
     }
 
-    onAdd(formData);
+    // Clean up the data before submitting - remove actualAmount and ensure subCategoryId is set
+    const cleanedData: Partial<CategoryBudget> = {
+      categoryId: formData.categoryId,
+      subCategoryId: formData.subCategoryId || '', // Default to empty string if undefined
+      budgetedAmount: formData.budgetedAmount || 0,
+      description: formData.description,
+      currency: formData.currency || projectCurrency // Use selected currency, fallback to project currency
+    };
+
+    onAdd(cleanedData);
     handleClose();
   };
 
@@ -115,7 +124,17 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
     >
       <DialogTitle>Add Planned Expense</DialogTitle>
       <DialogContent>
-        <Box display="flex" flexDirection="column" gap={2} mt={2}>
+        <Box 
+          component="form" 
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSubmit();
+          }}
+          display="flex" 
+          flexDirection="column" 
+          gap={2} 
+          mt={2}
+        >
           {/* Description */}
           <TextField
             fullWidth
@@ -177,21 +196,39 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
                   placeholder="Search or select subcategory..."
                 />
               )}
-              renderOption={(props, option) => (
-                <Box component="li" {...props}>
-                  {option._id === '' ? (
-                    <em>{option.name}</em>
-                  ) : (
-                    option.name
-                  )}
-                </Box>
-              )}
+              renderOption={(props, option) => {
+                const { key, ...otherProps } = props;
+                return (
+                  <Box component="li" key={key} {...otherProps}>
+                    {option._id === '' ? (
+                      <em>{option.name}</em>
+                    ) : (
+                      option.name
+                    )}
+                  </Box>
+                );
+              }}
               isOptionEqualToValue={(option, value) => option._id === value._id}
               clearOnBlur
               clearOnEscape
               autoHighlight
             />
           )}
+
+          {/* Currency Selection */}
+          <FormControl fullWidth>
+            <InputLabel>Currency</InputLabel>
+            <Select
+              value={formData.currency || projectCurrency}
+              onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+              label="Currency"
+            >
+              <MenuItem value="ILS">ILS (₪)</MenuItem>
+              <MenuItem value="USD">USD ($)</MenuItem>
+              <MenuItem value="EUR">EUR (€)</MenuItem>
+              <MenuItem value="GBP">GBP (£)</MenuItem>
+            </Select>
+          </FormControl>
 
           {/* Budget Amount */}
           <TextField
@@ -203,8 +240,14 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
               ...prev,
               budgetedAmount: Number(e.target.value) || 0
             }))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
             InputProps={{
-              startAdornment: <Typography sx={{ mr: 1 }}>{getCurrencySymbol(projectCurrency)}</Typography>,
+              startAdornment: <Typography sx={{ mr: 1 }}>{getCurrencySymbol(formData.currency || projectCurrency)}</Typography>,
               inputProps: { min: 0, step: 10 }
             }}
           />
@@ -223,7 +266,7 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
                 )}
               </Typography>
               <Typography variant="body2" color="primary.main">
-                Budget: {getCurrencySymbol(projectCurrency)}{formData.budgetedAmount || 0}
+                Budget: {formatCurrency(formData.budgetedAmount || 0, formData.currency || projectCurrency)}
               </Typography>
             </Box>
           )}

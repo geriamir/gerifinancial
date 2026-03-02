@@ -16,7 +16,7 @@ if (process.env.NODE_ENV === 'test') {
   config.jwtExpiration = '1h';
 } else if (process.env.NODE_ENV === 'e2e') {
   // Use real database with e2e suffix for end-to-end tests
-  config.mongodbUri = 'mongodb://localhost:27777/gerifinancial-e2e';
+  config.mongodbUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/gerifinancial-e2e';
   config.jwtSecret = 'e2e-secret';
   config.jwtExpiration = '1h';
 }

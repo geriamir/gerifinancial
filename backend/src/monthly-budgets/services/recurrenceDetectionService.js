@@ -8,10 +8,10 @@ class RecurrenceDetectionService {
   /**
    * Detect recurrence patterns in user transactions
    * @param {string} userId - User ID
-   * @param {number} monthsToAnalyze - Number of months to analyze (default 6)
+   * @param {number} monthsToAnalyze - Number of months to analyze (default 7)
    * @returns {Array} Array of detected patterns
    */
-  async detectPatterns(userId, monthsToAnalyze = 6) {
+  async detectPatterns(userId, monthsToAnalyze = 7) {
     try {
       logger.info(`Starting pattern detection for user ${userId} with ${monthsToAnalyze} months of data`);
 
@@ -196,7 +196,7 @@ class RecurrenceDetectionService {
     const { transactions } = group;
     
     // Apply single-transaction-per-period constraint
-    if (!this.validateSingleTransactionPerPeriod(transactions, group.commonDescription.includes('גז'))) {
+    if (!this.validateSingleTransactionPerPeriod(transactions)) {
       return null; // Reject if multiple transactions in same period
     }
 
@@ -214,7 +214,7 @@ class RecurrenceDetectionService {
     if (biMonthlyPattern) {
       return biMonthlyPattern;
     }
-    
+
     // Check for quarterly pattern (every 3 months)
     const quarterlyPattern = this.checkQuarterlyPattern(monthOccurrences, analysisMonths);
     if (quarterlyPattern) {
@@ -263,11 +263,19 @@ class RecurrenceDetectionService {
     }
     
     // Additional validation: check spacing consistency
-    const monthYears = Object.keys(monthlyGroups).sort();
+    // Sort month-years numerically by converting to absolute month numbers
+    const monthYears = Object.keys(monthlyGroups).sort((a, b) => {
+      const [yearA, monthA] = a.split('-').map(Number);
+      const [yearB, monthB] = b.split('-').map(Number);
+      const absoluteMonthA = yearA * 12 + monthA;
+      const absoluteMonthB = yearB * 12 + monthB;
+      return absoluteMonthA - absoluteMonthB;
+    });
     
     if (monthYears.length >= 3) {
       // For 3+ occurrences, check if spacing is consistent
-      return this.validateSpacingConsistency(monthYears);
+      const isSpacingConsistent = this.validateSpacingConsistency(monthYears);
+      return isSpacingConsistent;
     }
     
     return true; // Passed single-transaction-per-month constraint
@@ -347,8 +355,8 @@ class RecurrenceDetectionService {
     }
     
     // Check if months are consecutive or mostly consecutive
-    const sortedMonths = [...monthOccurrences].sort((a, b) => a - b);
-    const isConsecutive = this.checkConsecutivePattern(sortedMonths, analysisMonths);
+    // Use chronological order (transactions are pre-sorted by date)
+    const isConsecutive = this.checkConsecutivePattern(monthOccurrences, analysisMonths);
     
     if (!isConsecutive) {
       return null; // Not a monthly pattern if months are scattered
@@ -378,19 +386,24 @@ class RecurrenceDetectionService {
 
   /**
    * Check if months form a consecutive or mostly consecutive pattern
-   * @param {Array} sortedMonths - Sorted array of month numbers
+   * @param {Array} orderedMonths - Month numbers in chronological order (from date-sorted transactions)
    * @param {number} analysisMonths - Number of months analyzed
    * @returns {boolean} True if pattern is consecutive enough
    */
-  checkConsecutivePattern(sortedMonths, analysisMonths) {
-    if (sortedMonths.length < 3) return false;
+  checkConsecutivePattern(orderedMonths, analysisMonths) {
+    if (orderedMonths.length < 3) return false;
     
     // Check for consecutive months with minimal gaps
     let consecutiveCount = 1;
     let maxConsecutiveRun = 1;
     
-    for (let i = 1; i < sortedMonths.length; i++) {
-      const gap = sortedMonths[i] - sortedMonths[i - 1];
+    for (let i = 1; i < orderedMonths.length; i++) {
+      let gap = orderedMonths[i] - orderedMonths[i - 1];
+      
+      // Handle year wraparound (e.g., Dec to Jan: 1-12 = -11, +12 = 1)
+      if (gap < 0) {
+        gap = gap + 12;
+      }
       
       if (gap === 1) {
         // Perfect consecutive month
@@ -406,7 +419,7 @@ class RecurrenceDetectionService {
     }
     
     // Require at least 3 consecutive months or most months to be consecutive
-    const consecutiveRatio = maxConsecutiveRun / sortedMonths.length;
+    const consecutiveRatio = maxConsecutiveRun / orderedMonths.length;
     
     return maxConsecutiveRun >= 3 || consecutiveRatio >= 0.7;
   }
@@ -420,47 +433,62 @@ class RecurrenceDetectionService {
   checkBiMonthlyPattern(monthOccurrences, analysisMonths) {
     if (monthOccurrences.length < 2) return null;
     
-    const expectedOccurrences = Math.floor(analysisMonths / 2);
+    // For bi-monthly patterns, we expect roughly half the analysis period
+    // But be more lenient - allow 2-4 occurrences for 6 month analysis
+    const minOccurrences = 2;
+    const maxOccurrences = Math.ceil(analysisMonths / 2) + 1; // Add 1 for flexibility
     const actualOccurrences = monthOccurrences.length;
-    
-    // Allow for some variance (±1 occurrence)
-    if (Math.abs(actualOccurrences - expectedOccurrences) > 1) {
+
+    if (actualOccurrences < minOccurrences || actualOccurrences > maxOccurrences) {
+      logger.info(`Bi-monthly rejected: ${actualOccurrences} occurrences outside range [${minOccurrences}, ${maxOccurrences}]`);
       return null;
     }
     
-    // For year boundary handling, we need to check patterns differently
-    // Create a sequence that handles year boundaries
-    const monthSequence = [...monthOccurrences];
+    // Sort months to check gaps - use original chronological order from transactions
+    // (transactions are pre-sorted by date), don't re-sort by raw month number
+    // as that breaks year-spanning data (e.g., [8,10,12,2] would become [2,8,10,12])
+    const orderedMonths = monthOccurrences;
     
-    // Check if this could be a bi-monthly pattern by examining gaps
-    let isConsistent = true;
-    
-    if (monthSequence.length === 2) {
-      // For 2 months, check if they could be bi-monthly
-      const [first, second] = monthSequence.sort((a, b) => a - b);
-      const gap = second - first;
-      // Allow gaps: 2 (normal), 10 (Nov->Jan), 11 (Oct->Dec->Feb pattern)
-      isConsistent = gap === 2 || gap === 10 || gap === 11;
-    } else {
-      // For 3+ months, check sequential gaps
-      const sortedMonths = [...monthOccurrences].sort((a, b) => a - b);
+    // Check if all gaps between consecutive months are exactly 2
+    // Need to handle year boundary (e.g., Dec=12 to Feb=2 is a 2-month gap)
+    let allGapsAreTwo = true;
+    for (let i = 1; i < orderedMonths.length; i++) {
+      let gap = orderedMonths[i] - orderedMonths[i - 1];
       
-      for (let i = 1; i < sortedMonths.length; i++) {
-        const gap = sortedMonths[i] - sortedMonths[i - 1];
-        // Allow gap of 2 months (with some flexibility for year boundaries)
-        if (gap !== 2 && gap !== 10 && gap !== 11) { // Handle year boundary cases
-          isConsistent = false;
-          break;
-        }
+      // Handle year wraparound: e.g., Dec(12) to Feb(2) = 2-12 = -10, +12 = 2
+      if (gap < 0) {
+        gap = gap + 12;
+      }
+      
+      if (gap !== 2) {
+        allGapsAreTwo = false;
+        logger.debug(`Bi-monthly gap check: months ${orderedMonths[i-1]} to ${orderedMonths[i]} = ${gap} months (expected 2)`);
+        break;
       }
     }
     
-    if (!isConsistent) return null;
+    if (!allGapsAreTwo) {
+      logger.debug(`Bi-monthly rejected: gaps are not consistent (months: ${orderedMonths.join(', ')})`);
+      return null;
+    }
     
-    // Return only the months that actually occurred for testing consistency
+    // Return only the months that actually occurred for pattern matching
     const scheduledMonths = [...new Set(monthOccurrences)].sort((a, b) => a - b);
     
-    const confidence = this.calculatePatternConfidence(actualOccurrences, expectedOccurrences, isConsistent);
+    // Calculate confidence based on occurrence count and consistency
+    let confidence = 0.75; // Base confidence for bi-monthly patterns
+    
+    // Boost confidence for more occurrences
+    if (actualOccurrences >= 3) {
+      confidence += 0.1;
+    }
+    if (actualOccurrences >= 4) {
+      confidence += 0.05;
+    }
+    
+    confidence = Math.min(0.95, confidence);
+    
+    logger.info(`Bi-monthly pattern detected: months [${scheduledMonths.join(', ')}], confidence: ${confidence}`);
     
     return {
       type: PATTERN_TYPES.BI_MONTHLY,
@@ -487,20 +515,24 @@ class RecurrenceDetectionService {
     }
     
     // Check if months follow quarterly pattern
-    const sortedMonths = [...monthOccurrences].sort((a, b) => a - b);
+    // Use chronological order (transactions are pre-sorted by date)
+    const orderedMonths = monthOccurrences;
     
     // Check spacing between consecutive occurrences - be more strict for quarterly
     let validGaps = 0;
-    for (let i = 1; i < sortedMonths.length; i++) {
-      const gap = sortedMonths[i] - sortedMonths[i - 1];
-      // Allow gap of exactly 3 months (with some flexibility for year boundaries)
-      if (gap === 3 || gap === -9) { // -9 for year boundary (e.g., Oct->Jan)
+    for (let i = 1; i < orderedMonths.length; i++) {
+      let gap = orderedMonths[i] - orderedMonths[i - 1];
+      // Handle year wraparound (e.g., Nov to Feb: 2-11 = -9, +12 = 3)
+      if (gap < 0) {
+        gap = gap + 12;
+      }
+      if (gap === 3) {
         validGaps++;
       }
     }
     
     // Require all gaps to be valid for quarterly pattern
-    const isConsistent = validGaps === (sortedMonths.length - 1);
+    const isConsistent = validGaps === (orderedMonths.length - 1);
     
     if (!isConsistent) return null;
     

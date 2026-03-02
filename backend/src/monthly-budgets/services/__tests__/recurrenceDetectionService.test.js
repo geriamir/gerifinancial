@@ -155,6 +155,15 @@ describe('RecurrenceDetectionService', () => {
       expect(result.confidence).toBeGreaterThan(0.7);
     });
 
+    test('should detect bi-monthly pattern within same year', () => {
+      const monthOccurrences = [1, 3]; // Jan, Mar (2 month gap)
+      const result = recurrenceDetectionService.checkBiMonthlyPattern(monthOccurrences, 4);
+      
+      expect(result).toBeTruthy();
+      expect(result.type).toBe('bi-monthly');
+      expect(result.scheduledMonths).toEqual([1, 3]);
+    });
+
     test('should detect bi-monthly pattern with year boundary', () => {
       const monthOccurrences = [11, 1]; // Nov, Jan (crossing year boundary - 2 month gap)
       const result = recurrenceDetectionService.checkBiMonthlyPattern(monthOccurrences, 4);

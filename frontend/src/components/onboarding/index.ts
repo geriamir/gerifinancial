@@ -8,4 +8,4 @@ export { CreditCardVerification } from './CreditCardVerification';
 export { OnboardingComplete } from './OnboardingComplete';
 
 // Export types
-export type { OnboardingStepProps, OnboardingData } from './OnboardingWizard';
+export type { OnboardingStepProps } from './OnboardingWizard';

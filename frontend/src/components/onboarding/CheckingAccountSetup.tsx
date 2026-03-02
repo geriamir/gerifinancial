@@ -14,12 +14,16 @@ import {
 } from '@mui/material';
 import { AxiosError } from 'axios';
 import { CHECKING_ACCOUNT_BANKS } from '../../constants/banks';
-import { bankAccountsApi } from '../../services/api/bank';
 import { track } from '../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
 import { OnboardingStepProps } from './OnboardingWizard';
 
-export const CheckingAccountSetup: React.FC<OnboardingStepProps> = ({
+export interface CheckingAccountSetupProps extends OnboardingStepProps {
+  onConnect: (bankId: string, credentials: any, displayName?: string) => Promise<any>;
+}
+
+export const CheckingAccountSetup: React.FC<CheckingAccountSetupProps> = ({
+  onConnect,
   onComplete,
   onBack
 }) => {
@@ -67,14 +71,15 @@ export const CheckingAccountSetup: React.FC<OnboardingStepProps> = ({
         isOnboarding: true
       });
 
-      const response = await bankAccountsApi.add({
-        bankId: formData.bankId,
-        name: formData.name,
-        credentials: {
+      // Use the new onConnect method from the wizard
+      await onConnect(
+        formData.bankId,
+        {
           username: formData.username,
           password: formData.password
-        }
-      });
+        },
+        formData.name
+      );
 
       track(BANK_ACCOUNT_EVENTS.ADD_SUCCESS, {
         bankId: formData.bankId,
@@ -82,12 +87,10 @@ export const CheckingAccountSetup: React.FC<OnboardingStepProps> = ({
         isOnboarding: true
       });
 
-      // Pass the account data to the next step
-      onComplete('transaction-import', {
-        bankId: formData.bankId,
-        name: formData.name,
-        accountId: response._id
-      });
+      // Call onComplete to trigger status refresh
+      if (onComplete) {
+        onComplete();
+      }
 
     } catch (err) {
       const errorMessage = err instanceof AxiosError
@@ -107,9 +110,9 @@ export const CheckingAccountSetup: React.FC<OnboardingStepProps> = ({
   };
 
   return (
-    <Box>
+    <Box data-testid="checking-account-setup">
       <Box sx={{ mb: 3, textAlign: 'center' }}>
-        <Typography variant="h5" component="h2" gutterBottom>
+        <Typography variant="h5" component="h2" gutterBottom data-testid="checking-account-title">
           Connect Your Main Checking Account
         </Typography>
         <Typography variant="body1" color="text.secondary" gutterBottom>
@@ -126,6 +129,7 @@ export const CheckingAccountSetup: React.FC<OnboardingStepProps> = ({
             value={formData.bankId}
             onChange={handleSelectChange}
             label="Select Your Bank"
+            data-testid="bank-select"
           >
             {CHECKING_ACCOUNT_BANKS.map(bank => (
               <MenuItem key={bank.id} value={bank.id}>
@@ -148,6 +152,7 @@ export const CheckingAccountSetup: React.FC<OnboardingStepProps> = ({
           required
           helperText="We suggest 'Main Checking' - you can change this later"
           placeholder="Main Checking"
+          data-testid="display-name-input"
         />
 
         <TextField
@@ -159,6 +164,7 @@ export const CheckingAccountSetup: React.FC<OnboardingStepProps> = ({
           onChange={handleInputChange}
           required
           helperText="Your online banking username"
+          data-testid="username-input"
         />
 
         <TextField
@@ -171,6 +177,7 @@ export const CheckingAccountSetup: React.FC<OnboardingStepProps> = ({
           onChange={handleInputChange}
           required
           helperText="Your online banking password"
+          data-testid="password-input"
         />
 
         {error && (
@@ -195,6 +202,7 @@ export const CheckingAccountSetup: React.FC<OnboardingStepProps> = ({
             size="large"
             disabled={loading}
             sx={{ ml: 'auto' }}
+            data-testid="connect-checking-btn"
           >
             {loading ? 'Connecting...' : 'Connect Account'}
           </Button>

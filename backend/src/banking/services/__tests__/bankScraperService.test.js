@@ -70,23 +70,9 @@ describe('BankScraperService', () => {
     });
   });
 
-  describe('scrapeTransactions', () => {
-    it('should successfully scrape transactions', async () => {
-      const result = await bankScraperService.scrapeTransactions(mockBankAccount);
-      expect(result.accounts[0].txns).toEqual(mockTransactions);
-    });
-
-    it('should retry on scraping failure', async () => {
-      const errorAccount = {
-        ...mockBankAccount,
-        bankId: 'error_bank'
-      };
-
-      await expect(bankScraperService.scrapeTransactions(errorAccount))
-        .rejects
-        .toThrow('Bank API is temporarily unavailable');
-    });
-  });
+  // REMOVED: scrapeTransactions tests
+  // The comprehensive scrapeTransactions method has been replaced with isolated sync methods
+  // in dataSyncService. Tests for the new isolated approach are covered in dataSyncService.test.js
 
   describe('validateCredentials', () => {
     it('should validate correct credentials', async () => {

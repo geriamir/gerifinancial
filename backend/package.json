@@ -45,10 +45,12 @@
   "dependencies": {
     "@vitalets/google-translate-api": "^9.2.1",
     "bcryptjs": "^3.0.2",
+    "bullmq": "^5.12.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "express-validator": "^7.2.1",
+    "ioredis": "^5.8.0",
     "israeli-bank-scrapers": "file:../../israeli-bank-scrapers",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.16.0",

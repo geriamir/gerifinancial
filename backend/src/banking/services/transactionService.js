@@ -17,25 +17,61 @@ const convertToObjectId = (id) => {
 
 class TransactionService {
 
-  async scrapeTransactions(bankAccount, options = {}) {
+  // REMOVED: scrapeTransactions method
+  // Use dataSyncService.syncRegularAccountsIsolated() instead
+
+  /**
+   * Check if a transaction is a duplicate using multi-field matching
+   * More reliable than single identifier field
+   * @param {Object} transactionData - Transaction data to check
+   * @returns {Promise<Object|null>} - Existing transaction if duplicate found, null otherwise
+   */
+  async findPotentialDuplicate(transactionData) {
+    const { accountId, userId, date, amount, description, memo } = transactionData;
+    
+    // Create date range for same day (handles timezone variations and exact time differences)
+    const transactionDate = new Date(date);
+    const startOfDay = new Date(transactionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(transactionDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+    
     try {
-      const accounts = await bankScraperService.scrapeTransactions(bankAccount, options);
-      return await this.processScrapedTransactions(accounts, bankAccount);
-    } catch (error) {
-      bankAccount.status = 'error';
-      bankAccount.lastError = {
-        message: error.message,
-        date: new Date()
+      // Query for exact match on account, user, date (within same day), amount, description, and memo
+      // This uses the existing index: { accountId: 1, date: 1, amount: 1, description: 1 }
+      const query = {
+        accountId: convertToObjectId(accountId),
+        userId: convertToObjectId(userId),
+        date: {
+          $gte: startOfDay,
+          $lte: endOfDay
+        },
+        amount: amount,
+        description: description
       };
-      await bankAccount.save();
       
-      return {
-        newTransactions: 0,
-        duplicates: 0,
-        errors: [{
-          error: error.message
-        }]
-      };
+      // Include memo in duplicate check if provided
+      // Memo can be in either the memo field or rawData.memo field
+      if (memo) {
+        query.$or = [
+          { 'rawData.memo': memo },
+          { memo: memo }
+        ];
+      } else {
+        // If no memo provided, only match transactions that also have no memo
+        query.$and = [
+          { $or: [{ 'rawData.memo': { $exists: false } }, { 'rawData.memo': null }] },
+          { $or: [{ memo: { $exists: false } }, { memo: null }] }
+        ];
+      }
+      
+      const duplicate = await Transaction.findOne(query);
+      
+      return duplicate;
+    } catch (error) {
+      logger.error('Error checking for duplicate transaction:', error);
+      // Return null on error to allow transaction creation (fail open)
+      return null;
     }
   }
 
@@ -95,6 +131,22 @@ class TransactionService {
             continue;
           }
 
+          // Check for duplicate using multi-field matching (more reliable than identifier alone)
+          const existingTransaction = await this.findPotentialDuplicate({
+            accountId: bankAccount._id,
+            userId: bankAccount.userId,
+            date: transactionDate,
+            amount: transaction.chargedAmount,
+            description: transaction.description,
+            memo: transaction.rawData?.memo || transaction.memo || null
+          });
+
+          if (existingTransaction) {
+            logger.info(`Duplicate transaction detected via multi-field match: ${transaction.description}, date: ${transactionDate}, amount: ${transaction.chargedAmount}, existing ID: ${existingTransaction._id}`);
+            results.duplicates++;
+            continue; // Skip this transaction
+          }
+
           // Create transaction without type initially
           // For credit card providers, include the specific account identifier for later credit card matching
           const rawData = {
@@ -122,14 +174,17 @@ class TransactionService {
           });
           
           results.newTransactions++;
+          logger.debug(`Created new transaction: ${savedTx.description}, date: ${savedTx.date}, amount: ${savedTx.amount}, ID: ${savedTx._id}`);
           
           // Attempt auto-categorization which will also set the transaction type
           await categoryMappingService.attemptAutoCategorization(savedTx);
         } catch (error) {
+          // Still catch MongoDB unique constraint errors as a fallback
           if (error.code === 11000) {
-            logger.warn(`Duplicate transaction detected: ${transaction.identifier}`, error);
+            logger.warn(`Duplicate transaction detected via MongoDB constraint: ${transaction.identifier}`, error);
             results.duplicates++;
           } else {
+            logger.error(`Error processing transaction: ${transaction.description}`, error);
             results.errors.push({
               identifier: transaction.identifier,
               error: error.message

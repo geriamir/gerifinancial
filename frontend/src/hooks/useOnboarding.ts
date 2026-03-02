@@ -1,123 +1,214 @@
-import { useState, useCallback } from 'react';
-import { onboardingApi, OnboardingStatus, UpdateOnboardingStatusDto } from '../services/api/onboarding';
+import { useState, useEffect, useCallback } from 'react';
+import { onboardingApi, OnboardingStatus } from '../services/api/onboarding';
+import { useSSE } from './useSSE';
 
-export interface OnboardingData {
-  checkingAccount?: {
-    bankId: string;
-    name: string;
-    accountId: string;
-  };
-  transactionImport?: {
-    transactionsImported: number;
-    categorized: number;
-    importDate: Date;
-  };
-  creditCardAnalysis?: {
-    hasCreditCardActivity: boolean;
-    transactionCount: number;
-    recommendation: 'connect' | 'optional' | 'skip';
-    analysisDate: Date;
-  };
-  creditCards?: Array<{
-    id: string;
-    displayName: string;
-    provider: string;
-  }>;
+interface UseOnboardingResult {
+  status: OnboardingStatus | null;
+  loading: boolean;
+  error: Error | null;
+  refetch: () => Promise<OnboardingStatus>;
+  addCheckingAccount: (bankId: string, credentials: any, displayName?: string) => Promise<any>;
+  addCreditCardAccount: (bankId: string, credentials: any, displayName?: string) => Promise<any>;
+  proceedToCreditCardSetup: () => Promise<void>;
+  skipCreditCards: () => Promise<void>;
+  completeOnboarding: () => Promise<void>;
 }
 
-export const useOnboarding = () => {
-  const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
-  const [onboardingData, setOnboardingData] = useState<OnboardingData>({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+/**
+ * Custom hook for managing onboarding state
+ * 
+ * Features:
+ * - Fetches onboarding status
+ * - Real-time updates via SSE
+ * - Methods for onboarding actions
+ * - Error handling
+ * 
+ * @returns Onboarding state and methods
+ */
+export const useOnboarding = (): UseOnboardingResult => {
 
-  const updateStepData = useCallback((stepId: string, data: any) => {
-    setOnboardingData(prev => ({
-      ...prev,
-      [stepId.replace('-', '')]: data
-    }));
-  }, []);
+  const [status, setStatus] = useState<OnboardingStatus | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<Error | null>(null);
 
-  const markStepComplete = useCallback((stepId: string) => {
-    setCompletedSteps(prev => new Set([...Array.from(prev), stepId]));
-  }, []);
-
-  const updateOnboardingStatus = useCallback(async (stepId: string, stepData?: any) => {
-    setLoading(true);
-    setError(null);
-    
+  /**
+   * Fetch current onboarding status
+   */
+  const fetchStatus = useCallback(async () => {
     try {
-      // Update local state first
-      markStepComplete(stepId);
-      if (stepData) {
-        updateStepData(stepId, stepData);
-      }
-
-      // Prepare data for backend update
-      const newCompletedSteps = new Set([...Array.from(completedSteps), stepId]);
-      const isComplete = stepId === 'complete' || newCompletedSteps.has('complete');
-      
-      const updateData: UpdateOnboardingStatusDto = {
-        isComplete,
-        completedSteps: Array.from(newCompletedSteps),
-        hasCheckingAccount: newCompletedSteps.has('checking-account'),
-        hasCreditCards: newCompletedSteps.has('credit-card-setup') && 
-                       onboardingData.creditCards && 
-                       onboardingData.creditCards.length > 0,
-        creditCardAnalysisResults: onboardingData.creditCardAnalysis ? {
-          transactionCount: onboardingData.creditCardAnalysis.transactionCount,
-          recommendation: onboardingData.creditCardAnalysis.recommendation,
-          analyzedAt: onboardingData.creditCardAnalysis.analysisDate instanceof Date 
-            ? onboardingData.creditCardAnalysis.analysisDate 
-            : new Date(onboardingData.creditCardAnalysis.analysisDate)
-        } : undefined
-      };
-
-      // Update backend
-      await onboardingApi.updateStatus(updateData);
-      
-      return true;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update onboarding status';
-      setError(errorMessage);
-      console.error('Failed to update onboarding status:', err);
-      return false;
-    } finally {
+      setError(null);
+      const data = await onboardingApi.getOnboardingStatus();
+      setStatus(data);
       setLoading(false);
-    }
-  }, [completedSteps, onboardingData, markStepComplete, updateStepData]);
-
-  const loadOnboardingStatus = useCallback(async (): Promise<OnboardingStatus | null> => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const status = await onboardingApi.getStatus();
-      setCompletedSteps(new Set(status.completedSteps));
-      return status;
+      return data;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load onboarding status';
-      setError(errorMessage);
-      console.error('Failed to load onboarding status:', err);
-      return null;
-    } finally {
+      setError(err as Error);
       setLoading(false);
+      throw err;
     }
   }, []);
 
-  const clearError = useCallback(() => {
-    setError(null);
+  /**
+   * Handle SSE events - refetch status when events occur
+   */
+  const handleSSEEvent = useCallback(async (event: any) => {
+    console.log('[useOnboarding] Received SSE event:', event.type);
+    
+    // Refetch status on relevant events
+    switch (event.type) {
+      case 'scraping:started':
+      case 'scraping:progress':
+      case 'scraping:completed':
+      case 'scraping:failed':
+      case 'onboarding:credit-card-detection':
+      case 'onboarding:credit-card-matching':
+        await fetchStatus();
+        break;
+    }
+  }, [fetchStatus]);
+
+  // Connect to SSE for real-time updates
+  useSSE(handleSSEEvent, { autoConnect: true });
+
+  /**
+   * Add checking account during onboarding
+   */
+  const addCheckingAccount = useCallback(async (
+    bankId: string, 
+    credentials: any, 
+    displayName?: string
+  ) => {
+    try {
+      setError(null);
+      const result = await onboardingApi.addCheckingAccount(bankId, credentials, displayName);
+      // Delay to let backend update before refetching (3 seconds to ensure backend has started scraping)
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Refetch status after adding account
+      await fetchStatus();
+      return result;
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, [fetchStatus]);
+
+  /**
+   * Add credit card account during onboarding
+   */
+  const addCreditCardAccount = useCallback(async (
+    bankId: string,
+    credentials: any,
+    displayName?: string
+  ) => {
+    try {
+      setError(null);
+      const result = await onboardingApi.addCreditCardAccount(bankId, credentials, displayName);
+      // Refetch status after adding account
+      await fetchStatus();
+      return result;
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, [fetchStatus]);
+
+  /**
+   * Skip credit card setup
+   */
+  const proceedToCreditCardSetup = useCallback(async () => {
+    try {
+      setError(null);
+      await onboardingApi.proceedToCreditCardSetup();
+      // Refetch status after proceeding
+      await fetchStatus();
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, [fetchStatus]);
+
+  const skipCreditCards = useCallback(async () => {
+    try {
+      setError(null);
+      await onboardingApi.skipCreditCards();
+      // Refetch status after skipping
+      await fetchStatus();
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, [fetchStatus]);
+
+  /**
+   * Complete onboarding (with or without full coverage)
+   */
+  const completeOnboarding = useCallback(async () => {
+    try {
+      setError(null);
+      await onboardingApi.completeOnboarding();
+      // Refetch status after completing
+      await fetchStatus();
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    }
+  }, [fetchStatus]);
+
+  /**
+   * Initial fetch on mount
+   */
+  useEffect(() => {
+    fetchStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {
-    completedSteps,
-    onboardingData,
+    status,
     loading,
     error,
-    updateStepData,
-    markStepComplete,
-    updateOnboardingStatus,
-    loadOnboardingStatus,
-    clearError
+    refetch: fetchStatus,
+    addCheckingAccount,
+    addCreditCardAccount,
+    proceedToCreditCardSetup,
+    skipCreditCards,
+    completeOnboarding
   };
+};
+
+/**
+ * Helper hook to determine what UI to show based on current step
+ */
+export const useOnboardingStep = (status: OnboardingStatus | null) => {
+  if (!status) {
+    return 'loading';
+  }
+
+  switch (status.currentStep) {
+    case 'checking-account':
+      return 'connect-checking';
+      
+    case 'transaction-import':
+      if (status.transactionImport.scrapingStatus.isActive) {
+        return 'importing';
+      }
+      return 'waiting';
+      
+    case 'credit-card-detection':
+      return 'analyzing';
+      
+    case 'credit-card-setup':
+      return 'credit-card-setup';
+      
+    case 'credit-card-matching':
+      if (!status.creditCardMatching.completed) {
+        return 'matching';
+      }
+      return 'matching-complete';
+      
+    case 'complete':
+      return 'complete';
+      
+    default:
+      return 'unknown';
+  }
 };

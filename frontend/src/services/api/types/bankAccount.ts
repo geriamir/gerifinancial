@@ -8,6 +8,10 @@ export interface BankAccount {
     message: string;
     date: string;
   };
+  credentials?: {
+    username: string;
+    // password is never exposed
+  };
   scrapingConfig: {
     schedule: {
       frequency: 'daily' | 'weekly' | 'monthly';
@@ -37,13 +41,12 @@ export interface ScrapeOptionsDto {
 }
 
 export interface SingleAccountScrapeResult {
-  newTransactions: number;
-  duplicates: number;
-  needsVerification: number;
-  errors: Array<{ error: string }>;
-  // Enhanced fields for investment data (optional for backward compatibility)
-  newInvestments?: number;
-  updatedInvestments?: number;
+  message: string;
+  accountId: string;
+  accountName: string;
+  queuedJobs: string[];
+  totalJobs: number;
+  priority: string;
 }
 
 export interface BulkScrapeResult {

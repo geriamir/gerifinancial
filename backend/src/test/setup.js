@@ -99,12 +99,17 @@ afterAll(async () => {
       await mongoose.connection.close(true); // Force close
     }
     
-    // Stop MongoDB Memory Server with timeout
+    // Stop MongoDB Memory Server with proper timeout handling
     if (mongod) {
+      let timeoutId;
       await Promise.race([
         mongod.stop(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('MongoDB stop timeout')), 10000))
-      ]);
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('MongoDB stop timeout')), 10000);
+        })
+      ]).finally(() => {
+        if (timeoutId) clearTimeout(timeoutId);
+      });
     }
   } catch (error) {
     console.warn('Test teardown warning (non-blocking):', error.message);

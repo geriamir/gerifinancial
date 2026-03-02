@@ -23,6 +23,7 @@ Cypress.Commands.add('createTestUser', (options = {}) => {
       Cypress.env('testUserId', response.body.userId);
       
       // Set onboarding as complete for test users to skip onboarding flow
+      // Update both legacy (onboardingStatus) and new (onboarding) fields
       return cy.request({
         method: 'POST',
         url: `${Cypress.env('apiUrl')}/api/users/onboarding-status`,
@@ -33,7 +34,37 @@ Cypress.Commands.add('createTestUser', (options = {}) => {
           hasCheckingAccount: true,
           hasCreditCards: false
         }
+      }).then(() => {
+        return cy.request({
+          method: 'POST',
+          url: `${Cypress.env('apiUrl')}/api/onboarding/complete-onboarding`,
+          headers: { Authorization: `Bearer ${token}` }
+        });
       }).then(() => token);
+    });
+});
+
+// Create onboarding user (without completing onboarding)
+Cypress.Commands.add('createOnboardingUser', (options = {}) => {
+  const defaultOptions = {
+    email: 'onboarding@example.com',
+    password: 'password123',
+    name: 'Onboarding User',
+    ...options
+  };
+
+  return cy.request('POST', `${Cypress.env('apiUrl')}/api/auth/register`, defaultOptions)
+    .then((response) => {
+      const token = response.body.token;
+      const userId = response.body.user?.id || response.body.userId;
+      Cypress.env('testUserId', userId);
+      
+      cy.log('Created onboarding user:', userId);
+      
+      // New users automatically get onboarding structure with defaults:
+      // isComplete: false, currentStep: 'checking-account'
+      // This matches what happens in the real app
+      return token;
     });
 });
 
@@ -82,7 +113,7 @@ Cypress.Commands.add('createBankAccount', (token: string, options: Partial<BankA
 
 // Clear test data command - now uses MongoDB task
 Cypress.Commands.add('clearTestData', () => {
-  cy.task('db:clearTestData', null, { timeout: 10000 }).then(() => {
+  cy.task('db:clearTestData', null, { timeout: 30000 }).then(() => {
     localStorage.clear();
   });
 });

@@ -2,13 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
-import { onboardingApi } from '../../services/api/onboarding';
-
-interface OnboardingStatus {
-  isComplete: boolean;
-  hasCheckingAccount: boolean;
-  completedSteps: string[];
-}
+import { onboardingApi, OnboardingStatus } from '../../services/api/onboarding';
 
 interface OnboardingGuardProps {
   children: React.ReactNode;
@@ -30,16 +24,57 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
       }
 
       try {
-        // Check if user has onboarding status
-        const status = await onboardingApi.getStatus();
+        // Check if user has onboarding status (use new API)
+        const status = await onboardingApi.getOnboardingStatus();
         setOnboardingStatus(status);
       } catch (error) {
         console.error('Failed to check onboarding status:', error);
         // Fallback: assume onboarding is needed for new users
         setOnboardingStatus({
           isComplete: false,
-          hasCheckingAccount: false,
-          completedSteps: []
+          currentStep: 'checking-account',
+          completedSteps: [],
+          startedAt: new Date().toISOString(),
+          completedAt: null,
+          checkingAccount: {
+            connected: false,
+            accountId: null,
+            connectedAt: null,
+            bankId: null
+          },
+          transactionImport: {
+            completed: false,
+            transactionsImported: 0,
+            completedAt: null,
+            scrapingStatus: {
+              isActive: false,
+              status: null,
+              error: null,
+              message: null,
+              progress: 0
+            }
+          },
+          creditCardDetection: {
+            analyzed: false,
+            analyzedAt: null,
+            transactionCount: 0,
+            recommendation: null,
+            sampleTransactions: []
+          },
+          creditCardSetup: {
+            skipped: false,
+            skippedAt: null,
+            creditCardAccounts: []
+          },
+          creditCardMatching: {
+            completed: false,
+            completedAt: null,
+            totalCreditCardPayments: 0,
+            coveredPayments: 0,
+            uncoveredPayments: 0,
+            coveragePercentage: 0,
+            matchedPayments: []
+          }
         });
       } finally {
         setLoading(false);
@@ -57,7 +92,7 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
       if (!isAuthenticated || !user || authLoading) return;
 
       try {
-        const status = await onboardingApi.getStatus();
+        const status = await onboardingApi.getOnboardingStatus();
         setOnboardingStatus(status);
       } catch (error) {
         console.error('Failed to recheck onboarding status:', error);

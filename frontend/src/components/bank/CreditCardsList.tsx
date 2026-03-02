@@ -183,6 +183,7 @@ export const CreditCardsList: React.FC = () => {
   const [creditCards, setCreditCards] = useState<CreditCardWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
 
   const fetchCreditCards = async () => {
     try {
@@ -200,6 +201,10 @@ export const CreditCardsList: React.FC = () => {
   useEffect(() => {
     fetchCreditCards();
   }, []);
+
+  // Cards with activity in the last 6 months are "active"
+  const activeCards = creditCards.filter(card => card.totalSpentLast6Months > 0 || card.recentTransactionCount > 0);
+  const inactiveCards = creditCards.filter(card => card.totalSpentLast6Months === 0 && card.recentTransactionCount === 0);
 
   if (loading) {
     return <Typography>Loading credit cards...</Typography>;
@@ -230,11 +235,35 @@ export const CreditCardsList: React.FC = () => {
           </Typography>
         </Paper>
       ) : (
-        <Stack spacing={0}>
-          {creditCards.map(card => (
-            <CreditCardItem key={card._id} card={card} />
-          ))}
-        </Stack>
+        <>
+          <Stack spacing={0}>
+            {activeCards.map(card => (
+              <CreditCardItem key={card._id} card={card} />
+            ))}
+          </Stack>
+
+          {inactiveCards.length > 0 && (
+            <Box sx={{ mt: 4 }}>
+              <Button
+                onClick={() => setShowInactive(!showInactive)}
+                endIcon={showInactive ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                sx={{ mb: 1, textTransform: 'none' }}
+                color="inherit"
+              >
+                <Typography variant="subtitle1" color="text.secondary">
+                  Inactive Cards ({inactiveCards.length})
+                </Typography>
+              </Button>
+              <Collapse in={showInactive}>
+                <Stack spacing={0}>
+                  {inactiveCards.map(card => (
+                    <CreditCardItem key={card._id} card={card} />
+                  ))}
+                </Stack>
+              </Collapse>
+            </Box>
+          )}
+        </>
       )}
     </Box>
   );

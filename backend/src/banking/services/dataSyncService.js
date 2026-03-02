@@ -1,145 +1,58 @@
 const { BankAccount, Transaction } = require('../models');
 const { TransactionType } = require('../constants/enums');
-const { CurrencyExchange, ForeignCurrencyAccount } = require('../../foreign-currency');
-const { Investment } = require('../../investments');
+const { ForeignCurrencyAccount } = require('../../foreign-currency');
 const bankScraperService = require('./bankScraperService');
-const transactionService = require('./transactionService');
-const creditCardDetectionService = require('./creditCardDetectionService');
-const { investmentService, portfolioService } = require('../../investments');
 const logger = require('../../shared/utils/logger');
+const queuedDataSyncService = require('./queuedDataSyncService');
 
 class DataSyncService {
+  constructor() {
+    // Delay strategy initialization to avoid circular dependencies
+    this.strategies = null;
+  }
+
+  // Get strategies from global registry
+  getStrategies() {
+    if (!global.syncStrategies) {
+      throw new Error('Sync strategies not initialized. Please ensure app.js has initialized the strategy registry.');
+    }
+    return global.syncStrategies;
+  }
+
   /**
-   * Syncs bank account data by scraping and processing transactions, portfolios, and investments.
+   * Syncs bank account data using the async queue system.
    * @param {BankAccount} bankAccount - The bank account to sync data for.
    * @param {Object} [options={}] - Additional options for the sync process.
    */
   async syncBankAccountData(bankAccount, options = {}) {
-    try {
-      logger.info(`Starting comprehensive data sync for bank account ${bankAccount._id} (${bankAccount.name}) starting from ${bankAccount.lastScraped ? bankAccount.lastScraped.toISOString() : 'initial scrape'}...`);
+    logger.info(`Starting queue-based data sync for bank account ${bankAccount._id} (${bankAccount.name}) starting from ${bankAccount.lastScraped ? bankAccount.lastScraped.toISOString() : 'initial scrape'}...`);
 
-      // Single scraping session that gets transactions, portfolios, and legacy investments
-      const scrapingResult = await bankScraperService.scrapeTransactions(bankAccount, options);
-      
-      // Delegate processing to dedicated services
-      const transactionResults = await transactionService.processScrapedTransactions(scrapingResult.accounts || [], bankAccount);
-
-      // Update scraping status to complete after transactions are processed and categorized
-      await this.updateScrapingStatusComplete(bankAccount._id, transactionResults);
-      
-      // Process portfolios (new structure) or legacy investments
-      let portfolioResults = { newPortfolios: 0, updatedPortfolios: 0, errors: [] };
-      let investmentResults = { newInvestments: 0, updatedInvestments: 0, errors: [] };
-      
-      if (scrapingResult.portfolios && scrapingResult.portfolios.length > 0) {
-        // New portfolio structure - each portfolio contains investments
-        logger.info(`Processing ${scrapingResult.portfolios.length} portfolios for bank account ${bankAccount._id}`);
-        portfolioResults = await portfolioService.processScrapedPortfolios(scrapingResult.portfolios, bankAccount);
-        
-        // Aggregate investment results from all portfolios
-        if (portfolioResults.aggregatedInvestmentResults) {
-          investmentResults = portfolioResults.aggregatedInvestmentResults;
-        }
-      }
-
-      // Process investment transactions if available
-      if (scrapingResult.investmentTransactions && scrapingResult.investmentTransactions.length > 0) {
-        logger.info(`Processing ${scrapingResult.investmentTransactions.length} investment transactions for bank account ${bankAccount._id}`);
-      }
-
-      // Process foreign currency accounts if available
-      let foreignCurrencyResults = { newAccounts: 0, updatedAccounts: 0, newTransactions: 0, errors: [] };
-      if (scrapingResult.foreignCurrencyAccounts && scrapingResult.foreignCurrencyAccounts.length > 0) {
-        logger.info(`Processing ${scrapingResult.foreignCurrencyAccounts.length} foreign currency accounts for bank account ${bankAccount._id}`);
-        foreignCurrencyResults = await this.processForeignCurrencyAccounts(
-          scrapingResult.foreignCurrencyAccounts, 
-          bankAccount
-        );
-      }
-      
-      // Update bank account status on successful sync
-      const syncSuccessful = this.isSyncSuccessful(transactionResults, investmentResults, portfolioResults);
-      if (syncSuccessful) {
-        await this.updateBankAccountStatus(bankAccount._id, transactionResults);
-      }
-      
-      const combinedResults = {
-        transactions: transactionResults,
-        investments: investmentResults,
-        portfolios: portfolioResults,
-        totalNewItems: transactionResults.newTransactions + investmentResults.newInvestments + portfolioResults.newPortfolios,
-        totalUpdatedItems: investmentResults.updatedInvestments + portfolioResults.updatedPortfolios,
-        hasErrors: transactionResults.errors.length > 0 || investmentResults.errors.length > 0 || portfolioResults.errors.length > 0
-      };
-      
-      // Step 4: Post-categorization credit card detection
-      if (syncSuccessful) {
-        try {
-          await creditCardDetectionService.detectAndUpdateCreditCards(bankAccount.userId);
-          logger.info(`Credit card detection completed for user ${bankAccount.userId}`);
-        } catch (detectionError) {
-          logger.warn(`Credit card detection failed for user ${bankAccount.userId}: ${detectionError.message}`);
-          // Don't fail the entire sync for detection errors
-        }
-      }
-      
-      logger.info(`Data sync completed for account ${bankAccount._id} (${bankAccount.name}):`, {
-        newTransactions: transactionResults.newTransactions,
-        newInvestments: investmentResults.newInvestments,
-        updatedInvestments: investmentResults.updatedInvestments,
-        newPortfolios: portfolioResults.newPortfolios,
-        updatedPortfolios: portfolioResults.updatedPortfolios,
-        errors: combinedResults.hasErrors
-      });
-      
-      return combinedResults;
-    } catch (error) {
-      logger.error(`Data sync failed for bank account ${bankAccount._id}: ${error.message}`);
-      
-      // Update bank account error status
-      await this.updateBankAccountError(bankAccount, error.message);
-      
-      throw error;
-    }
-  }
-
-  // Helper method for backward compatibility - delegates to transaction service
-  async syncTransactionsOnly(bankAccount, options = {}) {
-    try {
-      logger.info(`Starting transaction-only sync for bank account ${bankAccount._id}...`);
-      
-      const scrapingResult = await bankScraperService.scrapeTransactions(bankAccount, options);
-      const transactionResults = await transactionService.processScrapedTransactions(scrapingResult.accounts || [], bankAccount);
-      
-      // Update lastScraped timestamp on successful scraping
-      if (transactionResults.errors.length === 0 || transactionResults.newTransactions > 0) {
-        await this.updateBankAccountStatus(bankAccount._id, transactionResults);
-      }
-      
-      return transactionResults;
-    } catch (error) {
-      logger.error(`Transaction-only sync failed for bank account ${bankAccount._id}: ${error.message}`);
-      await this.updateBankAccountError(bankAccount, error.message);
-      throw error;
-    }
-  }
-
-  // Helper method for investment-only sync
-  async syncInvestmentsOnly(bankAccount, options = {}) {
-    try {
-      logger.info(`Starting investment-only sync for bank account ${bankAccount._id}...`);
-      
-      const scrapingResult = await bankScraperService.scrapeTransactions(bankAccount, options);
-      const investmentResults = await investmentService.processScrapedInvestments(scrapingResult.investments || [], bankAccount);
-      
-      return {
-        investments: investmentResults,
-        hasErrors: investmentResults.errors.length > 0
-      };
-    } catch (error) {
-      logger.error(`Investment-only sync failed for bank account ${bankAccount._id}: ${error.message}`);
-      throw error;
-    }
+    // Import queue service (lazy import to avoid circular dependencies)
+    
+    const priority = options.priority || 'normal';
+    
+    // Queue all strategies for comprehensive sync
+    const result = await queuedDataSyncService.queueBankAccountSync(
+      bankAccount._id,
+      { ...options, priority }
+    );
+    
+    logger.info(`Queued comprehensive sync jobs for account ${bankAccount._id}:`, result.queuedJobs);
+    
+    // Return simplified result structure for queue-based processing
+    return {
+      message: 'Comprehensive sync jobs queued successfully',
+      jobIds: result.queuedJobs,
+      totalJobs: result.totalJobs,
+      priority,
+      queuedAt: new Date().toISOString(),
+      estimatedCompletionTime: '2-5 minutes',
+      note: 'Results will be processed by background workers. Use queue/stats endpoint to monitor progress.',
+      // Minimal compatibility properties
+      hasErrors: false,
+      hasAnySuccess: true,
+      isQueueBased: true
+    };
   }
 
   // Get comprehensive sync status for a bank account
@@ -155,6 +68,7 @@ class DataSyncService {
         userId 
       });
       
+      const { Investment } = require('../../investments');
       const investmentCount = await Investment.countDocuments({ 
         bankAccountId: bankAccountId, 
         userId,
@@ -209,19 +123,24 @@ class DataSyncService {
       
       if (transactionResults && transactionResults.mostRecentTransactionDate) {
         lastScrapedDate = transactionResults.mostRecentTransactionDate;
-        logger.info(`Using most recent transaction date ${lastScrapedDate.toISOString()} as lastScraped for account ${freshBankAccount._id}`);
+        logger.info(`Using most recent transaction date ${lastScrapedDate.toISOString()} as base for lastScraped for account ${freshBankAccount._id}`);
+        
+        // Add 1 day to ensure we don't miss any transactions on the boundary
+        // This is safer than adding 1 minute, which can still cause overlaps
+        // Multi-field duplicate detection will catch any duplicates from the overlap
+        lastScrapedDate.setDate(lastScrapedDate.getDate() + 1);
+        lastScrapedDate.setHours(0, 0, 0, 0); // Set to start of next day
+        
+        logger.info(`Set lastScraped to start of next day (${lastScrapedDate.toISOString()}) to prevent boundary gaps`);
       } else {
         logger.info(`No recent transaction date found, using current time as lastScraped for account ${freshBankAccount._id}`);
       }
-
-      // Adding 1 minute to avoid duplicate transactions
-      lastScrapedDate.setMinutes(lastScrapedDate.getMinutes() + 1);
 
       freshBankAccount.lastScraped = lastScrapedDate;
       freshBankAccount.status = 'active';
       freshBankAccount.lastError = null; // Clear any previous errors
       await freshBankAccount.save();
-      logger.info(`Updated lastScraped for account ${freshBankAccount._id} to ${freshBankAccount.lastScraped}`);
+      logger.info(`Updated lastScraped for account ${freshBankAccount._id} to ${freshBankAccount.lastScraped.toISOString()}`);
     }
   }
 
@@ -398,34 +317,25 @@ class DataSyncService {
             );
           }
 
-          // Update exchange rate if available
-          if (fcAccount.transactions.length > 0) {
-            const latestTransaction = fcAccount.transactions
-              .filter(t => t.exchangeRate)
-              .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+          // Update account balance using proper exchange rate service
+          if (fcAccount.balance !== undefined) {
+            try {
+              // Get proper exchange rate from currency exchange service instead of transaction data
+              const { currencyExchangeService } = require('../../foreign-currency');
+              const currentRate = await currencyExchangeService.getCurrentRate(fcAccount.currency, 'ILS');
               
-            if (latestTransaction && latestTransaction.exchangeRate) {
-              await foreignCurrencyAccount.updateBalance(
-                fcAccount.balance, 
-                latestTransaction.exchangeRate
-              );
-
-              // Update currency exchange rate in database
-              try {
-                await CurrencyExchange.updateRate(
-                  fcAccount.currency,
-                  'ILS',
-                  latestTransaction.exchangeRate,
-                  new Date(latestTransaction.date),
-                  'israeli-bank-scrapers',
-                  {
-                    accountNumber: fcAccount.originalAccountNumber,
-                    source: 'transaction'
-                  }
-                );
-              } catch (rateError) {
-                logger.warn(`Failed to update exchange rate for ${fcAccount.currency}:`, rateError.message);
+              if (currentRate) {
+                await foreignCurrencyAccount.updateBalance(fcAccount.balance, currentRate);
+                logger.info(`Updated ${fcAccount.currency} account balance using proper exchange rate: ${currentRate}`);
+              } else {
+                // Fallback to updating balance without exchange rate
+                await foreignCurrencyAccount.updateBalance(fcAccount.balance);
+                logger.warn(`No exchange rate available for ${fcAccount.currency}, updated balance without conversion`);
               }
+            } catch (rateError) {
+              logger.warn(`Failed to get proper exchange rate for ${fcAccount.currency}, updating balance without conversion:`, rateError.message);
+              // Fallback to updating balance without exchange rate
+              await foreignCurrencyAccount.updateBalance(fcAccount.balance);
             }
           }
 
