@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Button, CircularProgress, Typography, Stack, Alert, Chip } from '@mui/material';
-import { FactCheck as VerifyIcon } from '@mui/icons-material';
+import { Button, CircularProgress, Typography, Stack, Alert } from '@mui/material';
+import { FindReplace as RecoverIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { bankAccountsApi } from '../../services/api/bank';
 import { format } from 'date-fns';
@@ -8,12 +8,10 @@ import { track } from '../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
 
 interface ScrapeResult {
-  newTransactions: number;
-  duplicates: number;
-  needsVerification: number;
-  errors: Array<{ error: string }>;
-  newInvestments?: number;
-  updatedInvestments?: number;
+  message: string;
+  queuedJobs?: string[];
+  totalJobs?: number;
+  priority?: string;
 }
 
 interface AccountScrapingProps {
@@ -30,7 +28,9 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
   onScrapingComplete 
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false);
   const [scrapeResult, setScrapeResult] = useState<ScrapeResult | null>(null);
+  const [recoverMessage, setRecoverMessage] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const handleScrape = async () => {
@@ -54,6 +54,23 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
     navigate('/verify');
   };
 
+  const handleRecover = async () => {
+    setIsRecovering(true);
+    setRecoverMessage(null);
+    try {
+      const result = await bankAccountsApi.recoverTransactions(accountId);
+      const correctedDate = format(new Date(result.correctedLastScraped), 'PPpp');
+      setRecoverMessage(`Scrape date reset to ${correctedDate}. Recovery scrape queued (${result.totalJobs} jobs).`);
+      onScrapingComplete?.();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Recovery failed';
+      setRecoverMessage(`Error: ${errorMessage}`);
+      console.error('Recovery failed:', err);
+    } finally {
+      setIsRecovering(false);
+    }
+  };
+
   return (
     <Stack spacing={2}>
       <Typography variant="body2" color="text.secondary">
@@ -72,63 +89,40 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
           {isLoading ? 'Scraping...' : 'Scrape Now'}
         </Button>
 
-        {scrapeResult?.needsVerification ? (
+        {scrapeResult && (
           <Button
             variant="outlined"
             size="small"
             color="warning"
             onClick={handleVerifyClick}
-            startIcon={<VerifyIcon />}
           >
-            Verify {scrapeResult.needsVerification} Transactions
+            Verify Transactions
           </Button>
-        ) : null}
+        )}
+
+        <Button
+          variant="text"
+          size="small"
+          color="secondary"
+          onClick={handleRecover}
+          disabled={isRecovering || isLoading || isDisabled}
+          startIcon={isRecovering ? <CircularProgress size={16} /> : <RecoverIcon />}
+        >
+          {isRecovering ? 'Recovering...' : 'Missing Transactions'}
+        </Button>
       </Stack>
 
+      {recoverMessage && (
+        <Alert severity={recoverMessage.startsWith('Error') ? 'error' : 'success'} sx={{ mt: 1 }}>
+          {recoverMessage}
+        </Alert>
+      )}
+
       {scrapeResult && (
-        <Stack spacing={1}>
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Chip
-              label={`${scrapeResult.newTransactions} New Transactions`}
-              size="small"
-              color="primary"
-            />
-            {scrapeResult.needsVerification > 0 && (
-              <Chip
-                label={`${scrapeResult.needsVerification} Need Verification`}
-                size="small"
-                color="warning"
-              />
-            )}
-            {scrapeResult.duplicates > 0 && (
-              <Chip
-                label={`${scrapeResult.duplicates} Duplicates`}
-                size="small"
-                color="default"
-              />
-            )}
-            {(scrapeResult.newInvestments || 0) > 0 && (
-              <Chip
-                label={`${scrapeResult.newInvestments} New Investments`}
-                size="small"
-                color="secondary"
-              />
-            )}
-            {(scrapeResult.updatedInvestments || 0) > 0 && (
-              <Chip
-                label={`${scrapeResult.updatedInvestments} Updated Investments`}
-                size="small"
-                color="info"
-              />
-            )}
-          </Stack>
-          
-          {scrapeResult.errors.length > 0 && (
-            <Alert severity="error" sx={{ mt: 1 }}>
-              {scrapeResult.errors.length} error(s) occurred during scraping
-            </Alert>
-          )}
-        </Stack>
+        <Alert severity="success" sx={{ mt: 1 }}>
+          {scrapeResult.message}
+          {scrapeResult.totalJobs != null && ` (${scrapeResult.totalJobs} job(s) queued)`}
+        </Alert>
       )}
     </Stack>
   );

@@ -14,12 +14,14 @@ import {
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Key as KeyIcon
 } from '@mui/icons-material';
 import { bankAccountsApi } from '../../services/api/bank';
 import { BankAccount } from '../../services/api/types';
 import { SUPPORTED_BANKS } from '../../constants/banks';
 import { BankAccountForm } from './BankAccountForm';
+import { UpdateCredentialsDialog } from './UpdateCredentialsDialog';
 import { track } from '../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
 import { ScrapeAllAccounts } from './ScrapeAllAccounts';
@@ -45,6 +47,8 @@ export const BankAccountsList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showUpdateCredentials, setShowUpdateCredentials] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const fetchAccounts = async () => {
     try {
       const data = await bankAccountsApi.getAll();
@@ -99,6 +103,11 @@ export const BankAccountsList: React.FC = () => {
         error: errorMessage 
       });
     }
+  };
+
+  const handleUpdateCredentials = (account: BankAccount) => {
+    setSelectedAccount(account);
+    setShowUpdateCredentials(true);
   };
 
   const getBankName = (bankId: string) => {
@@ -178,6 +187,15 @@ export const BankAccountsList: React.FC = () => {
                       size="small"
                     />
                     <IconButton
+                      onClick={() => handleUpdateCredentials(account)}
+                      title="Update Credentials"
+                      aria-label={`Update credentials for ${account.name}`}
+                      size="small"
+                      color="primary"
+                    >
+                      <KeyIcon />
+                    </IconButton>
+                    <IconButton
                       onClick={() => handleTestConnection(account._id, getBankName(account.bankId))}
                       title="Test Connection"
                       aria-label={`Test connection for ${account.name}`}
@@ -205,6 +223,16 @@ export const BankAccountsList: React.FC = () => {
       <BankAccountForm
         open={showAddForm}
         onClose={() => setShowAddForm(false)}
+        onSuccess={fetchAccounts}
+      />
+
+      <UpdateCredentialsDialog
+        open={showUpdateCredentials}
+        account={selectedAccount}
+        onClose={() => {
+          setShowUpdateCredentials(false);
+          setSelectedAccount(null);
+        }}
         onSuccess={fetchAccounts}
       />
     </Box>

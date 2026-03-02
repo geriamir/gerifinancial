@@ -30,6 +30,17 @@ export const bankAccountsApi = {
     return response.data;
   },
 
+  updateCredentials: async (
+    id: string,
+    credentials: {
+      username: string;
+      password: string;
+    }
+  ): Promise<{ message: string; account: BankAccount }> => {
+    const response = await api.put(`/bank-accounts/${id}/credentials`, credentials);
+    return response.data;
+  },
+
   delete: async (id: string): Promise<void> => {
     await api.delete(`/bank-accounts/${id}`);
   },
@@ -56,6 +67,17 @@ export const bankAccountsApi = {
 
   scrapeAll: async (): Promise<BulkScrapeResult> => {
     const response = await api.post<BulkScrapeResult>('/bank-accounts/scrape-all');
+    return response.data;
+  },
+
+  recoverTransactions: async (id: string): Promise<{
+    message: string;
+    previousLastScraped: string | null;
+    correctedLastScraped: string;
+    latestTransactionDate: string | null;
+    totalJobs: number;
+  }> => {
+    const response = await api.post(`/bank-accounts/${id}/recover-transactions`);
     return response.data;
   }
 };

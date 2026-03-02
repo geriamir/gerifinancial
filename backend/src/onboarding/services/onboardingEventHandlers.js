@@ -54,6 +54,7 @@ class OnboardingEventHandlers {
       }
 
       const isOnboardingAccount = user.onboarding?.checkingAccount?.accountId?.toString() === bankAccountId.toString();
+      const isOnboardingComplete = user.onboarding?.isComplete === true;
       
       const bankAccount = await BankAccount.findById(bankAccountId);
       if (!bankAccount) {
@@ -76,7 +77,7 @@ class OnboardingEventHandlers {
       await bankAccount.save();
       
       // Only update onboarding structure if this is the onboarding checking account
-      if (isOnboardingAccount) {
+      if (isOnboardingAccount && !isOnboardingComplete) {
         const updateResult = await User.findByIdAndUpdate(
           userId,
           {
@@ -118,6 +119,7 @@ class OnboardingEventHandlers {
       }
 
       const isOnboardingCheckingAccount = user.onboarding?.checkingAccount?.accountId?.toString() === bankAccountId.toString();
+      const isOnboardingComplete = user.onboarding?.isComplete === true;
       const onboardingCreditCards = user.onboarding?.creditCardSetup?.creditCardAccounts || [];
       const isOnboardingCreditCard = onboardingCreditCards.some(
         cc => cc.accountId?.toString() === bankAccountId.toString()
@@ -154,7 +156,7 @@ class OnboardingEventHandlers {
       await bankAccount.save();
       
       // Handle onboarding checking account completion
-      if (isOnboardingCheckingAccount) {
+      if (isOnboardingCheckingAccount && !isOnboardingComplete) {
         // Run credit card detection
         logger.info(`Running credit card detection for user ${userId}`);
         const analysis = await creditCardDetectionService.analyzeCreditCardUsage(userId, 2);
@@ -195,7 +197,7 @@ class OnboardingEventHandlers {
       }
       
       // Handle onboarding credit card account completion
-      if (isOnboardingCreditCard) {
+      if (isOnboardingCreditCard && !isOnboardingComplete) {
         logger.info(`Onboarding credit card account ${bankAccountId} scraping completed`);
         
         // Check if this is the account we're currently waiting for (tracked by processingAccountId)

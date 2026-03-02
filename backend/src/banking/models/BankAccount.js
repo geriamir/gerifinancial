@@ -155,7 +155,13 @@ const bankAccountSchema = new mongoose.Schema({
 // Remove sensitive information when converting to JSON
 bankAccountSchema.set('toJSON', {
   transform: function(doc, ret, options) {
-    delete ret.credentials;
+    // Keep username but remove password
+    if (ret.credentials) {
+      ret.credentials = {
+        username: ret.credentials.username
+        // password is intentionally omitted
+      };
+    }
     return ret;
   }
 });
