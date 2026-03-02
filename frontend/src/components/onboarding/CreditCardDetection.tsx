@@ -161,8 +161,8 @@ export const CreditCardDetection: React.FC<CreditCardDetectionProps> = ({
             variant="outlined" 
             size="large"
             onClick={handleSkipCreditCards}
+            data-testid="skip-cards-btn"
           >
-            Skip for Now
           </Button>
         </Box>
 
@@ -234,8 +234,8 @@ export const CreditCardDetection: React.FC<CreditCardDetectionProps> = ({
           variant="contained" 
           size="large"
           onClick={handleSkipCreditCards}
+          data-testid="skip-cards-btn"
         >
-          Continue Without Credit Cards
         </Button>
       </Box>
 

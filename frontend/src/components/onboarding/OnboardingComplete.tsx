@@ -79,7 +79,7 @@ export const OnboardingComplete: React.FC<OnboardingCompleteProps> = ({
       <Box sx={{ textAlign: 'center', mb: 4 }}>
         <CheckIcon color="success" sx={{ fontSize: 80, mb: 2 }} />
         <Typography variant="h4" component="h2" gutterBottom>
-          🎉 Setup Complete!
+          🎉 Onboarding Complete!
         </Typography>
         <Typography variant="h6" color="text.secondary" gutterBottom>
           Welcome to GeriFinancial
@@ -226,6 +226,7 @@ export const OnboardingComplete: React.FC<OnboardingCompleteProps> = ({
           onClick={handleGoToDashboard}
           startIcon={<DashboardIcon />}
           sx={{ mb: 2 }}
+          data-testid="go-to-dashboard-btn"
         >
           Go to Dashboard
         </Button>

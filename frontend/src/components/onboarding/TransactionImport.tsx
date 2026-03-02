@@ -127,7 +127,7 @@ const TransactionImport: React.FC<TransactionImportProps> = ({
 
   return (
     <Fade in timeout={500}>
-      <Box sx={{ maxWidth: 600, mx: 'auto' }}>
+      <Box sx={{ maxWidth: 600, mx: 'auto' }} data-testid="transaction-import-status">
         <Paper elevation={2} sx={{ p: 4 }}>
           <Typography variant="h5" gutterBottom align="center">
             Transaction Import
@@ -162,6 +162,7 @@ const TransactionImport: React.FC<TransactionImportProps> = ({
                   )}
                 </Box>
                 <LinearProgress 
+                  data-testid="progress-bar"
                   variant="determinate" 
                   value={progress}
                   sx={{ height: 8, borderRadius: 4 }}
@@ -175,7 +176,7 @@ const TransactionImport: React.FC<TransactionImportProps> = ({
                     {stageInfo.icon}
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }} data-testid="status-message">
                       {stageInfo.text}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
