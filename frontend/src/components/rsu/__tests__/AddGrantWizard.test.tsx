@@ -113,7 +113,7 @@ describe('AddGrantWizard', () => {
 
   describe('Form Validation', () => {
     it('should show validation errors for empty required fields', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       renderWithProviders(
         <AddGrantWizard open={true} onClose={mockOnClose} />
       );
@@ -124,11 +124,11 @@ describe('AddGrantWizard', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Stock symbol is required')).toBeInTheDocument();
-      }, { timeout: 10000 });
+      });
     });
 
     it('should validate stock symbol field', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       renderWithProviders(
         <AddGrantWizard open={true} onClose={mockOnClose} />
       );
@@ -149,8 +149,8 @@ describe('AddGrantWizard', () => {
       // The validation should show "Grant date is required" since stock symbol is filled
       await waitFor(() => {
         expect(screen.getByText('Grant date is required')).toBeInTheDocument();
-      }, { timeout: 5000 });
-    }, 15000); // Increase Jest test timeout to 15 seconds
+      });
+    });
   });
 
   describe('Form Submission', () => {
@@ -167,7 +167,7 @@ describe('AddGrantWizard', () => {
     });
 
     it('should handle form wizard navigation', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       
       renderWithProviders(
         <AddGrantWizard open={true} onClose={mockOnClose} />
@@ -185,11 +185,11 @@ describe('AddGrantWizard', () => {
       // Should show grant date validation
       await waitFor(() => {
         expect(screen.getByText('Grant date is required')).toBeInTheDocument();
-      }, { timeout: 10000 });
-    }, 15000);
+      });
+    });
 
     it('should show form validation errors', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       
       renderWithProviders(
         <AddGrantWizard open={true} onClose={mockOnClose} />
@@ -201,13 +201,13 @@ describe('AddGrantWizard', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Stock symbol is required')).toBeInTheDocument();
-      }, { timeout: 10000 });
+      });
     });
   });
 
   describe('Dialog Controls', () => {
     it('should call onClose when cancel button is clicked', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       renderWithProviders(
         <AddGrantWizard open={true} onClose={mockOnClose} />
       );
