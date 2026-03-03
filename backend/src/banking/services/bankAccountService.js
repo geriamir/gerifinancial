@@ -86,20 +86,20 @@ class BankAccountService {
     }
   }
 
-  async updateCredentials(accountId, userId, { username, password }) {
+  async updateCredentials(accountId, userId, { username, password, apiToken }) {
     const bankAccount = await BankAccount.findOne({ _id: accountId, userId });
     if (!bankAccount) {
       throw new Error('Bank account not found');
     }
 
-    // Validate new credentials before saving
-    await bankScraperService.validateCredentials(bankAccount.bankId, { username, password });
-
-    // Update credentials
-    bankAccount.credentials = {
-      username,
-      password // Will be encrypted by pre-save hook
-    };
+    if (bankAccount.bankId === 'mercury') {
+      // Mercury uses API token — no scraper validation
+      bankAccount.credentials = { apiToken };
+    } else {
+      // Israeli banks: validate new credentials before saving
+      await bankScraperService.validateCredentials(bankAccount.bankId, { username, password });
+      bankAccount.credentials = { username, password };
+    }
 
     // Clear any previous errors
     bankAccount.lastError = null;

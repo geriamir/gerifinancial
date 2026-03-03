@@ -33,8 +33,9 @@ export const bankAccountsApi = {
   updateCredentials: async (
     id: string,
     credentials: {
-      username: string;
-      password: string;
+      username?: string;
+      password?: string;
+      apiToken?: string;
     }
   ): Promise<{ message: string; account: BankAccount }> => {
     const response = await api.put(`/bank-accounts/${id}/credentials`, credentials);

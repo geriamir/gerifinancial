@@ -21,7 +21,7 @@ class MockQueuedDataSyncService {
       throw new Error(`Bank account not found: ${bankAccountId}`);
     }
 
-    const strategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
+    const strategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency', 'mercury-checking'];
     const jobIds = strategies.map((strategyName, index) => ({
       jobId: `mock-job-${bankAccountId}-${strategyName}-${Date.now()}-${index}`,
       strategyName,
@@ -99,7 +99,7 @@ class MockQueuedDataSyncService {
       throw new Error(`Bank account not found: ${bankAccountId}`);
     }
 
-    const validStrategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
+    const validStrategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency', 'mercury-checking'];
     if (!validStrategies.includes(strategyName)) {
       throw new Error(`Invalid strategy: ${strategyName}`);
     }

@@ -1,4 +1,3 @@
-const logger = require('../../shared/utils/logger');
 const { decrypt } = require('../../shared/utils/encryption');
 
 const MERCURY_BASE_URL = 'https://api.mercury.com/api/v1';

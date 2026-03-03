@@ -1,5 +1,3 @@
-const logger = require('../../../shared/utils/logger');
-
 /**
  * Abstract base class for all sync strategies.
  * Defines the common interface that every sync strategy must implement.

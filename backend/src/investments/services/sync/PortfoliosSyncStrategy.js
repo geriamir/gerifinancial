@@ -1,4 +1,4 @@
-const { BaseSyncStrategy, IsraeliScraperSyncStrategy, bankScraperService } = require('../../../banking');
+const { IsraeliScraperSyncStrategy, bankScraperService } = require('../../../banking');
 const logger = require('../../../shared/utils/logger');
 const portfolioService = require('../portfolioService');
 const investmentService = require('../investmentService');
