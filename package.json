@@ -18,7 +18,8 @@
     "test:e2e": "npm run test:e2e:ci",
     "cypress:open": "node scripts/open-cypress.js",
     "test:all": "npm run test && npm run test:e2e",
-    "clear-users": "cd backend && node src/scripts/clearUserData.js"
+    "clear-users": "cd backend && node src/scripts/clearUserData.js",
+    "debugscrape": "set DEBUG=israeli-bank-scrapers:* && npm run dev"
   },
   "repository": {
     "type": "git",

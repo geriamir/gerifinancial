@@ -171,12 +171,31 @@ class PortfolioService {
     const investmentService = require('./investmentService');
     
     if (!investments || !Array.isArray(investments)) {
-      return { newInvestments: 0, updatedInvestments: 0, errors: [] };
+      return { investmentResults: { newInvestments: 0, updatedInvestments: 0, errors: [] } };
     }
 
     // Delegate to investment service to handle persistence with portfolio MongoDB _id
     const results = await investmentService.processPortfolioInvestments(investments, portfolioMongoId, bankAccount);
     
+    // Close investments not returned by the scraper
+    const scrapedPaperIds = new Set(
+      investments.map(i => i.paperId?.toString()).filter(Boolean)
+    );
+
+    const activeInvestments = await Investment.find({
+      portfolioId: portfolioMongoId,
+      status: 'active'
+    });
+
+    for (const inv of activeInvestments) {
+      if (!scrapedPaperIds.has(inv.accountNumber)) {
+        inv.status = 'closed';
+        inv.lastUpdated = new Date();
+        await inv.save();
+        logger.info(`Closed stale investment ${inv.accountNumber} for portfolio ${portfolioMongoId}`);
+      }
+    }
+
     return {
       investmentResults: results
     };
@@ -229,6 +248,28 @@ class PortfolioService {
     existingPortfolio.rawData = portfolioData.rawData;
     existingPortfolio.lastUpdated = new Date();
     existingPortfolio.status = 'active';
+    
+    // Sync embedded investments from the Investment collection
+    const activeInvestments = await Investment.find({
+      portfolioId: existingPortfolio._id,
+      status: 'active'
+    });
+
+    existingPortfolio.investments = activeInvestments.flatMap(inv =>
+      (inv.holdings || []).map(h => ({
+        symbol: h.symbol,
+        name: h.name,
+        quantity: h.quantity,
+        currentPrice: h.currentPrice,
+        marketValue: h.marketValue,
+        currency: h.currency || inv.currency,
+        sector: h.sector,
+        investmentType: h.holdingType || 'stock',
+        paperId: inv.accountNumber
+      }))
+    );
+
+    existingPortfolio.calculateMarketValue();
     
     await existingPortfolio.save();
     return existingPortfolio;
@@ -424,7 +465,7 @@ class PortfolioService {
         totalMarketValue: portfolio.totalMarketValue || 0,
         cashBalance: portfolio.cashBalance || 0,
         currency: portfolio.currency,
-        investments: portfolio.investments.map(investment => ({
+        investments: (portfolio.investments || []).map(investment => ({
           symbol: investment.symbol,
           name: investment.name,
           quantity: investment.quantity,
@@ -480,7 +521,7 @@ class PortfolioService {
       existingSnapshot.totalMarketValue = portfolio.totalMarketValue || 0;
       existingSnapshot.cashBalance = portfolio.cashBalance || 0;
       existingSnapshot.currency = portfolio.currency;
-      existingSnapshot.investments = portfolio.investments.map(investment => ({
+      existingSnapshot.investments = (portfolio.investments || []).map(investment => ({
         symbol: investment.symbol,
         name: investment.name,
         quantity: investment.quantity,
