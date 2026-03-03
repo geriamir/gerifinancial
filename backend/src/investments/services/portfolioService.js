@@ -1,4 +1,5 @@
 const { Portfolio, PortfolioSnapshot } = require('../models');
+const { Investment } = require('../models');
 const logger = require('../../shared/utils/logger');
 
 class PortfolioService {
@@ -170,12 +171,31 @@ class PortfolioService {
     const investmentService = require('./investmentService');
     
     if (!investments || !Array.isArray(investments)) {
-      return { newInvestments: 0, updatedInvestments: 0, errors: [] };
+      return { investmentResults: { newInvestments: 0, updatedInvestments: 0, errors: [] } };
     }
 
     // Delegate to investment service to handle persistence with portfolio MongoDB _id
     const results = await investmentService.processPortfolioInvestments(investments, portfolioMongoId, bankAccount);
     
+    // Close investments not returned by the scraper
+    const scrapedPaperIds = new Set(
+      investments.map(i => i.paperId?.toString()).filter(Boolean)
+    );
+
+    const activeInvestments = await Investment.find({
+      portfolioId: portfolioMongoId,
+      status: 'active'
+    });
+
+    for (const inv of activeInvestments) {
+      if (!scrapedPaperIds.has(inv.accountNumber)) {
+        inv.status = 'closed';
+        inv.lastUpdated = new Date();
+        await inv.save();
+        logger.info(`Closed stale investment ${inv.accountNumber} for portfolio ${portfolioMongoId}`);
+      }
+    }
+
     return {
       investmentResults: results
     };
@@ -229,8 +249,77 @@ class PortfolioService {
     existingPortfolio.lastUpdated = new Date();
     existingPortfolio.status = 'active';
     
+    // Sync embedded investments from the Investment collection
+    const activeInvestments = await Investment.find({
+      portfolioId: existingPortfolio._id,
+      status: 'active'
+    });
+
+    existingPortfolio.investments = activeInvestments.flatMap(inv =>
+      (inv.holdings || []).map(h => ({
+        symbol: h.symbol,
+        name: h.name,
+        quantity: h.quantity,
+        currentPrice: h.currentPrice,
+        marketValue: h.marketValue,
+        currency: h.currency || inv.currency,
+        sector: h.sector,
+        investmentType: h.holdingType || 'stock',
+        paperId: inv.accountNumber
+      }))
+    );
+
+    existingPortfolio.calculateMarketValue();
+    
     await existingPortfolio.save();
     return existingPortfolio;
+  }
+
+  /**
+   * Close portfolios and investments that were not returned by the latest scrape.
+   * When a bank no longer returns portfolio data, those portfolios are marked as 'closed'.
+   */
+  async closeStalePortfolios(scrapedPortfolios, bankAccount) {
+    const results = { closedPortfolios: 0, closedInvestments: 0 };
+
+    try {
+      // Build set of scraped portfolio IDs
+      const scrapedPortfolioIds = new Set(
+        (scrapedPortfolios || [])
+          .map(p => p.portfolioId || p.paperId?.toString() || p.accountNumber)
+          .filter(Boolean)
+      );
+
+      // Find all active portfolios for this bank account
+      const activePortfolios = await Portfolio.find({
+        userId: bankAccount.userId,
+        bankAccountId: bankAccount._id,
+        status: 'active'
+      });
+
+      for (const portfolio of activePortfolios) {
+        if (!scrapedPortfolioIds.has(portfolio.portfolioId)) {
+          // This portfolio was not in the scrape results — mark as closed
+          portfolio.status = 'closed';
+          portfolio.lastUpdated = new Date();
+          await portfolio.save();
+          results.closedPortfolios++;
+
+          // Also close all investments under this portfolio
+          const closedInvestments = await Investment.updateMany(
+            { portfolioId: portfolio._id, status: 'active' },
+            { $set: { status: 'closed', lastUpdated: new Date() } }
+          );
+          results.closedInvestments += closedInvestments.modifiedCount || 0;
+
+          logger.info(`Closed stale portfolio ${portfolio.portfolioId} and ${closedInvestments.modifiedCount || 0} investments for account ${bankAccount._id}`);
+        }
+      }
+    } catch (error) {
+      logger.error(`Error closing stale portfolios for account ${bankAccount._id}: ${error.message}`);
+    }
+
+    return results;
   }
 
   async getUserPortfolios(userId, options = {}) {
@@ -376,7 +465,7 @@ class PortfolioService {
         totalMarketValue: portfolio.totalMarketValue || 0,
         cashBalance: portfolio.cashBalance || 0,
         currency: portfolio.currency,
-        investments: portfolio.investments.map(investment => ({
+        investments: (portfolio.investments || []).map(investment => ({
           symbol: investment.symbol,
           name: investment.name,
           quantity: investment.quantity,
@@ -432,7 +521,7 @@ class PortfolioService {
       existingSnapshot.totalMarketValue = portfolio.totalMarketValue || 0;
       existingSnapshot.cashBalance = portfolio.cashBalance || 0;
       existingSnapshot.currency = portfolio.currency;
-      existingSnapshot.investments = portfolio.investments.map(investment => ({
+      existingSnapshot.investments = (portfolio.investments || []).map(investment => ({
         symbol: investment.symbol,
         name: investment.name,
         quantity: investment.quantity,

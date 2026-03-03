@@ -119,7 +119,8 @@ const portfolioSchema = new mongoose.Schema({
   rawData: {
     type: mongoose.Schema.Types.Mixed,
     required: false
-  }
+  },
+  investments: [portfolioInvestmentSchema]
 }, {
   timestamps: true
 });
