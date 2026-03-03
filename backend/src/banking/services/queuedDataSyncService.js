@@ -54,7 +54,9 @@ class QueuedDataSyncService {
     logger.info(`Queueing sync jobs for bank account ${bankAccount.name} (${bankAccountId})`);
 
     const jobIds = [];
-    const strategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
+    const strategies = bankAccount.bankId === 'mercury'
+      ? ['mercury-checking']
+      : ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
     
     // Determine job priority based on account or options
     const priority = this.determinePriority(bankAccount, options);

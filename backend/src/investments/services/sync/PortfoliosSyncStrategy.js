@@ -1,4 +1,4 @@
-const { BaseSyncStrategy, bankScraperService } = require('../../../banking');
+const { BaseSyncStrategy, IsraeliScraperSyncStrategy, bankScraperService } = require('../../../banking');
 const logger = require('../../../shared/utils/logger');
 const portfolioService = require('../portfolioService');
 const investmentService = require('../investmentService');
@@ -6,7 +6,7 @@ const investmentService = require('../investmentService');
 /**
  * Sync strategy for investment portfolios and transactions
  */
-class PortfoliosSyncStrategy extends BaseSyncStrategy {
+class PortfoliosSyncStrategy extends IsraeliScraperSyncStrategy {
   constructor() {
     super({
       name: 'portfolios',

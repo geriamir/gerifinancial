@@ -5,17 +5,24 @@ const logger = require('../../shared/utils/logger');
 const bankAccountEvents = require('./bankAccountEvents');
 
 class BankAccountService {
-  async create(userId, { bankId, name, username, password }) {
-    // Validate bank credentials first
-    await bankScraperService.validateCredentials(bankId, { username, password });
+  async create(userId, { bankId, name, username, password, apiToken }) {
+    let credentials;
+
+    if (bankId === 'mercury') {
+      // Mercury uses API token auth — no scraper validation needed
+      credentials = { apiToken };
+    } else {
+      // Israeli banks use username/password with browser scraping
+      await bankScraperService.validateCredentials(bankId, { username, password });
+      credentials = { username, password };
+    }
+
     const bankAccount = new BankAccount({
       userId,
       bankId,
       name,
-      credentials: {
-        username,
-        password // Will be encrypted by pre-save hook
-      },
+      credentials,
+      defaultCurrency: bankId === 'mercury' ? 'USD' : 'ILS',
       status: 'active'
     });
 

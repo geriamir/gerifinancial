@@ -21,15 +21,22 @@ router.post('/', auth, async (req, res) => {
   try {
     const { bankId, name, credentials } = req.body;
 
-    if (!bankId || !name || !credentials?.username || !credentials?.password) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (bankId === 'mercury') {
+      if (!name || !credentials?.apiToken) {
+        return res.status(400).json({ error: 'Missing required fields: name and API token are required for Mercury' });
+      }
+    } else {
+      if (!bankId || !name || !credentials?.username || !credentials?.password) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
     }
 
     const bankAccount = await bankAccountService.create(req.user._id, {
       bankId,
       name,
       username: credentials.username,
-      password: credentials.password
+      password: credentials.password,
+      apiToken: credentials.apiToken
     });
 
     // Return without sensitive data

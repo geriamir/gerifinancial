@@ -41,11 +41,28 @@ class BankClassificationService {
   }
   
   /**
-   * Get all supported banks (checking + credit card)
+   * Get list of API-based banks (no browser scraping)
+   * @returns {string[]} Array of API bank IDs
+   */
+  static getApiBanks() {
+    return ['mercury'];
+  }
+  
+  /**
+   * Check if a bank ID is an API-based bank
+   * @param {string} bankId - Bank identifier
+   * @returns {boolean} True if it's an API-based bank
+   */
+  static isApiBank(bankId) {
+    return this.getApiBanks().includes(bankId);
+  }
+  
+  /**
+   * Get all supported banks (checking + credit card + API)
    * @returns {string[]} Array of all supported bank IDs
    */
   static getAllSupportedBanks() {
-    return [...this.getCheckingBanks(), ...this.getCreditCardProviders()];
+    return [...this.getCheckingBanks(), ...this.getCreditCardProviders(), ...this.getApiBanks()];
   }
   
   /**
@@ -68,6 +85,9 @@ class BankClassificationService {
     }
     if (this.isCreditCardProvider(bankId)) {
       return 'credit';
+    }
+    if (this.isApiBank(bankId)) {
+      return 'api';
     }
     return null;
   }

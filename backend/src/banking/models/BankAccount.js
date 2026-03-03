@@ -11,7 +11,7 @@ const bankAccountSchema = new mongoose.Schema({
   bankId: {
     type: String,
     required: true,
-    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard'] // Supported banks
+    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury'] // Supported banks
   },
   defaultCurrency: {
     type: String,
@@ -25,11 +25,15 @@ const bankAccountSchema = new mongoose.Schema({
   credentials: {
     username: {
       type: String,
-      required: true
+      required: function() { return this.bankId !== 'mercury'; }
     },
     password: {
       type: String,
-      required: true
+      required: function() { return this.bankId !== 'mercury'; }
+    },
+    apiToken: {
+      type: String,
+      required: function() { return this.bankId === 'mercury'; }
     }
   },
   // Per-strategy sync tracking
@@ -155,11 +159,10 @@ const bankAccountSchema = new mongoose.Schema({
 // Remove sensitive information when converting to JSON
 bankAccountSchema.set('toJSON', {
   transform: function(doc, ret, options) {
-    // Keep username but remove password
     if (ret.credentials) {
       ret.credentials = {
         username: ret.credentials.username
-        // password is intentionally omitted
+        // password and apiToken are intentionally omitted
       };
     }
     return ret;
@@ -172,10 +175,14 @@ bankAccountSchema.index({ userId: 1, bankId: 1 });
 // Pre-save middleware to encrypt password
 bankAccountSchema.pre('save', function(next) {
   try {
-    if (this.isModified('credentials.password')) {
-      // Only encrypt if not already encrypted (encrypted strings contain ':')
+    if (this.isModified('credentials.password') && this.credentials.password) {
       if (!this.credentials.password.includes(':')) {
         this.credentials.password = encrypt(this.credentials.password);
+      }
+    }
+    if (this.isModified('credentials.apiToken') && this.credentials.apiToken) {
+      if (!this.credentials.apiToken.includes(':')) {
+        this.credentials.apiToken = encrypt(this.credentials.apiToken);
       }
     }
     next();
