@@ -52,6 +52,11 @@ const bankAccountSchema = new mongoose.Schema({
       lastScraped: { type: Date, default: null },
       lastAttempted: { type: Date, default: null },
       status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
+    },
+    'mercury-checking': {
+      lastScraped: { type: Date, default: null },
+      lastAttempted: { type: Date, default: null },
+      status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
     }
   },
   // Global last scraped for backward compatibility and general status
@@ -172,16 +177,24 @@ bankAccountSchema.set('toJSON', {
 // Index for efficient queries
 bankAccountSchema.index({ userId: 1, bankId: 1 });
 
-// Pre-save middleware to encrypt password
+// Check if a value looks like it was encrypted by our encrypt() function.
+// Encrypted format is: 32-hex-char IV + ':' + hex-encoded ciphertext
+function isEncrypted(text) {
+  if (!text || !text.includes(':')) return false;
+  const ivPart = text.split(':')[0];
+  return /^[0-9a-f]{32}$/i.test(ivPart);
+}
+
+// Pre-save middleware to encrypt credentials
 bankAccountSchema.pre('save', function(next) {
   try {
     if (this.isModified('credentials.password') && this.credentials.password) {
-      if (!this.credentials.password.includes(':')) {
+      if (!isEncrypted(this.credentials.password)) {
         this.credentials.password = encrypt(this.credentials.password);
       }
     }
     if (this.isModified('credentials.apiToken') && this.credentials.apiToken) {
-      if (!this.credentials.apiToken.includes(':')) {
+      if (!isEncrypted(this.credentials.apiToken)) {
         this.credentials.apiToken = encrypt(this.credentials.apiToken);
       }
     }

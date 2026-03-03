@@ -41,7 +41,7 @@ class MercurySyncStrategy extends BaseSyncStrategy {
       const client = new MercuryApiClient(bankAccount.credentials.apiToken);
 
       // Determine start date from strategy sync or default 6 months back
-      const strategyData = bankAccount.strategySync?.['checking-accounts'];
+      const strategyData = bankAccount.strategySync?.['mercury-checking'];
       let startDate;
       if (strategyData?.lastScraped) {
         startDate = strategyData.lastScraped;
