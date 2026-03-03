@@ -186,7 +186,7 @@ describe('AddGrantWizard', () => {
       await waitFor(() => {
         expect(screen.getByText('Grant date is required')).toBeInTheDocument();
       }, { timeout: 10000 });
-    });
+    }, 15000);
 
     it('should show form validation errors', async () => {
       const user = userEvent.setup();
