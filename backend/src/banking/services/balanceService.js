@@ -1,5 +1,7 @@
 const { BalanceSnapshot, BankAccount } = require('../models');
 const logger = require('../../shared/utils/logger');
+const currencyExchangeService = require('../../foreign-currency/services/currencyExchangeService');
+const User = require('../../auth/models/User');
 
 class BalanceService {
   /**
@@ -70,10 +72,37 @@ class BalanceService {
   }
 
   /**
-   * Get current balance summary for all of a user's bank accounts
+   * Get the user's display currency, defaulting to 'ILS'.
+   */
+  async getUserDisplayCurrency(userId) {
+    const user = await User.findById(userId).select('displayCurrency').lean();
+    return user?.displayCurrency || 'ILS';
+  }
+
+  /**
+   * Convert an amount to the target currency using the exchange service.
+   * Returns the original amount if conversion fails or currency already matches.
+   */
+  async convertToTargetCurrency(amount, fromCurrency, targetCurrency) {
+    if (!fromCurrency || fromCurrency === targetCurrency) return amount;
+    try {
+      const rate = await currencyExchangeService.getCurrentRate(fromCurrency, targetCurrency);
+      return amount * rate;
+    } catch (err) {
+      logger.warn(`Currency conversion failed for ${fromCurrency} → ${targetCurrency}: ${err.message}`);
+      return amount;
+    }
+  }
+
+  /**
+   * Get current balance summary for all of a user's bank accounts.
+   * Balances are converted to the user's display currency.
    */
   async getAccountSummary(userId) {
-    const latestSnapshots = await BalanceSnapshot.getLatestByUser(userId);
+    const [latestSnapshots, displayCurrency] = await Promise.all([
+      BalanceSnapshot.getLatestByUser(userId),
+      this.getUserDisplayCurrency(userId)
+    ]);
 
     // Enrich with account details
     const bankAccounts = await BankAccount.find({ userId })
@@ -85,15 +114,25 @@ class BalanceService {
       accountMap[account._id.toString()] = account;
     }
 
-    return latestSnapshots.map(snapshot => {
+    const items = [];
+    for (const snapshot of latestSnapshots) {
       const account = accountMap[snapshot.bankAccountId.toString()];
-      return {
+      const currency = snapshot.currency || account?.defaultCurrency || displayCurrency;
+      const convertedBalance = await this.convertToTargetCurrency(snapshot.balance, currency, displayCurrency);
+      const convertedDayChange = await this.convertToTargetCurrency(snapshot.dayChange, currency, displayCurrency);
+
+      items.push({
         ...snapshot,
+        convertedBalance,
+        convertedDayChange,
+        displayCurrency,
         accountName: account?.name,
         bankId: account?.bankId,
         accountStatus: account?.status
-      };
-    });
+      });
+    }
+
+    return items;
   }
 
   /**

@@ -101,7 +101,8 @@ router.get('/profile', auth, async (req, res) => {
       user: {
         id: req.user._id,
         email: req.user.email,
-        name: req.user.name
+        name: req.user.name,
+        displayCurrency: req.user.displayCurrency || 'ILS'
       }
     });
   } catch (error) {

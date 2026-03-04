@@ -41,16 +41,18 @@ interface FinancialSummary {
   budgetStatus: 'on-track' | 'over-budget' | 'under-budget';
   budgetExists?: boolean;
   totalBudgetedExpenses?: number;
+  displayCurrency: string;
 }
 
 interface FinancialSummaryCardsProps {
   loading?: boolean;
 }
 
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('he-IL', {
+const formatCurrency = (amount: number, currency = 'ILS'): string => {
+  const locale = currency === 'ILS' ? 'he-IL' : 'en-US';
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: 'ILS',
+    currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
@@ -87,7 +89,8 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
     monthlyExpenses: 0,
     budgetProgress: 0,
     balanceChange: 0,
-    budgetStatus: 'on-track'
+    budgetStatus: 'on-track',
+    displayCurrency: 'ILS'
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -202,12 +205,14 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
         let actualBalance = totalBalance;
         let balanceChange = 0;
         let balanceSummaryData: BalanceSummaryItem[] = [];
+        let balanceDisplayCurrency = 'ILS';
 
         if (balanceSummary.status === 'fulfilled') {
           balanceSummaryData = balanceSummary.value;
           if (balanceSummaryData.length > 0) {
-            actualBalance = balanceSummaryData.reduce((sum, item) => sum + item.balance, 0);
-            balanceChange = balanceSummaryData.reduce((sum, item) => sum + item.dayChange, 0);
+            actualBalance = balanceSummaryData.reduce((sum, item) => sum + item.convertedBalance, 0);
+            balanceChange = balanceSummaryData.reduce((sum, item) => sum + item.convertedDayChange, 0);
+            balanceDisplayCurrency = balanceSummaryData[0].displayCurrency || 'ILS';
           }
         }
 
@@ -228,7 +233,8 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
           balanceChange,
           budgetStatus,
           budgetExists,
-          totalBudgetedExpenses
+          totalBudgetedExpenses,
+          displayCurrency: balanceDisplayCurrency
         });
 
       } catch (err) {
@@ -260,9 +266,9 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
   const cards = [
     {
       title: 'Total Balance',
-      value: formatCurrency(summary.totalBalance),
+      value: formatCurrency(summary.totalBalance, summary.displayCurrency),
       change: summary.balanceChange !== 0
-        ? `${summary.balanceChange > 0 ? '+' : ''}${formatCurrency(summary.balanceChange)} today`
+        ? `${summary.balanceChange > 0 ? '+' : ''}${formatCurrency(summary.balanceChange, summary.displayCurrency)} today`
         : '',
       changeColor: summary.balanceChange >= 0 ? 'success.main' : 'error.main',
       icon: <BalanceIcon sx={{ fontSize: 40, color: 'primary.main' }} />,

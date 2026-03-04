@@ -96,6 +96,9 @@ export interface BalanceSummaryItem {
   currency: string;
   dayChange: number;
   dayChangePercent: number;
+  convertedBalance: number;
+  convertedDayChange: number;
+  displayCurrency: string;
   accountName: string;
   bankId: string;
   accountStatus: string;
