@@ -1,6 +1,7 @@
 const logger = require('../../../shared/utils/logger');
 const IsraeliScraperSyncStrategy = require('./IsraeliScraperSyncStrategy');
 const transactionService = require('../transactionService');
+const balanceService = require('../balanceService');
 
 class CheckingAccountsSyncStrategy extends IsraeliScraperSyncStrategy {
   constructor() {
@@ -38,6 +39,21 @@ class CheckingAccountsSyncStrategy extends IsraeliScraperSyncStrategy {
       scrapingResult.accounts || [], 
       bankAccount
     );
+
+    // Record balance from scraper (optional — not all Israeli banks return it)
+    for (const account of (scrapingResult.accounts || [])) {
+      if (account.balance != null) {
+        try {
+          await balanceService.recordBalance(bankAccount._id, {
+            balance: account.balance,
+            currency: bankAccount.defaultCurrency || 'ILS',
+            source: 'scraper'
+          });
+        } catch (err) {
+          logger.warn(`Failed to record balance for account ${bankAccount._id}: ${err.message}`);
+        }
+      }
+    }
     
     return {
       transactions: transactionResults,

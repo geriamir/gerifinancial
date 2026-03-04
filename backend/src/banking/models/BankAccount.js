@@ -64,6 +64,15 @@ const bankAccountSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  // Current balance (updated on each sync for quick access)
+  currentBalance: {
+    type: Number,
+    default: null
+  },
+  lastBalanceUpdate: {
+    type: Date,
+    default: null
+  },
   status: {
     type: String,
     enum: ['active', 'error', 'pending', 'disabled'],

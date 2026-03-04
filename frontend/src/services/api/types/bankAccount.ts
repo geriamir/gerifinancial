@@ -4,6 +4,9 @@ export interface BankAccount {
   name: string;
   status: 'active' | 'error' | 'pending' | 'disabled';
   lastScraped: string | null;
+  currentBalance?: number | null;
+  lastBalanceUpdate?: string | null;
+  defaultCurrency?: string;
   lastError?: {
     message: string;
     date: string;
@@ -74,4 +77,33 @@ export interface UpdateScrapingConfigDto {
     startDate?: string;
     monthsBack?: number;
   };
+}
+
+export interface BalanceSnapshot {
+  date: string;
+  balance: number;
+  availableBalance: number | null;
+  currency: string;
+  dayChange: number;
+  dayChangePercent: number;
+}
+
+export interface BalanceSummaryItem {
+  bankAccountId: string;
+  date: string;
+  balance: number;
+  availableBalance: number | null;
+  currency: string;
+  dayChange: number;
+  dayChangePercent: number;
+  accountName: string;
+  bankId: string;
+  accountStatus: string;
+}
+
+export interface NetWorthHistoryItem {
+  date: string;
+  dateString: string;
+  totalBalance: number;
+  accountCount: number;
 }
