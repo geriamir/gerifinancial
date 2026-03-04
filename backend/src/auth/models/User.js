@@ -18,6 +18,11 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  displayCurrency: {
+    type: String,
+    default: 'ILS',
+    trim: true
+  },
   // Enhanced onboarding tracking with complete state persistence
   onboarding: {
     // Overall status

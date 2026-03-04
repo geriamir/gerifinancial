@@ -204,4 +204,45 @@ router.get('/queue/health', auth, async (req, res) => {
   }
 });
 
+// ===== BALANCE ROUTES =====
+
+const balanceService = require('../services/balanceService');
+
+// Get current balance summary for all user accounts
+router.get('/balance/summary', auth, async (req, res) => {
+  try {
+    const summary = await balanceService.getAccountSummary(req.user._id);
+    res.json(summary);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get aggregated net worth history
+router.get('/balance/net-worth', auth, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const history = await balanceService.getNetWorthHistory(req.user._id, days);
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get balance history for a specific account
+router.get('/:id/balance/history', auth, async (req, res) => {
+  try {
+    // Verify ownership
+    const bankAccount = await BankAccount.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!bankAccount) {
+      return res.status(404).json({ error: 'Bank account not found' });
+    }
+    const days = parseInt(req.query.days) || 30;
+    const history = await balanceService.getBalanceHistory(req.params.id, days);
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

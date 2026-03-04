@@ -29,6 +29,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { transactionsApi } from '../../services/api/transactions';
 import { budgetsApi } from '../../services/api/budgets';
+import { bankAccountsApi } from '../../services/api/bank';
+import type { BalanceSummaryItem } from '../../services/api/types/bankAccount';
 
 interface FinancialSummary {
   totalBalance: number;
@@ -39,16 +41,18 @@ interface FinancialSummary {
   budgetStatus: 'on-track' | 'over-budget' | 'under-budget';
   budgetExists?: boolean;
   totalBudgetedExpenses?: number;
+  displayCurrency: string;
 }
 
 interface FinancialSummaryCardsProps {
   loading?: boolean;
 }
 
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('he-IL', {
+const formatCurrency = (amount: number, currency = 'ILS'): string => {
+  const locale = currency === 'ILS' ? 'he-IL' : 'en-US';
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: 'ILS',
+    currency,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount);
@@ -85,7 +89,8 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
     monthlyExpenses: 0,
     budgetProgress: 0,
     balanceChange: 0,
-    budgetStatus: 'on-track'
+    budgetStatus: 'on-track',
+    displayCurrency: 'ILS'
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,12 +110,13 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
         const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
         const endOfMonth = new Date(currentYear, currentMonth, 0);
         
-        const [currentTransactions, budgetSummary] = await Promise.allSettled([
+        const [currentTransactions, budgetSummary, balanceSummary] = await Promise.allSettled([
           transactionsApi.getTransactions({
             startDate: startOfMonth,
             endDate: endOfMonth
           }),
-          budgetsApi.getBudgetSummary(currentYear, currentMonth)
+          budgetsApi.getBudgetSummary(currentYear, currentMonth),
+          bankAccountsApi.getBalanceSummary()
         ]);
 
         // Calculate monthly income and expenses
@@ -195,18 +201,29 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
           }
         }
 
-        // Use actualBalance from budget summary, fallback to calculated totalBalance
-        let actualBalance = totalBalance; // fallback to calculated from transactions
-        if (budgetSummary.status === 'fulfilled') {
+        // Use real balance data from balance snapshots if available
+        let actualBalance = totalBalance;
+        let balanceChange = 0;
+        let balanceSummaryData: BalanceSummaryItem[] = [];
+        let balanceDisplayCurrency = 'ILS';
+
+        if (balanceSummary.status === 'fulfilled') {
+          balanceSummaryData = balanceSummary.value;
+          if (balanceSummaryData.length > 0) {
+            actualBalance = balanceSummaryData.reduce((sum, item) => sum + item.convertedBalance, 0);
+            balanceChange = balanceSummaryData.reduce((sum, item) => sum + item.convertedDayChange, 0);
+            balanceDisplayCurrency = balanceSummaryData[0].displayCurrency || 'ILS';
+          }
+        }
+
+        // Fall back to budget summary actualBalance if no balance snapshots
+        if (balanceSummaryData.length === 0 && budgetSummary.status === 'fulfilled') {
           const budgetResponse = budgetSummary.value as any;
           const budgetData = budgetResponse.data || budgetResponse;
           if (budgetData.monthly && budgetData.monthly.actualBalance !== undefined) {
             actualBalance = budgetData.monthly.actualBalance;
           }
         }
-
-        // Calculate balance change (simplified - would need last month's data for real calculation)
-        const balanceChange = actualBalance > 0 ? 5.2 : -2.1; // Placeholder
 
         setSummary({
           totalBalance: actualBalance,
@@ -216,7 +233,8 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
           balanceChange,
           budgetStatus,
           budgetExists,
-          totalBudgetedExpenses
+          totalBudgetedExpenses,
+          displayCurrency: balanceDisplayCurrency
         });
 
       } catch (err) {
@@ -248,11 +266,13 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
   const cards = [
     {
       title: 'Total Balance',
-      value: formatCurrency(summary.totalBalance),
-      change: `${summary.balanceChange > 0 ? '+' : ''}${summary.balanceChange}%`,
-      changeColor: summary.balanceChange > 0 ? 'success.main' : 'error.main',
+      value: formatCurrency(summary.totalBalance, summary.displayCurrency),
+      change: summary.balanceChange !== 0
+        ? `${summary.balanceChange > 0 ? '+' : ''}${formatCurrency(summary.balanceChange, summary.displayCurrency)} today`
+        : '',
+      changeColor: summary.balanceChange >= 0 ? 'success.main' : 'error.main',
       icon: <BalanceIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
-      subtitle: 'vs last month'
+      subtitle: 'across all accounts'
     },
     {
       title: 'This Month',

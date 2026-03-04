@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
   Chip,
+  Collapse,
   IconButton,
   List,
   Paper,
@@ -15,7 +16,9 @@ import {
   Add as AddIcon,
   Delete as DeleteIcon,
   Refresh as RefreshIcon,
-  Key as KeyIcon
+  Key as KeyIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 import { bankAccountsApi } from '../../services/api/bank';
 import { BankAccount } from '../../services/api/types';
@@ -26,6 +29,8 @@ import { track } from '../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
 import { ScrapeAllAccounts } from './ScrapeAllAccounts';
 import { AccountScraping } from './AccountScraping';
+import { formatCurrency } from '../../utils/formatters';
+import { BalanceHistoryChart } from './BalanceHistoryChart';
 
 const getStatusColor = (status: BankAccount['status']) => {
   switch (status) {
@@ -49,6 +54,7 @@ export const BankAccountsList: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showUpdateCredentials, setShowUpdateCredentials] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
+  const [expandedAccount, setExpandedAccount] = useState<string | null>(null);
   const fetchAccounts = async () => {
     try {
       const data = await bankAccountsApi.getAll();
@@ -168,6 +174,11 @@ export const BankAccountsList: React.FC = () => {
                     <Typography color="textSecondary" variant="body2">
                       {getBankName(account.bankId)}
                     </Typography>
+                    {account.currentBalance != null && (
+                      <Typography variant="body1" fontWeight="bold" sx={{ mt: 0.5 }}>
+                        {formatCurrency(account.currentBalance, account.defaultCurrency || 'ILS')}
+                      </Typography>
+                    )}
                     {account.lastError && (
                       <Typography color="error" variant="caption" display="block" sx={{ mb: 1 }}>
                         Error: {account.lastError.message}
@@ -212,8 +223,33 @@ export const BankAccountsList: React.FC = () => {
                     >
                       <DeleteIcon />
                     </IconButton>
+                    {account.currentBalance != null && (
+                      <IconButton
+                        onClick={() => setExpandedAccount(
+                          expandedAccount === account._id ? null : account._id
+                        )}
+                        title="Balance History"
+                        aria-label={`Balance history for ${account.name}`}
+                        size="small"
+                      >
+                        {expandedAccount === account._id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                      </IconButton>
+                    )}
                   </Stack>
                 </Stack>
+                {account.currentBalance != null && (
+                  <Collapse in={expandedAccount === account._id}>
+                    <Box sx={{ mt: 2, borderTop: 1, borderColor: 'divider', pt: 1 }}>
+                      <Typography variant="subtitle2" color="textSecondary" sx={{ mb: 1 }}>
+                        Balance History (30 days)
+                      </Typography>
+                      <BalanceHistoryChart
+                        accountId={account._id}
+                        currency={account.defaultCurrency || 'ILS'}
+                      />
+                    </Box>
+                  </Collapse>
+                )}
               </CardContent>
             </Card>
           ))}

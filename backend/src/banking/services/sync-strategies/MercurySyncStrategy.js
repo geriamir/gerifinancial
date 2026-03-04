@@ -2,6 +2,7 @@ const logger = require('../../../shared/utils/logger');
 const BaseSyncStrategy = require('./BaseSyncStrategy');
 const MercuryApiClient = require('../mercuryApiClient');
 const transactionService = require('../transactionService');
+const balanceService = require('../balanceService');
 
 /**
  * Sync strategy for Mercury Bank using their public REST API.
@@ -53,6 +54,26 @@ class MercurySyncStrategy extends BaseSyncStrategy {
       // Fetch all Mercury accounts
       const mercuryAccounts = await client.getAccounts();
       logger.info(`Mercury returned ${mercuryAccounts.length} accounts`);
+
+      // Record balance from Mercury account data
+      let totalBalance = 0;
+      for (const account of mercuryAccounts) {
+        if (account.status === 'active' && account.currentBalance != null) {
+          totalBalance += account.currentBalance;
+        }
+      }
+      try {
+        await balanceService.recordBalance(bankAccount._id, {
+          balance: totalBalance,
+          availableBalance: mercuryAccounts
+            .filter(a => a.status === 'active')
+            .reduce((sum, a) => sum + (a.availableBalance || 0), 0),
+          currency: bankAccount.defaultCurrency || 'USD',
+          source: 'api'
+        });
+      } catch (err) {
+        logger.warn(`Failed to record Mercury balance for account ${bankAccount._id}: ${err.message}`);
+      }
 
       // Fetch transactions for each account and map to scraper format
       const scrapedAccounts = [];

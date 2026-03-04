@@ -5,7 +5,10 @@ import {
   UpdateScrapingConfigDto,
   ScrapeOptionsDto,
   SingleAccountScrapeResult,
-  BulkScrapeResult 
+  BulkScrapeResult,
+  BalanceSnapshot,
+  BalanceSummaryItem,
+  NetWorthHistoryItem
 } from './types/bankAccount';
 
 export const bankAccountsApi = {
@@ -79,6 +82,23 @@ export const bankAccountsApi = {
     totalJobs: number;
   }> => {
     const response = await api.post(`/bank-accounts/${id}/recover-transactions`);
+    return response.data;
+  },
+
+  // ===== Balance API =====
+
+  getBalanceSummary: async (): Promise<BalanceSummaryItem[]> => {
+    const response = await api.get('/bank-accounts/balance/summary');
+    return response.data;
+  },
+
+  getNetWorthHistory: async (days: number = 30): Promise<NetWorthHistoryItem[]> => {
+    const response = await api.get(`/bank-accounts/balance/net-worth?days=${days}`);
+    return response.data;
+  },
+
+  getBalanceHistory: async (id: string, days: number = 30): Promise<BalanceSnapshot[]> => {
+    const response = await api.get(`/bank-accounts/${id}/balance/history?days=${days}`);
     return response.data;
   }
 };
