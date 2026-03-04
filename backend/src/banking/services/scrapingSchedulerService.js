@@ -226,7 +226,9 @@ class ScrapingSchedulerService {
    */
   async accountNeedsStartupScraping(account) {
     try {
-      const strategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
+      const strategies = account.bankId === 'mercury'
+        ? ['mercury-checking']
+        : ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
       const strategiesNeedingSync = [];
 
       // Check each strategy individually

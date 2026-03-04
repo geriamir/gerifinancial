@@ -11,7 +11,7 @@ const bankAccountSchema = new mongoose.Schema({
   bankId: {
     type: String,
     required: true,
-    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard'] // Supported banks
+    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury'] // Supported banks
   },
   defaultCurrency: {
     type: String,
@@ -25,11 +25,15 @@ const bankAccountSchema = new mongoose.Schema({
   credentials: {
     username: {
       type: String,
-      required: true
+      required: function() { return this.bankId !== 'mercury'; }
     },
     password: {
       type: String,
-      required: true
+      required: function() { return this.bankId !== 'mercury'; }
+    },
+    apiToken: {
+      type: String,
+      required: function() { return this.bankId === 'mercury'; }
     }
   },
   // Per-strategy sync tracking
@@ -45,6 +49,11 @@ const bankAccountSchema = new mongoose.Schema({
       status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
     },
     'foreign-currency': {
+      lastScraped: { type: Date, default: null },
+      lastAttempted: { type: Date, default: null },
+      status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
+    },
+    'mercury-checking': {
       lastScraped: { type: Date, default: null },
       lastAttempted: { type: Date, default: null },
       status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
@@ -155,11 +164,10 @@ const bankAccountSchema = new mongoose.Schema({
 // Remove sensitive information when converting to JSON
 bankAccountSchema.set('toJSON', {
   transform: function(doc, ret, options) {
-    // Keep username but remove password
     if (ret.credentials) {
       ret.credentials = {
         username: ret.credentials.username
-        // password is intentionally omitted
+        // password and apiToken are intentionally omitted
       };
     }
     return ret;
@@ -169,13 +177,25 @@ bankAccountSchema.set('toJSON', {
 // Index for efficient queries
 bankAccountSchema.index({ userId: 1, bankId: 1 });
 
-// Pre-save middleware to encrypt password
+// Check if a value looks like it was encrypted by our encrypt() function.
+// Encrypted format is: 32-hex-char IV + ':' + hex-encoded ciphertext
+function isEncrypted(text) {
+  if (!text || !text.includes(':')) return false;
+  const ivPart = text.split(':')[0];
+  return /^[0-9a-f]{32}$/i.test(ivPart);
+}
+
+// Pre-save middleware to encrypt credentials
 bankAccountSchema.pre('save', function(next) {
   try {
-    if (this.isModified('credentials.password')) {
-      // Only encrypt if not already encrypted (encrypted strings contain ':')
-      if (!this.credentials.password.includes(':')) {
+    if (this.isModified('credentials.password') && this.credentials.password) {
+      if (!isEncrypted(this.credentials.password)) {
         this.credentials.password = encrypt(this.credentials.password);
+      }
+    }
+    if (this.isModified('credentials.apiToken') && this.credentials.apiToken) {
+      if (!isEncrypted(this.credentials.apiToken)) {
+        this.credentials.apiToken = encrypt(this.credentials.apiToken);
       }
     }
     next();

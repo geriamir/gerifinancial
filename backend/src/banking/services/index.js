@@ -10,7 +10,7 @@ const categoryMappingService = require('./categoryMappingService');
 const categoryAIService = require('./categoryAIService');
 const tagService = require('./tagService');
 const scrapingSchedulerService = require('./scrapingSchedulerService');
-const { BaseSyncStrategy, CheckingAccountsSyncStrategy } = require('./sync-strategies');
+const { BaseSyncStrategy, IsraeliScraperSyncStrategy, CheckingAccountsSyncStrategy } = require('./sync-strategies');
 
 module.exports = {
   bankScraperService,
@@ -25,5 +25,6 @@ module.exports = {
   tagService,
   scrapingSchedulerService,
   BaseSyncStrategy,
+  IsraeliScraperSyncStrategy,
   CheckingAccountsSyncStrategy
 };

@@ -5,17 +5,24 @@ const logger = require('../../shared/utils/logger');
 const bankAccountEvents = require('./bankAccountEvents');
 
 class BankAccountService {
-  async create(userId, { bankId, name, username, password }) {
-    // Validate bank credentials first
-    await bankScraperService.validateCredentials(bankId, { username, password });
+  async create(userId, { bankId, name, username, password, apiToken }) {
+    let credentials;
+
+    if (bankId === 'mercury') {
+      // Mercury uses API token auth — no scraper validation needed
+      credentials = { apiToken };
+    } else {
+      // Israeli banks use username/password with browser scraping
+      await bankScraperService.validateCredentials(bankId, { username, password });
+      credentials = { username, password };
+    }
+
     const bankAccount = new BankAccount({
       userId,
       bankId,
       name,
-      credentials: {
-        username,
-        password // Will be encrypted by pre-save hook
-      },
+      credentials,
+      defaultCurrency: bankId === 'mercury' ? 'USD' : 'ILS',
       status: 'active'
     });
 
@@ -79,20 +86,20 @@ class BankAccountService {
     }
   }
 
-  async updateCredentials(accountId, userId, { username, password }) {
+  async updateCredentials(accountId, userId, { username, password, apiToken }) {
     const bankAccount = await BankAccount.findOne({ _id: accountId, userId });
     if (!bankAccount) {
       throw new Error('Bank account not found');
     }
 
-    // Validate new credentials before saving
-    await bankScraperService.validateCredentials(bankAccount.bankId, { username, password });
-
-    // Update credentials
-    bankAccount.credentials = {
-      username,
-      password // Will be encrypted by pre-save hook
-    };
+    if (bankAccount.bankId === 'mercury') {
+      // Mercury uses API token — no scraper validation
+      bankAccount.credentials = { apiToken };
+    } else {
+      // Israeli banks: validate new credentials before saving
+      await bankScraperService.validateCredentials(bankAccount.bankId, { username, password });
+      bankAccount.credentials = { username, password };
+    }
 
     // Clear any previous errors
     bankAccount.lastError = null;

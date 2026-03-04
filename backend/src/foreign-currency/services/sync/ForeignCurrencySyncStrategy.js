@@ -1,10 +1,10 @@
-const { BaseSyncStrategy, bankScraperService, dataSyncService } = require('../../../banking');
+const { IsraeliScraperSyncStrategy, bankScraperService, dataSyncService } = require('../../../banking');
 const logger = require('../../../shared/utils/logger');
 
 /**
  * Sync strategy for foreign currency accounts
  */
-class ForeignCurrencySyncStrategy extends BaseSyncStrategy {
+class ForeignCurrencySyncStrategy extends IsraeliScraperSyncStrategy {
   constructor() {
     super({
       name: 'foreignCurrency',

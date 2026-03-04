@@ -18,19 +18,28 @@ export const CREDIT_CARD_PROVIDERS: SupportedBank[] = [
   { id: 'isracard', name: 'Isracard' }
 ];
 
+// API-based banks (no browser scraping needed)
+export const API_BANKS: SupportedBank[] = [
+  { id: 'mercury', name: 'Mercury' }
+];
+
 // All supported banks (for backward compatibility)
 export const SUPPORTED_BANKS: SupportedBank[] = [
   ...CHECKING_ACCOUNT_BANKS,
-  ...CREDIT_CARD_PROVIDERS
+  ...CREDIT_CARD_PROVIDERS,
+  ...API_BANKS
 ];
 
 // Helper functions for bank classification
-export const getBankType = (bankId: string): 'checking' | 'credit' | null => {
+export const getBankType = (bankId: string): 'checking' | 'credit' | 'api' | null => {
   if (CHECKING_ACCOUNT_BANKS.some(bank => bank.id === bankId)) {
     return 'checking';
   }
   if (CREDIT_CARD_PROVIDERS.some(bank => bank.id === bankId)) {
     return 'credit';
+  }
+  if (API_BANKS.some(bank => bank.id === bankId)) {
+    return 'api';
   }
   return null;
 };
@@ -43,6 +52,12 @@ export const isCreditCardProvider = (bankId: string): boolean => {
   return CREDIT_CARD_PROVIDERS.some(bank => bank.id === bankId);
 };
 
-export const getBanksByType = (type: 'checking' | 'credit'): SupportedBank[] => {
-  return type === 'checking' ? CHECKING_ACCOUNT_BANKS : CREDIT_CARD_PROVIDERS;
+export const isApiBank = (bankId: string): boolean => {
+  return API_BANKS.some(bank => bank.id === bankId);
+};
+
+export const getBanksByType = (type: 'checking' | 'credit' | 'api'): SupportedBank[] => {
+  if (type === 'checking') return CHECKING_ACCOUNT_BANKS;
+  if (type === 'credit') return CREDIT_CARD_PROVIDERS;
+  return API_BANKS;
 };

@@ -1,8 +1,8 @@
 const logger = require('../../../shared/utils/logger');
-const BaseSyncStrategy = require('./BaseSyncStrategy');
+const IsraeliScraperSyncStrategy = require('./IsraeliScraperSyncStrategy');
 const transactionService = require('../transactionService');
 
-class CheckingAccountsSyncStrategy extends BaseSyncStrategy {
+class CheckingAccountsSyncStrategy extends IsraeliScraperSyncStrategy {
   constructor() {
     super({
       name: 'checking',

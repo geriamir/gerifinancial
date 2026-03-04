@@ -15,7 +15,7 @@ import {
   TextField
 } from '@mui/material';
 import { bankAccountsApi } from '../../services/api/bank';
-import { SUPPORTED_BANKS } from '../../constants/banks';
+import { SUPPORTED_BANKS, isApiBank } from '../../constants/banks';
 import { track } from '../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
 
@@ -34,7 +34,8 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
     bankId: '',
     name: '',
     username: '',
-    password: ''
+    password: '',
+    apiToken: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -66,13 +67,14 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
     });
 
     try {
-    await bankAccountsApi.add({
+      const credentials = isApiBank(formData.bankId)
+        ? { apiToken: formData.apiToken }
+        : { username: formData.username, password: formData.password };
+
+      await bankAccountsApi.add({
         bankId: formData.bankId,
         name: formData.name,
-        credentials: {
-          username: formData.username,
-          password: formData.password
-        }
+        credentials
       });
 
       track(BANK_ACCOUNT_EVENTS.ADD_SUCCESS, {
@@ -103,7 +105,8 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
       bankId: '',
       name: '',
       username: '',
-      password: ''
+      password: '',
+      apiToken: ''
     });
     setError('');
   };
@@ -152,26 +155,42 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
             helperText="Enter a name to identify this account (e.g. 'Main Checking')"
           />
 
-          <TextField
-            fullWidth
-            margin="normal"
-            label="Username"
-            name="username"
-            value={formData.username}
-            onChange={handleInputChange}
-            required
-          />
+          {isApiBank(formData.bankId) ? (
+            <TextField
+              fullWidth
+              margin="normal"
+              label="API Token"
+              name="apiToken"
+              type="password"
+              value={formData.apiToken}
+              onChange={handleInputChange}
+              required
+              helperText="Generate an API token from your Mercury dashboard"
+            />
+          ) : (
+            <>
+              <TextField
+                fullWidth
+                margin="normal"
+                label="Username"
+                name="username"
+                value={formData.username}
+                onChange={handleInputChange}
+                required
+              />
 
-          <TextField
-            fullWidth
-            margin="normal"
-            label="Password"
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleInputChange}
-            required
-          />
+              <TextField
+                fullWidth
+                margin="normal"
+                label="Password"
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                required
+              />
+            </>
+          )}
 
           {error && <FormHelperText error>{error}</FormHelperText>}
         </form>

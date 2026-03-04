@@ -54,7 +54,9 @@ class QueuedDataSyncService {
     logger.info(`Queueing sync jobs for bank account ${bankAccount.name} (${bankAccountId})`);
 
     const jobIds = [];
-    const strategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
+    const strategies = bankAccount.bankId === 'mercury'
+      ? ['mercury-checking']
+      : ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
     
     // Determine job priority based on account or options
     const priority = this.determinePriority(bankAccount, options);
@@ -185,7 +187,7 @@ class QueuedDataSyncService {
       throw new Error(`Bank account not found: ${bankAccountId}`);
     }
 
-    const validStrategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
+    const validStrategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency', 'mercury-checking'];
     if (!validStrategies.includes(strategyName)) {
       throw new Error(`Invalid strategy: ${strategyName}. Valid strategies: ${validStrategies.join(', ')}`);
     }

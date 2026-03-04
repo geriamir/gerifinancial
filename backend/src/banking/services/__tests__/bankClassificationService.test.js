@@ -79,7 +79,7 @@ describe('BankClassificationService', () => {
   describe('getAllSupportedBanks', () => {
     test('should return all supported banks (checking + credit)', () => {
       const allBanks = BankClassificationService.getAllSupportedBanks();
-      const expectedBanks = ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard'];
+      const expectedBanks = ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury'];
       expect(allBanks).toEqual(expectedBanks);
     });
     
@@ -224,10 +224,11 @@ describe('BankClassificationService', () => {
       allBanks.forEach(bank => {
         const isChecking = BankClassificationService.isCheckingBank(bank);
         const isCredit = BankClassificationService.isCreditCardProvider(bank);
+        const isApi = BankClassificationService.isApiBank(bank);
         
         // Each bank should be exactly one type
-        expect(isChecking || isCredit).toBe(true);
-        expect(isChecking && isCredit).toBe(false);
+        expect(isChecking || isCredit || isApi).toBe(true);
+        expect([isChecking, isCredit, isApi].filter(Boolean).length).toBe(1);
       });
     });
   });

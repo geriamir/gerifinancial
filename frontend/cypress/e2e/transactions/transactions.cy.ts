@@ -251,7 +251,7 @@ describe('Transactions Page', () => {
           });
     
     // Wait for transaction list to be ready
-    cy.get('[data-testid="transactions-list"]')
+    cy.get('[data-testid="transactions-list"]', { timeout: 10000 })
       .should('be.visible')
       .find('li[data-testid^="transaction-item-"]')
       .should('have.length.at.least', 1);
@@ -399,26 +399,21 @@ describe('Transactions Page', () => {
     // Wait for loading to complete
     cy.get('[data-testid="loading-indicator"]').should('not.exist');
 
-    // Check if results exist or if there's an empty state
-    cy.get('[data-testid="transactions-list"]').then($list => {
-      if ($list.find('li[data-testid^="transaction-item-"]').length > 0) {
-        // If there are transactions, verify they contain the search term
-        cy.get('li[data-testid^="transaction-item-"]')
-          .should('have.length.at.least', 1)
-          .first()
-          .should('contain.text', 'Supermarket');
-      } else {
-        // If no transactions found, verify either empty state or just log it
-        // This is acceptable if the test data doesn't happen to have "Supermarket"
-        cy.log('No transactions found matching search term - this may be acceptable');
-        // Optionally check for empty state message
-        cy.get('body').then($body => {
-          if ($body.find('[data-testid="no-transactions-message"]').length > 0) {
-            cy.get('[data-testid="no-transactions-message"]').should('be.visible');
-          }
-        });
-      }
-    });
+    // After search, component shows either transactions-list or no-transactions-message.
+    // Use a combined selector so Cypress retries until one appears.
+    cy.get('[data-testid="transactions-list"], [data-testid="no-transactions-message"]', { timeout: 10000 })
+      .should('be.visible')
+      .then($el => {
+        if ($el.is('[data-testid="transactions-list"]')) {
+          cy.get('[data-testid="transactions-list"]')
+            .find('li[data-testid^="transaction-item-"]')
+            .should('have.length.at.least', 1)
+            .first()
+            .should('contain.text', 'Supermarket');
+        } else {
+          cy.get('[data-testid="no-transactions-message"]').should('be.visible');
+        }
+      });
   });
 
   // it('should filter by date range', () => {

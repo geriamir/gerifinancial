@@ -16,7 +16,7 @@ const creditCardService = require('./services/creditCardService');
 const scrapingEvents = require('./services/scrapingEvents');
 
 // Sync strategies (used by other subsystems)
-const { BaseSyncStrategy, CheckingAccountsSyncStrategy } = require('./services/sync-strategies');
+const { BaseSyncStrategy, IsraeliScraperSyncStrategy, CheckingAccountsSyncStrategy, MercurySyncStrategy } = require('./services/sync-strategies');
 
 // Constants (used by other subsystems)
 const { TransactionType } = require('./constants/enums');
@@ -49,7 +49,9 @@ module.exports = {
   
   // Sync strategies
   BaseSyncStrategy,
+  IsraeliScraperSyncStrategy,
   CheckingAccountsSyncStrategy,
+  MercurySyncStrategy,
   
   // Constants
   TransactionType,

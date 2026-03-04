@@ -21,15 +21,22 @@ router.post('/', auth, async (req, res) => {
   try {
     const { bankId, name, credentials } = req.body;
 
-    if (!bankId || !name || !credentials?.username || !credentials?.password) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (bankId === 'mercury') {
+      if (!name || !credentials?.apiToken) {
+        return res.status(400).json({ error: 'Missing required fields: name and API token are required for Mercury' });
+      }
+    } else {
+      if (!bankId || !name || !credentials?.username || !credentials?.password) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
     }
 
     const bankAccount = await bankAccountService.create(req.user._id, {
       bankId,
       name,
       username: credentials.username,
-      password: credentials.password
+      password: credentials.password,
+      apiToken: credentials.apiToken
     });
 
     // Return without sensitive data
@@ -53,16 +60,28 @@ router.patch('/:id', auth, async (req, res) => {
 // Update bank account credentials
 router.put('/:id/credentials', auth, async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, apiToken } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required' });
+    // Look up account to determine bank type
+    const account = await BankAccount.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!account) {
+      return res.status(404).json({ error: 'Bank account not found' });
+    }
+
+    if (account.bankId === 'mercury') {
+      if (!apiToken) {
+        return res.status(400).json({ error: 'API token is required for Mercury' });
+      }
+    } else {
+      if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required' });
+      }
     }
 
     const bankAccount = await bankAccountService.updateCredentials(
       req.params.id,
       req.user._id,
-      { username, password }
+      { username, password, apiToken }
     );
 
     res.json({

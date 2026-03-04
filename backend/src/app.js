@@ -5,7 +5,7 @@ const config = require('./shared/config');
 const logger = require('./shared/utils/logger');
 const ensureLogsDir = require('./shared/middleware/ensureLogsDir');
 
-const { CheckingAccountsSyncStrategy } = require('./banking/services/sync-strategies');
+const { CheckingAccountsSyncStrategy, MercurySyncStrategy } = require('./banking/services/sync-strategies');
 
 // Ensure logs directory exists in production
 ensureLogsDir();
@@ -25,7 +25,8 @@ function initializeSyncStrategies() {
   global.syncStrategies = {
     'checking-accounts': new CheckingAccountsSyncStrategy(),
     'investment-portfolios': new PortfoliosSyncStrategy(),
-    'foreign-currency': new ForeignCurrencySyncStrategy()
+    'foreign-currency': new ForeignCurrencySyncStrategy(),
+    'mercury-checking': new MercurySyncStrategy()
   };
 
   logger.info('Sync strategies initialized and registered globally');

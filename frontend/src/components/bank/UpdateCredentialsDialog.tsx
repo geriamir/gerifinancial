@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { BankAccount } from '../../services/api/types';
 import { bankAccountsApi } from '../../services/api/bank';
+import { isApiBank } from '../../constants/banks';
 
 interface UpdateCredentialsDialogProps {
   open: boolean;
@@ -29,13 +30,17 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
   onSuccess
 }) => {
   const [password, setPassword] = useState('');
+  const [apiToken, setApiToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
+  const isMercury = account ? isApiBank(account.bankId) : false;
+
   const handleClose = () => {
     if (!loading) {
       setPassword('');
+      setApiToken('');
       setError('');
       setSuccess(false);
       onClose();
@@ -47,9 +52,16 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
     
     if (!account) return;
     
-    if (!password) {
-      setError('Password is required');
-      return;
+    if (isMercury) {
+      if (!apiToken) {
+        setError('API token is required');
+        return;
+      }
+    } else {
+      if (!password) {
+        setError('Password is required');
+        return;
+      }
     }
 
     setLoading(true);
@@ -57,23 +69,26 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
     setSuccess(false);
 
     try {
-      // Use existing username from account
-      const username = account.credentials?.username || '';
-      if (!username) {
-        setError('Unable to retrieve account username');
-        setLoading(false);
-        return;
+      if (isMercury) {
+        await bankAccountsApi.updateCredentials(account._id, {
+          apiToken
+        });
+      } else {
+        const username = account.credentials?.username || '';
+        if (!username) {
+          setError('Unable to retrieve account username');
+          setLoading(false);
+          return;
+        }
+        await bankAccountsApi.updateCredentials(account._id, {
+          username,
+          password
+        });
       }
-
-      await bankAccountsApi.updateCredentials(account._id, {
-        username,
-        password
-      });
       
       setSuccess(true);
       setError('');
       
-      // Close dialog after a short delay
       setTimeout(() => {
         handleClose();
         onSuccess();
@@ -125,30 +140,47 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
               </Alert>
             )}
 
-            <TextField
-              label="Username"
-              type="text"
-              fullWidth
-              value={account.credentials?.username || 'N/A'}
-              disabled
-              helperText="Username cannot be changed. Create a new account if needed."
-            />
+            {isMercury ? (
+              <TextField
+                label="API Token"
+                type="password"
+                fullWidth
+                required
+                value={apiToken}
+                onChange={(e) => setApiToken(e.target.value)}
+                disabled={loading || success}
+                placeholder="Enter your Mercury API token"
+                helperText="Generate a new token from your Mercury dashboard"
+              />
+            ) : (
+              <>
+                <TextField
+                  label="Username"
+                  type="text"
+                  fullWidth
+                  value={account.credentials?.username || 'N/A'}
+                  disabled
+                  helperText="Username cannot be changed. Create a new account if needed."
+                />
 
-            <TextField
-              label="Password"
-              type="password"
-              fullWidth
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading || success}
-              autoComplete="current-password"
-              placeholder="Enter your bank password"
-            />
+                <TextField
+                  label="Password"
+                  type="password"
+                  fullWidth
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading || success}
+                  autoComplete="current-password"
+                  placeholder="Enter your bank password"
+                />
+              </>
+            )}
 
             <Alert severity="info" sx={{ mt: 1 }}>
-              Your credentials will be validated with the bank before saving.
-              The connection will be tested automatically.
+              {isMercury
+                ? 'Your API token will be encrypted and stored securely.'
+                : 'Your credentials will be validated with the bank before saving. The connection will be tested automatically.'}
             </Alert>
           </Stack>
         </DialogContent>
@@ -163,10 +195,10 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
           <Button
             type="submit"
             variant="contained"
-            disabled={loading || success || !password}
+            disabled={loading || success || (isMercury ? !apiToken : !password)}
             startIcon={loading && <CircularProgress size={16} />}
           >
-            {loading ? 'Updating...' : 'Update Password'}
+            {loading ? 'Updating...' : isMercury ? 'Update Token' : 'Update Password'}
           </Button>
         </DialogActions>
       </form>
