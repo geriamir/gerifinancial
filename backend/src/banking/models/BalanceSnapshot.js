@@ -103,8 +103,8 @@ balanceSnapshotSchema.statics.getLatestByUser = async function(userId) {
 };
 
 /**
- * Get aggregated net worth history across all of a user's accounts.
- * Groups by date and sums balances (all converted to the same day).
+ * Get net worth history per date, grouped by currency.
+ * Returns per-date, per-currency subtotals for service-layer conversion.
  */
 balanceSnapshotSchema.statics.getNetWorthHistory = async function(userId, days = 30) {
   const startDate = new Date();
@@ -121,8 +121,11 @@ balanceSnapshotSchema.statics.getNetWorthHistory = async function(userId, days =
     { $sort: { date: 1 } },
     {
       $group: {
-        _id: { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
-        totalBalance: { $sum: '$balance' },
+        _id: {
+          dateString: { $dateToString: { format: '%Y-%m-%d', date: '$date' } },
+          currency: '$currency'
+        },
+        subtotal: { $sum: '$balance' },
         accountCount: { $sum: 1 },
         date: { $first: '$date' }
       }
@@ -132,8 +135,9 @@ balanceSnapshotSchema.statics.getNetWorthHistory = async function(userId, days =
       $project: {
         _id: 0,
         date: '$date',
-        dateString: '$_id',
-        totalBalance: 1,
+        dateString: '$_id.dateString',
+        currency: '$_id.currency',
+        subtotal: 1,
         accountCount: 1
       }
     }

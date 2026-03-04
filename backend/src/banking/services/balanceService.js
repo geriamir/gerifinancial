@@ -136,10 +136,35 @@ class BalanceService {
   }
 
   /**
-   * Get aggregated net worth history across all user accounts
+   * Get aggregated net worth history across all user accounts,
+   * with balances converted to the user's display currency.
    */
   async getNetWorthHistory(userId, days = 30) {
-    return BalanceSnapshot.getNetWorthHistory(userId, days);
+    const [rows, displayCurrency] = await Promise.all([
+      BalanceSnapshot.getNetWorthHistory(userId, days),
+      this.getUserDisplayCurrency(userId)
+    ]);
+
+    // Convert each currency subtotal, then merge by date
+    const dateMap = new Map();
+    for (const row of rows) {
+      const converted = await this.convertToTargetCurrency(row.subtotal, row.currency, displayCurrency);
+      const existing = dateMap.get(row.dateString);
+      if (existing) {
+        existing.totalBalance += converted;
+        existing.accountCount += row.accountCount;
+      } else {
+        dateMap.set(row.dateString, {
+          date: row.date,
+          dateString: row.dateString,
+          totalBalance: converted,
+          accountCount: row.accountCount,
+          displayCurrency
+        });
+      }
+    }
+
+    return Array.from(dateMap.values()).sort((a, b) => new Date(a.date) - new Date(b.date));
   }
 }
 

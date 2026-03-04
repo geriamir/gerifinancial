@@ -40,18 +40,18 @@ class CheckingAccountsSyncStrategy extends IsraeliScraperSyncStrategy {
       bankAccount
     );
 
-    // Record balance from scraper (optional — not all Israeli banks return it)
-    for (const account of (scrapingResult.accounts || [])) {
-      if (account.balance != null) {
-        try {
-          await balanceService.recordBalance(bankAccount._id, {
-            balance: account.balance,
-            currency: bankAccount.defaultCurrency || 'ILS',
-            source: 'scraper'
-          });
-        } catch (err) {
-          logger.warn(`Failed to record balance for account ${bankAccount._id}: ${err.message}`);
-        }
+    // Record aggregated balance from all scraped sub-accounts
+    const accounts = scrapingResult.accounts || [];
+    const balances = accounts.filter(a => a.balance != null).map(a => a.balance);
+    if (balances.length > 0) {
+      try {
+        await balanceService.recordBalance(bankAccount._id, {
+          balance: balances.reduce((sum, b) => sum + b, 0),
+          currency: bankAccount.defaultCurrency || 'ILS',
+          source: 'scraper'
+        });
+      } catch (err) {
+        logger.warn(`Failed to record balance for account ${bankAccount._id}: ${err.message}`);
       }
     }
     
