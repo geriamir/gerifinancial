@@ -32,7 +32,9 @@ class ProjectOverviewService {
         continue;
       }
 
-      let convertedAmount = Math.abs(transaction.amount);
+      // Negate amount: expenses (negative in DB) become positive spent,
+      // refunds (positive in DB) become negative to reduce the total
+      let convertedAmount = -transaction.amount;
       
       // Convert to project currency if needed
       if (transaction.currency !== projectCurrency) {
@@ -44,10 +46,10 @@ class ProjectOverviewService {
             transaction.processedDate,
             true // Allow fallback to nearest rate
           );
-          convertedAmount = conversionResult.convertedAmount;
+          // Re-apply sign after conversion
+          convertedAmount = transaction.amount < 0 ? conversionResult.convertedAmount : -conversionResult.convertedAmount;
         } catch (error) {
           console.warn(`Currency conversion failed for transaction ${transaction._id}:`, error.message);
-          // Keep the original amount as fallback
         }
       }
       
