@@ -380,7 +380,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                         </Box>
                         <Box display="flex" alignItems="center" gap={1}>
                           <Typography variant="body2" color="warning.dark" fontWeight="bold">
-                            {formatCompactCurrency(expense.originalAmount, expense.originalCurrency, 20)}
+                            {formatCompactCurrency(-expense.originalAmount, expense.originalCurrency, 20)}
                           </Typography>
                           <IconButton
                             size="small"

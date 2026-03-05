@@ -68,7 +68,6 @@ class InstallmentGroupingUtils {
             installment.processedDate,
             true // Allow fallback to nearest rate
           );
-          // TODO: do we need this?
           convertedAmount = conversionResult.convertedAmount;
           
           if (conversionResult.fallback) {
@@ -80,7 +79,7 @@ class InstallmentGroupingUtils {
       }
       
       totalConvertedAmount += convertedAmount;
-      totalOriginalAmount += Math.abs(installment.amount);
+      totalOriginalAmount += installment.amount;
       installmentIds.push(installment._id.toString());
       
       processedInstallments.push({

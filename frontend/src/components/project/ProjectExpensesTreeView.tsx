@@ -270,7 +270,7 @@ const ProjectExpensesTreeView: React.FC<ProjectExpensesTreeViewProps> = ({
                           {formatCompactDate(expense.transactionDate)}
                         </Typography>
                         <Typography variant="caption" color="warning.dark" fontWeight="medium" fontSize="0.6rem">
-                          {formatCompactCurrency(expense.originalAmount, expense.originalCurrency, 8)}
+                          {formatCompactCurrency(-expense.originalAmount, expense.originalCurrency, 8)}
                         </Typography>
                         <Tooltip title="Remove from project">
                           <IconButton

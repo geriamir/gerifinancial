@@ -16,7 +16,7 @@ class UnplannedExpenseService {
     return new UnplannedExpense({
       transactionId: transaction._id.toString(),
       transaction: transaction,
-      originalAmount: Math.abs(transaction.amount),
+      originalAmount: transaction.amount,
       originalCurrency: transaction.currency,
       convertedAmount: convertedAmount,
       exchangeRate: exchangeRate,
@@ -53,7 +53,7 @@ class UnplannedExpenseService {
     const groupId = `installment-group-${cleanIdentifier}--${earliestInstallment.rawData.originalAmount}`;
     
     // Calculate average exchange rate
-    const averageExchangeRate = totalOriginalAmount > 0 ? totalConvertedAmount / totalOriginalAmount : 1;
+    const averageExchangeRate = totalOriginalAmount !== 0 ? totalConvertedAmount / Math.abs(totalOriginalAmount) : 1;
     
     // Create enhanced transaction object with grouping metadata
     const enhancedTransaction = {

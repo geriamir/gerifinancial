@@ -314,7 +314,7 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                   <Box display="flex" alignItems="center" gap={0.5}>
                     <Box textAlign="right" mr={1}>
                       <Typography variant="body2" color="warning.dark" fontWeight="medium">
-                        {formatCompactCurrency(expense.originalAmount, expense.originalCurrency)}
+                        {formatCompactCurrency(-expense.originalAmount, expense.originalCurrency)}
                       </Typography>
                     </Box>
                     <IconButton
