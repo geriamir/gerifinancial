@@ -39,8 +39,13 @@ class IsraeliScraperSyncStrategy extends BaseSyncStrategy {
       logger.info(`${this.icon} Starting isolated ${this.displayName.toLowerCase()} sync for ${bankAccount._id}`);
       
       const bankScraperService = require('../bankScraperService');
-      const scraper = bankScraperService.createScraper(bankAccount, options);
-      const credentials = bankAccount.getScraperOptions().credentials;
+
+      // Use strategy-specific start date instead of the global lastScraped
+      const strategyOptions = bankAccount.getScraperOptionsForStrategy(this.name);
+      const mergedOptions = { ...options, startDate: strategyOptions.startDate };
+
+      const scraper = bankScraperService.createScraper(bankAccount, mergedOptions);
+      const credentials = strategyOptions.credentials;
       
       if (!this.isSupported(scraper)) {
         logger.info(`ℹ️ Bank ${bankAccount.bankId} does not support ${this.displayName.toLowerCase()} - skipping`);

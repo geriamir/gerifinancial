@@ -7,7 +7,7 @@ const logger = require('../../../shared/utils/logger');
 class ForeignCurrencySyncStrategy extends IsraeliScraperSyncStrategy {
   constructor() {
     super({
-      name: 'foreignCurrency',
+      name: 'foreign-currency',
       displayName: 'Foreign Currency Accounts',
       icon: '💱',
       scrapingMethod: 'scrapeForeignCurrencyAccounts',

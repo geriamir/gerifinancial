@@ -268,7 +268,7 @@ bankAccountSchema.methods.getScraperOptions = function() {
 };
 
 // Update strategy sync status
-bankAccountSchema.methods.updateStrategySync = function(strategyName, success, error = null) {
+bankAccountSchema.methods.updateStrategySync = function(strategyName, success, error = null, lastTransactionDate = null) {
   if (!this.strategySync) {
     this.strategySync = {};
   }
@@ -285,11 +285,12 @@ bankAccountSchema.methods.updateStrategySync = function(strategyName, success, e
   this.strategySync[strategyName].lastAttempted = now;
   
   if (success) {
-    this.strategySync[strategyName].lastScraped = now;
+    // Use the latest transaction date when available, otherwise fall back to now
+    this.strategySync[strategyName].lastScraped = lastTransactionDate || now;
     this.strategySync[strategyName].status = 'success';
     
     // Update global lastScraped to most recent successful strategy sync
-    this.lastScraped = now;
+    this.lastScraped = lastTransactionDate || now;
   } else {
     this.strategySync[strategyName].status = 'failed';
     if (error) {

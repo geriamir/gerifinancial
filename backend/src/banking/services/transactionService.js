@@ -194,15 +194,13 @@ class TransactionService {
       }
     }
 
-    // Update lastScraped timestamp on successful scraping (even if no new transactions)
+    // Update account status on successful scraping (even if no new transactions).
+    // Note: lastScraped is managed per-strategy by scrapingJobProcessors via updateStrategySync().
     if (results.errors.length === 0 || results.newTransactions > 0) {
-      // Fetch fresh bankAccount from database to ensure we have a proper Mongoose model
       const freshBankAccount = await BankAccount.findById(bankAccount._id);
       if (freshBankAccount) {
-        freshBankAccount.lastScraped = new Date();
         freshBankAccount.status = 'active';
         await freshBankAccount.save();
-        console.log(`Updated lastScraped for account ${freshBankAccount._id} to ${freshBankAccount.lastScraped}`);
       }
     }
     

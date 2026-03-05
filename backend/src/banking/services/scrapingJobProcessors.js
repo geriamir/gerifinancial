@@ -121,8 +121,11 @@ class ScrapingJobProcessors {
       
       await job.updateProgress(90);
       
+      // Extract latest transaction date from result for accurate lastScraped tracking
+      const lastTransactionDate = result?.transactions?.mostRecentTransactionDate || null;
+
       // Update strategy-specific sync status - SUCCESS
-      bankAccount.updateStrategySync(strategyName, true);
+      bankAccount.updateStrategySync(strategyName, true, null, lastTransactionDate);
       await bankAccount.save();
       
       await job.updateProgress(100);

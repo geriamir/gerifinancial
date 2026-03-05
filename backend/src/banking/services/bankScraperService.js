@@ -51,8 +51,8 @@ class BankScraperService {
     startDateCopy.setDate(startDateCopy.getDate() + 1);
 
     // Log the scraping strategy being used
-    const isIncrementalScraping = bankAccount.lastScraped;
-    logger.info(`Creating scraper for bank account ${bankAccount._id}  with ${isIncrementalScraping ? 'incremental' : 'initial'} scraping from ${startDateCopy.toISOString()}`);
+    const isIncrementalScraping = !!startDate;
+    logger.info(`Creating scraper for bank account ${bankAccount._id} with ${isIncrementalScraping ? 'incremental' : 'initial'} scraping from ${startDateCopy.toISOString()} (base date: ${new Date(startDate).toISOString()})`);
 
     const scraper = createScraper({
       companyId: bankAccount.bankId,

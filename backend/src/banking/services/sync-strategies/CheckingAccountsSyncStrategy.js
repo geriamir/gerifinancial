@@ -6,7 +6,7 @@ const balanceService = require('../balanceService');
 class CheckingAccountsSyncStrategy extends IsraeliScraperSyncStrategy {
   constructor() {
     super({
-      name: 'checking',
+      name: 'checking-accounts',
       displayName: 'Checking Accounts',
       icon: '🏦',
       scrapingMethod: 'scrape',
