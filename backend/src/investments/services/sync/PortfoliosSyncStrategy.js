@@ -9,7 +9,7 @@ const investmentService = require('../investmentService');
 class PortfoliosSyncStrategy extends IsraeliScraperSyncStrategy {
   constructor() {
     super({
-      name: 'portfolios',
+      name: 'investment-portfolios',
       displayName: 'Investment Portfolios',
       icon: '📈',
       scrapingMethod: 'scrapePortfolios',
