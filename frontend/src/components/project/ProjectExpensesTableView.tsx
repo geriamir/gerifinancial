@@ -275,7 +275,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                                   </TableCell>
                                   <TableCell align="right" sx={{ minWidth: 120 }}>
                                     <Typography variant="body2" color="primary.main">
-                                      {formatCompactCurrency(Math.abs(expense.amount), expense.currency, 20)}
+                                      {formatCompactCurrency(-expense.amount, expense.currency, 20)}
                                     </Typography>
                                   </TableCell>
                                 </TableRow>

@@ -210,7 +210,7 @@ const ProjectExpensesTreeView: React.FC<ProjectExpensesTreeViewProps> = ({
                                 {formatCompactDate(expense.date)}
                               </Typography>
                               <Typography variant="caption" color="primary.main" fontWeight="medium" fontSize="0.6rem">
-                                {formatCompactCurrency(Math.abs(expense.amount), expense.currency, 8)}
+                                {formatCompactCurrency(-expense.amount, expense.currency, 8)}
                               </Typography>
                             </Box>
                           </Box>

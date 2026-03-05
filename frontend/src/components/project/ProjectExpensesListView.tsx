@@ -231,7 +231,7 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                           />
                           <ListItemSecondaryAction>
                             <Typography variant="body2" color="primary.main" fontWeight="medium">
-                              {formatCompactCurrency(Math.abs(expense.amount), expense.currency)}
+                              {formatCompactCurrency(-expense.amount, expense.currency)}
                             </Typography>
                           </ListItemSecondaryAction>
                         </ListItem>
