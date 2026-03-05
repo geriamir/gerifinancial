@@ -293,6 +293,14 @@ export const budgetsApi = {
       subCategoryId
     }).then((res: AxiosResponse) => res.data),
 
+  unassignExpense: (projectId: string, transactionId: string): Promise<{
+    success: boolean;
+    message: string;
+    data: any;
+  }> =>
+    api.put(`/budgets/projects/${projectId}/expenses/${transactionId}/unassign`)
+      .then((res: AxiosResponse) => res.data),
+
 
   bulkMoveExpensesToPlanned: (projectId: string, moves: Array<{
     transactionId: string;

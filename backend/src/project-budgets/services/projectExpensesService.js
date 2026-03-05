@@ -425,6 +425,44 @@ class ProjectExpensesService {
       throw error;
     }
   }
+  /**
+   * Unassign an expense from its planned category back to unplanned.
+   * Keeps the project tag but removes from allocatedTransactions.
+   */
+  async unassignExpense(projectId, transactionId) {
+    try {
+      const project = await ProjectBudget.findById(projectId);
+      if (!project) {
+        throw new Error('Project budget not found');
+      }
+
+      // Find which category budget contains this transaction
+      let found = false;
+      for (const budget of project.categoryBudgets) {
+        if (!budget.allocatedTransactions) continue;
+        const idx = budget.allocatedTransactions.findIndex(
+          id => id.toString() === transactionId.toString()
+        );
+        if (idx > -1) {
+          budget.allocatedTransactions.splice(idx, 1);
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        throw new Error('Transaction is not assigned to any planned category in this project');
+      }
+
+      await project.save();
+      logger.info(`Unassigned expense ${transactionId} back to unplanned in project ${projectId}`);
+
+      return { transactionId, projectId };
+    } catch (error) {
+      logger.error('Error unassigning expense:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new ProjectExpensesService();

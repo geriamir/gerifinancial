@@ -676,6 +676,46 @@ router.put('/projects/:id/expenses/:transactionId/move',
 );
 
 /**
+ * PUT /api/budgets/projects/:id/expenses/:transactionId/unassign
+ * Move expense back from planned to unplanned (keeps project tag)
+ */
+router.put('/projects/:id/expenses/:transactionId/unassign',
+  auth,
+  [
+    param('id').isMongoId().withMessage('Invalid project ID'),
+    param('transactionId').isMongoId().withMessage('Invalid transaction ID')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const project = await ProjectBudget.findOne({
+        _id: req.params.id,
+        userId: req.user._id
+      });
+
+      if (!project) {
+        return res.status(404).json({ success: false, message: 'Project not found' });
+      }
+
+      const result = await projectExpensesService.unassignExpense(
+        project._id,
+        req.params.transactionId
+      );
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Expense unassigned from planned category'
+      });
+    } catch (error) {
+      logger.error('Error unassigning expense:', error);
+      const status = error.message.includes('not') ? 404 : 500;
+      res.status(status).json({ success: false, message: error.message });
+    }
+  }
+);
+
+/**
  * POST /api/budgets/projects/:id/expenses/bulk-move
  * Move multiple expenses to planned category
  */
