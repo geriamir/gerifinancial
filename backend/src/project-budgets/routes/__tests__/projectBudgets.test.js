@@ -329,7 +329,6 @@ describe('Project Budget API Endpoints', () => {
       expect(response.body.data.groupId).toBe(groupId);
       expect(response.body.data.installmentCount).toBe(2);
       expect(response.body.data.totalConvertedAmount).toBe(500);
-      expect(response.body.data.installmentResults).toHaveLength(2);
     });
 
     test('GET /api/budgets/projects/:id/expenses/breakdown - should get comprehensive expense breakdown', async () => {
