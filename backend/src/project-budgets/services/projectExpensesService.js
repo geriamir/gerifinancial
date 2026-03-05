@@ -16,7 +16,7 @@ class ProjectExpensesService {
    * @param {string} targetSubCategoryId - Target subcategory ID
    * @returns {Object} Result containing transaction, converted amount, and target budget
    */
-  async moveExpenseToPlanned(projectId, transactionId, targetCategoryId, targetSubCategoryId) {
+  async moveExpenseToPlanned(projectId, transactionId, targetCategoryId, targetSubCategoryId, targetBudgetId = null) {
     try {
       // Get the project budget
       const project = await ProjectBudget.findById(projectId)
@@ -38,13 +38,19 @@ class ProjectExpensesService {
         throw new Error('Transaction not found or not associated with this project');
       }
 
-      // Find the target category budget
-      const targetBudget = project.categoryBudgets.find(budget => {
-        const budgetCategoryId = budget.categoryId._id || budget.categoryId;
-        const budgetSubCategoryId = budget.subCategoryId._id || budget.subCategoryId;
-        return budgetCategoryId.toString() === targetCategoryId.toString() &&
-               budgetSubCategoryId.toString() === targetSubCategoryId.toString();
-      });
+      // Find the target category budget — prefer budgetId if provided
+      let targetBudget;
+      if (targetBudgetId) {
+        targetBudget = project.categoryBudgets.id(targetBudgetId);
+      }
+      if (!targetBudget) {
+        targetBudget = project.categoryBudgets.find(budget => {
+          const budgetCategoryId = budget.categoryId._id || budget.categoryId;
+          const budgetSubCategoryId = budget.subCategoryId._id || budget.subCategoryId;
+          return budgetCategoryId.toString() === targetCategoryId.toString() &&
+                 budgetSubCategoryId.toString() === targetSubCategoryId.toString();
+        });
+      }
 
       if (!targetBudget) {
         throw new Error('Target category budget not found in project');
@@ -107,9 +113,10 @@ class ProjectExpensesService {
    * @param {string} groupIdentifier - The installment group identifier
    * @param {string} targetCategoryId - Target category ID
    * @param {string} targetSubCategoryId - Target subcategory ID
+   * @param {string|null} targetBudgetId - Optional specific budget item ID
    * @returns {Object} Result containing affected transactions and totals
    */
-  async moveInstallmentGroupToPlanned(projectId, groupIdentifier, targetCategoryId, targetSubCategoryId) {
+  async moveInstallmentGroupToPlanned(projectId, groupIdentifier, targetCategoryId, targetSubCategoryId, targetBudgetId = null) {
     try {
       // Parse the installment group ID
       const groupIdMatch = groupIdentifier.match(/^installment-group-(.+?)--([0-9.-]+)$/);
@@ -128,13 +135,19 @@ class ProjectExpensesService {
         throw new Error('Project budget not found');
       }
 
-      // Find the target category budget
-      const targetBudget = project.categoryBudgets.find(budget => {
-        const budgetCategoryId = budget.categoryId._id || budget.categoryId;
-        const budgetSubCategoryId = budget.subCategoryId._id || budget.subCategoryId;
-        return budgetCategoryId.toString() === targetCategoryId.toString() &&
-               budgetSubCategoryId.toString() === targetSubCategoryId.toString();
-      });
+      // Find the target category budget — prefer budgetId if provided
+      let targetBudget;
+      if (targetBudgetId) {
+        targetBudget = project.categoryBudgets.id(targetBudgetId);
+      }
+      if (!targetBudget) {
+        targetBudget = project.categoryBudgets.find(budget => {
+          const budgetCategoryId = budget.categoryId._id || budget.categoryId;
+          const budgetSubCategoryId = budget.subCategoryId._id || budget.subCategoryId;
+          return budgetCategoryId.toString() === targetCategoryId.toString() &&
+                 budgetSubCategoryId.toString() === targetSubCategoryId.toString();
+        });
+      }
 
       if (!targetBudget) {
         throw new Error('Target category budget not found in project');

@@ -598,7 +598,7 @@ router.put('/projects/:id/expenses/:transactionId/move',
       
       /** @type {string} */
       const { transactionId } = req.params;
-      const { categoryId, subCategoryId } = req.body;
+      const { categoryId, subCategoryId, budgetId } = req.body;
       
       // Check if this is an installment group ID (starts with "installment-group-")
       if (transactionId.startsWith('installment-group-')) {
@@ -606,7 +606,8 @@ router.put('/projects/:id/expenses/:transactionId/move',
           project._id,
           transactionId,
           categoryId,
-          subCategoryId
+          subCategoryId,
+          budgetId || null
         );
         
         res.json({
@@ -639,7 +640,8 @@ router.put('/projects/:id/expenses/:transactionId/move',
           project._id,
           transactionId,
           categoryId,
-          subCategoryId
+          subCategoryId,
+          budgetId || null
         );
         
         res.json({

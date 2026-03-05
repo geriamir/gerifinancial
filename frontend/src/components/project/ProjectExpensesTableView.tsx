@@ -45,7 +45,7 @@ interface ProjectExpensesTableViewProps {
   projectCurrency: string;
   projectType?: string;
   onRemoveFromProject: (transactionId: string) => void;
-  moveExpenseToPlanned: (transactionId: string, categoryId: string, subCategoryId: string) => Promise<void>;
+  moveExpenseToPlanned: (transactionId: string, categoryId: string, subCategoryId: string, budgetId?: string) => Promise<void>;
   onUnassignExpense?: (transactionId: string) => Promise<void>;
   movingExpense: string | null;
 }
@@ -117,7 +117,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
     setExpandedUnplanned(newExpanded);
   };
 
-  // Track custom target overrides per unplanned expense (key: transactionId, value: "categoryId|subCategoryId")
+  // Track custom target overrides per unplanned expense (key: transactionId, value: "categoryId|subCategoryId|budgetId")
   const [customTargets, setCustomTargets] = useState<Record<string, string>>({});
 
   // Group planned expenses by subcategory
@@ -307,37 +307,51 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
             const isMoving = movingExpense === expense.transactionId;
             const customTarget = customTargets[expense.transactionId];
 
-            // Build sorted recommendation list (reuse existing dedup logic)
-            const uniqueBudgetItems = new Map<string, { budgetItem: any; rec: any }>();
+            // Build recommendation list matched to specific budget items
+            const recBudgetItems: Array<{ budgetItem: CategoryBreakdownItem; rec: any }> = [];
             (expense.recommendations || []).forEach((rec: any) => {
               const matchingBudgetItems = plannedExpenses.filter(
                 item => item.subCategoryId._id === rec.subCategoryId
               );
               matchingBudgetItems.forEach((budgetItem) => {
-                const key = `${rec.subCategoryId}-${budgetItem.budgetId}`;
-                if (!uniqueBudgetItems.has(key) || (uniqueBudgetItems.get(key)?.rec.confidence || 0) < rec.confidence) {
-                  uniqueBudgetItems.set(key, { budgetItem, rec });
+                const existing = recBudgetItems.find(r => r.budgetItem.budgetId === budgetItem.budgetId);
+                if (!existing || (existing.rec.confidence || 0) < rec.confidence) {
+                  if (existing) {
+                    existing.rec = rec;
+                  } else {
+                    recBudgetItems.push({ budgetItem, rec });
+                  }
                 }
               });
             });
-            const sortedRecs = Array.from(uniqueBudgetItems.values()).sort((a, b) => b.rec.confidence - a.rec.confidence);
+            const sortedRecs = recBudgetItems.sort((a, b) => b.rec.confidence - a.rec.confidence);
+            const recBudgetIds = new Set(sortedRecs.map(r => r.budgetItem.budgetId));
+
+            // Helper to build a display label for a budget item
+            const budgetItemLabel = (item: CategoryBreakdownItem) => {
+              const catSub = `${item.categoryId.name} → ${item.subCategoryId.name}`;
+              return item.description ? `${catSub} — ${item.description}` : catSub;
+            };
 
             // Determine what will actually be moved
             let moveTargetCategoryId: string | null = null;
             let moveTargetSubCategoryId: string | null = null;
+            let moveTargetBudgetId: string | undefined = undefined;
             let moveTargetLabel = '';
 
             if (customTarget) {
-              const [catId, subCatId] = customTarget.split('|');
+              const [catId, subCatId, budId] = customTarget.split('|');
               moveTargetCategoryId = catId;
               moveTargetSubCategoryId = subCatId;
-              const match = plannedExpenses.find(p => p.categoryId._id === catId && p.subCategoryId._id === subCatId);
-              moveTargetLabel = match ? `${match.categoryId.name} → ${match.subCategoryId.name}` : 'Custom';
+              moveTargetBudgetId = budId || undefined;
+              const match = plannedExpenses.find(p => p.budgetId === budId);
+              moveTargetLabel = match ? budgetItemLabel(match) : 'Custom';
             } else if (sortedRecs.length > 0) {
-              const best = sortedRecs[0].rec;
-              moveTargetCategoryId = best.categoryId;
-              moveTargetSubCategoryId = best.subCategoryId;
-              moveTargetLabel = `${best.categoryName} → ${best.subCategoryName}`;
+              const best = sortedRecs[0];
+              moveTargetCategoryId = best.rec.categoryId;
+              moveTargetSubCategoryId = best.rec.subCategoryId;
+              moveTargetBudgetId = best.budgetItem.budgetId;
+              moveTargetLabel = budgetItemLabel(best.budgetItem);
             }
 
             return (
@@ -396,7 +410,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                         <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
                           <FormControl size="small" sx={{ minWidth: 250, flex: 1 }}>
                             <Select
-                              value={customTarget || (sortedRecs.length > 0 ? `${sortedRecs[0].rec.categoryId}|${sortedRecs[0].rec.subCategoryId}` : '')}
+                              value={customTarget || (sortedRecs.length > 0 ? `${sortedRecs[0].rec.categoryId}|${sortedRecs[0].rec.subCategoryId}|${sortedRecs[0].budgetItem.budgetId}` : '')}
                               onChange={(e) => {
                                 setCustomTargets(prev => ({ ...prev, [expense.transactionId]: e.target.value as string }));
                               }}
@@ -408,11 +422,11 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                                   — Recommendations —
                                 </MenuItem>
                               )}
-                              {sortedRecs.map(({ rec }) => (
-                                <MenuItem key={`rec-${rec.categoryId}-${rec.subCategoryId}`} value={`${rec.categoryId}|${rec.subCategoryId}`}>
+                              {sortedRecs.map(({ budgetItem, rec }) => (
+                                <MenuItem key={`rec-${budgetItem.budgetId}`} value={`${rec.categoryId}|${rec.subCategoryId}|${budgetItem.budgetId}`}>
                                   <Box display="flex" alignItems="center" gap={0.5} width="100%">
                                     <Typography variant="body2" sx={{ flex: 1 }}>
-                                      {rec.categoryName} → {rec.subCategoryName}
+                                      {budgetItemLabel(budgetItem)}
                                     </Typography>
                                     <Chip
                                       label={`${rec.confidence}%`}
@@ -428,22 +442,22 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                               ))}
                               {plannedExpenses.length > 0 && (
                                 <MenuItem disabled sx={{ fontSize: '0.75rem', fontWeight: 'bold', opacity: '1 !important' }}>
-                                  — All planned categories —
+                                  — All planned items —
                                 </MenuItem>
                               )}
                               {plannedExpenses
-                                .filter(p => !sortedRecs.some(r => r.rec.categoryId === p.categoryId._id && r.rec.subCategoryId === p.subCategoryId._id))
+                                .filter(p => !recBudgetIds.has(p.budgetId))
                                 .map(p => (
-                                  <MenuItem key={`plan-${p.categoryId._id}-${p.subCategoryId._id}`} value={`${p.categoryId._id}|${p.subCategoryId._id}`}>
+                                  <MenuItem key={`plan-${p.budgetId}`} value={`${p.categoryId._id}|${p.subCategoryId._id}|${p.budgetId}`}>
                                     <Typography variant="body2">
-                                      {p.categoryId.name} → {p.subCategoryId.name}
+                                      {budgetItemLabel(p)}
                                     </Typography>
                                   </MenuItem>
                                 ))
                               }
                               {plannedExpenses.length === 0 && sortedRecs.length === 0 && (
                                 <MenuItem disabled>
-                                  <Typography variant="body2" color="text.secondary">No planned categories available</Typography>
+                                  <Typography variant="body2" color="text.secondary">No planned items available</Typography>
                                 </MenuItem>
                               )}
                             </Select>
@@ -456,7 +470,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                             startIcon={isMoving ? <CircularProgress size={14} /> : <TrendingFlat />}
                             onClick={() => {
                               if (moveTargetCategoryId && moveTargetSubCategoryId) {
-                                moveExpenseToPlanned(expense.transactionId, moveTargetCategoryId, moveTargetSubCategoryId);
+                                moveExpenseToPlanned(expense.transactionId, moveTargetCategoryId, moveTargetSubCategoryId, moveTargetBudgetId);
                               }
                             }}
                             disabled={isMoving || !moveTargetCategoryId}

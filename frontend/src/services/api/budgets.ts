@@ -283,14 +283,15 @@ export const budgetsApi = {
     api.delete(`/budgets/projects/${projectId}/expenses/${transactionId}`)
       .then((res: AxiosResponse) => res.data),
 
-  moveExpenseToPlanned: (projectId: string, transactionId: string, categoryId: string, subCategoryId: string): Promise<{
+  moveExpenseToPlanned: (projectId: string, transactionId: string, categoryId: string, subCategoryId: string, budgetId?: string): Promise<{
     success: boolean;
     message: string;
     data: any;
   }> =>
     api.put(`/budgets/projects/${projectId}/expenses/${transactionId}/move`, {
       categoryId,
-      subCategoryId
+      subCategoryId,
+      ...(budgetId ? { budgetId } : {})
     }).then((res: AxiosResponse) => res.data),
 
   unassignExpense: (projectId: string, transactionId: string): Promise<{
