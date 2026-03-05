@@ -683,7 +683,7 @@ router.put('/projects/:id/expenses/:transactionId/unassign',
   auth,
   [
     param('id').isMongoId().withMessage('Invalid project ID'),
-    param('transactionId').isMongoId().withMessage('Invalid transaction ID')
+    param('transactionId').isString().withMessage('Transaction ID is required')
   ],
   handleValidationErrors,
   async (req, res) => {

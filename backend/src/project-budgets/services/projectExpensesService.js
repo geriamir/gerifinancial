@@ -428,6 +428,7 @@ class ProjectExpensesService {
   /**
    * Unassign an expense from its planned category back to unplanned.
    * Keeps the project tag but removes from allocatedTransactions.
+   * Supports both single transaction IDs and installment group IDs.
    */
   async unassignExpense(projectId, transactionId) {
     try {
@@ -436,28 +437,44 @@ class ProjectExpensesService {
         throw new Error('Project budget not found');
       }
 
-      // Find which category budget contains this transaction
-      let found = false;
+      let transactionIds = [transactionId];
+
+      // Handle installment groups
+      if (transactionId.startsWith('installment-group-')) {
+        const groupParts = transactionId.replace('installment-group-', '').split('--');
+        const identifier = groupParts[0];
+
+        const groupTransactions = await Transaction.find({
+          userId: project.userId,
+          identifier: identifier,
+          tags: project.projectTag
+        }).select('_id');
+
+        transactionIds = groupTransactions.map(t => t._id.toString());
+      }
+
+      let removedCount = 0;
       for (const budget of project.categoryBudgets) {
         if (!budget.allocatedTransactions) continue;
-        const idx = budget.allocatedTransactions.findIndex(
-          id => id.toString() === transactionId.toString()
-        );
-        if (idx > -1) {
-          budget.allocatedTransactions.splice(idx, 1);
-          found = true;
-          break;
+        for (const tid of transactionIds) {
+          const idx = budget.allocatedTransactions.findIndex(
+            id => id.toString() === tid.toString()
+          );
+          if (idx > -1) {
+            budget.allocatedTransactions.splice(idx, 1);
+            removedCount++;
+          }
         }
       }
 
-      if (!found) {
+      if (removedCount === 0) {
         throw new Error('Transaction is not assigned to any planned category in this project');
       }
 
       await project.save();
-      logger.info(`Unassigned expense ${transactionId} back to unplanned in project ${projectId}`);
+      logger.info(`Unassigned ${removedCount} expense(s) for ${transactionId} back to unplanned in project ${projectId}`);
 
-      return { transactionId, projectId };
+      return { transactionId, projectId, removedCount };
     } catch (error) {
       logger.error('Error unassigning expense:', error);
       throw error;
