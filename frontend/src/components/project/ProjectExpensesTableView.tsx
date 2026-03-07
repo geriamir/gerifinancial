@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Table,
@@ -133,6 +133,24 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
     groups[subCategoryId].budgetItems.push(budgetItem);
     return groups;
   }, {} as Record<string, { subcategory: any; category: any; budgetItems: CategoryBreakdownItem[] }>);
+
+  // Index planned expenses by subCategoryId for O(1) lookup in recommendation matching
+  const plannedBySubCategory = useMemo(() => {
+    const map = new Map<string, CategoryBreakdownItem[]>();
+    plannedExpenses.forEach(item => {
+      const key = item.subCategoryId._id;
+      const arr = map.get(key);
+      if (arr) arr.push(item);
+      else map.set(key, [item]);
+    });
+    return map;
+  }, [plannedExpenses]);
+
+  // Helper to build a display label for a budget item
+  const budgetItemLabel = (item: CategoryBreakdownItem) => {
+    const catSub = `${item.categoryId.name} → ${item.subCategoryId.name}`;
+    return item.description ? `${catSub} — ${item.description}` : catSub;
+  };
 
   const getRecommendationIcon = (confidence: number, wouldExceedBudget: boolean) => {
     if (wouldExceedBudget) return <Warning sx={{ fontSize: 14 }} />;
@@ -310,9 +328,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
             // Build recommendation list matched to specific budget items
             const recBudgetItems: Array<{ budgetItem: CategoryBreakdownItem; rec: any }> = [];
             (expense.recommendations || []).forEach((rec: any) => {
-              const matchingBudgetItems = plannedExpenses.filter(
-                item => item.subCategoryId._id === rec.subCategoryId
-              );
+              const matchingBudgetItems = plannedBySubCategory.get(rec.subCategoryId) || [];
               matchingBudgetItems.forEach((budgetItem) => {
                 const existing = recBudgetItems.find(r => r.budgetItem.budgetId === budgetItem.budgetId);
                 if (!existing || (existing.rec.confidence || 0) < rec.confidence) {
@@ -326,12 +342,6 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
             });
             const sortedRecs = recBudgetItems.sort((a, b) => b.rec.confidence - a.rec.confidence);
             const recBudgetIds = new Set(sortedRecs.map(r => r.budgetItem.budgetId));
-
-            // Helper to build a display label for a budget item
-            const budgetItemLabel = (item: CategoryBreakdownItem) => {
-              const catSub = `${item.categoryId.name} → ${item.subCategoryId.name}`;
-              return item.description ? `${catSub} — ${item.description}` : catSub;
-            };
 
             // Determine what will actually be moved
             let moveTargetCategoryId: string | null = null;
