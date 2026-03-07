@@ -598,67 +598,24 @@ router.put('/projects/:id/expenses/:transactionId/move',
       
       /** @type {string} */
       const { transactionId } = req.params;
-      const { categoryId, subCategoryId } = req.body;
+      const { categoryId, subCategoryId, budgetId } = req.body;
       
       // Check if this is an installment group ID (starts with "installment-group-")
       if (transactionId.startsWith('installment-group-')) {
-        // Handle installment group
-        
-        // Parse the group ID to get the identifier and original amount
-        const groupParts = transactionId.replace('installment-group-', '').split('--');
-        const identifier = groupParts[0];
-        const originalAmount = Math.abs(parseFloat(groupParts[1]));
-        
-        // Find all transactions in this installment group
-        const installmentTransactions = await Transaction.find({
-          userId: req.user._id,
-          identifier: identifier,
-          'rawData.type': 'installments',
-          tags: project.projectTag
-        });
-        
-        if (installmentTransactions.length === 0) {
-          return res.status(404).json({
-            success: false,
-            message: 'Installment group not found'
-          });
-        }
-        
-        // Move all transactions in the group
-        const installmentResults = [];
-        for (const transaction of installmentTransactions) {
-          try {
-            await projectTransactionService.moveExpenseToPlannedCategory(
-              transaction._id,
-              project._id,
-              categoryId,
-              subCategoryId
-            );
-            installmentResults.push({
-              transactionId: transaction._id,
-              success: true,
-              convertedAmount: Math.abs(transaction.amount)
-            });
-          } catch (error) {
-            installmentResults.push({
-              transactionId: transaction._id,
-              success: false,
-              error: error.message
-            });
-          }
-        }
-        
-        const totalConvertedAmount = installmentResults
-          .filter(r => r.success)
-          .reduce((sum, r) => sum + r.convertedAmount, 0);
+        const result = await projectExpensesService.moveInstallmentGroupToPlanned(
+          project._id,
+          transactionId,
+          categoryId,
+          subCategoryId,
+          budgetId || null
+        );
         
         res.json({
           success: true,
           data: {
             groupId: transactionId,
-            installmentCount: installmentTransactions.length,
-            totalConvertedAmount,
-            installmentResults,
+            installmentCount: result.transactionCount,
+            totalConvertedAmount: result.totalConvertedAmount,
             targetCategory: {
               categoryId,
               subCategoryId
@@ -679,37 +636,24 @@ router.put('/projects/:id/expenses/:transactionId/move',
           });
         }
         
-        // Get the transaction to check its amount
-        const transaction = await Transaction.findOne({
-          _id: transactionId,
-          userId: req.user._id
-        });
-        
-        if (!transaction) {
-          return res.status(404).json({
-            success: false,
-            message: 'Transaction not found'
-          });
-        }
-        
-        const result = await projectTransactionService.moveExpenseToPlannedCategory(
-          transactionId,
+        const result = await projectExpensesService.moveExpenseToPlanned(
           project._id,
+          transactionId,
           categoryId,
-          subCategoryId
+          subCategoryId,
+          budgetId || null
         );
         
         res.json({
           success: true,
           data: {
             transactionId: transactionId,
-            convertedAmount: Math.abs(transaction.amount),
+            convertedAmount: result.convertedAmount,
             projectId: project._id,
             targetCategory: {
               categoryId,
               subCategoryId
-            },
-            groupId: result.groupId
+            }
           },
           message: 'Expense moved to planned category successfully'
         });
@@ -729,6 +673,46 @@ router.put('/projects/:id/expenses/:transactionId/move',
         message: 'Failed to move expense to planned category',
         error: error.message
       });
+    }
+  }
+);
+
+/**
+ * PUT /api/budgets/projects/:id/expenses/:transactionId/unassign
+ * Move expense back from planned to unplanned (keeps project tag)
+ */
+router.put('/projects/:id/expenses/:transactionId/unassign',
+  auth,
+  [
+    param('id').isMongoId().withMessage('Invalid project ID'),
+    param('transactionId').isString().withMessage('Transaction ID is required')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const project = await ProjectBudget.findOne({
+        _id: req.params.id,
+        userId: req.user._id
+      });
+
+      if (!project) {
+        return res.status(404).json({ success: false, message: 'Project not found' });
+      }
+
+      const result = await projectExpensesService.unassignExpense(
+        project._id,
+        req.params.transactionId
+      );
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Expense unassigned from planned category'
+      });
+    } catch (error) {
+      logger.error('Error unassigning expense:', error);
+      const status = error.message.includes('not found') || error.message.includes('not assigned') ? 404 : 500;
+      res.status(status).json({ success: false, message: error.message });
     }
   }
 );

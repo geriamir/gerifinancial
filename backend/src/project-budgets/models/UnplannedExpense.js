@@ -158,8 +158,8 @@ class UnplannedExpense {
   
   _validateNumber(value, fieldName) {
     const num = Number(value);
-    if (isNaN(num) || num < 0) {
-      throw new Error(`UnplannedExpense: Field '${fieldName}' must be a non-negative number`);
+    if (isNaN(num)) {
+      throw new Error(`UnplannedExpense: Field '${fieldName}' must be a valid number`);
     }
     return num;
   }

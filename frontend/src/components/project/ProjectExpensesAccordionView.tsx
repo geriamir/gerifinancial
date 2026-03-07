@@ -225,7 +225,7 @@ const ProjectExpensesAccordionView: React.FC<ProjectExpensesAccordionViewProps> 
                           </Typography>
                         </Box>
                         <Typography variant="caption" color="primary.main" fontWeight="medium">
-                          {formatCompactCurrency(Math.abs(expense.amount), expense.currency)}
+                          {formatCompactCurrency(-expense.amount, expense.currency)}
                         </Typography>
                       </Box>
                     ))}
@@ -298,7 +298,7 @@ const ProjectExpensesAccordionView: React.FC<ProjectExpensesAccordionViewProps> 
                 <Box display="flex" alignItems="center" gap={0.5}>
                   <Box textAlign="right" mr={1}>
                     <Typography variant="body2" color="warning.dark" fontWeight="medium">
-                      {formatCompactCurrency(expense.originalAmount, expense.originalCurrency)}
+                      {formatCompactCurrency(-expense.originalAmount, expense.originalCurrency)}
                     </Typography>
                   </Box>
                   <IconButton

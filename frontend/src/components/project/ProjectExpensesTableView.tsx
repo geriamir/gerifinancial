@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Table,
@@ -13,15 +13,15 @@ import {
   Chip,
   Button,
   CircularProgress,
-  LinearProgress} from '@mui/material';
+  LinearProgress,
+  Select,
+  MenuItem,
+  FormControl} from '@mui/material';
 import {
-  ExpandLess,
-  ExpandMore,
   Delete,
   TrendingFlat,
-  CheckCircle,
   Warning,
-  Info
+  Undo
 } from '@mui/icons-material';
 import { CategoryBreakdownItem, UnplannedExpense } from '../../types/projects';
 import {
@@ -41,7 +41,8 @@ interface ProjectExpensesTableViewProps {
   projectCurrency: string;
   projectType?: string;
   onRemoveFromProject: (transactionId: string) => void;
-  moveExpenseToPlanned: (transactionId: string, categoryId: string, subCategoryId: string) => Promise<void>;
+  moveExpenseToPlanned: (transactionId: string, categoryId: string, subCategoryId: string, budgetId?: string) => Promise<void>;
+  onUnassignExpense?: (transactionId: string) => Promise<void>;
   movingExpense: string | null;
 }
 
@@ -53,6 +54,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
   projectType,
   onRemoveFromProject,
   moveExpenseToPlanned,
+  onUnassignExpense,
   movingExpense
 }) => {
   // Initialize with all subcategories expanded by default
@@ -86,11 +88,6 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
     }
   }, [plannedExpenses, expandedSubcategories]);
 
-  // Initialize with all unplanned expenses expanded by default
-  const [expandedUnplanned, setExpandedUnplanned] = useState<Set<string>>(() => {
-    return new Set(unplannedExpenses.map(expense => expense.transactionId));
-  });
-
   const toggleSubcategory = (subcategoryId: string) => {
     const newExpanded = new Set(expandedSubcategories);
     if (newExpanded.has(subcategoryId)) {
@@ -101,15 +98,8 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
     setExpandedSubcategories(newExpanded);
   };
 
-  const toggleUnplanned = (transactionId: string) => {
-    const newExpanded = new Set(expandedUnplanned);
-    if (newExpanded.has(transactionId)) {
-      newExpanded.delete(transactionId);
-    } else {
-      newExpanded.add(transactionId);
-    }
-    setExpandedUnplanned(newExpanded);
-  };
+  // Track custom target overrides per unplanned expense (key: transactionId, value: "categoryId|subCategoryId|budgetId")
+  const [customTargets, setCustomTargets] = useState<Record<string, string>>({});
 
   // Group planned expenses by subcategory
   const groupedBySubcategory = plannedExpenses.reduce((groups, budgetItem) => {
@@ -125,10 +115,22 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
     return groups;
   }, {} as Record<string, { subcategory: any; category: any; budgetItems: CategoryBreakdownItem[] }>);
 
-  const getRecommendationIcon = (confidence: number, wouldExceedBudget: boolean) => {
-    if (wouldExceedBudget) return <Warning sx={{ fontSize: 14 }} />;
-    if (confidence >= 95) return <CheckCircle sx={{ fontSize: 14 }} />;
-    return <Info sx={{ fontSize: 14 }} />;
+  // Index planned expenses by subCategoryId for O(1) lookup in recommendation matching
+  const plannedBySubCategory = useMemo(() => {
+    const map = new Map<string, CategoryBreakdownItem[]>();
+    plannedExpenses.forEach(item => {
+      const key = item.subCategoryId._id;
+      const arr = map.get(key);
+      if (arr) arr.push(item);
+      else map.set(key, [item]);
+    });
+    return map;
+  }, [plannedExpenses]);
+
+  // Helper to build a display label for a budget item
+  const budgetItemLabel = (item: CategoryBreakdownItem) => {
+    const catSub = `${item.categoryId.name} → ${item.subCategoryId.name}`;
+    return item.description ? `${catSub} — ${item.description}` : catSub;
   };
 
   return (
@@ -252,10 +254,21 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                                     </Typography>
                                   </TableCell>
                                   <TableCell></TableCell>
-                                  <TableCell></TableCell>
+                                  <TableCell>
+                                    {onUnassignExpense && expense._id && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => onUnassignExpense(expense._id)}
+                                        title="Unassign from this category"
+                                        sx={{ color: 'warning.main', p: 0 }}
+                                      >
+                                        <Undo sx={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    )}
+                                  </TableCell>
                                   <TableCell align="right" sx={{ minWidth: 120 }}>
                                     <Typography variant="body2" color="primary.main">
-                                      {formatCompactCurrency(Math.abs(expense.amount), expense.currency, 20)}
+                                      {formatCompactCurrency(-expense.amount, expense.currency, 20)}
                                     </Typography>
                                   </TableCell>
                                 </TableRow>
@@ -284,174 +297,182 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
 
           {/* Unplanned Expenses */}
           {unplannedExpenses.map((expense) => {
-            const isExpanded = expandedUnplanned.has(expense.transactionId);
             const isMoving = movingExpense === expense.transactionId;
+            const customTarget = customTargets[expense.transactionId];
+
+            // Build recommendation list matched to specific budget items
+            const recBudgetItems: Array<{ budgetItem: CategoryBreakdownItem; rec: any }> = [];
+            (expense.recommendations || []).forEach((rec: any) => {
+              const matchingBudgetItems = plannedBySubCategory.get(rec.subCategoryId) || [];
+              matchingBudgetItems.forEach((budgetItem) => {
+                const existing = recBudgetItems.find(r => r.budgetItem.budgetId === budgetItem.budgetId);
+                if (!existing || (existing.rec.confidence || 0) < rec.confidence) {
+                  if (existing) {
+                    existing.rec = rec;
+                  } else {
+                    recBudgetItems.push({ budgetItem, rec });
+                  }
+                }
+              });
+            });
+            const sortedRecs = recBudgetItems.sort((a, b) => b.rec.confidence - a.rec.confidence);
+            const recBudgetIds = new Set(sortedRecs.map(r => r.budgetItem.budgetId));
+
+            // Determine what will actually be moved
+            let moveTargetCategoryId: string | null = null;
+            let moveTargetSubCategoryId: string | null = null;
+            let moveTargetBudgetId: string | undefined = undefined;
+            let moveTargetLabel = '';
+
+            if (customTarget) {
+              const [catId, subCatId, budId] = customTarget.split('|');
+              moveTargetCategoryId = catId;
+              moveTargetSubCategoryId = subCatId;
+              moveTargetBudgetId = budId || undefined;
+              const match = plannedExpenses.find(p => p.budgetId === budId);
+              moveTargetLabel = match ? budgetItemLabel(match) : 'Custom';
+            } else if (sortedRecs.length > 0) {
+              const best = sortedRecs[0];
+              moveTargetCategoryId = best.rec.categoryId;
+              moveTargetSubCategoryId = best.rec.subCategoryId;
+              moveTargetBudgetId = best.budgetItem.budgetId;
+              moveTargetLabel = budgetItemLabel(best.budgetItem);
+            }
 
             return (
               <React.Fragment key={expense.transactionId}>
-                {/* Unplanned Expense Row */}
-                <TableRow 
-                  sx={{ 
-                    opacity: isMoving ? 0.7 : 1
-                  }}
-                >
-                  <TableCell>
-                    <IconButton 
-                      size="small" 
-                      sx={{ p: 0 }}
-                      onClick={() => toggleUnplanned(expense.transactionId)}
-                      disabled={isMoving}
-                    >
-                      {isExpanded ? <ExpandLess sx={{ fontSize: 16 }} /> : <ExpandMore sx={{ fontSize: 16 }} />}
-                    </IconButton>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight="medium">
-                      {truncateText(expense.transaction.chargedAccount || expense.transaction.description || 'Transaction', 30)}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {expense.category.name} → {expense.subCategory.name}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="caption">
-                      {formatCompactDate(expense.transactionDate)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    {expense.recommendations && expense.recommendations.length > 0 && (
-                      <Chip
-                        label={`${expense.recommendations.length} rec`}
-                        size="small"
-                        color="info"
-                        sx={{ height: 20, fontSize: '0.65rem' }}
-                      />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <IconButton
-                      size="small"
-                      onClick={() => onRemoveFromProject(expense.transactionId)}
-                      sx={{ color: 'error.main', p: 0 }}
-                      disabled={isMoving}
-                    >
-                      <Delete sx={{ fontSize: 16 }} />
-                    </IconButton>
-                  </TableCell>
-                  <TableCell align="right" sx={{ minWidth: 120 }}>
-                    <Typography variant="body2" color="warning.dark" fontWeight="medium">
-                      {formatCompactCurrency(expense.originalAmount, expense.originalCurrency, 20)}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-
-                {/* Recommendations */}
+                {/* Unplanned expense card row */}
                 <TableRow>
                   <TableCell colSpan={6} sx={{ p: 0, border: 'none' }}>
-                    <Collapse in={isExpanded} timeout="auto" unmountOnExit>
-                      <Box sx={{ p: COMPACT_SPACING.medium }}>
-                        {expense.recommendations && expense.recommendations.length > 0 ? (
-                          <Box display="flex" flexDirection="column" gap={COMPACT_SPACING.small}>
-                            <Typography variant="caption" color="text.secondary">
-                              Recommendations:
-                            </Typography>
-                            {(() => {
-                              // First, collect all unique budget items across all recommendations
-                              const uniqueBudgetItems = new Map<string, { budgetItem: any; rec: any; bestRec?: any }>();
-                              
-                              // Process all recommendations to find unique budget items
-                              expense.recommendations.forEach((rec, recIndex) => {
-                                const matchingBudgetItems = plannedExpenses.filter(
-                                  item => item.subCategoryId._id === rec.subCategoryId
-                                );
-                                
-                                matchingBudgetItems.forEach((budgetItem) => {
-                                  const budgetItemKey = `${rec.subCategoryId}-${budgetItem.budgetId}`;
-                                  
-                                  // If we haven't seen this budget item, add it
-                                  // If we have seen it, keep the one with higher confidence
-                                  if (!uniqueBudgetItems.has(budgetItemKey) || 
-                                      (uniqueBudgetItems.get(budgetItemKey)?.rec.confidence || 0) < rec.confidence) {
-                                    uniqueBudgetItems.set(budgetItemKey, { budgetItem, rec, bestRec: rec });
-                                  }
-                                });
-                              });
+                    <Box sx={{
+                      m: COMPACT_SPACING.small,
+                      p: COMPACT_SPACING.medium,
+                      border: '1px solid',
+                      borderColor: 'warning.light',
+                      borderRadius: 1,
+                      backgroundColor: 'warning.50',
+                      opacity: isMoving ? 0.7 : 1
+                    }}>
+                      {/* Expense header */}
+                      <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                        <Box flex={1}>
+                          <Typography variant="body2" fontWeight="bold">
+                            {expense.transaction.chargedAccount || expense.transaction.description || 'Transaction'}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {expense.category.name} → {expense.subCategory.name} · {formatCompactDate(expense.transactionDate)}
+                          </Typography>
+                        </Box>
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Typography variant="body2" color="warning.dark" fontWeight="bold">
+                            {formatCompactCurrency(-expense.originalAmount, expense.originalCurrency, 20)}
+                          </Typography>
+                          <IconButton
+                            size="small"
+                            onClick={() => onRemoveFromProject(expense.transactionId)}
+                            sx={{ color: 'error.main', p: 0 }}
+                            disabled={isMoving}
+                            title="Remove from project"
+                          >
+                            <Delete sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Box>
+                      </Box>
 
-                              // Convert to array and sort by confidence (best first)
-                              const sortedBudgetItems = Array.from(uniqueBudgetItems.values())
-                                .sort((a, b) => b.rec.confidence - a.rec.confidence);
+                      {/* Assign to section */}
+                      <Box sx={{
+                        p: COMPACT_SPACING.small,
+                        backgroundColor: 'background.paper',
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: 'grey.200'
+                      }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>
+                          Assign to:
+                        </Typography>
 
-                              // Generate the recommendations UI (limit to 4 for display)
-                              return sortedBudgetItems.slice(0, 4).map((item, displayIndex) => {
-                                const { budgetItem, rec } = item;
-                                const budgetItemKey = `${rec.subCategoryId}-${budgetItem.budgetId}`;
-                                
-                                const displayName = budgetItem.description ? 
-                                  `${rec.subCategoryName} (${budgetItem.description})` : 
-                                  rec.subCategoryName;
-                                
-                                return (
-                                  <Box
-                                    key={budgetItemKey}
-                                    display="flex"
-                                    alignItems="center"
-                                    justifyContent="space-between"
-                                    sx={{
-                                      p: COMPACT_SPACING.small,
-                                      backgroundColor: displayIndex === 0 ? 'primary.light' : 'grey.50',
-                                      borderRadius: 1,
-                                      border: '1px solid',
-                                      borderColor: displayIndex === 0 ? 'primary.main' : 'grey.200'
-                                    }}
-                                  >
-                                    <Box flex={1}>
-                                      <Box display="flex" alignItems="center" gap={COMPACT_SPACING.small}>
-                                        <Typography variant="caption" fontWeight="bold">
-                                          {truncateText(displayName, 35)}
-                                        </Typography>
-                                        <Chip
-                                          icon={getRecommendationIcon(rec.confidence, rec.wouldExceedBudget)}
-                                          label={`${rec.confidence}%`}
-                                          size="small"
-                                          color={getRecommendationChipColor(rec.confidence, rec.wouldExceedBudget)}
-                                          sx={{ height: 18, fontSize: '0.6rem' }}
-                                        />
-                                        {displayIndex === 0 && (
-                                          <Chip
-                                            label="Best"
-                                            size="small"
-                                            color="primary"
-                                            sx={{ height: 18, fontSize: '0.6rem' }}
-                                          />
-                                        )}
-                                      </Box>
-                                      <Typography variant="caption" color="text.secondary">
-                                        {truncateText(rec.reason, 40)}
-                                      </Typography>
-                                    </Box>
-                                    <Button
+                        {/* Target selector — dropdown of all planned categories + recommendations */}
+                        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                          <FormControl size="small" sx={{ minWidth: 250, flex: 1 }}>
+                            <Select
+                              value={customTarget || (sortedRecs.length > 0 ? `${sortedRecs[0].rec.categoryId}|${sortedRecs[0].rec.subCategoryId}|${sortedRecs[0].budgetItem.budgetId}` : '')}
+                              onChange={(e) => {
+                                setCustomTargets(prev => ({ ...prev, [expense.transactionId]: e.target.value as string }));
+                              }}
+                              displayEmpty
+                              sx={{ fontSize: '0.8rem', height: 32 }}
+                            >
+                              {sortedRecs.length > 0 && (
+                                <MenuItem disabled sx={{ fontSize: '0.75rem', fontWeight: 'bold', opacity: '1 !important' }}>
+                                  — Recommendations —
+                                </MenuItem>
+                              )}
+                              {sortedRecs.map(({ budgetItem, rec }) => (
+                                <MenuItem key={`rec-${budgetItem.budgetId}`} value={`${rec.categoryId}|${rec.subCategoryId}|${budgetItem.budgetId}`}>
+                                  <Box display="flex" alignItems="center" gap={0.5} width="100%">
+                                    <Typography variant="body2" sx={{ flex: 1 }}>
+                                      {budgetItemLabel(budgetItem)}
+                                    </Typography>
+                                    <Chip
+                                      label={`${rec.confidence}%`}
                                       size="small"
-                                      variant={displayIndex === 0 ? "contained" : "outlined"}
-                                      color={rec.wouldExceedBudget ? "warning" : "primary"}
-                                      startIcon={isMoving ? <CircularProgress size={12} /> : <TrendingFlat />}
-                                      onClick={() => moveExpenseToPlanned(expense.transactionId, rec.categoryId, rec.subCategoryId)}
-                                      disabled={isMoving}
-                                      sx={{ minWidth: 'auto', px: COMPACT_SPACING.small, py: 0.25 }}
-                                    >
-                                      Move
-                                    </Button>
+                                      color={getRecommendationChipColor(rec.confidence, rec.wouldExceedBudget)}
+                                      sx={{ height: 18, fontSize: '0.6rem' }}
+                                    />
+                                    {rec.wouldExceedBudget && (
+                                      <Warning sx={{ fontSize: 14, color: 'warning.main' }} />
+                                    )}
                                   </Box>
-                                );
-                              });
-                            })()}
-                          </Box>
-                        ) : (
-                          <Typography variant="caption" color="text.secondary" fontStyle="italic">
-                            No recommendations available
+                                </MenuItem>
+                              ))}
+                              {plannedExpenses.length > 0 && (
+                                <MenuItem disabled sx={{ fontSize: '0.75rem', fontWeight: 'bold', opacity: '1 !important' }}>
+                                  — All planned items —
+                                </MenuItem>
+                              )}
+                              {plannedExpenses
+                                .filter(p => !recBudgetIds.has(p.budgetId))
+                                .map(p => (
+                                  <MenuItem key={`plan-${p.budgetId}`} value={`${p.categoryId._id}|${p.subCategoryId._id}|${p.budgetId}`}>
+                                    <Typography variant="body2">
+                                      {budgetItemLabel(p)}
+                                    </Typography>
+                                  </MenuItem>
+                                ))
+                              }
+                              {plannedExpenses.length === 0 && sortedRecs.length === 0 && (
+                                <MenuItem disabled>
+                                  <Typography variant="body2" color="text.secondary">No planned items available</Typography>
+                                </MenuItem>
+                              )}
+                            </Select>
+                          </FormControl>
+
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="primary"
+                            startIcon={isMoving ? <CircularProgress size={14} /> : <TrendingFlat />}
+                            onClick={() => {
+                              if (moveTargetCategoryId && moveTargetSubCategoryId) {
+                                moveExpenseToPlanned(expense.transactionId, moveTargetCategoryId, moveTargetSubCategoryId, moveTargetBudgetId);
+                              }
+                            }}
+                            disabled={isMoving || !moveTargetCategoryId}
+                            sx={{ whiteSpace: 'nowrap', height: 32 }}
+                          >
+                            Assign
+                          </Button>
+                        </Box>
+
+                        {/* Show what will happen */}
+                        {moveTargetLabel && (
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                            Will assign to: <strong>{moveTargetLabel}</strong>
                           </Typography>
                         )}
                       </Box>
-                    </Collapse>
+                    </Box>
                   </TableCell>
                 </TableRow>
               </React.Fragment>

@@ -16,7 +16,7 @@ class ProjectExpensesService {
    * @param {string} targetSubCategoryId - Target subcategory ID
    * @returns {Object} Result containing transaction, converted amount, and target budget
    */
-  async moveExpenseToPlanned(projectId, transactionId, targetCategoryId, targetSubCategoryId) {
+  async moveExpenseToPlanned(projectId, transactionId, targetCategoryId, targetSubCategoryId, targetBudgetId = null) {
     try {
       // Get the project budget
       const project = await ProjectBudget.findById(projectId)
@@ -38,17 +38,27 @@ class ProjectExpensesService {
         throw new Error('Transaction not found or not associated with this project');
       }
 
-      // Find the target category budget
-      const targetBudget = project.categoryBudgets.find(budget => {
-        const budgetCategoryId = budget.categoryId._id || budget.categoryId;
-        const budgetSubCategoryId = budget.subCategoryId._id || budget.subCategoryId;
-        return budgetCategoryId.toString() === targetCategoryId.toString() &&
-               budgetSubCategoryId.toString() === targetSubCategoryId.toString();
-      });
+      // Find the target category budget — prefer budgetId if provided
+      let targetBudget;
+      if (targetBudgetId) {
+        targetBudget = project.categoryBudgets.id(targetBudgetId);
+      }
+      if (!targetBudget) {
+        targetBudget = project.categoryBudgets.find(budget => {
+          const budgetCategoryId = budget.categoryId._id || budget.categoryId;
+          const budgetSubCategoryId = budget.subCategoryId._id || budget.subCategoryId;
+          return budgetCategoryId.toString() === targetCategoryId.toString() &&
+                 budgetSubCategoryId.toString() === targetSubCategoryId.toString();
+        });
+      }
 
       if (!targetBudget) {
         throw new Error('Target category budget not found in project');
       }
+
+      // Derive category/subcategory from the resolved budget to avoid mismatches
+      const resolvedCategoryId = targetBudget.categoryId._id || targetBudget.categoryId;
+      const resolvedSubCategoryId = targetBudget.subCategoryId._id || targetBudget.subCategoryId;
 
       // Convert transaction amount to project currency if needed
       let convertedAmount = Math.abs(transaction.amount);
@@ -71,9 +81,9 @@ class ProjectExpensesService {
         }
       }
 
-      // Update the transaction's category/subcategory to match the target
-      transaction.category = targetCategoryId;
-      transaction.subCategory = targetSubCategoryId;
+      // Update the transaction's category/subcategory to match the resolved budget
+      transaction.category = resolvedCategoryId;
+      transaction.subCategory = resolvedSubCategoryId;
       
       // Ensure rawData exists for validation
       if (!transaction.rawData) {
@@ -107,9 +117,10 @@ class ProjectExpensesService {
    * @param {string} groupIdentifier - The installment group identifier
    * @param {string} targetCategoryId - Target category ID
    * @param {string} targetSubCategoryId - Target subcategory ID
+   * @param {string|null} targetBudgetId - Optional specific budget item ID
    * @returns {Object} Result containing affected transactions and totals
    */
-  async moveInstallmentGroupToPlanned(projectId, groupIdentifier, targetCategoryId, targetSubCategoryId) {
+  async moveInstallmentGroupToPlanned(projectId, groupIdentifier, targetCategoryId, targetSubCategoryId, targetBudgetId = null) {
     try {
       // Parse the installment group ID
       const groupIdMatch = groupIdentifier.match(/^installment-group-(.+?)--([0-9.-]+)$/);
@@ -128,17 +139,27 @@ class ProjectExpensesService {
         throw new Error('Project budget not found');
       }
 
-      // Find the target category budget
-      const targetBudget = project.categoryBudgets.find(budget => {
-        const budgetCategoryId = budget.categoryId._id || budget.categoryId;
-        const budgetSubCategoryId = budget.subCategoryId._id || budget.subCategoryId;
-        return budgetCategoryId.toString() === targetCategoryId.toString() &&
-               budgetSubCategoryId.toString() === targetSubCategoryId.toString();
-      });
+      // Find the target category budget — prefer budgetId if provided
+      let targetBudget;
+      if (targetBudgetId) {
+        targetBudget = project.categoryBudgets.id(targetBudgetId);
+      }
+      if (!targetBudget) {
+        targetBudget = project.categoryBudgets.find(budget => {
+          const budgetCategoryId = budget.categoryId._id || budget.categoryId;
+          const budgetSubCategoryId = budget.subCategoryId._id || budget.subCategoryId;
+          return budgetCategoryId.toString() === targetCategoryId.toString() &&
+                 budgetSubCategoryId.toString() === targetSubCategoryId.toString();
+        });
+      }
 
       if (!targetBudget) {
         throw new Error('Target category budget not found in project');
       }
+
+      // Derive category/subcategory from the resolved budget to avoid mismatches
+      const resolvedCategoryId = targetBudget.categoryId._id || targetBudget.categoryId;
+      const resolvedSubCategoryId = targetBudget.subCategoryId._id || targetBudget.subCategoryId;
 
       // Find all transactions in the installment group
       const transactions = await Transaction.find({
@@ -177,9 +198,9 @@ class ProjectExpensesService {
           }
         }
 
-        // Update the transaction's category/subcategory
-        transaction.category = targetCategoryId;
-        transaction.subCategory = targetSubCategoryId;
+        // Update the transaction's category/subcategory from the resolved budget
+        transaction.category = resolvedCategoryId;
+        transaction.subCategory = resolvedSubCategoryId;
         
         // Ensure rawData exists for validation
         if (!transaction.rawData) {
@@ -380,7 +401,9 @@ class ProjectExpensesService {
               continue;
             }
 
-            let convertedAmount = Math.abs(transaction.amount);
+            // Negate amount: expenses (negative in DB) become positive spent,
+            // refunds (positive in DB) become negative to reduce the total
+            let convertedAmount = -transaction.amount;
             if (transaction.currency !== project.currency) {
               try {
                 const conversionResult = await currencyExchangeService.convertAmount(
@@ -390,10 +413,9 @@ class ProjectExpensesService {
                   transaction.processedDate,
                   true // Allow fallback to nearest rate
                 );
-                convertedAmount = conversionResult.convertedAmount;
+                convertedAmount = transaction.amount < 0 ? conversionResult.convertedAmount : -conversionResult.convertedAmount;
               } catch (error) {
                 logger.warn(`Currency conversion failed for transaction ${transaction._id}:`, error.message);
-                // Keep the original amount as fallback
               }
             }
             
@@ -422,6 +444,64 @@ class ProjectExpensesService {
       return plannedExpenses;
     } catch (error) {
       logger.error('Error getting planned expenses:', error);
+      throw error;
+    }
+  }
+  /**
+   * Unassign an expense from its planned category back to unplanned.
+   * Keeps the project tag but removes from allocatedTransactions.
+   * Supports both single transaction IDs and installment group IDs.
+   */
+  async unassignExpense(projectId, transactionId) {
+    try {
+      const project = await ProjectBudget.findById(projectId);
+      if (!project) {
+        throw new Error('Project budget not found');
+      }
+
+      let transactionIds = [transactionId];
+
+      // Handle installment groups
+      if (transactionId.startsWith('installment-group-')) {
+        const groupIdMatch = transactionId.match(/^installment-group-(.+?)--([0-9.-]+)$/);
+        if (!groupIdMatch) {
+          throw new Error('Invalid installment group identifier format');
+        }
+        const cleanIdentifier = groupIdMatch[1];
+
+        const groupTransactions = await Transaction.find({
+          userId: project.userId,
+          identifier: { $regex: `^${cleanIdentifier}-*$` },
+          tags: project.projectTag
+        }).select('_id');
+
+        transactionIds = groupTransactions.map(t => t._id.toString());
+      }
+
+      let removedCount = 0;
+      for (const budget of project.categoryBudgets) {
+        if (!budget.allocatedTransactions) continue;
+        for (const tid of transactionIds) {
+          const idx = budget.allocatedTransactions.findIndex(
+            id => id.toString() === tid.toString()
+          );
+          if (idx > -1) {
+            budget.allocatedTransactions.splice(idx, 1);
+            removedCount++;
+          }
+        }
+      }
+
+      if (removedCount === 0) {
+        throw new Error('Transaction is not assigned to any planned category in this project');
+      }
+
+      await project.save();
+      logger.info(`Unassigned ${removedCount} expense(s) for ${transactionId} back to unplanned in project ${projectId}`);
+
+      return { transactionId, projectId, removedCount };
+    } catch (error) {
+      logger.error('Error unassigning expense:', error);
       throw error;
     }
   }

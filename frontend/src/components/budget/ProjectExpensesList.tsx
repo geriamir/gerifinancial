@@ -112,7 +112,7 @@ const ProjectExpensesList: React.FC<ProjectExpensesListProps> = ({
                     projectCurrency={projectCurrency}
                     projectType={projectType}
                     onRemoveFromProject={onRemoveFromProject}
-                    moveExpenseToPlanned={async (transactionId: string, categoryId: string, subCategoryId: string) => {
+                    moveExpenseToPlanned={async (transactionId: string, categoryId: string, subCategoryId: string, budgetId?: string) => {
                       if (!projectId) {
                         console.error('Project ID is required to move expense');
                         return;
@@ -120,7 +120,7 @@ const ProjectExpensesList: React.FC<ProjectExpensesListProps> = ({
 
                       try {
                         setMovingExpense(transactionId);
-                        await budgetsApi.moveExpenseToPlanned(projectId, transactionId, categoryId, subCategoryId);
+                        await budgetsApi.moveExpenseToPlanned(projectId, transactionId, categoryId, subCategoryId, budgetId);
                         
                         // Call refresh callback after successful move
                         if (onExpensesMoved) {
@@ -128,12 +128,25 @@ const ProjectExpensesList: React.FC<ProjectExpensesListProps> = ({
                         }
                       } catch (error) {
                         console.error('Failed to move expense to planned:', error);
-                        // TODO: Show error message to user
                       } finally {
                         setMovingExpense(null);
                       }
                     }}
                     movingExpense={movingExpense}
+                    onUnassignExpense={async (transactionId: string) => {
+                      if (!projectId) return;
+                      try {
+                        setMovingExpense(transactionId);
+                        await budgetsApi.unassignExpense(projectId, transactionId);
+                        if (onExpensesMoved) {
+                          onExpensesMoved();
+                        }
+                      } catch (error) {
+                        console.error('Failed to unassign expense:', error);
+                      } finally {
+                        setMovingExpense(null);
+                      }
+                    }}
                   />
                 )}
 
@@ -145,7 +158,7 @@ const ProjectExpensesList: React.FC<ProjectExpensesListProps> = ({
                     projectCurrency={projectCurrency}
                     projectType={projectType}
                     onRemoveFromProject={onRemoveFromProject}
-                    moveExpenseToPlanned={async (transactionId: string, categoryId: string, subCategoryId: string) => {
+                    moveExpenseToPlanned={async (transactionId: string, categoryId: string, subCategoryId: string, budgetId?: string) => {
                       if (!projectId) {
                         console.error('Project ID is required to move expense');
                         return;
@@ -153,7 +166,7 @@ const ProjectExpensesList: React.FC<ProjectExpensesListProps> = ({
 
                       try {
                         setMovingExpense(transactionId);
-                        await budgetsApi.moveExpenseToPlanned(projectId, transactionId, categoryId, subCategoryId);
+                        await budgetsApi.moveExpenseToPlanned(projectId, transactionId, categoryId, subCategoryId, budgetId);
                         
                         // Call refresh callback after successful move
                         if (onExpensesMoved) {

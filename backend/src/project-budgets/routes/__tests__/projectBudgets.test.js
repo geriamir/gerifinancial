@@ -329,7 +329,234 @@ describe('Project Budget API Endpoints', () => {
       expect(response.body.data.groupId).toBe(groupId);
       expect(response.body.data.installmentCount).toBe(2);
       expect(response.body.data.totalConvertedAmount).toBe(500);
-      expect(response.body.data.installmentResults).toHaveLength(2);
+    });
+
+    test('PUT /api/budgets/projects/:id/expenses/:transactionId/unassign - should unassign a single transaction', async () => {
+      // Create project with a budget item that has an allocated transaction
+      const project = new ProjectBudget({
+        userId: testUser._id,
+        name: 'Unassign Single Test',
+        type: 'vacation',
+        startDate: new Date('2025-06-01'),
+        endDate: new Date('2025-06-15'),
+        categoryBudgets: [{
+          categoryId: testCategory._id,
+          subCategoryId: testSubCategory._id,
+          budgetedAmount: 1000
+        }]
+      });
+      await project.save();
+      await project.createProjectTag();
+
+      // Create and tag transaction, then allocate it
+      const transaction = new Transaction({
+        identifier: 'unassign-single-test',
+        userId: testUser._id,
+        accountId: new mongoose.Types.ObjectId(),
+        amount: -300,
+        type: TransactionType.EXPENSE,
+        currency: 'ILS',
+        date: new Date('2025-06-05'),
+        processedDate: new Date('2025-06-05'),
+        description: 'Expense to unassign',
+        category: testCategory._id,
+        subCategory: testSubCategory._id,
+        tags: [project.projectTag],
+        rawData: {}
+      });
+      await transaction.save();
+
+      // Allocate to budget item
+      project.categoryBudgets[0].allocatedTransactions.push(transaction._id);
+      await project.save();
+
+      const response = await request(app)
+        .put(`/api/budgets/projects/${project._id}/expenses/${transaction._id}/unassign`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.transactionId).toBe(transaction._id.toString());
+      expect(response.body.data.removedCount).toBe(1);
+
+      // Verify the transaction was removed from allocatedTransactions
+      const updatedProject = await ProjectBudget.findById(project._id);
+      expect(updatedProject.categoryBudgets[0].allocatedTransactions).toHaveLength(0);
+
+      // Verify the transaction still has the project tag (stays in project, just unplanned)
+      const updatedTransaction = await Transaction.findById(transaction._id);
+      expect(updatedTransaction.tags).toContainEqual(project.projectTag);
+    });
+
+    test('PUT /api/budgets/projects/:id/expenses/:transactionId/unassign - should unassign an installment group', async () => {
+      // Create project
+      const project = new ProjectBudget({
+        userId: testUser._id,
+        name: 'Unassign Installment Test',
+        type: 'vacation',
+        startDate: new Date('2025-06-01'),
+        endDate: new Date('2025-06-15'),
+        categoryBudgets: [{
+          categoryId: testCategory._id,
+          subCategoryId: testSubCategory._id,
+          budgetedAmount: 2000
+        }]
+      });
+      await project.save();
+      await project.createProjectTag();
+
+      // Create installment transactions
+      const installment1 = new Transaction({
+        identifier: 'unassign-inst',
+        userId: testUser._id,
+        accountId: new mongoose.Types.ObjectId(),
+        amount: -200,
+        type: TransactionType.EXPENSE,
+        currency: 'ILS',
+        date: new Date('2025-06-01'),
+        processedDate: new Date('2025-06-01'),
+        description: 'Installment 1/3',
+        category: testCategory._id,
+        subCategory: testSubCategory._id,
+        tags: [project.projectTag],
+        rawData: { type: 'installments', originalAmount: 600, installmentNumber: 1, totalInstallments: 3 }
+      });
+      await installment1.save();
+
+      const installment2 = new Transaction({
+        identifier: 'unassign-inst',
+        userId: testUser._id,
+        accountId: new mongoose.Types.ObjectId(),
+        amount: -200,
+        type: TransactionType.EXPENSE,
+        currency: 'ILS',
+        date: new Date('2025-06-05'),
+        processedDate: new Date('2025-06-05'),
+        description: 'Installment 2/3',
+        category: testCategory._id,
+        subCategory: testSubCategory._id,
+        tags: [project.projectTag],
+        rawData: { type: 'installments', originalAmount: 600, installmentNumber: 2, totalInstallments: 3 }
+      });
+      await installment2.save();
+
+      const installment3 = new Transaction({
+        identifier: 'unassign-inst',
+        userId: testUser._id,
+        accountId: new mongoose.Types.ObjectId(),
+        amount: -200,
+        type: TransactionType.EXPENSE,
+        currency: 'ILS',
+        date: new Date('2025-06-10'),
+        processedDate: new Date('2025-06-10'),
+        description: 'Installment 3/3',
+        category: testCategory._id,
+        subCategory: testSubCategory._id,
+        tags: [project.projectTag],
+        rawData: { type: 'installments', originalAmount: 600, installmentNumber: 3, totalInstallments: 3 }
+      });
+      await installment3.save();
+
+      // Allocate all installments to budget item
+      project.categoryBudgets[0].allocatedTransactions.push(
+        installment1._id, installment2._id, installment3._id
+      );
+      await project.save();
+
+      const groupId = 'installment-group-unassign-inst--600';
+
+      const response = await request(app)
+        .put(`/api/budgets/projects/${project._id}/expenses/${groupId}/unassign`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.transactionId).toBe(groupId);
+      expect(response.body.data.removedCount).toBe(3);
+
+      // Verify all installments were removed from allocatedTransactions
+      const updatedProject = await ProjectBudget.findById(project._id);
+      expect(updatedProject.categoryBudgets[0].allocatedTransactions).toHaveLength(0);
+    });
+
+    test('PUT /api/budgets/projects/:id/expenses/:transactionId/move - should target specific budget item via budgetId', async () => {
+      // Create a second subcategory so we have two budget items with the same category
+      const subCategory2 = new SubCategory({
+        name: 'Hotels Second',
+        parentCategory: testCategory._id,
+        userId: testUser._id
+      });
+      await subCategory2.save();
+
+      // Create project with two budget items sharing the same category but different subcategories
+      // (simulates multiple planned items where budgetId disambiguation is needed)
+      const project = new ProjectBudget({
+        userId: testUser._id,
+        name: 'BudgetId Move Test',
+        type: 'vacation',
+        startDate: new Date('2025-06-01'),
+        endDate: new Date('2025-06-15'),
+        categoryBudgets: [
+          {
+            categoryId: testCategory._id,
+            subCategoryId: testSubCategory._id,
+            budgetedAmount: 500,
+            description: 'First hotel'
+          },
+          {
+            categoryId: testCategory._id,
+            subCategoryId: testSubCategory._id,
+            budgetedAmount: 800,
+            description: 'Second hotel'
+          }
+        ]
+      });
+      await project.save();
+      await project.createProjectTag();
+
+      const secondBudgetId = project.categoryBudgets[1]._id.toString();
+
+      // Create transaction
+      const transaction = new Transaction({
+        identifier: 'budgetid-move-test',
+        userId: testUser._id,
+        accountId: new mongoose.Types.ObjectId(),
+        amount: -350,
+        type: TransactionType.EXPENSE,
+        currency: 'ILS',
+        date: new Date('2025-06-07'),
+        processedDate: new Date('2025-06-07'),
+        description: 'Hotel expense for second hotel',
+        category: testCategory._id,
+        subCategory: testSubCategory._id,
+        tags: [project.projectTag],
+        rawData: {}
+      });
+      await transaction.save();
+
+      // Move with explicit budgetId targeting the second budget item
+      const response = await request(app)
+        .put(`/api/budgets/projects/${project._id}/expenses/${transaction._id}/move`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          categoryId: testCategory._id,
+          subCategoryId: testSubCategory._id,
+          budgetId: secondBudgetId
+        })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.transactionId.toString()).toBe(transaction._id.toString());
+      expect(response.body.data.convertedAmount).toBe(350);
+
+      // Verify the transaction was allocated to the second budget item, not the first
+      const updatedProject = await ProjectBudget.findById(project._id);
+      expect(updatedProject.categoryBudgets[0].allocatedTransactions).toHaveLength(0);
+      expect(updatedProject.categoryBudgets[1].allocatedTransactions).toHaveLength(1);
+      expect(updatedProject.categoryBudgets[1].allocatedTransactions[0].toString()).toBe(transaction._id.toString());
+
+      // Clean up extra subcategory
+      await SubCategory.deleteOne({ _id: subCategory2._id });
     });
 
     test('GET /api/budgets/projects/:id/expenses/breakdown - should get comprehensive expense breakdown', async () => {
