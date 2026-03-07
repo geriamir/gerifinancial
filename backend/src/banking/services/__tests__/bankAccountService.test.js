@@ -1,11 +1,15 @@
 const mongoose = require('mongoose');
-const { BankAccount } = require('../../models');
+const { BankAccount, Transaction } = require('../../models');
 const bankAccountService = require('../bankAccountService');
 const bankScraperService = require('../bankScraperService');
+const queuedDataSyncService = require('../queuedDataSyncService');
 const logger = require('../../../shared/utils/logger');
 
 // Mock dependencies
 jest.mock('../bankScraperService');
+jest.mock('../queuedDataSyncService', () => ({
+  queueBankAccountSync: jest.fn()
+}));
 jest.mock('../../../shared/utils/logger');
 
 // Import valid credentials from mock scraper
@@ -240,6 +244,93 @@ describe('BankAccountService', () => {
       expect(result).toBeNull();
       expect(bankScraperService.testConnection).not.toHaveBeenCalled();
       expect(eventListeners.accountActivated).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('recoverMissingTransactions', () => {
+    let account;
+
+    beforeEach(async () => {
+      account = await BankAccount.create({
+        userId,
+        bankId: 'hapoalim',
+        name: 'Recovery Test Account',
+        credentials: { username: 'user', password: 'pass' },
+        status: 'active',
+        lastScraped: new Date('2026-03-01')
+      });
+
+      queuedDataSyncService.queueBankAccountSync.mockResolvedValue({
+        queuedJobs: 1,
+        totalJobs: 1
+      });
+    });
+
+    it('should set lastScraped to latest non-future transaction date', async () => {
+      const pastDate = new Date('2026-02-20');
+      const recentDate = new Date('2026-03-05');
+      const futureDate = new Date('2026-04-15');
+
+      await Transaction.create([
+        { identifier: 'tx-past', userId, accountId: account._id, amount: -100, currency: 'ILS', date: pastDate, type: 'Expense', description: 'Past', rawData: {} },
+        { identifier: 'tx-recent', userId, accountId: account._id, amount: -200, currency: 'ILS', date: recentDate, type: 'Expense', description: 'Recent', rawData: {} },
+        { identifier: 'tx-future', userId, accountId: account._id, amount: -50, currency: 'ILS', date: futureDate, type: 'Expense', description: 'Future installment', rawData: {} }
+      ]);
+
+      const result = await bankAccountService.recoverMissingTransactions(account._id, userId);
+
+      expect(result.correctedLastScraped).toEqual(recentDate);
+
+      const updated = await BankAccount.findById(account._id);
+      expect(updated.lastScraped).toEqual(recentDate);
+    });
+
+    it('should also reset strategy-level lastScraped dates', async () => {
+      account.strategySync = {
+        'checking-accounts': { lastScraped: new Date('2026-03-01'), lastAttempted: new Date(), status: 'success' },
+        'investment-portfolios': { lastScraped: new Date('2026-03-01'), lastAttempted: new Date(), status: 'success' }
+      };
+      account.markModified('strategySync');
+      await account.save();
+
+      const recentDate = new Date('2026-03-04');
+      await Transaction.create({
+        identifier: 'tx-strat', userId, accountId: account._id, amount: -100, currency: 'ILS', date: recentDate, type: 'Expense', description: 'Test', rawData: {}
+      });
+
+      await bankAccountService.recoverMissingTransactions(account._id, userId);
+
+      const updated = await BankAccount.findById(account._id);
+      expect(updated.strategySync['checking-accounts'].lastScraped).toEqual(recentDate);
+      expect(updated.strategySync['investment-portfolios'].lastScraped).toEqual(recentDate);
+    });
+
+    it('should fall back to 6 months ago when no transactions exist', async () => {
+      const before = new Date();
+      before.setMonth(before.getMonth() - 6);
+
+      const result = await bankAccountService.recoverMissingTransactions(account._id, userId);
+
+      // Should be approximately 6 months ago (within a few seconds)
+      expect(result.correctedLastScraped.getTime()).toBeGreaterThanOrEqual(before.getTime() - 5000);
+      expect(result.correctedLastScraped.getTime()).toBeLessThanOrEqual(Date.now());
+      expect(result.latestTransactionDate).toBeNull();
+    });
+
+    it('should not set lastScraped to a future date when only future transactions exist', async () => {
+      const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      await Transaction.create({
+        identifier: 'tx-only-future', userId, accountId: account._id, amount: -100, currency: 'ILS', date: futureDate, type: 'Expense', description: 'Future only', rawData: {}
+      });
+
+      const before = new Date();
+      before.setMonth(before.getMonth() - 6);
+
+      const result = await bankAccountService.recoverMissingTransactions(account._id, userId);
+
+      // No non-future transaction found, should fall back to ~6 months ago
+      expect(result.correctedLastScraped.getTime()).toBeLessThanOrEqual(Date.now());
+      expect(result.correctedLastScraped.getTime()).toBeGreaterThanOrEqual(before.getTime() - 5000);
     });
   });
 });

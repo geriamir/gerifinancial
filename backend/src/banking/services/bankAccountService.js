@@ -339,6 +339,7 @@ class BankAccountService {
           bankAccount.strategySync[strategy].lastScraped = newLastScraped;
         }
       }
+      bankAccount.markModified('strategySync');
     }
 
     await bankAccount.save();
