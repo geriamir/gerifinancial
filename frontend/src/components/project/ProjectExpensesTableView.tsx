@@ -18,13 +18,9 @@ import {
   MenuItem,
   FormControl} from '@mui/material';
 import {
-  ExpandLess,
-  ExpandMore,
   Delete,
   TrendingFlat,
-  CheckCircle,
   Warning,
-  Info,
   Undo
 } from '@mui/icons-material';
 import { CategoryBreakdownItem, UnplannedExpense } from '../../types/projects';
@@ -92,11 +88,6 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
     }
   }, [plannedExpenses, expandedSubcategories]);
 
-  // Initialize with all unplanned expenses expanded by default
-  const [expandedUnplanned, setExpandedUnplanned] = useState<Set<string>>(() => {
-    return new Set(unplannedExpenses.map(expense => expense.transactionId));
-  });
-
   const toggleSubcategory = (subcategoryId: string) => {
     const newExpanded = new Set(expandedSubcategories);
     if (newExpanded.has(subcategoryId)) {
@@ -105,16 +96,6 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
       newExpanded.add(subcategoryId);
     }
     setExpandedSubcategories(newExpanded);
-  };
-
-  const toggleUnplanned = (transactionId: string) => {
-    const newExpanded = new Set(expandedUnplanned);
-    if (newExpanded.has(transactionId)) {
-      newExpanded.delete(transactionId);
-    } else {
-      newExpanded.add(transactionId);
-    }
-    setExpandedUnplanned(newExpanded);
   };
 
   // Track custom target overrides per unplanned expense (key: transactionId, value: "categoryId|subCategoryId|budgetId")
@@ -150,12 +131,6 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
   const budgetItemLabel = (item: CategoryBreakdownItem) => {
     const catSub = `${item.categoryId.name} → ${item.subCategoryId.name}`;
     return item.description ? `${catSub} — ${item.description}` : catSub;
-  };
-
-  const getRecommendationIcon = (confidence: number, wouldExceedBudget: boolean) => {
-    if (wouldExceedBudget) return <Warning sx={{ fontSize: 14 }} />;
-    if (confidence >= 95) return <CheckCircle sx={{ fontSize: 14 }} />;
-    return <Info sx={{ fontSize: 14 }} />;
   };
 
   return (
