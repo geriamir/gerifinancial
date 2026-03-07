@@ -161,6 +161,40 @@ describe('TransactionService', () => {
       });
       expect(transactions).toHaveLength(2);
     });
+
+    it('should pick the latest non-future date for mostRecentTransactionDate', async () => {
+      const pastDate = new Date('2026-02-15');
+      const recentDate = new Date('2026-03-05');
+      const futureDate = new Date('2026-04-20');
+
+      const accounts = [{
+        txns: [
+          { identifier: 'past-tx', date: pastDate, chargedAmount: -100, description: 'Past expense', currency: 'ILS' },
+          { identifier: 'recent-tx', date: recentDate, chargedAmount: -200, description: 'Recent expense', currency: 'ILS' },
+          { identifier: 'future-tx', date: futureDate, chargedAmount: -50, description: 'Future installment', currency: 'ILS' }
+        ]
+      }];
+
+      const result = await transactionService.processScrapedTransactions(accounts, mockBankAccount);
+
+      expect(result.mostRecentTransactionDate).toEqual(recentDate);
+    });
+
+    it('should keep mostRecentTransactionDate null when all transactions are future-dated', async () => {
+      const futureDate1 = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const futureDate2 = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000);
+
+      const accounts = [{
+        txns: [
+          { identifier: 'future-tx-1', date: futureDate1, chargedAmount: -100, description: 'Future 1', currency: 'ILS' },
+          { identifier: 'future-tx-2', date: futureDate2, chargedAmount: -200, description: 'Future 2', currency: 'ILS' }
+        ]
+      }];
+
+      const result = await transactionService.processScrapedTransactions(accounts, mockBankAccount);
+
+      expect(result.mostRecentTransactionDate).toBeNull();
+    });
   });
 
 });
