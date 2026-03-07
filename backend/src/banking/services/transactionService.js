@@ -119,8 +119,9 @@ class TransactionService {
         try {
           const transactionDate = new Date(transaction.date);
           
-          // Track the most recent transaction date
-          if (!results.mostRecentTransactionDate || transactionDate > results.mostRecentTransactionDate) {
+          // Track the most recent transaction date (exclude future-dated installments)
+          const now = new Date();
+          if (transactionDate <= now && (!results.mostRecentTransactionDate || transactionDate > results.mostRecentTransactionDate)) {
             results.mostRecentTransactionDate = transactionDate;
           }
           
