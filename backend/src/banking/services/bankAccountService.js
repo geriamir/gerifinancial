@@ -309,8 +309,11 @@ class BankAccountService {
       throw new Error('Bank account not found');
     }
 
-    // Find the actual latest transaction date for this account
-    const latestTransaction = await Transaction.findOne({ accountId })
+    // Find the actual latest transaction date for this account (exclude future-dated installments)
+    const latestTransaction = await Transaction.findOne({
+      accountId,
+      date: { $lte: new Date() }
+    })
       .sort({ date: -1 })
       .select('date')
       .lean();

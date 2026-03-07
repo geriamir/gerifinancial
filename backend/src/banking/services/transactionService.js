@@ -87,6 +87,7 @@ class TransactionService {
 
     // Check once if this is a credit card provider
     const isCreditCardProvider = BankClassificationService.isCreditCardProvider(bankAccount.bankId);
+    const now = new Date();
 
     for (const account of scrapedAccounts) {
       let creditCard = null;
@@ -119,8 +120,8 @@ class TransactionService {
         try {
           const transactionDate = new Date(transaction.date);
           
-          // Track the most recent transaction date
-          if (!results.mostRecentTransactionDate || transactionDate > results.mostRecentTransactionDate) {
+          // Track the most recent transaction date (exclude future-dated installments)
+          if (transactionDate <= now && (!results.mostRecentTransactionDate || transactionDate > results.mostRecentTransactionDate)) {
             results.mostRecentTransactionDate = transactionDate;
           }
           
