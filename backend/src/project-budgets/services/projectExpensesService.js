@@ -56,6 +56,10 @@ class ProjectExpensesService {
         throw new Error('Target category budget not found in project');
       }
 
+      // Derive category/subcategory from the resolved budget to avoid mismatches
+      const resolvedCategoryId = targetBudget.categoryId._id || targetBudget.categoryId;
+      const resolvedSubCategoryId = targetBudget.subCategoryId._id || targetBudget.subCategoryId;
+
       // Convert transaction amount to project currency if needed
       let convertedAmount = Math.abs(transaction.amount);
       if (transaction.currency !== project.currency) {
@@ -77,9 +81,9 @@ class ProjectExpensesService {
         }
       }
 
-      // Update the transaction's category/subcategory to match the target
-      transaction.category = targetCategoryId;
-      transaction.subCategory = targetSubCategoryId;
+      // Update the transaction's category/subcategory to match the resolved budget
+      transaction.category = resolvedCategoryId;
+      transaction.subCategory = resolvedSubCategoryId;
       
       // Ensure rawData exists for validation
       if (!transaction.rawData) {
@@ -153,6 +157,10 @@ class ProjectExpensesService {
         throw new Error('Target category budget not found in project');
       }
 
+      // Derive category/subcategory from the resolved budget to avoid mismatches
+      const resolvedCategoryId = targetBudget.categoryId._id || targetBudget.categoryId;
+      const resolvedSubCategoryId = targetBudget.subCategoryId._id || targetBudget.subCategoryId;
+
       // Find all transactions in the installment group
       const transactions = await Transaction.find({
         userId: project.userId,
@@ -190,9 +198,9 @@ class ProjectExpensesService {
           }
         }
 
-        // Update the transaction's category/subcategory
-        transaction.category = targetCategoryId;
-        transaction.subCategory = targetSubCategoryId;
+        // Update the transaction's category/subcategory from the resolved budget
+        transaction.category = resolvedCategoryId;
+        transaction.subCategory = resolvedSubCategoryId;
         
         // Ensure rawData exists for validation
         if (!transaction.rawData) {
