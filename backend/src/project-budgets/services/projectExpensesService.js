@@ -463,12 +463,15 @@ class ProjectExpensesService {
 
       // Handle installment groups
       if (transactionId.startsWith('installment-group-')) {
-        const groupParts = transactionId.replace('installment-group-', '').split('--');
-        const identifier = groupParts[0];
+        const groupIdMatch = transactionId.match(/^installment-group-(.+?)--([0-9.-]+)$/);
+        if (!groupIdMatch) {
+          throw new Error('Invalid installment group identifier format');
+        }
+        const cleanIdentifier = groupIdMatch[1];
 
         const groupTransactions = await Transaction.find({
           userId: project.userId,
-          identifier: identifier,
+          identifier: { $regex: `^${cleanIdentifier}-*$` },
           tags: project.projectTag
         }).select('_id');
 
