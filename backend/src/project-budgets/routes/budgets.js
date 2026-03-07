@@ -711,7 +711,7 @@ router.put('/projects/:id/expenses/:transactionId/unassign',
       });
     } catch (error) {
       logger.error('Error unassigning expense:', error);
-      const status = error.message.includes('not') ? 404 : 500;
+      const status = error.message.includes('not found') || error.message.includes('not assigned') ? 404 : 500;
       res.status(status).json({ success: false, message: error.message });
     }
   }
