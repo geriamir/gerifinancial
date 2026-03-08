@@ -234,7 +234,8 @@ export const getSegmentDescription = (
 ): string => {
   switch (segmentName) {
     case 'Budget Remaining':
-      return `Available from ${formatCurrency(totalFunding, currency)} total funding`;
+    case 'Remaining Budget':
+      return `Available from ${formatCurrency(totalFunding || totalBudget, currency)} total ${totalFunding ? 'funding' : 'budget'}`;
     case 'Funding Remaining':
       return `Available from ${formatCurrency(totalFunding, currency)} total funding`;
     case 'Unplanned Budget':
