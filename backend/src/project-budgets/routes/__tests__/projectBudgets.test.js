@@ -996,4 +996,205 @@ describe('Project Budget API Endpoints', () => {
       expect(response.body.data.plannedCategories).toHaveLength(0);
     });
   });
+
+  describe('Discover Transactions', () => {
+
+    test('GET /api/budgets/projects/:id/discover-transactions - should find foreign currency transactions in date range', async () => {
+      const project = new ProjectBudget({
+        userId: testUser._id,
+        name: 'Discover Test Project',
+        type: 'vacation',
+        startDate: new Date('2025-06-01'),
+        endDate: new Date('2025-06-15'),
+        categoryBudgets: []
+      });
+      await project.save();
+      await project.createProjectTag();
+
+      const accountId = new mongoose.Types.ObjectId();
+
+      // Foreign currency transaction in range — should be discovered
+      await Transaction.create({
+        identifier: 'discover-usd-1', userId: testUser._id, accountId,
+        amount: -200, type: TransactionType.EXPENSE, currency: 'USD',
+        date: new Date('2025-06-05'), processedDate: new Date('2025-06-05'),
+        description: 'Hotel abroad', category: testCategory._id, rawData: {}
+      });
+
+      // ILS transaction in range — should be excluded by default
+      await Transaction.create({
+        identifier: 'discover-ils-1', userId: testUser._id, accountId,
+        amount: -100, type: TransactionType.EXPENSE, currency: 'ILS',
+        date: new Date('2025-06-05'), processedDate: new Date('2025-06-05'),
+        description: 'Local expense', rawData: {}
+      });
+
+      // Foreign currency but outside date range — should not appear
+      await Transaction.create({
+        identifier: 'discover-usd-outside', userId: testUser._id, accountId,
+        amount: -300, type: TransactionType.EXPENSE, currency: 'USD',
+        date: new Date('2025-07-01'), processedDate: new Date('2025-07-01'),
+        description: 'After trip', rawData: {}
+      });
+
+      const response = await request(app)
+        .get(`/api/budgets/projects/${project._id}/discover-transactions`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.transactions).toHaveLength(1);
+      expect(response.body.data.transactions[0].description).toBe('Hotel abroad');
+      expect(response.body.data.transactions[0].currency).toBe('USD');
+      expect(response.body.data.filters.availableCurrencies).toContain('USD');
+      expect(response.body.data.filters.availableCurrencies).toContain('ILS');
+    });
+
+    test('should exclude already-tagged transactions', async () => {
+      const project = new ProjectBudget({
+        userId: testUser._id,
+        name: 'Discover Exclude Tagged',
+        type: 'vacation',
+        startDate: new Date('2025-06-01'),
+        endDate: new Date('2025-06-15'),
+        categoryBudgets: []
+      });
+      await project.save();
+      await project.createProjectTag();
+
+      const accountId = new mongoose.Types.ObjectId();
+
+      // Already tagged transaction
+      const taggedTx = await Transaction.create({
+        identifier: 'discover-tagged', userId: testUser._id, accountId,
+        amount: -150, type: TransactionType.EXPENSE, currency: 'EUR',
+        date: new Date('2025-06-05'), processedDate: new Date('2025-06-05'),
+        description: 'Already tagged', tags: [project.projectTag], rawData: {}
+      });
+
+      // Not tagged
+      await Transaction.create({
+        identifier: 'discover-untagged', userId: testUser._id, accountId,
+        amount: -250, type: TransactionType.EXPENSE, currency: 'EUR',
+        date: new Date('2025-06-06'), processedDate: new Date('2025-06-06'),
+        description: 'Not tagged yet', rawData: {}
+      });
+
+      const response = await request(app)
+        .get(`/api/budgets/projects/${project._id}/discover-transactions`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      const descriptions = response.body.data.transactions.map(t => t.description);
+      expect(descriptions).toContain('Not tagged yet');
+      expect(descriptions).not.toContain('Already tagged');
+    });
+
+    test('should filter by specific currencies', async () => {
+      const project = new ProjectBudget({
+        userId: testUser._id,
+        name: 'Discover Currency Filter',
+        type: 'vacation',
+        startDate: new Date('2025-06-01'),
+        endDate: new Date('2025-06-15'),
+        categoryBudgets: []
+      });
+      await project.save();
+      await project.createProjectTag();
+
+      const accountId = new mongoose.Types.ObjectId();
+
+      await Transaction.create({
+        identifier: 'discover-eur', userId: testUser._id, accountId,
+        amount: -100, type: TransactionType.EXPENSE, currency: 'EUR',
+        date: new Date('2025-06-05'), processedDate: new Date('2025-06-05'),
+        description: 'Euro expense', rawData: {}
+      });
+
+      await Transaction.create({
+        identifier: 'discover-gbp', userId: testUser._id, accountId,
+        amount: -200, type: TransactionType.EXPENSE, currency: 'GBP',
+        date: new Date('2025-06-06'), processedDate: new Date('2025-06-06'),
+        description: 'Pound expense', rawData: {}
+      });
+
+      const response = await request(app)
+        .get(`/api/budgets/projects/${project._id}/discover-transactions?currencies=EUR`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body.data.transactions).toHaveLength(1);
+      expect(response.body.data.transactions[0].currency).toBe('EUR');
+    });
+
+    test('should filter by category', async () => {
+      const project = new ProjectBudget({
+        userId: testUser._id,
+        name: 'Discover Category Filter',
+        type: 'vacation',
+        startDate: new Date('2025-06-01'),
+        endDate: new Date('2025-06-15'),
+        categoryBudgets: []
+      });
+      await project.save();
+      await project.createProjectTag();
+
+      const accountId = new mongoose.Types.ObjectId();
+
+      await Transaction.create({
+        identifier: 'discover-travel', userId: testUser._id, accountId,
+        amount: -100, type: TransactionType.EXPENSE, currency: 'USD',
+        date: new Date('2025-06-05'), processedDate: new Date('2025-06-05'),
+        description: 'Travel expense', category: testCategory._id, rawData: {}
+      });
+
+      const otherCategory = await Category.create({
+        name: 'Food', type: TransactionType.EXPENSE, userId: testUser._id
+      });
+
+      await Transaction.create({
+        identifier: 'discover-food', userId: testUser._id, accountId,
+        amount: -50, type: TransactionType.EXPENSE, currency: 'USD',
+        date: new Date('2025-06-06'), processedDate: new Date('2025-06-06'),
+        description: 'Food expense', category: otherCategory._id, rawData: {}
+      });
+
+      const response = await request(app)
+        .get(`/api/budgets/projects/${project._id}/discover-transactions?categoryIds=${testCategory._id}&excludeILS=false`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body.data.transactions).toHaveLength(1);
+      expect(response.body.data.transactions[0].description).toBe('Travel expense');
+    });
+
+    test('should include ILS when excludeILS=false', async () => {
+      const project = new ProjectBudget({
+        userId: testUser._id,
+        name: 'Discover Include ILS',
+        type: 'vacation',
+        startDate: new Date('2025-06-01'),
+        endDate: new Date('2025-06-15'),
+        categoryBudgets: []
+      });
+      await project.save();
+      await project.createProjectTag();
+
+      const accountId = new mongoose.Types.ObjectId();
+
+      await Transaction.create({
+        identifier: 'discover-ils-incl', userId: testUser._id, accountId,
+        amount: -100, type: TransactionType.EXPENSE, currency: 'ILS',
+        date: new Date('2025-06-05'), processedDate: new Date('2025-06-05'),
+        description: 'ILS expense', category: testCategory._id, rawData: {}
+      });
+
+      const response = await request(app)
+        .get(`/api/budgets/projects/${project._id}/discover-transactions?excludeILS=false&categoryIds=${testCategory._id}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body.data.transactions.some(t => t.currency === 'ILS')).toBe(true);
+    });
+  });
 });

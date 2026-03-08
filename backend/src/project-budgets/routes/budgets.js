@@ -904,7 +904,7 @@ router.get('/projects/:id/discover-transactions',
       }
 
       const options = {
-        excludeILS: req.query.excludeILS !== undefined ? req.query.excludeILS : true
+        excludeILS: req.query.excludeILS === undefined ? true : req.query.excludeILS !== 'false'
       };
 
       if (req.query.currencies) {
