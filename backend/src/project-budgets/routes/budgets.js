@@ -874,4 +874,65 @@ router.get('/projects/:id/expenses/breakdown',
   }
 );
 
+/**
+ * GET /api/budgets/projects/:id/discover-transactions
+ * Discover transactions that could belong to this project
+ * Query params: currencies (comma-separated), categoryIds (comma-separated), excludeILS (boolean)
+ */
+router.get('/projects/:id/discover-transactions',
+  auth,
+  [
+    param('id').isMongoId().withMessage('Invalid project ID'),
+    query('currencies').optional().isString(),
+    query('categoryIds').optional().isString(),
+    query('excludeILS').optional().isBoolean().toBoolean()
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      // Verify project ownership
+      const project = await ProjectBudget.findOne({
+        _id: req.params.id,
+        userId: req.user._id
+      });
+
+      if (!project) {
+        return res.status(404).json({
+          success: false,
+          message: 'Project not found'
+        });
+      }
+
+      const options = {
+        excludeILS: req.query.excludeILS !== undefined ? req.query.excludeILS : true
+      };
+
+      if (req.query.currencies) {
+        options.currencies = req.query.currencies.split(',').map(c => c.trim());
+      }
+      if (req.query.categoryIds) {
+        options.categoryIds = req.query.categoryIds.split(',').map(c => c.trim());
+      }
+
+      const result = await projectTransactionService.discoverTransactions(
+        req.params.id,
+        req.user._id,
+        options
+      );
+
+      res.json({
+        success: true,
+        data: result
+      });
+    } catch (error) {
+      logger.error('Error discovering transactions for project:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to discover transactions',
+        error: error.message
+      });
+    }
+  }
+);
+
 module.exports = router;

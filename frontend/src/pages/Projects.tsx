@@ -23,7 +23,8 @@ import {
   Delete,
   Edit,
   Save,
-  Cancel
+  Cancel,
+  TravelExplore
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import ProjectBudgetsList from '../components/budget/ProjectBudgetsList';
@@ -36,6 +37,7 @@ import { FundingSource } from '../types/projects';
 import { SUPPORTED_CURRENCIES, formatCurrency, getCurrencySymbol } from '../types/foreignCurrency';
 import { categoriesApi } from '../services/api/categories';
 import { budgetsApi } from '../services/api/budgets';
+import DiscoverTransactionsDialog from '../components/project/DiscoverTransactionsDialog';
 
 const FUNDING_SOURCE_TYPES = [
   { value: 'ongoing_funds', label: 'Ongoing Funds' },
@@ -80,6 +82,7 @@ const Projects: React.FC = () => {
       keywords: string[];
     }>;
   } | null>(null);
+  const [discoverDialogOpen, setDiscoverDialogOpen] = useState(false);
 
   // Load categories when component mounts
   useEffect(() => {
@@ -222,6 +225,7 @@ const Projects: React.FC = () => {
 
 
     return (
+      <>
       <Container maxWidth="lg">
         <Box py={3}>
           {/* Navigation */}
@@ -341,6 +345,14 @@ const Projects: React.FC = () => {
                   <Typography variant="h4" component="h1" sx={{ flex: 1 }}>
                     {specificProject.name || 'Untitled Project'}
                   </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<TravelExplore />}
+                    onClick={() => setDiscoverDialogOpen(true)}
+                  >
+                    Discover Transactions
+                  </Button>
                   <IconButton onClick={() => startEditing('header')} size="small">
                     <Edit />
                   </IconButton>
@@ -746,6 +758,32 @@ const Projects: React.FC = () => {
           </Box>
         </Box>
       </Container>
+
+      <DiscoverTransactionsDialog
+        open={discoverDialogOpen}
+        onClose={() => setDiscoverDialogOpen(false)}
+        projectId={specificProject._id}
+        projectName={specificProject.name || 'Project'}
+        onTagged={async () => {
+          try {
+            const response = await budgetsApi.getProjectExpenseBreakdown(specificProject._id);
+            const breakdown = response.data || response;
+            updateProject(specificProject._id, {
+              categoryBreakdown: breakdown.plannedCategories || breakdown.categoryBreakdown,
+              unplannedExpenses: breakdown.unplannedExpenses,
+              totalPaid: breakdown.totalPaid,
+              totalPlannedPaid: breakdown.totalPlannedPaid,
+              totalUnplannedPaid: breakdown.totalUnplannedPaid,
+              progress: breakdown.progress,
+              isOverBudget: breakdown.isOverBudget,
+              remainingBudget: breakdown.totalBudget - breakdown.totalPaid
+            });
+          } catch (error) {
+            console.error('Failed to refresh project data after tagging:', error);
+          }
+        }}
+      />
+    </>
     );
   }
 

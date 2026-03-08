@@ -354,4 +354,43 @@ export const budgetsApi = {
   }> =>
     api.post(`/budgets/projects/${projectId}/planned-expenses`, expenseData)
       .then((res: AxiosResponse) => res.data),
+
+  discoverTransactions: (projectId: string, params?: {
+    currencies?: string[];
+    categoryIds?: string[];
+    excludeILS?: boolean;
+  }): Promise<{
+    success: boolean;
+    data: {
+      transactions: Array<{
+        _id: string;
+        description: string;
+        amount: number;
+        currency: string;
+        date: string;
+        category?: { _id: string; name: string };
+        subCategory?: { _id: string; name: string };
+        accountId?: { _id: string; name: string; bankId: string };
+      }>;
+      filters: {
+        availableCurrencies: string[];
+        availableCategories: Array<{ _id: string; name: string }>;
+      };
+      project: {
+        _id: string;
+        name: string;
+        startDate: string;
+        endDate: string;
+        currency: string;
+      };
+    };
+  }> => {
+    const queryParams = new URLSearchParams();
+    if (params?.currencies?.length) queryParams.set('currencies', params.currencies.join(','));
+    if (params?.categoryIds?.length) queryParams.set('categoryIds', params.categoryIds.join(','));
+    if (params?.excludeILS !== undefined) queryParams.set('excludeILS', String(params.excludeILS));
+    const qs = queryParams.toString();
+    return api.get(`/budgets/projects/${projectId}/discover-transactions${qs ? `?${qs}` : ''}`)
+      .then((res: AxiosResponse) => res.data);
+  },
 };

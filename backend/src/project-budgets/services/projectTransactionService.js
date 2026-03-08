@@ -394,6 +394,102 @@ class ProjectTransactionService {
       throw error;
     }
   }
+  /**
+   * Discover transactions that could belong to a project
+   * Finds transactions within the project's date range matching filter criteria
+   * that are not already tagged to the project
+   */
+  async discoverTransactions(projectId, userId, options = {}) {
+    const { currencies, categoryIds, excludeILS = true } = options;
+
+    const project = await ProjectBudget.findOne({
+      _id: convertToObjectId(projectId),
+      userId: convertToObjectId(userId)
+    });
+
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    // Build query: user's transactions within project date range
+    const query = {
+      userId: convertToObjectId(userId),
+      date: { $gte: project.startDate, $lte: project.endDate }
+    };
+
+    // Exclude transactions already tagged to this project
+    if (project.projectTag) {
+      query.tags = { $ne: project.projectTag };
+    }
+
+    // Currency filter
+    if (currencies && currencies.length > 0) {
+      query.currency = { $in: currencies };
+    } else if (excludeILS) {
+      query.currency = { $ne: 'ILS' };
+    }
+
+    // Category filter
+    if (categoryIds && categoryIds.length > 0) {
+      query.category = { $in: categoryIds.map(id => convertToObjectId(id)) };
+    }
+
+    // Fetch matching transactions
+    const transactions = await Transaction.find(query)
+      .populate('category', 'name')
+      .populate('subCategory', 'name')
+      .populate('accountId', 'name bankId')
+      .sort({ date: -1 })
+      .lean();
+
+    // Get distinct currencies available in the date range (for filter UI)
+    const availableCurrencies = await Transaction.distinct('currency', {
+      userId: convertToObjectId(userId),
+      date: { $gte: project.startDate, $lte: project.endDate },
+      ...(project.projectTag ? { tags: { $ne: project.projectTag } } : {})
+    });
+
+    // Get distinct categories available in the date range (for filter UI)
+    const categoryDocs = await Transaction.aggregate([
+      {
+        $match: {
+          userId: convertToObjectId(userId),
+          date: { $gte: project.startDate, $lte: project.endDate },
+          category: { $ne: null },
+          ...(project.projectTag ? { tags: { $ne: project.projectTag } } : {})
+        }
+      },
+      { $group: { _id: '$category' } },
+      {
+        $lookup: {
+          from: 'categories',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'cat'
+        }
+      },
+      { $unwind: '$cat' },
+      { $project: { _id: '$cat._id', name: '$cat.name' } },
+      { $sort: { name: 1 } }
+    ]);
+
+    logger.info(`Discovered ${transactions.length} transactions for project ${projectId} with filters: currencies=${currencies || (excludeILS ? 'non-ILS' : 'all')}, categories=${categoryIds || 'all'}`);
+
+    return {
+      transactions,
+      filters: {
+        availableCurrencies: availableCurrencies.sort(),
+        availableCategories: categoryDocs
+      },
+      project: {
+        _id: project._id,
+        name: project.name,
+        startDate: project.startDate,
+        endDate: project.endDate,
+        currency: project.currency
+      }
+    };
+  }
 }
 
 module.exports = new ProjectTransactionService();
