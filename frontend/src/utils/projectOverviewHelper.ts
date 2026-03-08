@@ -11,7 +11,7 @@ export interface ProjectOverviewSegment {
 
 export interface ProjectOverviewData {
   segments: ProjectOverviewSegment[];
-  scenario: 1 | 2 | 3 | 4;
+  scenario: 1 | 2 | 3 | 4 | 5;
   totalValue: number;
   title: string;
 }
@@ -40,7 +40,7 @@ export const calculateProjectOverviewData = (
   totalUnplanned: number = 0
 ): ProjectOverviewData => {
   const segments: ProjectOverviewSegment[] = [];
-  let scenario: 1 | 2 | 3 | 4;
+  let scenario: 1 | 2 | 3 | 4 | 5;
   let totalValue: number;
   let title: string;
 
@@ -56,7 +56,51 @@ export const calculateProjectOverviewData = (
     formattedValue: formatCurrency(value, currency)
   });
 
-  if (totalPaid > totalFunding) {
+  if (totalFunding === 0) {
+    // Scenario 5: No Funding - use budget as reference
+    scenario = 5;
+    
+    if (totalBudget === 0 && totalPaid === 0) {
+      title = "No Budget Data";
+      totalValue = 0;
+    } else if (totalPaid > totalBudget) {
+      // Overspent the plan
+      title = "Over-Spent (No Funding)";
+      totalValue = totalPaid;
+      
+      if (totalUnplanned > 0) {
+        segments.push(createSegment('Unplanned Expenses', totalUnplanned, PROJECT_OVERVIEW_COLORS.unplannedExpenses));
+      }
+      
+      const plannedOverBudget = Math.max(0, totalPlannedSpent - totalBudget);
+      if (plannedOverBudget > 0) {
+        segments.push(createSegment('Overspent', plannedOverBudget, PROJECT_OVERVIEW_COLORS.overPaid));
+      }
+      
+      const plannedWithinBudget = Math.min(totalPlannedSpent, totalBudget);
+      if (plannedWithinBudget > 0) {
+        segments.push(createSegment('Planned Paid', plannedWithinBudget, PROJECT_OVERVIEW_COLORS.totalPaid));
+      }
+    } else {
+      // Within plan
+      title = "Budget Tracking";
+      totalValue = totalBudget;
+      
+      const remaining = totalBudget - totalPaid;
+      if (remaining > 0) {
+        segments.push(createSegment('Remaining Budget', remaining, PROJECT_OVERVIEW_COLORS.budgetRemaining));
+      }
+      
+      if (totalUnplanned > 0) {
+        segments.push(createSegment('Unplanned Expenses', totalUnplanned, PROJECT_OVERVIEW_COLORS.unplannedExpenses));
+      }
+      
+      if (totalPlannedSpent > 0) {
+        segments.push(createSegment('Planned Paid', totalPlannedSpent, PROJECT_OVERVIEW_COLORS.totalPaid));
+      }
+    }
+
+  } else if (totalPaid > totalFunding) {
     // Scenario 4: Over-Budget
     scenario = 4;
     totalValue = totalPaid;
@@ -190,7 +234,8 @@ export const getSegmentDescription = (
 ): string => {
   switch (segmentName) {
     case 'Budget Remaining':
-      return `Available from ${formatCurrency(totalFunding, currency)} total funding`;
+    case 'Remaining Budget':
+      return `Available from ${formatCurrency(totalFunding || totalBudget, currency)} total ${totalFunding ? 'funding' : 'budget'}`;
     case 'Funding Remaining':
       return `Available from ${formatCurrency(totalFunding, currency)} total funding`;
     case 'Unplanned Budget':
@@ -208,6 +253,8 @@ export const getSegmentDescription = (
       return `Amount spent beyond the planned budget (${formatCurrency(totalBudget, currency)})`;
     case 'Over Paid':
       return `Amount spent beyond planned budget`;
+    case 'Overspent':
+      return `Amount spent beyond planned budget (${formatCurrency(totalBudget, currency)})`;
     case 'Overbudget Plan':
       return `Planned amount exceeding available funding`;
     case 'Budgeted Plan':
@@ -227,7 +274,7 @@ export const getSegmentDescription = (
  * Get scenario-specific insights and recommendations
  */
 export const getScenarioInsights = (
-  scenario: 1 | 2 | 3 | 4,
+  scenario: 1 | 2 | 3 | 4 | 5,
   totalFunding: number,
   totalBudget: number,
   totalPaid: number,
@@ -262,6 +309,20 @@ export const getScenarioInsights = (
         recommendation: 'Immediate action required: Secure additional funding or halt non-essential expenses.'
       };
     
+    case 5:
+      if (totalPaid > totalBudget) {
+        return {
+          status: 'danger',
+          message: `Spending (${formatCurrency(totalPaid, currency)}) has exceeded the planned budget (${formatCurrency(totalBudget, currency)}) with no funding allocated.`,
+          recommendation: 'Consider adding funding sources and reviewing spending.'
+        };
+      }
+      return {
+        status: 'warning',
+        message: `No funding allocated. Tracking ${formatCurrency(totalPaid, currency)} spent against ${formatCurrency(totalBudget, currency)} planned.`,
+        recommendation: 'Consider adding funding sources to track budget health.'
+      };
+
     default:
       return {
         status: 'good',
