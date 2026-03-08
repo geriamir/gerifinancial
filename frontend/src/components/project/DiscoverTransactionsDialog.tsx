@@ -42,6 +42,10 @@ interface DiscoverTransaction {
   category?: { _id: string; name: string };
   subCategory?: { _id: string; name: string };
   accountId?: { _id: string; name: string; bankId: string };
+  rawData?: {
+    originalCurrency?: string;
+    originalAmount?: number;
+  };
 }
 
 interface DiscoverTransactionsDialogProps {
@@ -176,7 +180,9 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
     const totals: Record<string, number> = {};
     for (const t of transactions) {
       if (selectedIds.has(t._id)) {
-        totals[t.currency] = (totals[t.currency] || 0) + Math.abs(t.amount);
+        const cur = t.rawData?.originalCurrency || t.currency;
+        const amt = t.rawData?.originalAmount != null ? Math.abs(t.rawData.originalAmount) : Math.abs(t.amount);
+        totals[cur] = (totals[cur] || 0) + amt;
       }
     }
     return totals;
@@ -352,7 +358,18 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
                         )}
                       </TableCell>
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                        {formatCurrency(Math.abs(tx.amount), tx.currency)}
+                        {tx.rawData?.originalCurrency && tx.rawData?.originalAmount ? (
+                          <Box>
+                            <Typography variant="body2">
+                              {tx.rawData.originalCurrency}{Math.abs(tx.rawData.originalAmount).toFixed(2)}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {formatCurrency(Math.abs(tx.amount), tx.currency)}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          formatCurrency(Math.abs(tx.amount), tx.currency)
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

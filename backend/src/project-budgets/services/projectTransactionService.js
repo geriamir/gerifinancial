@@ -411,6 +411,9 @@ class ProjectTransactionService {
       throw new Error('Project not found');
     }
 
+    // ILS identifiers: the currency field uses ISO 'ILS', rawData uses symbol '₪' or 'ILS'
+    const ilsIdentifiers = ['ILS', '₪'];
+
     // Build query: user's transactions within project date range
     const query = {
       userId: convertToObjectId(userId),
@@ -422,11 +425,18 @@ class ProjectTransactionService {
       query.tags = { $ne: project.projectTag };
     }
 
-    // Currency filter
+    // Currency filter — check rawData.originalCurrency (the actual transaction currency)
+    // Falls back to the top-level currency field for transactions without rawData
     if (currencies && currencies.length > 0) {
-      query.currency = { $in: currencies };
+      query.$or = [
+        { 'rawData.originalCurrency': { $in: currencies } },
+        { currency: { $in: currencies } }
+      ];
     } else if (excludeILS) {
-      query.currency = { $ne: 'ILS' };
+      query.$or = [
+        { 'rawData.originalCurrency': { $exists: true, $nin: ilsIdentifiers } },
+        { 'rawData.originalCurrency': { $exists: false }, currency: { $ne: 'ILS' } }
+      ];
     }
 
     // Category filter
@@ -442,21 +452,31 @@ class ProjectTransactionService {
       .sort({ date: -1 })
       .lean();
 
-    // Get distinct currencies available in the date range (for filter UI)
-    const availableCurrencies = await Transaction.distinct('currency', {
+    // Get distinct original currencies in the date range (for filter UI)
+    const baseMatch = {
       userId: convertToObjectId(userId),
       date: { $gte: project.startDate, $lte: project.endDate },
       ...(project.projectTag ? { tags: { $ne: project.projectTag } } : {})
-    });
+    };
+
+    const availableCurrencies = await Transaction.aggregate([
+      { $match: baseMatch },
+      {
+        $group: {
+          _id: {
+            $ifNull: ['$rawData.originalCurrency', '$currency']
+          }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]).then(results => results.map(r => r._id).filter(Boolean));
 
     // Get distinct categories available in the date range (for filter UI)
     const categoryDocs = await Transaction.aggregate([
       {
         $match: {
-          userId: convertToObjectId(userId),
-          date: { $gte: project.startDate, $lte: project.endDate },
-          category: { $ne: null },
-          ...(project.projectTag ? { tags: { $ne: project.projectTag } } : {})
+          ...baseMatch,
+          category: { $ne: null }
         }
       },
       { $group: { _id: '$category' } },

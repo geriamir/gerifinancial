@@ -371,6 +371,7 @@ export const budgetsApi = {
         category?: { _id: string; name: string };
         subCategory?: { _id: string; name: string };
         accountId?: { _id: string; name: string; bankId: string };
+        rawData?: { originalCurrency?: string; originalAmount?: number };
       }>;
       filters: {
         availableCurrencies: string[];
