@@ -374,7 +374,7 @@ export const budgetsApi = {
         rawData?: { originalCurrency?: string; originalAmount?: number };
       }>;
       filters: {
-        availableCurrencies: string[];
+        availableCurrencies: Array<{ code: string; symbol: string; label: string }>;
         availableCategories: Array<{ _id: string; name: string }>;
       };
       project: {

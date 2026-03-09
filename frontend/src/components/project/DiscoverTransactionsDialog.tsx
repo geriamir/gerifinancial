@@ -71,7 +71,7 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
   const [tagResult, setTagResult] = useState<{ success: number; failed: number } | null>(null);
 
   // Filters
-  const [availableCurrencies, setAvailableCurrencies] = useState<string[]>([]);
+  const [availableCurrencies, setAvailableCurrencies] = useState<Array<{ code: string; symbol: string; label: string }>>([]);
   const [availableCategories, setAvailableCategories] = useState<Array<{ _id: string; name: string }>>([]);
   const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -213,9 +213,10 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
                 {excludeILS && selectedCurrencies.length === 0 && (
                   <Chip label="Excluding ILS" size="small" />
                 )}
-                {selectedCurrencies.map(c => (
-                  <Chip key={c} label={c} size="small" color="primary" variant="outlined" />
-                ))}
+                {selectedCurrencies.map(code => {
+                  const cur = availableCurrencies.find(c => c.code === code);
+                  return <Chip key={code} label={cur?.label || code} size="small" color="primary" variant="outlined" />;
+                })}
                 {selectedCategories.length > 0 && (
                   <Chip label={`${selectedCategories.length} categories`} size="small" color="secondary" variant="outlined" />
                 )}
@@ -242,15 +243,15 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
                 />
               </FormGroup>
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 2 }}>
-                {availableCurrencies.map(currency => (
+                {availableCurrencies.map(cur => (
                   <Chip
-                    key={currency}
-                    label={currency}
+                    key={cur.code}
+                    label={cur.label}
                     size="small"
-                    color={selectedCurrencies.includes(currency) ? 'primary' : 'default'}
-                    variant={selectedCurrencies.includes(currency) ? 'filled' : 'outlined'}
+                    color={selectedCurrencies.includes(cur.code) ? 'primary' : 'default'}
+                    variant={selectedCurrencies.includes(cur.code) ? 'filled' : 'outlined'}
                     onClick={() => {
-                      toggleCurrency(currency);
+                      toggleCurrency(cur.code);
                       setExcludeILS(false);
                     }}
                   />

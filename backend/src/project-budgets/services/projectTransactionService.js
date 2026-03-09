@@ -414,6 +414,21 @@ class ProjectTransactionService {
     // ILS identifiers: the currency field uses ISO 'ILS', rawData uses symbol '₪' or 'ILS'
     const ilsIdentifiers = ['ILS', '₪'];
 
+    // Symbol-to-ISO mapping for normalization
+    const symbolToISO = { '₪': 'ILS', '$': 'USD', '€': 'EUR', '£': 'GBP' };
+    const isoToSymbol = { 'ILS': '₪', 'USD': '$', 'EUR': '€', 'GBP': '£' };
+
+    // Expand user-selected currencies to match both symbol and ISO forms
+    const expandCurrencies = (codes) => {
+      const expanded = new Set();
+      for (const c of codes) {
+        expanded.add(c);
+        if (symbolToISO[c]) expanded.add(symbolToISO[c]);
+        if (isoToSymbol[c]) expanded.add(isoToSymbol[c]);
+      }
+      return [...expanded];
+    };
+
     // Build query: user's transactions within project date range
     const query = {
       userId: convertToObjectId(userId),
@@ -428,9 +443,10 @@ class ProjectTransactionService {
     // Currency filter — check rawData.originalCurrency (the actual transaction currency)
     // Falls back to the top-level currency field for transactions without rawData
     if (currencies && currencies.length > 0) {
+      const expanded = expandCurrencies(currencies);
       query.$or = [
-        { 'rawData.originalCurrency': { $in: currencies } },
-        { currency: { $in: currencies } }
+        { 'rawData.originalCurrency': { $in: expanded } },
+        { currency: { $in: expanded } }
       ];
     } else if (excludeILS) {
       query.$or = [
@@ -459,7 +475,7 @@ class ProjectTransactionService {
       ...(project.projectTag ? { tags: { $ne: project.projectTag } } : {})
     };
 
-    const availableCurrencies = await Transaction.aggregate([
+    const rawCurrencies = await Transaction.aggregate([
       { $match: baseMatch },
       {
         $group: {
@@ -470,6 +486,18 @@ class ProjectTransactionService {
       },
       { $sort: { _id: 1 } }
     ]).then(results => results.map(r => r._id).filter(Boolean));
+
+    // Normalize to ISO codes and deduplicate, keeping both symbol and ISO for display
+    const currencyMap = new Map(); // ISO -> { code, symbol, label }
+    for (const raw of rawCurrencies) {
+      const iso = symbolToISO[raw] || raw;
+      const symbol = isoToSymbol[iso] || raw;
+      if (!currencyMap.has(iso)) {
+        const label = symbol !== iso ? `${symbol} (${iso})` : iso;
+        currencyMap.set(iso, { code: iso, symbol, label });
+      }
+    }
+    const availableCurrencies = [...currencyMap.values()].sort((a, b) => a.label.localeCompare(b.label));
 
     // Get distinct categories available in the date range (for filter UI)
     const categoryDocs = await Transaction.aggregate([
@@ -498,7 +526,7 @@ class ProjectTransactionService {
     return {
       transactions,
       filters: {
-        availableCurrencies: availableCurrencies.sort(),
+        availableCurrencies,
         availableCategories: categoryDocs
       },
       project: {

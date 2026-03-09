@@ -1048,8 +1048,8 @@ describe('Project Budget API Endpoints', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data.transactions).toHaveLength(1);
       expect(response.body.data.transactions[0].description).toBe('Hotel abroad');
-      expect(response.body.data.filters.availableCurrencies).toContain('$');
-      expect(response.body.data.filters.availableCurrencies).toContain('₪');
+      expect(response.body.data.filters.availableCurrencies.some(c => c.code === 'USD')).toBe(true);
+      expect(response.body.data.filters.availableCurrencies.some(c => c.code === 'ILS')).toBe(true);
     });
 
     test('should exclude already-tagged transactions', async () => {
