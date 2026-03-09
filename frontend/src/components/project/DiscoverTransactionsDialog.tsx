@@ -176,11 +176,14 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
     }
   };
 
+  const symbolToISO: Record<string, string> = { '₪': 'ILS', '$': 'USD', '€': 'EUR', '£': 'GBP' };
+
   const selectedTotal = useMemo(() => {
     const totals: Record<string, number> = {};
     for (const t of transactions) {
       if (selectedIds.has(t._id)) {
-        const cur = t.rawData?.originalCurrency || t.currency;
+        const rawCur = t.rawData?.originalCurrency || t.currency;
+        const cur = symbolToISO[rawCur] || rawCur;
         const amt = t.rawData?.originalAmount != null ? Math.abs(t.rawData.originalAmount) : Math.abs(t.amount);
         totals[cur] = (totals[cur] || 0) + amt;
       }
