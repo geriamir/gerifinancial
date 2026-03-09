@@ -476,6 +476,9 @@ class ProjectTransactionService {
       const currentCategoryName = txn.category?.name || '';
       const description = (txn.description || '').toLowerCase();
 
+      // Skip transactions already categorized under Travel
+      if (currentCategoryName === 'Travel') continue;
+
       // 1) Try mapping by current category name
       const mappedSubName = VACATION_CATEGORY_MAP[currentCategoryName];
       if (mappedSubName && subCatByName[mappedSubName]) {
