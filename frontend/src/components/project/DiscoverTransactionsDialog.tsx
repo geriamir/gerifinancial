@@ -182,9 +182,11 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
     const totals: Record<string, number> = {};
     for (const t of transactions) {
       if (selectedIds.has(t._id)) {
-        const rawCur = t.rawData?.originalCurrency || t.currency;
+        // Use original currency/amount pair when both are available, otherwise use charged
+        const hasOriginal = t.rawData?.originalCurrency != null && t.rawData?.originalAmount != null;
+        const rawCur = hasOriginal ? t.rawData!.originalCurrency! : t.currency;
         const cur = symbolToISO[rawCur] || rawCur;
-        const amt = t.rawData?.originalAmount != null ? Math.abs(t.rawData.originalAmount) : Math.abs(t.amount);
+        const amt = hasOriginal ? Math.abs(t.rawData!.originalAmount!) : Math.abs(t.amount);
         totals[cur] = (totals[cur] || 0) + amt;
       }
     }
