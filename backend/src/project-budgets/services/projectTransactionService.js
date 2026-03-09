@@ -460,7 +460,7 @@ class ProjectTransactionService {
     }
 
     const travelSubCategories = await SubCategory.find({
-      categoryId: travelCategory._id
+      parentCategory: travelCategory._id
     }).lean();
 
     // Build a name→doc lookup for quick matching
