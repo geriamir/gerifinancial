@@ -48,6 +48,13 @@ interface DiscoverTransaction {
   };
 }
 
+interface CategorySuggestion {
+  categoryId: string;
+  categoryName: string;
+  subCategoryId: string;
+  subCategoryName: string;
+}
+
 interface DiscoverTransactionsDialogProps {
   open: boolean;
   onClose: () => void;
@@ -68,7 +75,7 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [tagging, setTagging] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tagResult, setTagResult] = useState<{ success: number; failed: number } | null>(null);
+  const [tagResult, setTagResult] = useState<{ success: number; failed: number; recategorized?: number } | null>(null);
 
   // Filters
   const [availableCurrencies, setAvailableCurrencies] = useState<Array<{ code: string; symbol: string; label: string }>>([]);
@@ -77,7 +84,8 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [excludeILS, setExcludeILS] = useState(true);
   const [showFilters, setShowFilters] = useState(true);
-  const [projectInfo, setProjectInfo] = useState<{ startDate: string; endDate: string; currency: string } | null>(null);
+  const [projectInfo, setProjectInfo] = useState<{ startDate: string; endDate: string; currency: string; type?: string } | null>(null);
+  const [categorySuggestions, setCategorySuggestions] = useState<Record<string, CategorySuggestion>>({});
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
@@ -90,6 +98,7 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
         excludeILS: selectedCurrencies.length > 0 ? false : excludeILS
       });
       setTransactions(result.data.transactions);
+      setCategorySuggestions(result.data.categorySuggestions || {});
       setAvailableCurrencies(result.data.filters.availableCurrencies);
       setAvailableCategories(result.data.filters.availableCategories);
       setProjectInfo(result.data.project);
@@ -113,6 +122,7 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
       setExcludeILS(true);
       setTagResult(null);
       setError(null);
+      setCategorySuggestions({});
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -154,13 +164,25 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
     setTagging(true);
     setError(null);
     try {
+      // Build category suggestions map for selected transactions
+      const selectedSuggestions: Record<string, { categoryId: string; subCategoryId: string }> = {};
+      const selectedArr = Array.from(selectedIds);
+      for (const id of selectedArr) {
+        const s = categorySuggestions[id];
+        if (s) {
+          selectedSuggestions[id] = { categoryId: s.categoryId, subCategoryId: s.subCategoryId };
+        }
+      }
+
       const result = await budgetsApi.bulkTagTransactionsToProject(
         projectId,
-        Array.from(selectedIds)
+        selectedArr,
+        Object.keys(selectedSuggestions).length > 0 ? selectedSuggestions : undefined
       );
       const successCount = (result as any).data?.successfulTags ?? (result as any).addedCount ?? 0;
       const failedCount = (result as any).data?.errors?.length ?? 0;
-      setTagResult({ success: successCount, failed: failedCount });
+      const recategorizedCount = (result as any).data?.recategorized ?? 0;
+      setTagResult({ success: successCount, failed: failedCount, recategorized: recategorizedCount });
 
       // Remove tagged transactions from list
       setTransactions(prev => prev.filter(t => !selectedIds.has(t._id)));
@@ -332,6 +354,9 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
                     <TableCell>Date</TableCell>
                     <TableCell>Description</TableCell>
                     <TableCell>Category</TableCell>
+                    {Object.keys(categorySuggestions).length > 0 && (
+                      <TableCell>Suggested</TableCell>
+                    )}
                     <TableCell align="right">Amount</TableCell>
                   </TableRow>
                 </TableHead>
@@ -363,6 +388,17 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
                           </Typography>
                         )}
                       </TableCell>
+                      {Object.keys(categorySuggestions).length > 0 && (
+                        <TableCell>
+                          {categorySuggestions[tx._id] ? (
+                            <Typography variant="body2" color="primary.main" sx={{ fontWeight: 500 }}>
+                              {categorySuggestions[tx._id].subCategoryName}
+                            </Typography>
+                          ) : (
+                            <Typography variant="body2" color="text.disabled">—</Typography>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                         {tx.rawData?.originalCurrency && tx.rawData?.originalAmount ? (
                           <Box>
@@ -389,6 +425,7 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
         {tagResult && (
           <Alert severity={tagResult.failed > 0 ? 'warning' : 'success'} sx={{ mt: 2 }}>
             Tagged {tagResult.success} transaction{tagResult.success !== 1 ? 's' : ''} to project.
+            {tagResult.recategorized ? ` ${tagResult.recategorized} recategorized under Travel.` : ''}
             {tagResult.failed > 0 && ` ${tagResult.failed} failed.`}
           </Alert>
         )}

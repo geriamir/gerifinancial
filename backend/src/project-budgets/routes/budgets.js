@@ -464,7 +464,8 @@ router.post('/projects/:id/expenses/bulk-tag',
       
       const result = await projectTransactionService.bulkTagTransactionsToProject(
         project._id,
-        req.body.transactionIds
+        req.body.transactionIds,
+        req.body.categorySuggestions || {}
       );
       
       // Build results array for test compatibility
@@ -487,13 +488,14 @@ router.post('/projects/:id/expenses/bulk-tag',
         success: true,
         data: {
           successfulTags: result.successfulTags,
+          recategorized: result.recategorized || 0,
           totalRequested: req.body.transactionIds.length,
           results: results,
           errors: result.failedTags,
           projectId: project._id,
           projectName: project.name
         },
-        message: `${result.successfulTags} transactions tagged to project successfully`
+        message: `${result.successfulTags} transactions tagged to project successfully${result.recategorized ? `, ${result.recategorized} recategorized` : ''}`
       });
     } catch (error) {
       logger.error('Error bulk tagging transactions to project:', error);

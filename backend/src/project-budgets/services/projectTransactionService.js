@@ -1,5 +1,6 @@
 const { ProjectBudget } = require('../models');
-const { Tag, Transaction } = require('../../banking');
+const { Tag, Transaction, Category, SubCategory } = require('../../banking');
+const { CategorizationMethod } = require('../../banking/constants/enums');
 const { ObjectId } = require('mongodb');
 const logger = require('../../shared/utils/logger');
 
@@ -11,6 +12,31 @@ const convertToObjectId = (id) => {
     throw new Error('Invalid ID format');
   }
 };
+
+// Mapping from common category/subcategory names to Travel subcategory names
+const VACATION_CATEGORY_MAP = {
+  // Category name → Travel subcategory
+  'Eating Out': 'Restaurants & Dining',
+  'Food': 'Restaurants & Dining',
+  'Restaurants': 'Restaurants & Dining',
+  'Groceries': 'Restaurants & Dining',
+  'Cars and Transportation': 'Travel Transportation',
+  'Transportation': 'Travel Transportation',
+  'Shopping': 'Shopping & Souvenirs',
+  'Entertainment': 'Tours & Activities',
+  'Health': 'Travel - Miscellaneous',
+};
+
+// Description keywords → Travel subcategory
+const VACATION_KEYWORD_MAP = [
+  { keywords: ['hotel', 'hostel', 'airbnb', 'booking.com', 'lodge', 'resort', 'מלון'], target: 'Hotels' },
+  { keywords: ['flight', 'airline', 'airport', 'טיסה', 'טיסות'], target: 'Flights' },
+  { keywords: ['restaurant', 'dining', 'cafe', 'coffee', 'food', 'meal', 'pizza', 'burger', 'bakery', 'מסעדה', 'קפה', 'אוכל'], target: 'Restaurants & Dining' },
+  { keywords: ['taxi', 'uber', 'lyft', 'bus', 'train', 'metro', 'rental', 'car hire', 'parking', 'fuel', 'gas station', 'תחבורה', 'מונית'], target: 'Travel Transportation' },
+  { keywords: ['tour', 'museum', 'attraction', 'ticket', 'sightseeing', 'activity', 'ski', 'אטרקציה', 'טיול'], target: 'Tours & Activities' },
+  { keywords: ['insurance', 'ביטוח'], target: 'Travel Insurance' },
+  { keywords: ['souvenir', 'gift shop', 'duty free', 'מזכרת'], target: 'Shopping & Souvenirs' },
+];
 
 class ProjectTransactionService {
   /**
@@ -209,7 +235,7 @@ class ProjectTransactionService {
   /**
    * Bulk tag transactions to project (for batch operations)
    */
-  async bulkTagTransactionsToProject(projectId, transactionIds) {
+  async bulkTagTransactionsToProject(projectId, transactionIds, categorySuggestions = {}) {
     try {
       const project = await ProjectBudget.findOne({
         _id: convertToObjectId(projectId)
@@ -225,13 +251,33 @@ class ProjectTransactionService {
 
       const results = {
         successfulTags: 0,
-        failedTags: []
+        failedTags: [],
+        recategorized: 0
       };
 
       for (const transactionId of transactionIds) {
         try {
           await this.allocateTransactionToProject(transactionId, projectId, project.userId);
           results.successfulTags++;
+
+          // Apply category suggestion if provided
+          const suggestion = categorySuggestions[transactionId];
+          if (suggestion && suggestion.categoryId && suggestion.subCategoryId) {
+            try {
+              const txn = await Transaction.findById(transactionId);
+              if (txn) {
+                await txn.categorize(
+                  suggestion.categoryId,
+                  suggestion.subCategoryId,
+                  CategorizationMethod.PROJECT_DISCOVER,
+                  `Auto-categorized under Travel for vacation project: ${project.name}`
+                );
+                results.recategorized++;
+              }
+            } catch (catError) {
+              logger.warn(`Failed to recategorize transaction ${transactionId}: ${catError.message}`);
+            }
+          }
         } catch (error) {
           results.failedTags.push({
             transactionId,
@@ -394,6 +440,87 @@ class ProjectTransactionService {
       throw error;
     }
   }
+
+  /**
+   * Look up the user's Travel category and subcategories, then suggest a
+   * Travel subcategory for each transaction based on its current category
+   * and description keywords.
+   * Returns a map of transactionId → { categoryId, categoryName, subCategoryId, subCategoryName }
+   */
+  async suggestVacationCategories(userId, transactions) {
+    // Find the user's Travel category
+    const travelCategory = await Category.findOne({
+      userId: convertToObjectId(userId),
+      name: 'Travel'
+    });
+
+    if (!travelCategory) {
+      logger.warn(`No Travel category found for user ${userId}`);
+      return {};
+    }
+
+    const travelSubCategories = await SubCategory.find({
+      categoryId: travelCategory._id
+    }).lean();
+
+    // Build a name→doc lookup for quick matching
+    const subCatByName = {};
+    for (const sc of travelSubCategories) {
+      subCatByName[sc.name] = sc;
+    }
+
+    const fallback = subCatByName['Travel - Miscellaneous'] || travelSubCategories[0];
+    const suggestions = {};
+
+    for (const txn of transactions) {
+      const currentCategoryName = txn.category?.name || '';
+      const description = (txn.description || '').toLowerCase();
+
+      // 1) Try mapping by current category name
+      const mappedSubName = VACATION_CATEGORY_MAP[currentCategoryName];
+      if (mappedSubName && subCatByName[mappedSubName]) {
+        suggestions[txn._id.toString()] = {
+          categoryId: travelCategory._id,
+          categoryName: travelCategory.name,
+          subCategoryId: subCatByName[mappedSubName]._id,
+          subCategoryName: subCatByName[mappedSubName].name
+        };
+        continue;
+      }
+
+      // 2) Try keyword matching on description
+      let matched = false;
+      for (const rule of VACATION_KEYWORD_MAP) {
+        if (rule.keywords.some(kw => description.includes(kw))) {
+          const targetSub = subCatByName[rule.target];
+          if (targetSub) {
+            suggestions[txn._id.toString()] = {
+              categoryId: travelCategory._id,
+              categoryName: travelCategory.name,
+              subCategoryId: targetSub._id,
+              subCategoryName: targetSub.name
+            };
+            matched = true;
+            break;
+          }
+        }
+      }
+      if (matched) continue;
+
+      // 3) Fallback to Travel - Miscellaneous
+      if (fallback) {
+        suggestions[txn._id.toString()] = {
+          categoryId: travelCategory._id,
+          categoryName: travelCategory.name,
+          subCategoryId: fallback._id,
+          subCategoryName: fallback.name
+        };
+      }
+    }
+
+    return suggestions;
+  }
+
   /**
    * Discover transactions that could belong to a project
    * Finds transactions within the project's date range matching filter criteria
@@ -523,8 +650,15 @@ class ProjectTransactionService {
 
     logger.info(`Discovered ${transactions.length} transactions for project ${projectId} with filters: currencies=${currencies || (excludeILS ? 'non-ILS' : 'all')}, categories=${categoryIds || 'all'}`);
 
+    // For vacation projects, suggest Travel subcategories
+    let categorySuggestions = {};
+    if (project.type === 'vacation' && transactions.length > 0) {
+      categorySuggestions = await this.suggestVacationCategories(userId, transactions);
+    }
+
     return {
       transactions,
+      categorySuggestions,
       filters: {
         availableCurrencies,
         availableCategories: categoryDocs
@@ -532,6 +666,7 @@ class ProjectTransactionService {
       project: {
         _id: project._id,
         name: project.name,
+        type: project.type,
         startDate: project.startDate,
         endDate: project.endDate,
         currency: project.currency

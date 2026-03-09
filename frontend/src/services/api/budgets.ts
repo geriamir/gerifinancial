@@ -267,13 +267,13 @@ export const budgetsApi = {
     api.post(`/budgets/projects/${projectId}/expenses/tag`, { transactionId })
       .then((res: AxiosResponse) => res.data),
 
-  bulkTagTransactionsToProject: (projectId: string, transactionIds: string[]): Promise<{
+  bulkTagTransactionsToProject: (projectId: string, transactionIds: string[], categorySuggestions?: Record<string, { categoryId: string; subCategoryId: string }>): Promise<{
     success: boolean;
     message: string;
     addedCount: number;
     unplannedExpenses: any[];
   }> =>
-    api.post(`/budgets/projects/${projectId}/expenses/bulk-tag`, { transactionIds })
+    api.post(`/budgets/projects/${projectId}/expenses/bulk-tag`, { transactionIds, categorySuggestions })
       .then((res: AxiosResponse) => res.data),
 
   removeTransactionFromProject: (projectId: string, transactionId: string): Promise<{
@@ -373,6 +373,12 @@ export const budgetsApi = {
         accountId?: { _id: string; name: string; bankId: string };
         rawData?: { originalCurrency?: string; originalAmount?: number };
       }>;
+      categorySuggestions: Record<string, {
+        categoryId: string;
+        categoryName: string;
+        subCategoryId: string;
+        subCategoryName: string;
+      }>;
       filters: {
         availableCurrencies: Array<{ code: string; symbol: string; label: string }>;
         availableCategories: Array<{ _id: string; name: string }>;
@@ -380,6 +386,7 @@ export const budgetsApi = {
       project: {
         _id: string;
         name: string;
+        type: string;
         startDate: string;
         endDate: string;
         currency: string;

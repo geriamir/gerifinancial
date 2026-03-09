@@ -1,7 +1,8 @@
 const CategorizationMethod = {
   MANUAL: 'manual',
   PREVIOUS_DATA: 'previous_data',
-  AI: 'ai'
+  AI: 'ai',
+  PROJECT_DISCOVER: 'project_discover'
 };
 
 const TransactionStatus = {
