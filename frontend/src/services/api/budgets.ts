@@ -379,6 +379,12 @@ export const budgetsApi = {
         subCategoryId: string;
         subCategoryName: string;
       }>;
+      travelSubCategories: Array<{
+        _id: string;
+        name: string;
+        categoryId: string;
+        categoryName: string;
+      }>;
       filters: {
         availableCurrencies: Array<{ code: string; symbol: string; label: string }>;
         availableCategories: Array<{ _id: string; name: string }>;

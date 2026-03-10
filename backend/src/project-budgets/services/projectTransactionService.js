@@ -1,6 +1,7 @@
 const { ProjectBudget } = require('../models');
 const { Tag, Transaction, Category, SubCategory } = require('../../banking');
 const { CategorizationMethod } = require('../../banking/constants/enums');
+const categoryAIService = require('../../banking/services/categoryAIService');
 const { ObjectId } = require('mongodb');
 const logger = require('../../shared/utils/logger');
 
@@ -510,7 +511,46 @@ class ProjectTransactionService {
       }
       if (matched) continue;
 
-      // 3) Fallback to Travel - Miscellaneous
+      // 3) Try AI categorization scoped to Travel subcategories
+      const aiCategories = [{
+        id: travelCategory._id.toString(),
+        name: travelCategory.name,
+        type: 'Expense',
+        keywords: [],
+        subCategories: travelSubCategories.map(sc => ({
+          id: sc._id.toString(),
+          name: sc.name,
+          keywords: sc.keywords || []
+        }))
+      }];
+
+      try {
+        const aiSuggestion = await categoryAIService.suggestCategory(
+          txn.description,
+          Math.abs(txn.amount),
+          aiCategories,
+          userId.toString(),
+          txn.rawData?.category || '',
+          txn.memo || txn.rawData?.memo || ''
+        );
+
+        if (aiSuggestion.subCategoryId) {
+          const aiSub = travelSubCategories.find(sc => sc._id.toString() === aiSuggestion.subCategoryId);
+          if (aiSub && aiSub.name !== 'Travel - Miscellaneous') {
+            suggestions[txn._id.toString()] = {
+              categoryId: travelCategory._id,
+              categoryName: travelCategory.name,
+              subCategoryId: aiSub._id,
+              subCategoryName: aiSub.name
+            };
+            continue;
+          }
+        }
+      } catch (aiError) {
+        logger.warn(`AI categorization failed for transaction ${txn._id}: ${aiError.message}`);
+      }
+
+      // 4) Fallback to Travel - Miscellaneous
       if (fallback) {
         suggestions[txn._id.toString()] = {
           categoryId: travelCategory._id,
@@ -653,15 +693,32 @@ class ProjectTransactionService {
 
     logger.info(`Discovered ${transactions.length} transactions for project ${projectId} with filters: currencies=${currencies || (excludeILS ? 'non-ILS' : 'all')}, categories=${categoryIds || 'all'}`);
 
-    // For vacation projects, suggest Travel subcategories
+    // For vacation projects, suggest Travel subcategories and provide the list for overrides
     let categorySuggestions = {};
-    if (project.type === 'vacation' && transactions.length > 0) {
-      categorySuggestions = await this.suggestVacationCategories(userId, transactions);
+    let travelSubCategories = [];
+    if (project.type === 'vacation') {
+      const travelCategory = await Category.findOne({
+        userId: convertToObjectId(userId),
+        name: 'Travel'
+      });
+      if (travelCategory) {
+        const subs = await SubCategory.find({ parentCategory: travelCategory._id }).lean();
+        travelSubCategories = subs.map(sc => ({
+          _id: sc._id,
+          name: sc.name,
+          categoryId: travelCategory._id,
+          categoryName: travelCategory.name
+        })).sort((a, b) => a.name.localeCompare(b.name));
+      }
+      if (transactions.length > 0) {
+        categorySuggestions = await this.suggestVacationCategories(userId, transactions);
+      }
     }
 
     return {
       transactions,
       categorySuggestions,
+      travelSubCategories,
       filters: {
         availableCurrencies,
         availableCategories: categoryDocs

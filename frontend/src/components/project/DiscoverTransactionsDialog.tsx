@@ -22,7 +22,9 @@ import {
   Alert,
   Divider,
   IconButton,
-  Collapse
+  Collapse,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   FilterList as FilterListIcon,
@@ -53,6 +55,13 @@ interface CategorySuggestion {
   categoryName: string;
   subCategoryId: string;
   subCategoryName: string;
+}
+
+interface TravelSubCategory {
+  _id: string;
+  name: string;
+  categoryId: string;
+  categoryName: string;
 }
 
 interface DiscoverTransactionsDialogProps {
@@ -86,6 +95,9 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
   const [showFilters, setShowFilters] = useState(true);
   const [projectInfo, setProjectInfo] = useState<{ startDate: string; endDate: string; currency: string; type?: string } | null>(null);
   const [categorySuggestions, setCategorySuggestions] = useState<Record<string, CategorySuggestion>>({});
+  const [travelSubCategories, setTravelSubCategories] = useState<TravelSubCategory[]>([]);
+  // User overrides: transactionId → subCategoryId (overrides the AI suggestion)
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string>>({});
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
@@ -99,6 +111,8 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
       });
       setTransactions(result.data.transactions);
       setCategorySuggestions(result.data.categorySuggestions || {});
+      setTravelSubCategories(result.data.travelSubCategories || []);
+      setCategoryOverrides({});
       setAvailableCurrencies(result.data.filters.availableCurrencies);
       setAvailableCategories(result.data.filters.availableCategories);
       setProjectInfo(result.data.project);
@@ -123,6 +137,8 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
       setTagResult(null);
       setError(null);
       setCategorySuggestions({});
+      setTravelSubCategories([]);
+      setCategoryOverrides({});
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -164,12 +180,19 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
     setTagging(true);
     setError(null);
     try {
-      // Build category suggestions map for selected transactions
+      // Build category suggestions map for selected transactions, applying user overrides
       const selectedSuggestions: Record<string, { categoryId: string; subCategoryId: string }> = {};
       const selectedArr = Array.from(selectedIds);
       for (const id of selectedArr) {
+        const override = categoryOverrides[id];
         const s = categorySuggestions[id];
-        if (s) {
+        if (override) {
+          // User picked a different subcategory
+          const overrideSub = travelSubCategories.find(sc => sc._id === override);
+          if (overrideSub) {
+            selectedSuggestions[id] = { categoryId: overrideSub.categoryId, subCategoryId: overrideSub._id };
+          }
+        } else if (s) {
           selectedSuggestions[id] = { categoryId: s.categoryId, subCategoryId: s.subCategoryId };
         }
       }
@@ -354,7 +377,7 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
                     <TableCell>Date</TableCell>
                     <TableCell>Description</TableCell>
                     <TableCell>Category</TableCell>
-                    {Object.keys(categorySuggestions).length > 0 && (
+                    {travelSubCategories.length > 0 && (
                       <TableCell>Suggested</TableCell>
                     )}
                     <TableCell align="right">Amount</TableCell>
@@ -388,12 +411,30 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
                           </Typography>
                         )}
                       </TableCell>
-                      {Object.keys(categorySuggestions).length > 0 && (
-                        <TableCell>
+                      {travelSubCategories.length > 0 && (
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           {categorySuggestions[tx._id] ? (
-                            <Typography variant="body2" color="primary.main" sx={{ fontWeight: 500 }}>
-                              {categorySuggestions[tx._id].subCategoryName}
-                            </Typography>
+                            <Select
+                              size="small"
+                              value={categoryOverrides[tx._id] || categorySuggestions[tx._id].subCategoryId}
+                              onChange={(e) => {
+                                const val = e.target.value as string;
+                                setCategoryOverrides(prev => {
+                                  if (val === categorySuggestions[tx._id].subCategoryId) {
+                                    const { [tx._id]: _, ...rest } = prev;
+                                    return rest;
+                                  }
+                                  return { ...prev, [tx._id]: val };
+                                });
+                              }}
+                              sx={{ minWidth: 160, fontSize: '0.8rem' }}
+                            >
+                              {travelSubCategories.map(sc => (
+                                <MenuItem key={sc._id} value={sc._id} sx={{ fontSize: '0.8rem' }}>
+                                  {sc.name}
+                                </MenuItem>
+                              ))}
+                            </Select>
                           ) : (
                             <Typography variant="body2" color="text.disabled">—</Typography>
                           )}
