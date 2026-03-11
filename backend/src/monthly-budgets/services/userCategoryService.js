@@ -144,6 +144,9 @@ const defaultCategories = [
       { name: "Flights", keywords: ["flights", "airline", "טיסות", "airlines"] },
       { name: "Hotels", keywords: ["hotels", "accommodation", "בתי מלון"] },
       { name: "Recreation", keywords: ["recreation", "tourist", "תיירות"] },
+      { name: "Restaurants & Dining", keywords: ["restaurant", "dining", "food", "meal", "מסעדה", "אוכל"] },
+      { name: "Shopping & Souvenirs", keywords: ["shopping", "souvenir", "gifts", "קניות", "מזכרות"] },
+      { name: "Tours & Activities", keywords: ["tour", "attraction", "museum", "sightseeing", "activity", "טיול", "אטרקציה"] },
       { name: "Travel Transportation", keywords: ["travel transportation", "taxi", "rental car", "תחבורה בנסיעות"] },
       { name: "Travel Insurance", keywords: ["travel insurance", "ביטוח נסיעות"] },
       { name: "Travel - Miscellaneous", keywords: ["travel", "vacation", "נסיעות"] }

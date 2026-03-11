@@ -267,13 +267,13 @@ export const budgetsApi = {
     api.post(`/budgets/projects/${projectId}/expenses/tag`, { transactionId })
       .then((res: AxiosResponse) => res.data),
 
-  bulkTagTransactionsToProject: (projectId: string, transactionIds: string[]): Promise<{
+  bulkTagTransactionsToProject: (projectId: string, transactionIds: string[], categorySuggestions?: Record<string, { categoryId: string; subCategoryId: string }>): Promise<{
     success: boolean;
     message: string;
     addedCount: number;
     unplannedExpenses: any[];
   }> =>
-    api.post(`/budgets/projects/${projectId}/expenses/bulk-tag`, { transactionIds })
+    api.post(`/budgets/projects/${projectId}/expenses/bulk-tag`, { transactionIds, categorySuggestions })
       .then((res: AxiosResponse) => res.data),
 
   removeTransactionFromProject: (projectId: string, transactionId: string): Promise<{
@@ -354,4 +354,57 @@ export const budgetsApi = {
   }> =>
     api.post(`/budgets/projects/${projectId}/planned-expenses`, expenseData)
       .then((res: AxiosResponse) => res.data),
+
+  discoverTransactions: (projectId: string, params?: {
+    currencies?: string[];
+    categoryIds?: string[];
+    excludeILS?: boolean;
+  }): Promise<{
+    success: boolean;
+    data: {
+      transactions: Array<{
+        _id: string;
+        description: string;
+        amount: number;
+        currency: string;
+        date: string;
+        category?: { _id: string; name: string };
+        subCategory?: { _id: string; name: string };
+        accountId?: { _id: string; name: string; bankId: string };
+        rawData?: { originalCurrency?: string; originalAmount?: number };
+      }>;
+      categorySuggestions: Record<string, {
+        categoryId: string;
+        categoryName: string;
+        subCategoryId: string;
+        subCategoryName: string;
+      }>;
+      travelSubCategories: Array<{
+        _id: string;
+        name: string;
+        categoryId: string;
+        categoryName: string;
+      }>;
+      filters: {
+        availableCurrencies: Array<{ code: string; symbol: string; label: string }>;
+        availableCategories: Array<{ _id: string; name: string }>;
+      };
+      project: {
+        _id: string;
+        name: string;
+        type: string;
+        startDate: string;
+        endDate: string;
+        currency: string;
+      };
+    };
+  }> => {
+    const queryParams = new URLSearchParams();
+    if (params?.currencies?.length) queryParams.set('currencies', params.currencies.join(','));
+    if (params?.categoryIds?.length) queryParams.set('categoryIds', params.categoryIds.join(','));
+    if (params?.excludeILS !== undefined) queryParams.set('excludeILS', String(params.excludeILS));
+    const qs = queryParams.toString();
+    return api.get(`/budgets/projects/${projectId}/discover-transactions${qs ? `?${qs}` : ''}`)
+      .then((res: AxiosResponse) => res.data);
+  },
 };

@@ -532,16 +532,23 @@ class ProjectOverviewService {
           (budget.allocatedTransactions && budget.allocatedTransactions.length > 0)
         )
         .map(async (budget) => {
-        // Calculate actual amount dynamically from allocated transactions
-        const actualAmount = await this.calculateActualAmountForBudget(budget, project.currency);
-        const variance = actualAmount - budget.budgetedAmount;
+        // Calculate actual amount in project currency (for totals/progress)
+        const actualAmountInProjectCurrency = await this.calculateActualAmountForBudget(budget, project.currency);
+        
+        // Calculate actual amount in budget's own currency (for per-line-item display)
+        let actualAmountInBudgetCurrency = actualAmountInProjectCurrency;
+        if (budget.currency !== project.currency) {
+          actualAmountInBudgetCurrency = await this.calculateActualAmountForBudget(budget, budget.currency);
+        }
+        
+        const variance = actualAmountInBudgetCurrency - budget.budgetedAmount;
         const variancePercentage = budget.budgetedAmount > 0 
           ? (variance / budget.budgetedAmount) * 100 
           : 0;
         
         let budgetedInProjectCurrency = budget.budgetedAmount;
-        let actualInProjectCurrency = actualAmount; // Already in project currency from calculation
-        let varianceInProjectCurrency = variance;
+        let actualInProjectCurrency = actualAmountInProjectCurrency;
+        let varianceInProjectCurrency = actualAmountInProjectCurrency - budgetedInProjectCurrency;
         
         // Convert budgeted amount to project currency if different
         if (budget.currency !== project.currency) {
@@ -589,7 +596,7 @@ class ProjectOverviewService {
           subCategoryId: budget.subCategoryId,
           description: budget.description, // User-defined description for planned expense name
           budgeted: budget.budgetedAmount,
-          actual: actualAmount, // Dynamic calculation result
+          actual: actualAmountInBudgetCurrency, // In budget's own currency for display
           currency: budget.currency,
           budgetedInProjectCurrency,
           actualInProjectCurrency,
