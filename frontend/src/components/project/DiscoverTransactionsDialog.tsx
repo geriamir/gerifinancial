@@ -72,6 +72,8 @@ interface DiscoverTransactionsDialogProps {
   onTagged: () => void;
 }
 
+const symbolToISO: Record<string, string> = { '₪': 'ILS', '$': 'USD', '€': 'EUR', '£': 'GBP' };
+
 const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
   open,
   onClose,
@@ -220,8 +222,6 @@ const DiscoverTransactionsDialog: React.FC<DiscoverTransactionsDialogProps> = ({
       setTagging(false);
     }
   };
-
-  const symbolToISO: Record<string, string> = { '₪': 'ILS', '$': 'USD', '€': 'EUR', '£': 'GBP' };
 
   const selectedTotal = useMemo(() => {
     const totals: Record<string, number> = {};
