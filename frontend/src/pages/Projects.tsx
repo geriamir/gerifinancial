@@ -15,7 +15,12 @@ import {
   CardContent,
   Alert,
   Chip,
-  Paper
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions
 } from '@mui/material';
 import { 
   ArrowBack, 
@@ -49,7 +54,7 @@ const FUNDING_SOURCE_TYPES = [
 
 const Projects: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
-  const { projects, loading, updateProject } = useProject();
+  const { projects, loading, updateProject, deleteProject } = useProject();
   const navigate = useNavigate();
   
   // Editing state management - only one item can be edited at a time
@@ -83,6 +88,8 @@ const Projects: React.FC = () => {
     }>;
   } | null>(null);
   const [discoverDialogOpen, setDiscoverDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Load categories when component mounts
   useEffect(() => {
@@ -126,6 +133,20 @@ const Projects: React.FC = () => {
     return newSet;
   });
   const handleSave = (field: string) => stopEditing(field);
+
+  const handleDeleteProject = async () => {
+    if (!projectId) return;
+    try {
+      setIsDeleting(true);
+      await deleteProject(projectId);
+      navigate('/projects');
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
 
   // If projectId is provided, find and show the specific project
   if (projectId) {
@@ -355,6 +376,9 @@ const Projects: React.FC = () => {
                   </Button>
                   <IconButton onClick={() => startEditing('header')} size="small">
                     <Edit />
+                  </IconButton>
+                  <IconButton onClick={() => setDeleteDialogOpen(true)} size="small" color="error">
+                    <Delete />
                   </IconButton>
                 </Box>
 
@@ -783,6 +807,23 @@ const Projects: React.FC = () => {
           }
         }}
       />
+
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Delete Project</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete "<strong>{specificProject.name}</strong>"? This will remove the project and its budget allocations. Tagged transactions will not be deleted.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteProject} color="error" variant="contained" disabled={isDeleting}>
+            {isDeleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
     );
   }
