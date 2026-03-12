@@ -6,13 +6,20 @@ import {
   Typography,
   Button,
   Chip,
-  LinearProgress
+  LinearProgress,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions
 } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrencyDisplay } from '../../utils/formatters';
 import type { ProjectBudget } from '../../types/projects';
 import SimpleProjectCreationDialog from '../projects/creation/SimpleProjectCreationDialog';
+import { useProject } from '../../contexts/ProjectContext';
 
 interface ProjectBudgetsListProps {
   projectBudgets: ProjectBudget[];
@@ -28,7 +35,11 @@ const ProjectBudgetsList: React.FC<ProjectBudgetsListProps> = ({
   onProjectCreated
 }) => {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<ProjectBudget | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
+  const { deleteProject } = useProject();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -60,6 +71,26 @@ const ProjectBudgetsList: React.FC<ProjectBudgetsListProps> = ({
 
   const handleWizardClose = () => {
     setIsWizardOpen(false);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, project: ProjectBudget) => {
+    e.stopPropagation();
+    setProjectToDelete(project);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteProject = async () => {
+    if (!projectToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteProject(projectToDelete._id);
+      setDeleteDialogOpen(false);
+      setProjectToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (!projectBudgets || projectBudgets.length === 0) {
@@ -146,18 +177,28 @@ const ProjectBudgetsList: React.FC<ProjectBudgetsListProps> = ({
                     </Typography>
                   </Box>
                 </Box>
-                <Box textAlign="right">
-                  <Typography variant="body2" color="text.secondary">
-                    {project.progress.toFixed(1)}% complete
-                  </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={project.progress}
-                    sx={{ width: 100, mt: 0.5 }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    {formatCurrencyDisplay(project.remainingBudget)} remaining
-                  </Typography>
+                <Box textAlign="right" display="flex" alignItems="center" gap={1}>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      {project.progress.toFixed(1)}% complete
+                    </Typography>
+                    <LinearProgress
+                      variant="determinate"
+                      value={project.progress}
+                      sx={{ width: 100, mt: 0.5 }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {formatCurrencyDisplay(project.remainingBudget)} remaining
+                    </Typography>
+                  </Box>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={(e) => handleDeleteClick(e, project)}
+                    title="Delete project"
+                  >
+                    <Delete fontSize="small" />
+                  </IconButton>
                 </Box>
               </Box>
             ))}
@@ -176,6 +217,24 @@ const ProjectBudgetsList: React.FC<ProjectBudgetsListProps> = ({
         onClose={handleWizardClose}
         onSuccess={handleProjectCreated}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Delete Project</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete &quot;<strong>{projectToDelete?.name}</strong>&quot;? This will remove the project and its budget allocations. Tagged transactions will not be deleted.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteProject} color="error" variant="contained" disabled={isDeleting}>
+            {isDeleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };
