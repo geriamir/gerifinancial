@@ -129,6 +129,7 @@ function projectReducer(state: ProjectContextState, action: ProjectAction): Proj
       return {
         ...state,
         projects: [action.project, ...state.projects],
+        loading: false,
         pagination: {
           ...state.pagination,
           total: state.pagination.total + 1
@@ -150,6 +151,7 @@ function projectReducer(state: ProjectContextState, action: ProjectAction): Proj
       return {
         ...state,
         projects: state.projects.filter(p => p._id !== action.projectId),
+        loading: false,
         currentProject: state.currentProject?._id === action.projectId 
           ? null 
           : state.currentProject,
