@@ -35,8 +35,10 @@ describe('ProjectTemplateService', () => {
       expect(templates.vacation).toBeDefined();
       expect(templates.vacation.name).toBe('Vacation');
       expect(templates.vacation.categoryName).toBe('Travel');
-      expect(templates.vacation.subCategories).toBeInstanceOf(Array);
-      expect(templates.vacation.subCategories.length).toBeGreaterThan(0);
+      expect(templates.vacation.defaultBudgetItems).toBeInstanceOf(Array);
+      expect(templates.vacation.defaultBudgetItems.length).toBe(3);
+      expect(templates.vacation.additionalSubCategories).toBeInstanceOf(Array);
+      expect(templates.vacation.additionalSubCategories.length).toBeGreaterThan(0);
     });
 
     test('should have proper vacation template structure', () => {
@@ -44,16 +46,21 @@ describe('ProjectTemplateService', () => {
       const vacation = templates.vacation;
 
       expect(vacation.description).toBeDefined();
-      expect(vacation.subCategories).toContainEqual(
+      expect(vacation.defaultBudgetItems).toContainEqual(
         expect.objectContaining({
           name: 'Hotels',
           keywords: expect.arrayContaining(['hotels', 'accommodation'])
         })
       );
-      expect(vacation.subCategories).toContainEqual(
+      expect(vacation.defaultBudgetItems).toContainEqual(
         expect.objectContaining({
           name: 'Flights',
           keywords: expect.arrayContaining(['flights', 'airline'])
+        })
+      );
+      expect(vacation.defaultBudgetItems).toContainEqual(
+        expect.objectContaining({
+          name: 'Travel Insurance'
         })
       );
     });
@@ -209,7 +216,8 @@ describe('ProjectTemplateService', () => {
       expect(template.name).toBe('Vacation');
       expect(template.categoryName).toBe('Travel');
       expect(template.subCategoryCount).toBeGreaterThan(0);
-      expect(template.subCategories).toBeInstanceOf(Array);
+      expect(template.defaultBudgetItems).toBeInstanceOf(Array);
+      expect(template.additionalSubCategories).toBeInstanceOf(Array);
     });
 
     test('should return null for unknown project type', () => {
@@ -240,7 +248,8 @@ describe('ProjectTemplateService', () => {
         expect(type.name).toBeDefined();
         expect(type.description).toBeDefined();
         expect(type.categoryName).toBeDefined();
-        expect(type.subCategories).toBeInstanceOf(Array);
+        expect(type.defaultBudgetItems).toBeInstanceOf(Array);
+        expect(type.additionalSubCategories).toBeInstanceOf(Array);
         expect(type.subCategoryCount).toBeDefined();
       });
     });

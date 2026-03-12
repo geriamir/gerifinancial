@@ -9,3 +9,11 @@ Before every git commit, run the following checks and ensure they all pass:
 3. **Frontend build (formatting/type check):** `cd frontend && npm run build`
 
 Do not commit if any of these checks fail. Fix the issues first, then re-run.
+
+## New Feature Branches
+
+Before creating a new feature branch, always:
+
+1. `git checkout main`
+2. `git pull origin main`
+3. Then create the branch from the up-to-date main: `git checkout -b feature/<name>`

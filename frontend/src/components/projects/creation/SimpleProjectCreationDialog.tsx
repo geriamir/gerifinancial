@@ -415,8 +415,8 @@ const SimpleProjectCreationDialog: React.FC<SimpleProjectCreationDialogProps> = 
           <Alert severity="info" sx={{ mt: 2 }}>
             <Typography variant="body2">
               <strong>What happens next?</strong><br />
-              • Your project will be created with template budget categories for {selectedProjectType?.label}<br />
-              • You can add funding sources and edit budget allocations after creation<br />
+              • Default budget items (Flights, Hotels, Insurance) will be added — edit amounts from the project page<br />
+              • You can add more budget categories and funding sources after creation<br />
               • A project tag will be created for tracking related transactions
             </Typography>
           </Alert>

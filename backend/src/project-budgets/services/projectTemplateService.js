@@ -7,16 +7,17 @@ const PROJECT_TEMPLATES = {
     name: 'Vacation',
     description: 'Template for vacation and travel projects',
     categoryName: 'Travel', // Use existing Travel category
-    subCategories: [
-      // Existing subcategories
+    // Default budget line items created for new projects
+    defaultBudgetItems: [
       { name: 'Flights', keywords: ['flights', 'airline', 'טיסות', 'airlines'] },
       { name: 'Hotels', keywords: ['hotels', 'accommodation', 'בתי מלון'] },
+      { name: 'Travel Insurance', keywords: ['travel insurance', 'ביטוח נסיעות'] }
+    ],
+    // Additional subcategories ensured to exist (for transaction categorization) but not auto-added as budget items
+    additionalSubCategories: [
       { name: 'Recreation', keywords: ['recreation', 'tourist', 'תיירות'] },
       { name: 'Travel Transportation', keywords: ['travel transportation', 'taxi', 'rental car', 'תחבורה בנסיעות'] },
-      { name: 'Travel Insurance', keywords: ['travel insurance', 'ביטוח נסיעות'] },
       { name: 'Travel - Miscellaneous', keywords: ['travel', 'vacation', 'נסיעות'] },
-      
-      // Suggested additional subcategories for better vacation planning
       { name: 'Restaurants & Dining', keywords: ['restaurant', 'dining', 'food', 'meal', 'מסעדה', 'אוכל'] },
       { name: 'Shopping & Souvenirs', keywords: ['shopping', 'souvenir', 'gifts', 'קניות', 'מזכרות'] },
       { name: 'Tours & Activities', keywords: ['tour', 'attraction', 'museum', 'sightseeing', 'activity', 'טיול', 'אטרקציה'] }
@@ -64,8 +65,9 @@ class ProjectTemplateService {
         });
       }
 
-      // Create subcategories and add them to categoryBudgets
-      for (const templateSubCategory of template.subCategories) {
+      // Ensure all subcategories exist (both default budget items and additional ones)
+      const allSubCategories = [...template.defaultBudgetItems, ...template.additionalSubCategories];
+      for (const templateSubCategory of allSubCategories) {
         let subCategory = await SubCategory.findOne({
           name: templateSubCategory.name,
           parentCategory: category._id,
@@ -81,8 +83,16 @@ class ProjectTemplateService {
           });
           logger.info(`Created new subcategory: ${templateSubCategory.name} for Travel category for user ${userId}`);
         }
+      }
 
-        // Add to project category budgets with 0 amount (user can set amounts later)
+      // Only add default budget items as project category budgets
+      for (const budgetItem of template.defaultBudgetItems) {
+        const subCategory = await SubCategory.findOne({
+          name: budgetItem.name,
+          parentCategory: category._id,
+          userId
+        });
+
         categoryBudgets.push({
           categoryId: category._id,
           subCategoryId: subCategory._id,
@@ -113,7 +123,7 @@ class ProjectTemplateService {
 
     return {
       ...template,
-      subCategoryCount: template.subCategories.length
+      subCategoryCount: template.defaultBudgetItems.length + template.additionalSubCategories.length
     };
   }
 
