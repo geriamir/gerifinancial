@@ -252,8 +252,6 @@ const SimpleProjectCreationDialog: React.FC<SimpleProjectCreationDialogProps> = 
     }
   };
 
-  const selectedProjectType = PROJECT_TYPE_OPTIONS.find(option => option.value === formData.type);
-
   return (
     <Dialog
       open={open}

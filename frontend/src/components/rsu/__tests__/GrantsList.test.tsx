@@ -208,6 +208,7 @@ describe('GrantsList', () => {
       );
 
       // Check for skeleton elements by class or variant
+      // eslint-disable-next-line testing-library/no-node-access
       const skeletons = document.querySelectorAll('.MuiSkeleton-root');
       expect(skeletons.length).toBeGreaterThan(0);
     });
@@ -234,11 +235,11 @@ describe('GrantsList', () => {
 
       await waitFor(() => {
         expect(screen.getByText('View Details')).toBeInTheDocument();
-        expect(screen.getByText('Record Sale')).toBeInTheDocument();
-        expect(screen.getByText('Update Price')).toBeInTheDocument();
-        expect(screen.getByText('Edit Grant')).toBeInTheDocument();
-        expect(screen.getByText('Delete Grant')).toBeInTheDocument();
       });
+      expect(screen.getByText('Record Sale')).toBeInTheDocument();
+      expect(screen.getByText('Update Price')).toBeInTheDocument();
+      expect(screen.getByText('Edit Grant')).toBeInTheDocument();
+      expect(screen.getByText('Delete Grant')).toBeInTheDocument();
     });
 
     it('should call onEditGrant when edit is clicked', async () => {
@@ -252,9 +253,10 @@ describe('GrantsList', () => {
       fireEvent.click(moreButtons[0]);
 
       await waitFor(() => {
-        const editButton = screen.getByText('Edit Grant');
-        fireEvent.click(editButton);
+        expect(screen.getByText('Edit Grant')).toBeInTheDocument();
       });
+      const editButton = screen.getByText('Edit Grant');
+      fireEvent.click(editButton);
 
       expect(onEditGrant).toHaveBeenCalledWith(mockGrants[0]);
     });
@@ -270,9 +272,10 @@ describe('GrantsList', () => {
       fireEvent.click(moreButtons[0]);
 
       await waitFor(() => {
-        const deleteButton = screen.getByText('Delete Grant');
-        fireEvent.click(deleteButton);
+        expect(screen.getByText('Delete Grant')).toBeInTheDocument();
       });
+      const deleteButton = screen.getByText('Delete Grant');
+      fireEvent.click(deleteButton);
 
       expect(onDeleteGrant).toHaveBeenCalledWith(mockGrants[0]);
     });
@@ -288,9 +291,10 @@ describe('GrantsList', () => {
       fireEvent.click(moreButtons[0]);
 
       await waitFor(() => {
-        const recordSaleButton = screen.getByText('Record Sale');
-        fireEvent.click(recordSaleButton);
+        expect(screen.getByText('Record Sale')).toBeInTheDocument();
       });
+      const recordSaleButton = screen.getByText('Record Sale');
+      fireEvent.click(recordSaleButton);
 
       expect(onRecordSale).toHaveBeenCalledWith(mockGrants[0]);
     });
@@ -306,9 +310,10 @@ describe('GrantsList', () => {
       fireEvent.click(moreButtons[0]);
 
       await waitFor(() => {
-        const viewDetailsButton = screen.getByText('View Details');
-        fireEvent.click(viewDetailsButton);
+        expect(screen.getByText('View Details')).toBeInTheDocument();
       });
+      const viewDetailsButton = screen.getByText('View Details');
+      fireEvent.click(viewDetailsButton);
 
       expect(onGrantSelect).toHaveBeenCalledWith(mockGrants[0]);
     });
@@ -325,9 +330,10 @@ describe('GrantsList', () => {
       fireEvent.click(moreButtons[0]);
 
       await waitFor(() => {
-        const updatePriceButton = screen.getByText('Update Price');
-        fireEvent.click(updatePriceButton);
+        expect(screen.getByText('Update Price')).toBeInTheDocument();
       });
+      const updatePriceButton = screen.getByText('Update Price');
+      fireEvent.click(updatePriceButton);
 
       expect(screen.getByText('Update Stock Price - MSFT')).toBeInTheDocument();
     });
@@ -450,6 +456,7 @@ describe('GrantsList', () => {
         moreButtons[0].focus();
       });
       
+      // eslint-disable-next-line testing-library/no-node-access
       expect(document.activeElement).toBe(moreButtons[0]);
     });
   });

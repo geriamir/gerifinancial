@@ -2,7 +2,6 @@ import {
   calculateProjectOverviewData,
   getScenarioInsights,
   getSegmentDescription,
-  PROJECT_OVERVIEW_COLORS,
 } from '../projectOverviewHelper';
 
 /** Helper: extract segment names from result */

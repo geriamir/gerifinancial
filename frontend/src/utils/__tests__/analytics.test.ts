@@ -34,13 +34,12 @@ describe('AnalyticsService', () => {
 
   afterEach(() => {
     // Restore original console
-    console = { ...originalConsole };
+    Object.assign(console, originalConsole);
   });
 
   describe('event tracking', () => {
     it('tracks events with proper data', () => {
       analytics.track('test_event', { foo: 'bar' });
-      const queue = analytics.getEventQueue();
       expect(console.log).toHaveBeenCalledWith(
         'Analytics Event:',
         'test_event',
@@ -68,7 +67,7 @@ describe('AnalyticsService', () => {
       const error = new Error('Test error');
       const context = { extra: 'info' };
       
-      const errorId = analytics.logError(error, context);
+      analytics.logError(error, context);
       const errorQueue = analytics.getErrorQueue();
 
       expect(errorQueue).toHaveLength(1);
@@ -93,7 +92,7 @@ describe('AnalyticsService', () => {
       }
 
       const error = new CustomError();
-      const errorId = analytics.logError(error);
+      analytics.logError(error);
       const errorQueue = analytics.getErrorQueue();
 
       expect(errorQueue[0].error.name).toBe('CustomError');
@@ -113,7 +112,7 @@ describe('AnalyticsService', () => {
   describe('exception handling', () => {
     describe('non-Error values', () => {
       it('wraps primitive values as errors while preserving context', async () => {
-        const errorId = await analytics.logException('string error', { context: 'test' });
+        await analytics.logException('string error', { context: 'test' });
         const errorQueue = analytics.getErrorQueue();
 
         expect(errorQueue).toHaveLength(1);
@@ -129,7 +128,7 @@ describe('AnalyticsService', () => {
       });
 
       it('handles null/undefined exceptions', async () => {
-        const errorId = await analytics.logException(null);
+        await analytics.logException(null);
         const errorQueue = analytics.getErrorQueue();
 
         expect(errorQueue).toHaveLength(1);

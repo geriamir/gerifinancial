@@ -1,3 +1,5 @@
+import type { Transaction } from './transactions';
+
 export interface CreditCard {
   _id: string;
   bankAccountId: string;
@@ -70,8 +72,6 @@ export interface CreditCardTrend {
   totalPeriodAmount: number;
   avgMonthlyAmount: number;
 }
-
-import type { Transaction } from './transactions';
 
 export interface CreditCardTransactionFilters {
   startDate?: Date;

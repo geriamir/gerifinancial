@@ -12,8 +12,6 @@ import {
 import { SimpleTreeView } from '@mui/x-tree-view/SimpleTreeView';
 import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import {
-  ExpandMore,
-  ChevronRight,
   Delete,
   TrendingFlat,
   CheckCircle,
@@ -23,7 +21,6 @@ import {
   Receipt,
   AccountBalance
 } from '@mui/icons-material';
-import { formatCurrency } from '../../types/foreignCurrency';
 import { CategoryBreakdownItem, UnplannedExpense } from '../../types/projects';
 import {
   formatCompactCurrency,
@@ -57,10 +54,6 @@ const ProjectExpensesTreeView: React.FC<ProjectExpensesTreeViewProps> = ({
   movingExpense
 }) => {
   const [expanded, setExpanded] = useState<string[]>([]);
-
-  const handleToggle = (event: React.SyntheticEvent, nodeIds: string[]) => {
-    setExpanded(nodeIds);
-  };
 
   // Group planned expenses by subcategory
   const groupedBySubcategory = plannedExpenses.reduce((groups, budgetItem) => {
@@ -122,7 +115,6 @@ const ProjectExpensesTreeView: React.FC<ProjectExpensesTreeViewProps> = ({
           {Object.values(groupedBySubcategory).map((group) => {
             const totalBudgeted = group.budgetItems.reduce((sum, item) => sum + item.budgeted, 0);
             const totalActual = group.budgetItems.reduce((sum, item) => sum + item.actual, 0);
-            const totalExpenseCount = group.budgetItems.reduce((sum, item) => sum + item.expenseCount, 0);
 
             return (
               <TreeItem
