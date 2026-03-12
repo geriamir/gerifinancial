@@ -1,12 +1,11 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CreditCardMonthlyDetail } from '../CreditCardMonthlyDetail';
 import { creditCardsApi } from '../../../services/api/creditCards';
 import type { 
-  CreditCardMonthlyStats, 
-  CategoryBreakdown
+  CreditCardMonthlyStats
 } from '../../../services/api/types/creditCard';
 
 // Mock the credit cards API
@@ -235,9 +234,9 @@ describe('CreditCardMonthlyDetail', () => {
 
       await waitFor(() => {
         expect(screen.getByText('December 2024 Summary')).toBeInTheDocument();
-        expect(screen.getByText('$1,250.75')).toBeInTheDocument();
-        expect(screen.getByText('25')).toBeInTheDocument();
       });
+      expect(screen.getByText('$1,250.75')).toBeInTheDocument();
+      expect(screen.getByText('25')).toBeInTheDocument();
     });
 
     it('should display category breakdown', async () => {
@@ -252,10 +251,10 @@ describe('CreditCardMonthlyDetail', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Category Breakdown')).toBeInTheDocument();
-        expect(screen.getByText('Fine Dining')).toBeInTheDocument();
-        expect(screen.getByText('$500.25')).toBeInTheDocument();
-        expect(screen.getByText('40.0%')).toBeInTheDocument();
       });
+      expect(screen.getByText('Fine Dining')).toBeInTheDocument();
+      expect(screen.getByText('$500.25')).toBeInTheDocument();
+      expect(screen.getByText('40.0%')).toBeInTheDocument();
     });
 
     it('should render pie chart for category breakdown', async () => {
@@ -270,8 +269,8 @@ describe('CreditCardMonthlyDetail', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('pie-chart')).toBeInTheDocument();
-        expect(screen.getByTestId('pie')).toBeInTheDocument();
       });
+      expect(screen.getByTestId('pie')).toBeInTheDocument();
     });
 
     it('should render bar chart for spending analysis', async () => {
@@ -286,8 +285,8 @@ describe('CreditCardMonthlyDetail', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
-        expect(screen.getByTestId('bar')).toBeInTheDocument();
       });
+      expect(screen.getByTestId('bar')).toBeInTheDocument();
     });
   });
 
@@ -323,9 +322,9 @@ describe('CreditCardMonthlyDetail', () => {
 
       await waitFor(() => {
         expect(screen.getByText('$1,250.75')).toBeInTheDocument();
-        expect(screen.getByText('$500.25')).toBeInTheDocument();
-        expect(screen.getByText('$300.50')).toBeInTheDocument();
       });
+      expect(screen.getByText('$500.25')).toBeInTheDocument();
+      expect(screen.getByText('$300.50')).toBeInTheDocument();
     });
 
     it('should format percentages correctly', async () => {
@@ -340,9 +339,9 @@ describe('CreditCardMonthlyDetail', () => {
 
       await waitFor(() => {
         expect(screen.getByText('40.0%')).toBeInTheDocument();
-        expect(screen.getByText('24.0%')).toBeInTheDocument();
-        expect(screen.getByText('20.0%')).toBeInTheDocument();
       });
+      expect(screen.getByText('24.0%')).toBeInTheDocument();
+      expect(screen.getByText('20.0%')).toBeInTheDocument();
     });
 
     it('should format transaction counts correctly', async () => {
@@ -357,9 +356,9 @@ describe('CreditCardMonthlyDetail', () => {
 
       await waitFor(() => {
         expect(screen.getByText('8 transactions')).toBeInTheDocument(); // Restaurants
-        expect(screen.getAllByText('6 transactions')).toHaveLength(2); // Gas and Groceries both have 6
-        expect(screen.getByText('5 transactions')).toBeInTheDocument(); // Shopping
       });
+      expect(screen.getAllByText('6 transactions')).toHaveLength(2); // Gas and Groceries both have 6
+      expect(screen.getByText('5 transactions')).toBeInTheDocument(); // Shopping
     });
   });
 });

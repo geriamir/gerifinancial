@@ -178,11 +178,11 @@ describe('StockPriceUpdater', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Price Change Preview')).toBeInTheDocument();
-        expect(screen.getByText('+$30.00')).toBeInTheDocument(); // 150 - 120
-        expect(screen.getByText('+25.00%')).toBeInTheDocument(); // (30/120) * 100
-        expect(screen.getByText('$150,000')).toBeInTheDocument(); // 1000 * 150
-        expect(screen.getByText('+$30,000')).toBeInTheDocument(); // Impact on portfolio
       });
+      expect(screen.getByText('+$30.00')).toBeInTheDocument(); // 150 - 120
+      expect(screen.getByText('+25.00%')).toBeInTheDocument(); // (30/120) * 100
+      expect(screen.getByText('$150,000')).toBeInTheDocument(); // 1000 * 150
+      expect(screen.getByText('+$30,000')).toBeInTheDocument(); // Impact on portfolio
     });
 
     it('should show negative change correctly', async () => {
@@ -213,15 +213,15 @@ describe('StockPriceUpdater', () => {
         expect(screen.getByText((content, element) => {
           return content.includes('-$20.00') || content.includes('-20.00');
         })).toBeInTheDocument();
-        
-        expect(screen.getByText((content, element) => {
-          return content.includes('-16.67%') || content.includes('-16.67');
-        })).toBeInTheDocument();
-        
-        expect(screen.getByText((content, element) => {
-          return content.includes('-$20,000') || content.includes('-20,000');
-        })).toBeInTheDocument();
       }, { timeout: 3000 });
+
+      expect(screen.getByText((content, element) => {
+        return content.includes('-16.67%') || content.includes('-16.67');
+      })).toBeInTheDocument();
+        
+      expect(screen.getByText((content, element) => {
+        return content.includes('-$20,000') || content.includes('-20,000');
+      })).toBeInTheDocument();
     });
 
     it('should not show preview when price equals current price', async () => {
@@ -507,9 +507,12 @@ describe('StockPriceUpdater', () => {
         />
       );
 
+      // eslint-disable-next-line testing-library/no-node-access
       const backdrop = document.querySelector('.MuiBackdrop-root');
+      // eslint-disable-next-line jest/no-conditional-expect
       if (backdrop) {
         await user.click(backdrop);
+        // eslint-disable-next-line jest/no-conditional-expect
         expect(mockOnClose).toHaveBeenCalled();
       }
     });
@@ -704,9 +707,9 @@ describe('StockPriceUpdater', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Price Change Preview')).toBeInTheDocument();
-        expect(screen.getByText((content) => content.includes('-$119.99') || content.includes('-119.99'))).toBeInTheDocument();
-        expect(screen.getByText((content) => content.includes('-99.99%') || content.includes('-99.99'))).toBeInTheDocument();
       });
+      expect(screen.getByText((content) => content.includes('-$119.99') || content.includes('-119.99'))).toBeInTheDocument();
+      expect(screen.getByText((content) => content.includes('-99.99%') || content.includes('-99.99'))).toBeInTheDocument();
     });
 
     it('should handle very large price values', async () => {
@@ -736,19 +739,19 @@ describe('StockPriceUpdater', () => {
         // Check for price change amount using test ID (flexible for number formatting)
         const priceChangeElement = screen.getByTestId('price-change-amount');
         expect(priceChangeElement).toHaveTextContent(/\+\$9,?880\.00/);
-        
-        // Check for percentage change using test ID (flexible for number formatting)
-        const percentChangeElement = screen.getByTestId('price-change-percent');
-        expect(percentChangeElement).toHaveTextContent(/\+8,?233\.33%/);
-        
-        // Check for new portfolio value using test ID (flexible for number formatting)
-        const portfolioValueElement = screen.getByTestId('new-portfolio-value');
-        expect(portfolioValueElement).toHaveTextContent(/\$10,?000,?000/);
-        
-        // Check for impact on portfolio using test ID (flexible for number formatting)
-        const gainLossElement = screen.getByTestId('gain-loss-impact');
-        expect(gainLossElement).toHaveTextContent(/\+\$9,?880,?000/);
       }, { timeout: 5000 });
+
+      // Check for percentage change using test ID (flexible for number formatting)
+      const percentChangeElement = screen.getByTestId('price-change-percent');
+      expect(percentChangeElement).toHaveTextContent(/\+8,?233\.33%/);
+        
+      // Check for new portfolio value using test ID (flexible for number formatting)
+      const portfolioValueElement = screen.getByTestId('new-portfolio-value');
+      expect(portfolioValueElement).toHaveTextContent(/\$10,?000,?000/);
+        
+      // Check for impact on portfolio using test ID (flexible for number formatting)
+      const gainLossElement = screen.getByTestId('gain-loss-impact');
+      expect(gainLossElement).toHaveTextContent(/\+\$9,?880,?000/);
     }, 10000);
 
     it('should handle network errors gracefully', async () => {

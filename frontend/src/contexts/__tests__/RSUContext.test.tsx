@@ -67,6 +67,7 @@ jest.mock('../../services/api/rsus', () => {
 });
 
 // Import the mocked API (Jest will return our mock instead of the real implementation)
+// eslint-disable-next-line import/first
 import { rsuApi } from '../../services/api/rsus';
 
 // Cast the mock to the correct type for Jest - use any to bypass complex nested mock typing

@@ -10,8 +10,7 @@ import {
   CircularProgress,
   LinearProgress,
   IconButton,
-  Stack,
-  Divider
+  Stack
 } from '@mui/material';
 import {
   ExpandMore,
@@ -21,7 +20,6 @@ import {
   Warning,
   Info
 } from '@mui/icons-material';
-import { formatCurrency } from '../../types/foreignCurrency';
 import { CategoryBreakdownItem, UnplannedExpense } from '../../types/projects';
 import {
   formatCompactCurrency,
@@ -97,7 +95,6 @@ const ProjectExpensesAccordionView: React.FC<ProjectExpensesAccordionViewProps> 
       {Object.values(groupedBySubcategory).map((group) => {
         const totalBudgeted = group.budgetItems.reduce((sum, item) => sum + item.budgeted, 0);
         const totalActual = group.budgetItems.reduce((sum, item) => sum + item.actual, 0);
-        const totalExpenseCount = group.budgetItems.reduce((sum, item) => sum + item.expenseCount, 0);
         const panelId = `planned-${group.subcategory._id}`;
 
         return (

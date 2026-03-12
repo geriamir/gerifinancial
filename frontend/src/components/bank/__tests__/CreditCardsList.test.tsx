@@ -112,8 +112,8 @@ describe('CreditCardsList', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Chase Sapphire')).toBeInTheDocument();
-        expect(screen.getByText('AmEx Gold')).toBeInTheDocument();
       });
+      expect(screen.getByText('AmEx Gold')).toBeInTheDocument();
 
       expect(screen.getByText('**** **** **** 1234')).toBeInTheDocument();
       expect(screen.getByText('**** **** **** 5678')).toBeInTheDocument();
@@ -214,8 +214,8 @@ describe('CreditCardsList', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Statistics')).toBeInTheDocument();
-        expect(screen.getByText('6-Month Trend')).toBeInTheDocument();
       });
+      expect(screen.getByText('6-Month Trend')).toBeInTheDocument();
     });
 
     it('should collapse card when expand button is clicked again', async () => {
@@ -333,8 +333,8 @@ describe('CreditCardsList', () => {
 
       await waitFor(() => {
         expect(screen.getByText('$2,500.75')).toBeInTheDocument();
-        expect(screen.getByText('$1,200.25')).toBeInTheDocument();
       });
+      expect(screen.getByText('$1,200.25')).toBeInTheDocument();
     });
 
     it('should display statistics when expanded', async () => {
@@ -350,11 +350,11 @@ describe('CreditCardsList', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Statistics')).toBeInTheDocument();
-        expect(screen.getByText('Average Monthly Spending')).toBeInTheDocument();
-        expect(screen.getByText('Total Transactions (6 months)')).toBeInTheDocument();
-        expect(screen.getByText('$416.79')).toBeInTheDocument(); // Average monthly
-        expect(screen.getByText('45')).toBeInTheDocument(); // Total transactions
       });
+      expect(screen.getByText('Average Monthly Spending')).toBeInTheDocument();
+      expect(screen.getByText('Total Transactions (6 months)')).toBeInTheDocument();
+      expect(screen.getByText('$416.79')).toBeInTheDocument(); // Average monthly
+      expect(screen.getByText('45')).toBeInTheDocument(); // Total transactions
     });
   });
 
@@ -383,6 +383,7 @@ describe('CreditCardsList', () => {
         expandButtons[0].focus();
       });
       
+      // eslint-disable-next-line testing-library/no-node-access
       expect(document.activeElement).toBe(expandButtons[0]);
     });
   });
@@ -476,10 +477,8 @@ describe('CreditCardsList', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Chase Sapphire')).toBeInTheDocument();
-        expect(screen.getByText('AmEx Gold')).toBeInTheDocument();
       });
-
-      // Should show identifiers
+      expect(screen.getByText('AmEx Gold')).toBeInTheDocument();
       expect(screen.getByText('**** **** **** 1234')).toBeInTheDocument();
       expect(screen.getByText('**** **** **** 5678')).toBeInTheDocument();
     });

@@ -1,7 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, cleanup, act, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import userEvent from '@testing-library/user-event';
 import { Pagination, InfiniteScroll } from '../Pagination';
 
 interface PaginationProps {
@@ -52,6 +51,7 @@ describe('Pagination', () => {
       render(<Pagination {...defaultProps} pageSize={1000000} />);
       const select = screen.getByLabelText('Items per page');
 
+      // eslint-disable-next-line testing-library/no-node-access
       const options = Array.from(select.getElementsByTagName('option'));
       const maxOption = Math.max(...options.map(opt => Number(opt.value)));
       expect(maxOption).toBeLessThanOrEqual(defaultProps.total);
@@ -175,9 +175,9 @@ describe('InfiniteScroll', () => {
 
   describe('edge cases', () => {
     it('handles empty items array', () => {
-      const { container } = render(<InfiniteScroll {...defaultScrollProps} items={[]} />);
+      render(<InfiniteScroll {...defaultScrollProps} items={[]} />);
       expect(screen.queryByRole('article')).not.toBeInTheDocument();
-      expect(container.querySelector('[role="feed"]')).toBeInTheDocument();
+      expect(screen.getByRole('feed')).toBeInTheDocument();
     });
 
     it('handles null or undefined items', () => {
@@ -228,8 +228,8 @@ describe('InfiniteScroll', () => {
       rerender(<InfiniteScroll {...defaultScrollProps} loading={true} />);
       await waitFor(() => {
         expect(screen.getByRole('status')).toHaveTextContent('Loading more items...');
-        expect(screen.getByRole('feed')).toHaveAttribute('aria-busy', 'true');
       });
+      expect(screen.getByRole('feed')).toHaveAttribute('aria-busy', 'true');
     });
   });
 });
