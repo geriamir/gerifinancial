@@ -139,10 +139,11 @@ const Projects: React.FC = () => {
     try {
       setIsDeleting(true);
       await deleteProject(projectId);
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
       navigate('/projects');
     } catch (error) {
       console.error('Failed to delete project:', error);
-    } finally {
       setIsDeleting(false);
       setDeleteDialogOpen(false);
     }
