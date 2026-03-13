@@ -219,7 +219,7 @@ const ProjectBudgetsList: React.FC<ProjectBudgetsListProps> = ({
       />
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+      <Dialog open={deleteDialogOpen} onClose={() => { setDeleteDialogOpen(false); setProjectToDelete(null); }}>
         <DialogTitle>Delete Project</DialogTitle>
         <DialogContent>
           <DialogContentText>
@@ -227,7 +227,7 @@ const ProjectBudgetsList: React.FC<ProjectBudgetsListProps> = ({
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
+          <Button onClick={() => { setDeleteDialogOpen(false); setProjectToDelete(null); }} disabled={isDeleting}>
             Cancel
           </Button>
           <Button onClick={handleDeleteProject} color="error" variant="contained" disabled={isDeleting}>
