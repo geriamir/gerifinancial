@@ -10,6 +10,13 @@ export interface BankAccount {
   lastError?: {
     message: string;
     date: string;
+  } | null;
+  strategySync?: {
+    [key: string]: {
+      lastScraped: string | null;
+      lastAttempted: string | null;
+      status: 'success' | 'failed' | 'never';
+    };
   };
   credentials?: {
     username: string;
