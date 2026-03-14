@@ -25,15 +25,23 @@ const bankAccountSchema = new mongoose.Schema({
   credentials: {
     username: {
       type: String,
-      required: function() { return this.bankId !== 'mercury'; }
+      required: function() { return this.bankId !== 'mercury' && this.bankId !== 'ibkr'; }
     },
     password: {
       type: String,
-      required: function() { return this.bankId !== 'mercury'; }
+      required: function() { return this.bankId !== 'mercury' && this.bankId !== 'ibkr'; }
     },
     apiToken: {
       type: String,
       required: function() { return this.bankId === 'mercury'; }
+    },
+    flexToken: {
+      type: String,
+      required: function() { return this.bankId === 'ibkr'; }
+    },
+    queryId: {
+      type: String,
+      required: function() { return this.bankId === 'ibkr'; }
     }
   },
   // Per-strategy sync tracking
@@ -54,6 +62,11 @@ const bankAccountSchema = new mongoose.Schema({
       status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
     },
     'mercury-checking': {
+      lastScraped: { type: Date, default: null },
+      lastAttempted: { type: Date, default: null },
+      status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
+    },
+    'ibkr-flex': {
       lastScraped: { type: Date, default: null },
       lastAttempted: { type: Date, default: null },
       status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }

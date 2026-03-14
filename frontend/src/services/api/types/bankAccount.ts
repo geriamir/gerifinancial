@@ -43,6 +43,8 @@ export interface AddBankAccountDto {
     username?: string;
     password?: string;
     apiToken?: string;
+    flexToken?: string;
+    queryId?: string;
   };
 }
 

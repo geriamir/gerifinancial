@@ -20,13 +20,15 @@ function initializeSyncStrategies() {
   // Import strategies from their respective subsystems
   const PortfoliosSyncStrategy = require('./investments/services/sync/PortfoliosSyncStrategy');
   const ForeignCurrencySyncStrategy = require('./foreign-currency/services/sync/ForeignCurrencySyncStrategy');
+  const IBKRFlexSyncStrategy = require('./investments/services/sync/IBKRFlexSyncStrategy');
 
   // Create strategy instances with keys matching scrapingJobProcessors expectations
   global.syncStrategies = {
     'checking-accounts': new CheckingAccountsSyncStrategy(),
     'investment-portfolios': new PortfoliosSyncStrategy(),
     'foreign-currency': new ForeignCurrencySyncStrategy(),
-    'mercury-checking': new MercurySyncStrategy()
+    'mercury-checking': new MercurySyncStrategy(),
+    'ibkr-flex': new IBKRFlexSyncStrategy()
   };
 
   logger.info('Sync strategies initialized and registered globally');

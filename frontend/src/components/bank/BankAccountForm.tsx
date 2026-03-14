@@ -35,7 +35,9 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
     name: '',
     username: '',
     password: '',
-    apiToken: ''
+    apiToken: '',
+    flexToken: '',
+    queryId: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -67,9 +69,14 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
     });
 
     try {
-      const credentials = isApiBank(formData.bankId)
-        ? { apiToken: formData.apiToken }
-        : { username: formData.username, password: formData.password };
+      let credentials;
+      if (formData.bankId === 'ibkr') {
+        credentials = { flexToken: formData.flexToken, queryId: formData.queryId };
+      } else if (isApiBank(formData.bankId)) {
+        credentials = { apiToken: formData.apiToken };
+      } else {
+        credentials = { username: formData.username, password: formData.password };
+      }
 
       await bankAccountsApi.add({
         bankId: formData.bankId,
@@ -106,7 +113,9 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
       name: '',
       username: '',
       password: '',
-      apiToken: ''
+      apiToken: '',
+      flexToken: '',
+      queryId: ''
     });
     setError('');
   };
@@ -155,7 +164,31 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
             helperText="Enter a name to identify this account (e.g. 'Main Checking')"
           />
 
-          {isApiBank(formData.bankId) ? (
+          {formData.bankId === 'ibkr' ? (
+            <>
+              <TextField
+                fullWidth
+                margin="normal"
+                label="Flex Web Service Token"
+                name="flexToken"
+                type="password"
+                value={formData.flexToken}
+                onChange={handleInputChange}
+                required
+                helperText="Generate a token in IBKR Account Management → Settings → Flex Web Service"
+              />
+              <TextField
+                fullWidth
+                margin="normal"
+                label="Flex Query ID"
+                name="queryId"
+                value={formData.queryId}
+                onChange={handleInputChange}
+                required
+                helperText="Create an Activity Flex Query in Reports → Flex Queries (include Positions, Trades, Cash Transactions)"
+              />
+            </>
+          ) : isApiBank(formData.bankId) ? (
             <TextField
               fullWidth
               margin="normal"

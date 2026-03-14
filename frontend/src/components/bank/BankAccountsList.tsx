@@ -52,7 +52,8 @@ const getStrategyDisplayName = (strategyKey: string): string => {
     'checking-accounts': 'Checking',
     'investment-portfolios': 'Investments',
     'foreign-currency': 'Foreign Currency',
-    'mercury-checking': 'Mercury Checking'
+    'mercury-checking': 'Mercury Checking',
+    'ibkr-flex': 'IBKR Flex'
   };
   return names[strategyKey] || strategyKey;
 };
