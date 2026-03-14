@@ -14,16 +14,31 @@ interface ScrapeResult {
   priority?: string;
 }
 
+const STRATEGY_DISPLAY_NAMES: Record<string, string> = {
+  'checking-accounts': 'Checking',
+  'investment-portfolios': 'Investments',
+  'foreign-currency': 'Foreign Currency',
+  'mercury-checking': 'Mercury Checking'
+};
+
 interface AccountScrapingProps {
   accountId: string;
   lastScraped: string | null;
+  strategySync?: {
+    [key: string]: {
+      lastScraped: string | null;
+      lastAttempted: string | null;
+      status: 'success' | 'failed' | 'never';
+    };
+  };
   isDisabled?: boolean;
   onScrapingComplete?: () => void;
 }
 
 export const AccountScraping: React.FC<AccountScrapingProps> = ({ 
   accountId, 
-  lastScraped, 
+  lastScraped,
+  strategySync,
   isDisabled,
   onScrapingComplete 
 }) => {
@@ -71,13 +86,30 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
     }
   };
 
+  const activeStrategies = strategySync 
+    ? Object.entries(strategySync).filter(([, s]) => s && s.status !== 'never')
+    : [];
+
   return (
     <Stack spacing={2}>
-      <Typography variant="body2" color="text.secondary">
-        {lastScraped 
-          ? `Last scraped: ${format(new Date(lastScraped), 'PPpp')}`
-          : 'Never scraped'}
-      </Typography>
+      {activeStrategies.length > 0 ? (
+        <Stack spacing={0}>
+          {activeStrategies.map(([strategy, sync]) => (
+            <Typography key={strategy} variant="body2" color="text.secondary">
+              {STRATEGY_DISPLAY_NAMES[strategy] || strategy}:{' '}
+              {sync.lastScraped
+                ? format(new Date(sync.lastScraped), 'PPpp')
+                : 'Never'}
+            </Typography>
+          ))}
+        </Stack>
+      ) : (
+        <Typography variant="body2" color="text.secondary">
+          {lastScraped 
+            ? `Last scraped: ${format(new Date(lastScraped), 'PPpp')}`
+            : 'Never scraped'}
+        </Typography>
+      )}
       <Stack direction="row" spacing={1}>
         <Button
           variant="outlined"

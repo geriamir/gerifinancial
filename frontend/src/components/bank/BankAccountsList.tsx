@@ -205,6 +205,7 @@ export const BankAccountsList: React.FC = () => {
                     <AccountScraping
                       accountId={account._id}
                       lastScraped={account.lastScraped}
+                      strategySync={account.strategySync}
                       isDisabled={account.status !== 'active'}
                       onScrapingComplete={fetchAccounts}
                     />
