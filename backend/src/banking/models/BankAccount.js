@@ -291,6 +291,13 @@ bankAccountSchema.methods.updateStrategySync = function(strategyName, success, e
     
     // Update global lastScraped to most recent successful strategy sync
     this.lastScraped = lastTransactionDate || now;
+
+    // Clear lastError if no strategies are still in failed state
+    const hasFailedStrategy = Object.values(this.strategySync.toObject ? this.strategySync.toObject() : this.strategySync)
+      .some(s => s && s.status === 'failed');
+    if (!hasFailedStrategy) {
+      this.lastError = null;
+    }
   } else {
     this.strategySync[strategyName].status = 'failed';
     if (error) {

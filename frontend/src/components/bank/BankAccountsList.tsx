@@ -47,6 +47,16 @@ const getStatusColor = (status: BankAccount['status']) => {
   }
 };
 
+const getStrategyDisplayName = (strategyKey: string): string => {
+  const names: Record<string, string> = {
+    'checking-accounts': 'Checking',
+    'investment-portfolios': 'Investments',
+    'foreign-currency': 'Foreign Currency',
+    'mercury-checking': 'Mercury Checking'
+  };
+  return names[strategyKey] || strategyKey;
+};
+
 export const BankAccountsList: React.FC = () => {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,14 +189,23 @@ export const BankAccountsList: React.FC = () => {
                         {formatCurrency(account.currentBalance, account.defaultCurrency || 'ILS')}
                       </Typography>
                     )}
+                    {account.strategySync && Object.entries(account.strategySync)
+                      .filter(([, sync]) => sync?.status === 'failed')
+                      .map(([strategy]) => (
+                        <Typography key={strategy} color="error" variant="caption" display="block">
+                          {getStrategyDisplayName(strategy)} sync failed
+                        </Typography>
+                      ))
+                    }
                     {account.lastError && (
                       <Typography color="error" variant="caption" display="block" sx={{ mb: 1 }}>
-                        Error: {account.lastError.message}
+                        {account.lastError.message}
                       </Typography>
                     )}
                     <AccountScraping
                       accountId={account._id}
                       lastScraped={account.lastScraped}
+                      strategySync={account.strategySync}
                       isDisabled={account.status !== 'active'}
                       onScrapingComplete={fetchAccounts}
                     />
