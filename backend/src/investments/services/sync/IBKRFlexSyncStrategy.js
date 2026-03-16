@@ -1,8 +1,8 @@
 const logger = require('../../../shared/utils/logger');
-const BaseSyncStrategy = require('../../services/sync-strategies/BaseSyncStrategy');
-const IBKRFlexClient = require('../../services/ibkrFlexClient');
-const portfolioService = require('../../../investments/services/portfolioService');
-const transactionService = require('../../services/transactionService');
+const BaseSyncStrategy = require('../../../banking/services/sync-strategies/BaseSyncStrategy');
+const IBKRFlexClient = require('../../../banking/services/ibkrFlexClient');
+const portfolioService = require('../portfolioService');
+const transactionService = require('../../../banking/services/transactionService');
 
 /**
  * Sync strategy for Interactive Brokers using the Flex Web Service.

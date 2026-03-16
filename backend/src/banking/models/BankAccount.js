@@ -11,7 +11,7 @@ const bankAccountSchema = new mongoose.Schema({
   bankId: {
     type: String,
     required: true,
-    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury'] // Supported banks
+    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury', 'ibkr'] // Supported banks
   },
   defaultCurrency: {
     type: String,
