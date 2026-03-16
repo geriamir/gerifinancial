@@ -98,7 +98,7 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
           <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                {formatCurrency(investment.totalValue)}
+                {formatCurrency(investment.totalValue, investment.currency)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Total Value
@@ -108,7 +108,7 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
             {investment.totalMarketValue > 0 && (
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {formatCurrency(investment.totalMarketValue)}
+                  {formatCurrency(investment.totalMarketValue, investment.currency)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Investments
@@ -119,7 +119,7 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
             {investment.cashBalance > 0 && (
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {formatCurrency(investment.cashBalance)}
+                  {formatCurrency(investment.cashBalance, investment.currency)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Cash
@@ -198,7 +198,7 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
                   <Box sx={{ textAlign: 'right' }}>
                     {holding.marketValue && (
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(holding.marketValue)}
+                        {formatCurrency(holding.marketValue, holding.currency || investment.currency)}
                       </Typography>
                     )}
                     <Chip
