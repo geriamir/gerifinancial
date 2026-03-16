@@ -1,4 +1,5 @@
 const scrapingQueue = require('../../shared/services/scrapingQueue');
+const strategyRegistry = require('../../shared/services/strategyRegistry');
 const distributedLock = require('../../shared/services/distributedLock');
 const scrapingEvents = require('./scrapingEvents');
 const { BankAccount } = require('../models');
@@ -67,18 +68,17 @@ class ScrapingJobProcessors {
       
       // Debug: Check strategy registry
       logger.info(`🔍 Checking strategy registry - global.syncStrategies exists: ${!!global.syncStrategies}`);
+      
+      // Ensure strategies are initialized (handles startup race with stale Redis jobs)
+      strategyRegistry.ensureInitialized();
+      
       if (global.syncStrategies) {
         logger.info(`🔍 Available strategies: ${Object.keys(global.syncStrategies).join(', ')}`);
       }
       
-      // Get strategy instance from global registry
-      if (!global.syncStrategies) {
-        throw new Error('Sync strategies not initialized. Please ensure app.js has initialized the strategy registry.');
-      }
-      
-      const strategy = global.syncStrategies[strategyName];
+      const strategy = strategyRegistry.getStrategy(strategyName);
       if (!strategy) {
-        throw new Error(`Strategy not found: ${strategyName}. Available strategies: ${Object.keys(global.syncStrategies).join(', ')}`);
+        throw new Error(`Strategy not found: ${strategyName}. Available strategies: ${strategyRegistry.getAvailableStrategies().join(', ')}`);
       }
 
       logger.info(`✅ Found strategy ${strategyName}, processing sync job for account ${bankAccount.name} (${bankAccountId})`);
