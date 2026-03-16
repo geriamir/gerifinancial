@@ -12,8 +12,7 @@ const holdingSchema = new mongoose.Schema({
   },
   quantity: {
     type: Number,
-    required: true,
-    min: 0
+    required: true
   },
   currentPrice: {
     type: Number,
@@ -22,8 +21,7 @@ const holdingSchema = new mongoose.Schema({
   },
   marketValue: {
     type: Number,
-    required: false,
-    min: 0
+    required: false
   },
   currency: {
     type: String,
@@ -87,7 +85,6 @@ const investmentSchema = new mongoose.Schema({
   holdings: [holdingSchema],
   totalMarketValue: {
     type: Number,
-    min: 0,
     default: 0
   },
   cashBalance: {
