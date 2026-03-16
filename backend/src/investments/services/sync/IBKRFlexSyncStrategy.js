@@ -93,18 +93,28 @@ class IBKRFlexSyncStrategy extends BaseSyncStrategy {
     const currency = report.accountInfo?.currency || bankAccount.defaultCurrency || 'USD';
 
     // Group positions by asset class for a single portfolio
-    const investments = report.openPositions.map(pos => ({
-      symbol: pos.symbol || pos.description,
-      name: pos.description || pos.symbol,
-      quantity: parseFloat(pos.position || pos.quantity || 0),
-      currentPrice: parseFloat(pos.markPrice || pos.closePrice || 0),
-      marketValue: parseFloat(pos.positionValue || pos.marketValue || 0),
-      costBasis: parseFloat(pos.costBasisMoney || 0),
-      holdingType: this.mapAssetClass(pos.assetCategory || pos.assetClass),
-      currency: pos.currency || currency,
-      isin: pos.isin || null,
-      exchange: pos.listingExchange || null
-    }));
+    const investments = report.openPositions.map(pos => {
+      const symbol = pos.symbol || pos.description;
+      const quantity = parseFloat(pos.position || pos.quantity || 0);
+      const mktValue = parseFloat(pos.positionValue || pos.marketValue || 0);
+
+      return {
+        paperId: symbol,
+        symbol,
+        name: pos.description || pos.symbol,
+        paperName: pos.description || pos.symbol,
+        amount: quantity,
+        quantity,
+        value: mktValue,
+        currentPrice: parseFloat(pos.markPrice || pos.closePrice || 0),
+        marketValue: mktValue,
+        costBasis: parseFloat(pos.costBasisMoney || 0),
+        holdingType: this.mapAssetClass(pos.assetCategory || pos.assetClass),
+        currency: pos.currency || currency,
+        isin: pos.isin || null,
+        exchange: pos.listingExchange || null
+      };
+    });
 
     const totalValue = investments.reduce((sum, inv) => sum + inv.marketValue, 0);
     const cashBalance = report.equitySummary
