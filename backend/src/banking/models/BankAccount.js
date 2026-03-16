@@ -220,6 +220,11 @@ bankAccountSchema.pre('save', function(next) {
         this.credentials.apiToken = encrypt(this.credentials.apiToken);
       }
     }
+    if (this.isModified('credentials.flexToken') && this.credentials.flexToken) {
+      if (!isEncrypted(this.credentials.flexToken)) {
+        this.credentials.flexToken = encrypt(this.credentials.flexToken);
+      }
+    }
     next();
   } catch (error) {
     next(error);

@@ -228,6 +228,8 @@ class ScrapingSchedulerService {
     try {
       const strategies = account.bankId === 'mercury'
         ? ['mercury-checking']
+        : account.bankId === 'ibkr'
+        ? ['ibkr-flex']
         : ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
       const strategiesNeedingSync = [];
 
