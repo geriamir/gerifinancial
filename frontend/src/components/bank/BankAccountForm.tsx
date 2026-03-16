@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { AxiosError } from 'axios';
 import {
+  Alert,
+  Box,
   Button,
   Dialog,
   DialogActions,
@@ -9,10 +11,12 @@ import {
   FormControl,
   FormHelperText,
   InputLabel,
+  Link,
   MenuItem,
   Select,
   SelectChangeEvent,
-  TextField
+  TextField,
+  Typography
 } from '@mui/material';
 import { bankAccountsApi } from '../../services/api/bank';
 import { SUPPORTED_BANKS, isApiBank } from '../../constants/banks';
@@ -166,6 +170,32 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
 
           {formData.bankId === 'ibkr' ? (
             <>
+              <Alert severity="info" sx={{ mt: 2, mb: 1 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  How to set up IBKR Flex Query
+                </Typography>
+                <Typography variant="body2" gutterBottom>
+                  A <strong>Flex Query</strong> is an IBKR reporting feature that lets you export account data (positions, trades, dividends, etc.) via API.
+                  Each user must create their own token and query — but the query configuration below is the same for everyone.
+                </Typography>
+                <Box component="ol" sx={{ pl: 2, mb: 1, '& li': { mb: 0.5 } }}>
+                  <Typography component="li" variant="body2">
+                    Log in to <Link href="https://www.interactivebrokers.com/sso/Login" target="_blank" rel="noopener">IBKR Account Management</Link> (Client Portal).
+                  </Typography>
+                  <Typography component="li" variant="body2">
+                    <strong>Create the token:</strong> Go to <em>Settings → Flex Web Service</em> and generate a new token. Copy it below.
+                  </Typography>
+                  <Typography component="li" variant="body2">
+                    <strong>Create the query:</strong> Go to <em>Reports / Tax Reports → Flex Queries → Activity Flex Query</em> and click <strong>Create</strong>.
+                  </Typography>
+                  <Typography component="li" variant="body2">
+                    In the query editor, enable these sections: <strong>Account Information</strong>, <strong>Open Positions</strong>, <strong>Trades</strong>, <strong>Cash Transactions</strong>, and <strong>Equity Summary</strong>. Leave the period as <em>Last 365 days</em> and format as <em>XML</em>.
+                  </Typography>
+                  <Typography component="li" variant="body2">
+                    Save the query and copy the <strong>Query ID</strong> shown next to it.
+                  </Typography>
+                </Box>
+              </Alert>
               <TextField
                 fullWidth
                 margin="normal"
@@ -175,7 +205,7 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
                 value={formData.flexToken}
                 onChange={handleInputChange}
                 required
-                helperText="Generate a token in IBKR Account Management → Settings → Flex Web Service"
+                helperText="Your personal token from Settings → Flex Web Service"
               />
               <TextField
                 fullWidth
@@ -185,10 +215,10 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
                 value={formData.queryId}
                 onChange={handleInputChange}
                 required
-                helperText="Create an Activity Flex Query in Reports → Flex Queries (include Positions, Trades, Cash Transactions)"
+                helperText="The numeric ID shown next to your Activity Flex Query"
               />
             </>
-          ) : isApiBank(formData.bankId) ? (
+          ): isApiBank(formData.bankId) ? (
             <TextField
               fullWidth
               margin="normal"
