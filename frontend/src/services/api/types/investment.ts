@@ -108,11 +108,19 @@ export interface InvestmentFilters {
   status?: string;
 }
 
+export interface PortfolioCashBalance {
+  cashBalance: number;
+  currency: string;
+}
+
+export type PortfolioCashBalances = Record<string, PortfolioCashBalance>;
+
 export interface InvestmentContextState {
   investments: Investment[];
   portfolioSummary: PortfolioSummary | null;
   portfolioTrends: PortfolioTrend[];
   performanceMetrics: PerformanceMetrics | null;
+  portfolioCashBalances: PortfolioCashBalances;
   loading: boolean;
   error: string | null;
 }

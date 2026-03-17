@@ -17,11 +17,12 @@ import {
   ExpandLess as ExpandLessIcon,
   AccountBalance as AccountIcon
 } from '@mui/icons-material';
-import { Investment, Holding } from '../../services/api/types/investment';
+import { Investment, Holding, PortfolioCashBalances } from '../../services/api/types/investment';
 import { formatCurrency } from '../../utils/formatters';
 
 interface InvestmentAccountListProps {
   investments: Investment[];
+  portfolioCashBalances: PortfolioCashBalances;
   loading: boolean;
   onRefresh: () => void;
 }
@@ -38,7 +39,7 @@ interface GroupedAccount {
   holdings: Holding[];
 }
 
-function groupByBankAccount(investments: Investment[]): GroupedAccount[] {
+function groupByBankAccount(investments: Investment[], portfolioCashBalances: PortfolioCashBalances): GroupedAccount[] {
   const groups = new Map<string, GroupedAccount>();
 
   for (const inv of investments) {
@@ -51,7 +52,6 @@ function groupByBankAccount(investments: Investment[]): GroupedAccount[] {
     if (existing) {
       existing.totalValue += inv.totalValue || 0;
       existing.totalMarketValue += inv.totalMarketValue || 0;
-      existing.cashBalance += inv.cashBalance || 0;
       existing.holdings.push(...inv.holdings);
       if (new Date(inv.lastUpdated) > new Date(existing.lastUpdated)) {
         existing.lastUpdated = inv.lastUpdated;
@@ -60,14 +60,16 @@ function groupByBankAccount(investments: Investment[]): GroupedAccount[] {
       const bankName = typeof inv.bankAccountId === 'object'
         ? (inv.bankAccountId as any).name
         : undefined;
+      // Use portfolio-level cash balance from the Portfolio document
+      const portfolioCash = portfolioCashBalances[key]?.cashBalance || 0;
       groups.set(key, {
         bankAccountId: key,
         accountName: bankName || inv.accountName || `Account ${inv.accountNumber}`,
         accountType: inv.accountType,
         currency: inv.currency,
-        totalValue: inv.totalValue || 0,
+        totalValue: (inv.totalValue || 0) + portfolioCash,
         totalMarketValue: inv.totalMarketValue || 0,
-        cashBalance: inv.cashBalance || 0,
+        cashBalance: portfolioCash,
         lastUpdated: inv.lastUpdated,
         holdings: [...inv.holdings]
       });
@@ -267,11 +269,12 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account }) => {
 
 export const InvestmentAccountList: React.FC<InvestmentAccountListProps> = ({
   investments,
+  portfolioCashBalances,
   loading,
   onRefresh
 }) => {
   const activeInvestments = investments.filter(inv => inv.status === 'active');
-  const grouped = groupByBankAccount(activeInvestments);
+  const grouped = groupByBankAccount(activeInvestments, portfolioCashBalances);
   const totalValue = grouped.reduce((sum, g) => sum + g.totalValue, 0);
   const currency = grouped.length === 1 ? grouped[0].currency : undefined;
 

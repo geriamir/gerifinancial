@@ -195,6 +195,24 @@ class InvestmentService {
     }
   }
 
+  // Returns a map of bankAccountId -> { cashBalance, currency } from Portfolio documents
+  async getPortfolioCashBalances(userId) {
+    const Portfolio = require('../models/Portfolio');
+    const portfolios = await Portfolio.find(
+      { userId, status: 'active' },
+      'bankAccountId cashBalance currency'
+    );
+    const result = {};
+    for (const p of portfolios) {
+      const key = p.bankAccountId.toString();
+      result[key] = {
+        cashBalance: (result[key]?.cashBalance || 0) + (p.cashBalance || 0),
+        currency: p.currency
+      };
+    }
+    return result;
+  }
+
   async getInvestmentById(investmentId, userId) {
     try {
       const investment = await Investment.findOne({ 

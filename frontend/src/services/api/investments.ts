@@ -7,20 +7,21 @@ import {
   HoldingHistory,
   InvestmentSnapshot,
   SyncResult,
-  InvestmentFilters
+  InvestmentFilters,
+  PortfolioCashBalances
 } from './types/investment';
 
 
 export const investmentApi = {
   // Get user's investments
-  getUserInvestments: async (filters?: InvestmentFilters): Promise<Investment[]> => {
+  getUserInvestments: async (filters?: InvestmentFilters): Promise<{ investments: Investment[]; portfolioCashBalances: PortfolioCashBalances }> => {
     const params = new URLSearchParams();
     if (filters?.bankAccountId) params.append('bankAccountId', filters.bankAccountId);
     if (filters?.accountType) params.append('accountType', filters.accountType);
     if (filters?.status) params.append('status', filters.status);
     
-    const response = await api.get<{ investments: Investment[] }>(`/investments?${params.toString()}`);
-    return response.data.investments;
+    const response = await api.get<{ investments: Investment[]; portfolioCashBalances: PortfolioCashBalances }>(`/investments?${params.toString()}`);
+    return { investments: response.data.investments, portfolioCashBalances: response.data.portfolioCashBalances || {} };
   },
 
   // Get investment by ID
