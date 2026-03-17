@@ -17,7 +17,7 @@ import {
   ExpandLess as ExpandLessIcon,
   AccountBalance as AccountIcon
 } from '@mui/icons-material';
-import { Investment } from '../../services/api/types/investment';
+import { Investment, Holding } from '../../services/api/types/investment';
 import { formatCurrency } from '../../utils/formatters';
 
 interface InvestmentAccountListProps {
@@ -26,16 +26,57 @@ interface InvestmentAccountListProps {
   onRefresh: () => void;
 }
 
-interface InvestmentAccountItemProps {
-  investment: Investment;
+interface GroupedAccount {
+  bankAccountId: string;
+  accountName: string;
+  accountType: string;
+  currency: string;
+  totalValue: number;
+  totalMarketValue: number;
+  cashBalance: number;
+  lastUpdated: Date;
+  holdings: Holding[];
 }
 
-const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investment }) => {
-  const [expanded, setExpanded] = React.useState(false);
+function groupByBankAccount(investments: Investment[]): GroupedAccount[] {
+  const groups = new Map<string, GroupedAccount>();
 
-  const handleExpandClick = () => {
-    setExpanded(!expanded);
-  };
+  for (const inv of investments) {
+    const key = inv.bankAccountId;
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.totalValue += inv.totalValue || 0;
+      existing.totalMarketValue += inv.totalMarketValue || 0;
+      existing.cashBalance += inv.cashBalance || 0;
+      existing.holdings.push(...inv.holdings);
+      if (new Date(inv.lastUpdated) > new Date(existing.lastUpdated)) {
+        existing.lastUpdated = inv.lastUpdated;
+      }
+    } else {
+      groups.set(key, {
+        bankAccountId: key,
+        accountName: inv.accountName || `Account ${inv.accountNumber}`,
+        accountType: inv.accountType,
+        currency: inv.currency,
+        totalValue: inv.totalValue || 0,
+        totalMarketValue: inv.totalMarketValue || 0,
+        cashBalance: inv.cashBalance || 0,
+        lastUpdated: inv.lastUpdated,
+        holdings: [...inv.holdings]
+      });
+    }
+  }
+
+  return Array.from(groups.values());
+}
+
+interface GroupedAccountItemProps {
+  account: GroupedAccount;
+}
+
+const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account }) => {
+  const [expanded, setExpanded] = React.useState(false);
 
   const formatLastUpdated = (date: Date) => {
     const now = new Date();
@@ -85,12 +126,12 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
         <Box sx={{ flex: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              {investment.accountName || `Account ${investment.accountNumber}`}
+              {account.accountName}
             </Typography>
             <Chip
-              label={investment.accountType}
+              label={account.accountType}
               size="small"
-              color={getAccountTypeColor(investment.accountType) as any}
+              color={getAccountTypeColor(account.accountType) as any}
               variant="outlined"
             />
           </Box>
@@ -98,17 +139,17 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
           <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                {formatCurrency(investment.totalValue, investment.currency)}
+                {formatCurrency(account.totalValue, account.currency)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Total Value
               </Typography>
             </Box>
             
-            {investment.totalMarketValue > 0 && (
+            {account.totalMarketValue > 0 && (
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {formatCurrency(investment.totalMarketValue, investment.currency)}
+                  {formatCurrency(account.totalMarketValue, account.currency)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Investments
@@ -116,10 +157,10 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
               </Box>
             )}
             
-            {investment.cashBalance > 0 && (
+            {account.cashBalance > 0 && (
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {formatCurrency(investment.cashBalance, investment.currency)}
+                  {formatCurrency(account.cashBalance, account.currency)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Cash
@@ -131,12 +172,12 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="caption" color="text.secondary">
-            {formatLastUpdated(investment.lastUpdated)}
+            {formatLastUpdated(account.lastUpdated)}
           </Typography>
           
-          {investment.holdings.length > 0 && (
+          {account.holdings.length > 0 && (
             <Tooltip title={expanded ? 'Hide holdings' : 'Show holdings'}>
-              <IconButton onClick={handleExpandClick} size="small">
+              <IconButton onClick={() => setExpanded(!expanded)} size="small">
                 {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
               </IconButton>
             </Tooltip>
@@ -145,16 +186,16 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
       </Box>
 
       {/* Holdings Details */}
-      {investment.holdings.length > 0 && (
+      {account.holdings.length > 0 && (
         <Collapse in={expanded} timeout="auto" unmountOnExit>
           <Divider sx={{ my: 1 }} />
           <Box sx={{ px: 1, pb: 1 }}>
             <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-              Holdings ({investment.holdings.length})
+              Holdings ({account.holdings.length})
             </Typography>
             
             <Box sx={{ display: 'grid', gap: 1 }}>
-              {investment.holdings.map((holding, index) => (
+              {account.holdings.map((holding, index) => (
                 <Box
                   key={`${holding.symbol}-${index}`}
                   sx={{
@@ -181,7 +222,7 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
                       </Typography>
                       {holding.price && (
                         <Typography variant="caption">
-                          Price: {formatCurrency(holding.price)}
+                          Price: {formatCurrency(holding.price, holding.currency || account.currency)}
                         </Typography>
                       )}
                       {holding.sector && (
@@ -198,7 +239,7 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
                   <Box sx={{ textAlign: 'right' }}>
                     {holding.marketValue && (
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(holding.marketValue, holding.currency || investment.currency)}
+                        {formatCurrency(holding.marketValue, holding.currency || account.currency)}
                       </Typography>
                     )}
                     <Chip
@@ -224,7 +265,9 @@ export const InvestmentAccountList: React.FC<InvestmentAccountListProps> = ({
   onRefresh
 }) => {
   const activeInvestments = investments.filter(inv => inv.status === 'active');
-  const totalValue = activeInvestments.reduce((sum, inv) => sum + inv.totalValue, 0);
+  const grouped = groupByBankAccount(activeInvestments);
+  const totalValue = grouped.reduce((sum, g) => sum + g.totalValue, 0);
+  const currency = grouped.length === 1 ? grouped[0].currency : undefined;
 
   return (
     <Card>
@@ -237,7 +280,7 @@ export const InvestmentAccountList: React.FC<InvestmentAccountListProps> = ({
               Investment Accounts
             </Typography>
             <Chip
-              label={`${activeInvestments.length} account${activeInvestments.length !== 1 ? 's' : ''}`}
+              label={`${grouped.length} account${grouped.length !== 1 ? 's' : ''}`}
               size="small"
               variant="outlined"
             />
@@ -246,7 +289,7 @@ export const InvestmentAccountList: React.FC<InvestmentAccountListProps> = ({
           {totalValue > 0 && (
             <Box sx={{ textAlign: 'right' }}>
               <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                {formatCurrency(totalValue)}
+                {formatCurrency(totalValue, currency)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Total Value
@@ -256,12 +299,12 @@ export const InvestmentAccountList: React.FC<InvestmentAccountListProps> = ({
         </Box>
 
         {/* Investment List */}
-        {activeInvestments.length > 0 ? (
+        {grouped.length > 0 ? (
           <List sx={{ p: 0 }}>
-            {activeInvestments.map((investment) => (
-              <InvestmentAccountItem
-                key={investment._id}
-                investment={investment}
+            {grouped.map((account) => (
+              <GroupedAccountItem
+                key={account.bankAccountId}
+                account={account}
               />
             ))}
           </List>
