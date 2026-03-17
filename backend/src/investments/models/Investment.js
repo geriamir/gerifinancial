@@ -185,7 +185,8 @@ investmentSchema.statics.getPortfolioSummary = async function(userId) {
         totalMarketValue: { $sum: '$totalMarketValue' },
         totalCashBalance: { $sum: '$cashBalance' },
         accountCount: { $sum: 1 },
-        lastUpdated: { $max: '$lastUpdated' }
+        lastUpdated: { $max: '$lastUpdated' },
+        currencies: { $addToSet: '$currency' }
       }
     },
     {
@@ -196,20 +197,27 @@ investmentSchema.statics.getPortfolioSummary = async function(userId) {
         totalCashBalance: 1,
         totalValue: { $add: ['$totalBalance', '$totalMarketValue', '$totalCashBalance'] },
         accountCount: 1,
-        lastUpdated: 1
+        lastUpdated: 1,
+        currencies: 1
       }
     }
   ];
 
   const result = await this.aggregate(pipeline);
-  return result[0] || {
+  const summary = result[0] || {
     totalBalance: 0,
     totalMarketValue: 0,
     totalCashBalance: 0,
     totalValue: 0,
     accountCount: 0,
-    lastUpdated: null
+    lastUpdated: null,
+    currencies: []
   };
+
+  // Use single currency if all accounts share one, otherwise default to ILS
+  summary.currency = summary.currencies?.length === 1 ? summary.currencies[0] : 'ILS';
+  delete summary.currencies;
+  return summary;
 };
 
 // Static method to get holdings summary across all accounts

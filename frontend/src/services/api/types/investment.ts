@@ -48,6 +48,7 @@ export interface PortfolioSummary {
   totalCashBalance: number;
   totalValue: number;
   accountCount: number;
+  currency?: string;
   lastUpdated: Date | null;
   topHoldings: Array<{
     symbol: string;
