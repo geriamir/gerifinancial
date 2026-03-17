@@ -60,7 +60,7 @@ const investmentTransactionSchema = new mongoose.Schema({
     required: true,
     validate: {
       validator: function(v) {
-        return typeof v === 'number' && !isNaN(v) && v >= 0;
+        return typeof v === 'number' && !isNaN(v) && isFinite(v);
       },
       message: props => `${props.value} is not a valid transaction value!`
     }
