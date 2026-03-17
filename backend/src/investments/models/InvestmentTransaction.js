@@ -111,6 +111,13 @@ const investmentTransactionSchema = new mongoose.Schema({
   rawData: {
     type: mongoose.Schema.Types.Mixed,
     required: false
+  },
+  
+  // External unique ID from source (e.g., IBKR tradeId)
+  externalId: {
+    type: String,
+    required: false,
+    index: true
   }
 }, {
   timestamps: true
@@ -131,6 +138,12 @@ investmentTransactionSchema.index({
   amount: 1, 
   value: 1 
 }, { unique: true });
+
+// Unique constraint on external source ID (e.g., IBKR tradeId)
+investmentTransactionSchema.index(
+  { userId: 1, bankAccountId: 1, externalId: 1 },
+  { unique: true, sparse: true }
+);
 
 // Virtual for transaction direction (buy/sell indicator)
 investmentTransactionSchema.virtual('direction').get(function() {

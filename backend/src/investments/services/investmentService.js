@@ -569,14 +569,24 @@ class InvestmentService {
         }
 
         // Check for existing transaction to prevent duplicates
-        const existingTransaction = await InvestmentTransaction.findOne({
-          userId: bankAccount.userId,
-          investmentId: matchingInvestment._id,
-          paperId: transactionData.paperId,
-          executionDate: transactionData.executionDate,
-          amount: transactionData.amount,
-          value: transactionData.value
-        });
+        let existingTransaction;
+        if (transactionData.externalId) {
+          existingTransaction = await InvestmentTransaction.findOne({
+            userId: bankAccount.userId,
+            bankAccountId: bankAccount._id,
+            externalId: transactionData.externalId
+          });
+        }
+        if (!existingTransaction) {
+          existingTransaction = await InvestmentTransaction.findOne({
+            userId: bankAccount.userId,
+            investmentId: matchingInvestment._id,
+            paperId: transactionData.paperId,
+            executionDate: transactionData.executionDate,
+            amount: transactionData.amount,
+            value: transactionData.value
+          });
+        }
 
         if (existingTransaction) {
           results.duplicatesSkipped++;
@@ -608,6 +618,7 @@ class InvestmentService {
           
           // Derived fields
           transactionType: transactionType,
+          externalId: transactionData.externalId || undefined,
           rawData: transactionData.rawData
         });
 

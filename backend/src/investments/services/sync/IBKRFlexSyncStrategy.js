@@ -176,6 +176,7 @@ class IBKRFlexSyncStrategy extends BaseSyncStrategy {
         currency: trade.currency || bankAccount.defaultCurrency || 'USD',
         executionDate: new Date(this.parseDate(trade.tradeDate || trade.dateTime)),
         executablePrice: price,
+        externalId: trade.tradeID || trade.transactionID || null,
         rawData: trade
       });
     }
@@ -194,6 +195,7 @@ class IBKRFlexSyncStrategy extends BaseSyncStrategy {
         currency: ct.currency || bankAccount.defaultCurrency || 'USD',
         executionDate: new Date(this.parseDate(ct.reportDate || ct.dateTime)),
         executablePrice: 0,
+        externalId: ct.transactionID || null,
         rawData: ct
       });
     }
