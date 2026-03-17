@@ -1,5 +1,6 @@
 const { Investment, InvestmentSnapshot, InvestmentTransaction } = require('../models');
 const INVESTMENT_CONSTANTS = require('../constants/investmentConstants');
+const mongoose = require('mongoose');
 const logger = require('../../shared/utils/logger');
 const { bankScraperService } = require('../../banking');
 
@@ -236,9 +237,19 @@ class InvestmentService {
       const summary = await Investment.getPortfolioSummary(userId);
       const holdings = await Investment.getHoldingsSummary(userId);
       
+      // Include portfolio-level cash from Portfolio documents
+      const Portfolio = require('../models/Portfolio');
+      const cashAgg = await Portfolio.aggregate([
+        { $match: { userId: new mongoose.Types.ObjectId(userId), status: 'active' } },
+        { $group: { _id: null, totalCash: { $sum: '$cashBalance' } } }
+      ]);
+      const portfolioCash = cashAgg[0]?.totalCash || 0;
+      summary.totalCashBalance = portfolioCash;
+      summary.totalValue = summary.totalBalance + summary.totalMarketValue + portfolioCash;
+      
       return {
         ...summary,
-        topHoldings: holdings.slice(0, 10), // Top 10 holdings by value
+        topHoldings: holdings.slice(0, 10),
         totalHoldings: holdings.length
       };
     } catch (error) {
