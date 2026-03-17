@@ -556,7 +556,7 @@ class InvestmentService {
           userId: bankAccount.userId,
           investmentId: matchingInvestment._id,
           bankAccountId: bankAccount._id,
-          portfolioId: transactionData.portfolioId,
+          portfolioId: transactionData.portfolioId || matchingInvestment.portfolioId?.toString() || matchingInvestment.externalPortfolioId,
           
           // Security identification
           paperId: transactionData.paperId,
