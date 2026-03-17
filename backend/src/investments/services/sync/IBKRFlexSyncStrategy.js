@@ -112,7 +112,13 @@ class IBKRFlexSyncStrategy extends BaseSyncStrategy {
         holdingType: this.mapAssetClass(pos.assetCategory || pos.assetClass),
         currency: pos.currency || currency,
         isin: pos.isin || null,
-        exchange: pos.listingExchange || null
+        exchange: pos.listingExchange || null,
+        // Option-specific fields
+        underlyingSymbol: pos.underlyingSymbol || null,
+        strikePrice: pos.strike ? parseFloat(pos.strike) : null,
+        expirationDate: pos.expiry ? this.parseDate(pos.expiry) : null,
+        putCall: pos.putCall === 'C' ? 'CALL' : pos.putCall === 'P' ? 'PUT' : null,
+        multiplier: pos.multiplier ? parseFloat(pos.multiplier) : null
       };
     });
 

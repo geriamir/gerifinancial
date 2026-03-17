@@ -35,7 +35,13 @@ const holdingSchema = new mongoose.Schema({
     type: String,
     enum: Object.values(INVESTMENT_CONSTANTS.HOLDING_TYPES),
     default: INVESTMENT_CONSTANTS.HOLDING_TYPES.STOCK
-  }
+  },
+  // Option-specific fields
+  underlyingSymbol: { type: String },
+  strikePrice: { type: Number },
+  expirationDate: { type: Date },
+  putCall: { type: String, enum: ['CALL', 'PUT'] },
+  multiplier: { type: Number }
 }, { _id: false });
 
 const investmentSchema = new mongoose.Schema({

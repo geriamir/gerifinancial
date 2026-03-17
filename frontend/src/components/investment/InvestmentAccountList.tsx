@@ -203,62 +203,89 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account }) => {
             </Typography>
             
             <Box sx={{ display: 'grid', gap: 1 }}>
-              {account.holdings.map((holding, index) => (
-                <Box
-                  key={`${holding.symbol}-${index}`}
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    p: 1,
-                    backgroundColor: 'grey.50',
-                    borderRadius: 1
-                  }}
-                >
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {holding.symbol}
-                    </Typography>
-                    {holding.name && (
-                      <Typography variant="caption" color="text.secondary">
-                        {holding.name}
-                      </Typography>
-                    )}
-                    <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
-                      <Typography variant="caption">
-                        Qty: {holding.quantity.toLocaleString()}
-                      </Typography>
-                      {holding.price && (
-                        <Typography variant="caption">
-                          Price: {formatCurrency(holding.price, holding.currency || account.currency)}
+              {account.holdings.map((holding, index) => {
+                const isOption = holding.holdingType === 'option';
+                const isShort = holding.quantity < 0;
+                const displaySymbol = isOption && holding.underlyingSymbol
+                  ? holding.underlyingSymbol
+                  : holding.symbol;
+
+                const formatExpiry = (dateStr?: string) => {
+                  if (!dateStr) return '';
+                  const d = new Date(dateStr);
+                  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' });
+                };
+
+                const optionLabel = isOption
+                  ? `${holding.putCall === 'CALL' ? 'Call' : 'Put'} ${formatCurrency(holding.strikePrice || 0, account.currency)} ${formatExpiry(holding.expirationDate)}`
+                  : null;
+
+                return (
+                  <Box
+                    key={`${holding.symbol}-${index}`}
+                    sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      p: 1,
+                      backgroundColor: 'grey.50',
+                      borderRadius: 1
+                    }}
+                  >
+                    <Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {displaySymbol}
+                        </Typography>
+                        {isShort && (
+                          <Chip label="Short" size="small" color="warning" sx={{ height: 20, fontSize: '0.7rem' }} />
+                        )}
+                      </Box>
+                      {isOption && optionLabel ? (
+                        <Typography variant="caption" color="text.secondary">
+                          {optionLabel}
+                        </Typography>
+                      ) : holding.name && (
+                        <Typography variant="caption" color="text.secondary">
+                          {holding.name}
                         </Typography>
                       )}
-                      {holding.sector && (
-                        <Chip
-                          label={holding.sector}
-                          size="small"
-                          variant="outlined"
-                          sx={{ height: 20, fontSize: '0.7rem' }}
-                        />
+                      <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
+                        <Typography variant="caption">
+                          {isOption ? 'Contracts' : 'Qty'}: {Math.abs(holding.quantity).toLocaleString()}
+                        </Typography>
+                        {holding.price && (
+                          <Typography variant="caption">
+                            Price: {formatCurrency(holding.price, holding.currency || account.currency)}
+                          </Typography>
+                        )}
+                        {holding.sector && (
+                          <Chip
+                            label={holding.sector}
+                            size="small"
+                            variant="outlined"
+                            sx={{ height: 20, fontSize: '0.7rem' }}
+                          />
+                        )}
+                      </Box>
+                    </Box>
+                    
+                    <Box sx={{ textAlign: 'right' }}>
+                      {holding.marketValue != null && (
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {formatCurrency(holding.marketValue, holding.currency || account.currency)}
+                        </Typography>
                       )}
+                      <Chip
+                        label={holding.holdingType}
+                        size="small"
+                        variant="outlined"
+                        sx={{ mt: 0.5 }}
+                      />
                     </Box>
                   </Box>
-                  
-                  <Box sx={{ textAlign: 'right' }}>
-                    {holding.marketValue && (
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(holding.marketValue, holding.currency || account.currency)}
-                      </Typography>
-                    )}
-                    <Chip
-                      label={holding.holdingType}
-                      size="small"
-                      variant="outlined"
-                      sx={{ mt: 0.5 }}
-                    />
-                  </Box>
-                </Box>
-              ))}
+                );
+              })}
             </Box>
           </Box>
         </Collapse>

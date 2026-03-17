@@ -6,7 +6,13 @@ export interface Holding {
   marketValue?: number;
   currency: string;
   sector?: string;
-  holdingType: 'stock' | 'bond' | 'etf' | 'mutual_fund' | 'other';
+  holdingType: 'stock' | 'bond' | 'etf' | 'mutual_fund' | 'option' | 'future' | 'other';
+  // Option-specific fields
+  underlyingSymbol?: string;
+  strikePrice?: number;
+  expirationDate?: string;
+  putCall?: 'CALL' | 'PUT';
+  multiplier?: number;
 }
 
 export interface Investment {

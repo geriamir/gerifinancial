@@ -16,6 +16,8 @@ const INVESTMENT_CONSTANTS = {
     BOND: 'bond',
     ETF: 'etf',
     MUTUAL_FUND: 'mutual_fund',
+    OPTION: 'option',
+    FUTURE: 'future',
     OTHER: 'other'
   },
   STATUS_TYPES: {

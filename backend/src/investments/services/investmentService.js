@@ -47,7 +47,13 @@ class InvestmentService {
           currentPrice: currentPrice,
           marketValue: value,
           currency: investmentData.currency || INVESTMENT_CONSTANTS.DEFAULT_CURRENCY,
-          holdingType: INVESTMENT_CONSTANTS.HOLDING_TYPES.STOCK // Default, could be enhanced based on symbol analysis
+          holdingType: investmentData.holdingType || INVESTMENT_CONSTANTS.HOLDING_TYPES.STOCK,
+          // Option-specific fields (only set when present)
+          ...(investmentData.underlyingSymbol && { underlyingSymbol: investmentData.underlyingSymbol }),
+          ...(investmentData.strikePrice != null && { strikePrice: investmentData.strikePrice }),
+          ...(investmentData.expirationDate && { expirationDate: investmentData.expirationDate }),
+          ...(investmentData.putCall && { putCall: investmentData.putCall }),
+          ...(investmentData.multiplier != null && { multiplier: investmentData.multiplier })
         };
 
         if (existingInvestment) {
