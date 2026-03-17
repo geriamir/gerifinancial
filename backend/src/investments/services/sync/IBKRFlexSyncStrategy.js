@@ -2,7 +2,7 @@ const logger = require('../../../shared/utils/logger');
 const BaseSyncStrategy = require('../../../banking/services/sync-strategies/BaseSyncStrategy');
 const IBKRFlexClient = require('../../../banking/services/ibkrFlexClient');
 const portfolioService = require('../portfolioService');
-const transactionService = require('../../../banking/services/transactionService');
+const investmentService = require('../investmentService');
 
 /**
  * Sync strategy for Interactive Brokers using the Flex Web Service.
@@ -149,48 +149,50 @@ class IBKRFlexSyncStrategy extends BaseSyncStrategy {
   }
 
   /**
-   * Process trades and cash transactions (dividends, interest, fees)
+   * Process trades and cash transactions as investment transactions
    */
   async processTransactions(report, bankAccount) {
-    const scrapedAccounts = [];
-    const txns = [];
+    const investmentTxns = [];
 
-    // Map trades to transaction format
+    // Map trades to investment transaction format
     for (const trade of report.trades) {
-      txns.push({
-        identifier: trade.tradeID || trade.ibOrderID || `trade-${trade.dateTime}-${trade.symbol}`,
-        date: this.parseDate(trade.tradeDate || trade.dateTime),
-        processedDate: this.parseDate(trade.settleDateTarget || trade.tradeDate || trade.dateTime),
-        description: `${trade.buySell || trade.side || ''} ${trade.symbol} x${trade.quantity}`.trim(),
-        memo: trade.description || null,
-        chargedAmount: parseFloat(trade.netCash || trade.proceeds || 0),
-        status: 'completed',
+      const symbol = trade.symbol || trade.description;
+      const quantity = parseFloat(trade.quantity || 0);
+      const price = parseFloat(trade.tradePrice || trade.price || 0);
+      const value = parseFloat(trade.netCash || trade.proceeds || 0);
+
+      investmentTxns.push({
+        paperId: symbol,
+        paperName: trade.description || symbol,
+        symbol,
+        amount: quantity,
+        value,
+        currency: trade.currency || bankAccount.defaultCurrency || 'USD',
+        executionDate: new Date(this.parseDate(trade.tradeDate || trade.dateTime)),
+        executablePrice: price,
         rawData: trade
       });
     }
 
-    // Map cash transactions (dividends, interest, fees, deposits, withdrawals)
+    // Map cash transactions (dividends, interest, fees)
     for (const ct of report.cashTransactions) {
-      txns.push({
-        identifier: ct.transactionID || `cash-${ct.dateTime}-${ct.type}-${ct.symbol || 'account'}`,
-        date: this.parseDate(ct.reportDate || ct.dateTime),
-        processedDate: this.parseDate(ct.settleDate || ct.reportDate || ct.dateTime),
-        description: this.buildCashDescription(ct),
-        memo: ct.description || null,
-        chargedAmount: parseFloat(ct.amount || 0),
-        status: 'completed',
+      const symbol = ct.symbol || 'CASH';
+      const amount = parseFloat(ct.amount || 0);
+
+      investmentTxns.push({
+        paperId: symbol,
+        paperName: this.buildCashDescription(ct),
+        symbol,
+        amount: 0,
+        value: amount,
+        currency: ct.currency || bankAccount.defaultCurrency || 'USD',
+        executionDate: new Date(this.parseDate(ct.reportDate || ct.dateTime)),
+        executablePrice: 0,
         rawData: ct
       });
     }
 
-    if (txns.length > 0) {
-      scrapedAccounts.push({
-        accountNumber: bankAccount.name || 'IBKR',
-        txns
-      });
-    }
-
-    return transactionService.processScrapedTransactions(scrapedAccounts, bankAccount);
+    return investmentService.processPortfolioTransactions(investmentTxns, bankAccount);
   }
 
   buildCashDescription(ct) {
