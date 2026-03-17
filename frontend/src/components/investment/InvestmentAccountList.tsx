@@ -42,7 +42,10 @@ function groupByBankAccount(investments: Investment[]): GroupedAccount[] {
   const groups = new Map<string, GroupedAccount>();
 
   for (const inv of investments) {
-    const key = inv.bankAccountId;
+    // bankAccountId may be a populated object or a plain string
+    const key = typeof inv.bankAccountId === 'object'
+      ? (inv.bankAccountId as any)._id
+      : inv.bankAccountId;
     const existing = groups.get(key);
 
     if (existing) {
@@ -54,9 +57,12 @@ function groupByBankAccount(investments: Investment[]): GroupedAccount[] {
         existing.lastUpdated = inv.lastUpdated;
       }
     } else {
+      const bankName = typeof inv.bankAccountId === 'object'
+        ? (inv.bankAccountId as any).name
+        : undefined;
       groups.set(key, {
         bankAccountId: key,
-        accountName: inv.accountName || `Account ${inv.accountNumber}`,
+        accountName: bankName || inv.accountName || `Account ${inv.accountNumber}`,
         accountType: inv.accountType,
         currency: inv.currency,
         totalValue: inv.totalValue || 0,
