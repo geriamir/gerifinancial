@@ -12,8 +12,7 @@ const portfolioInvestmentSchema = new mongoose.Schema({
   },
   quantity: {
     type: Number,
-    required: true,
-    min: 0
+    required: true
   },
   currentPrice: {
     type: Number,
@@ -22,8 +21,7 @@ const portfolioInvestmentSchema = new mongoose.Schema({
   },
   marketValue: {
     type: Number,
-    required: false,
-    min: 0
+    required: false
   },
   currency: {
     type: String,
@@ -88,12 +86,10 @@ const portfolioSchema = new mongoose.Schema({
   totalValue: {
     type: Number,
     required: true,
-    min: 0,
     default: 0
   },
   totalMarketValue: {
     type: Number,
-    min: 0,
     default: 0
   },
   cashBalance: {
