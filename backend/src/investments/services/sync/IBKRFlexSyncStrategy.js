@@ -45,7 +45,7 @@ class IBKRFlexSyncStrategy extends BaseSyncStrategy {
       );
 
       const report = await client.fetchReport();
-      logger.info(`IBKR Flex report fetched: ${report.openPositions.length} positions, ${report.trades.length} trades, ${report.cashTransactions.length} cash transactions`);
+      logger.info(`IBKR Flex report fetched: ${report.openPositions.length} positions, ${report.trades.length} trades, ${report.cashTransactions.length} cash transactions, ${report.cashReport.length} cash report rows, equitySummary: ${!!report.equitySummary}`);
 
       // Process positions into portfolios
       const portfolioData = this.mapPositionsToPortfolio(report, bankAccount);
@@ -117,9 +117,23 @@ class IBKRFlexSyncStrategy extends BaseSyncStrategy {
     });
 
     const totalValue = investments.reduce((sum, inv) => sum + inv.marketValue, 0);
-    const cashBalance = report.equitySummary
-      ? parseFloat(report.equitySummary.cash || report.equitySummary.totalCash || 0)
-      : 0;
+
+    // Extract cash balance from equity summary or cash report
+    let cashBalance = 0;
+    if (report.equitySummary) {
+      const es = report.equitySummary;
+      cashBalance = parseFloat(es.cash || es.cashValue || es.totalCash || es.totalCashValue || 0);
+    } else if (report.cashReport && report.cashReport.length > 0) {
+      // Cash report has per-currency rows; sum endingCash (or endingSettledCash) for the base currency
+      for (const row of report.cashReport) {
+        const amount = parseFloat(row.endingCash || row.endingSettledCash || row.clientFees || 0);
+        if (amount && (row.currency === currency || row.currency === 'BASE_SUMMARY')) {
+          cashBalance = amount;
+          break;
+        }
+      }
+    }
+    logger.info(`IBKR cash balance: ${cashBalance}`);
 
     return [{
       portfolioId: accountId,

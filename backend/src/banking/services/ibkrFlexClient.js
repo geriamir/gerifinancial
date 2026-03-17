@@ -91,11 +91,14 @@ class IBKRFlexClient {
     const response = parsed.FlexQueryResponse || parsed;
     const statement = response.FlexStatements?.FlexStatement || {};
 
+    logger.info(`IBKR Flex report sections: ${Object.keys(statement).join(', ')}`);
+
     return {
       accountInfo: this.extractSection(statement.AccountInformation),
       openPositions: this.extractArray(statement.OpenPositions?.OpenPosition),
       trades: this.extractArray(statement.Trades?.Trade),
       cashTransactions: this.extractArray(statement.CashTransactions?.CashTransaction),
+      cashReport: this.extractArray(statement.CashReport?.CashReportCurrency),
       equitySummary: this.extractSection(statement.EquitySummaryInDefault?.EquitySummaryByReportDateInBase)
     };
   }
