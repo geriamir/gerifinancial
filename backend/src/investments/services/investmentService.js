@@ -249,6 +249,86 @@ class InvestmentService {
     return result;
   }
 
+  // Returns price history and buy/sell events for a holding timeline chart
+  async getHoldingTimeline(userId, symbol, days = 365) {
+    const StockPrice = require('../models/StockPrice');
+    const upperSymbol = symbol.toUpperCase();
+
+    // Get ALL transactions for this symbol to compute position over time
+    const allTransactions = await InvestmentTransaction.find({
+      userId,
+      symbol: upperSymbol
+    }).sort({ executionDate: 1 }).lean();
+
+    if (allTransactions.length === 0) {
+      return { symbol: upperSymbol, priceHistory: [], events: [], days };
+    }
+
+    // Start date is the first transaction
+    const firstTxDate = new Date(allTransactions[0].executionDate);
+    firstTxDate.setHours(0, 0, 0, 0);
+
+    // Build cumulative position timeline from transactions
+    const positionChanges = allTransactions.map(t => ({
+      date: new Date(t.executionDate).toISOString().split('T')[0],
+      amount: t.amount // positive for buy, negative for sell
+    }));
+
+    // Get daily price history starting from first transaction
+    let prices = await StockPrice.find({
+      symbol: upperSymbol,
+      date: { $gte: firstTxDate },
+      isActive: true
+    }).sort({ date: 1 }).lean();
+
+    // If no prices, try to populate via stockPriceService
+    if (prices.length === 0) {
+      try {
+        const stockPriceService = require('../../rsu/services/stockPriceService');
+        await stockPriceService.populateHistoricalPrices(upperSymbol, firstTxDate, new Date());
+        prices = await StockPrice.find({
+          symbol: upperSymbol,
+          date: { $gte: firstTxDate },
+          isActive: true
+        }).sort({ date: 1 }).lean();
+      } catch (err) {
+        logger.warn(`Could not populate historical prices for ${upperSymbol}: ${err.message}`);
+      }
+    }
+
+    // Build position quantity at each date
+    let cumulativeQty = 0;
+    let txIdx = 0;
+
+    const priceHistory = prices.map(p => {
+      const dateKey = new Date(p.date).toISOString().split('T')[0];
+
+      // Apply all transactions up to and including this date
+      while (txIdx < positionChanges.length && positionChanges[txIdx].date <= dateKey) {
+        cumulativeQty += positionChanges[txIdx].amount;
+        txIdx++;
+      }
+
+      return {
+        date: p.date,
+        price: p.price,
+        quantity: cumulativeQty,
+        holdingValue: cumulativeQty * p.price
+      };
+    });
+
+    const events = allTransactions.map(t => ({
+      date: t.executionDate,
+      type: t.transactionType,
+      shares: Math.abs(t.amount),
+      pricePerShare: t.executablePrice,
+      value: t.value,
+      symbol: t.symbol
+    }));
+
+    return { symbol: upperSymbol, priceHistory, events, days };
+  }
+
   async getInvestmentById(investmentId, userId) {
     try {
       const investment = await Investment.findOne({ 

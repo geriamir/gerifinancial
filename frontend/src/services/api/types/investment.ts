@@ -26,6 +26,29 @@ export interface HoldingPriceData {
 
 export type HoldingsPriceData = Record<string, HoldingPriceData>;
 
+export interface TimelinePricePoint {
+  date: string;
+  price: number;
+  quantity: number;
+  holdingValue: number;
+}
+
+export interface TimelineEvent {
+  date: string;
+  type: 'BUY' | 'SELL' | 'DIVIDEND' | 'OTHER';
+  shares: number;
+  pricePerShare: number;
+  value: number;
+  symbol: string;
+}
+
+export interface HoldingTimeline {
+  symbol: string;
+  priceHistory: TimelinePricePoint[];
+  events: TimelineEvent[];
+  days: number;
+}
+
 export interface Investment {
   _id: string;
   userId: string;
