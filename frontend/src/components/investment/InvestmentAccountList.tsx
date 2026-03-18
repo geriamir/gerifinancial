@@ -234,15 +234,6 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
                       const lookupSymbol = posSymbol;
                       const displaySymbol = posSymbol;
 
-                      // Gain/loss from cost basis (stock only)
-                      const mktValue = holding.marketValue || 0;
-                      const costBasis = holding.costBasis;
-                      const gainLoss = costBasis != null ? mktValue - costBasis : null;
-                      const gainLossPercent = costBasis != null && costBasis !== 0
-                        ? ((mktValue - costBasis) / Math.abs(costBasis)) * 100
-                        : null;
-                      const isGain = gainLoss != null && gainLoss >= 0;
-
                       // Daily price change
                       const priceData = holdingsPriceData[lookupSymbol];
                       const dailyChange = priceData?.change || 0;
@@ -252,9 +243,20 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
 
                       // Use market price from StockPrice service, not IBKR sync snapshot
                       const currentPrice = priceData?.price ?? holding.currentPrice;
+                      const costBasis = holding.costBasis;
                       const avgCost = costBasis != null && holding.quantity !== 0
                         ? Math.abs(costBasis) / Math.abs(holding.quantity)
                         : null;
+
+                      // Compute market value and gain/loss from live price
+                      const mktValue = currentPrice != null
+                        ? currentPrice * Math.abs(holding.quantity)
+                        : (holding.marketValue || 0);
+                      const gainLoss = costBasis != null ? mktValue - costBasis : null;
+                      const gainLossPercent = costBasis != null && costBasis !== 0
+                        ? ((mktValue - costBasis) / Math.abs(costBasis)) * 100
+                        : null;
+                      const isGain = gainLoss != null && gainLoss >= 0;
 
                       const isSelected = selectedSymbol === lookupSymbol;
 
