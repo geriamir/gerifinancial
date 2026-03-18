@@ -176,6 +176,23 @@ router.get('/holdings/:symbol/history', async (req, res) => {
   }
 });
 
+// Get holding timeline: stock price history + buy/sell events
+router.get('/holdings/:symbol/timeline', async (req, res) => {
+  try {
+    const { days = 365 } = req.query;
+    const symbol = req.params.symbol.toUpperCase();
+    const timeline = await investmentService.getHoldingTimeline(
+      req.user.id,
+      symbol,
+      parseInt(days)
+    );
+    res.json(timeline);
+  } catch (error) {
+    logger.error('Error fetching holding timeline:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get investments by bank account
 router.get('/by-bank/:bankAccountId', async (req, res) => {
   try {

@@ -21,6 +21,7 @@ import {
 } from '@mui/icons-material';
 import { Investment, Holding, PortfolioCashBalances, HoldingsPriceData } from '../../services/api/types/investment';
 import { formatCurrency } from '../../utils/formatters';
+import { HoldingTimelineChart } from './HoldingTimelineChart';
 
 interface InvestmentAccountListProps {
   investments: Investment[];
@@ -89,6 +90,7 @@ interface GroupedAccountItemProps {
 
 const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdingsPriceData }) => {
   const [expanded, setExpanded] = React.useState(false);
+  const [selectedSymbol, setSelectedSymbol] = React.useState<string | null>(null);
 
   const formatLastUpdated = (date: Date) => {
     const now = new Date();
@@ -241,18 +243,23 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
                 const hasDailyChange = priceData != null && dailyChange !== 0;
                 const isDailyGain = dailyChange >= 0;
 
+                const isSelected = selectedSymbol === lookupSymbol;
+
                 return (
-                  <Box
-                    key={`${holding.symbol}-${index}`}
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      p: 1.5,
-                      backgroundColor: 'grey.50',
-                      borderRadius: 1
-                    }}
-                  >
+                  <Box key={`${holding.symbol}-${index}`}>
+                    <Box
+                      onClick={() => !isOption && setSelectedSymbol(isSelected ? null : lookupSymbol)}
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        p: 1.5,
+                        backgroundColor: isSelected ? 'action.selected' : 'grey.50',
+                        borderRadius: 1,
+                        cursor: isOption ? 'default' : 'pointer',
+                        '&:hover': !isOption ? { backgroundColor: 'action.hover' } : {}
+                      }}
+                    >
                     {/* Left: Symbol, name, quantity */}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -343,6 +350,13 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
                         </Typography>
                       )}
                     </Box>
+                    </Box>
+                    {/* Timeline chart for selected holding */}
+                    {isSelected && (
+                      <Box sx={{ p: 1.5, pt: 0 }}>
+                        <HoldingTimelineChart symbol={lookupSymbol} currency={account.currency} />
+                      </Box>
+                    )}
                   </Box>
                 );
               })}

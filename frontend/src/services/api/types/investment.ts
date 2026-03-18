@@ -42,10 +42,20 @@ export interface TimelineEvent {
   symbol: string;
 }
 
+export interface CoveredCall {
+  strikePrice: number;
+  expirationDate: string;
+  putCall: 'CALL' | 'PUT';
+  contracts: number;
+  multiplier: number;
+  symbol: string;
+}
+
 export interface HoldingTimeline {
   symbol: string;
   priceHistory: TimelinePricePoint[];
   events: TimelineEvent[];
+  coveredCalls: CoveredCall[];
   days: number;
 }
 

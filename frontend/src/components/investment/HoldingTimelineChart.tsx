@@ -14,10 +14,11 @@ import {
   YAxis,
   CartesianGrid,
   ResponsiveContainer,
-  Tooltip
+  Tooltip,
+  ReferenceLine
 } from 'recharts';
 import { investmentApi } from '../../services/api/investments';
-import { HoldingTimeline, TimelineEvent } from '../../services/api/types/investment';
+import { HoldingTimeline, TimelineEvent, CoveredCall } from '../../services/api/types/investment';
 import { formatCurrency } from '../../utils/formatters';
 
 interface HoldingTimelineChartProps {
@@ -28,9 +29,9 @@ interface HoldingTimelineChartProps {
 interface ChartDataPoint {
   date: string;
   dateLabel: string;
-  holdingValue: number | null;
   price: number | null;
   quantity: number;
+  holdingValue: number | null;
   buyEvent?: TimelineEvent;
   sellEvent?: TimelineEvent;
   dividendEvent?: TimelineEvent;
@@ -44,6 +45,11 @@ const TIMEFRAMES = [
   { label: 'ALL', days: 0 }
 ];
 
+const formatExpiry = (dateStr: string) => {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' });
+};
+
 const CustomTooltip = ({ active, payload, currency }: any) => {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0]?.payload as ChartDataPoint;
@@ -54,14 +60,14 @@ const CustomTooltip = ({ active, payload, currency }: any) => {
   return (
     <Card sx={{ p: 1.5, maxWidth: 280 }}>
       <Typography variant="caption" color="text.secondary">{data.dateLabel}</Typography>
-      {data.holdingValue != null && (
+      {data.price != null && (
         <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>
-          Value: {formatCurrency(data.holdingValue, currency)}
+          {formatCurrency(data.price, currency)} / share
         </Typography>
       )}
-      {data.price != null && (
+      {data.holdingValue != null && data.quantity > 0 && (
         <Typography variant="caption" display="block" color="text.secondary">
-          {data.quantity} shares × {formatCurrency(data.price, currency)}
+          {data.quantity} shares · {formatCurrency(data.holdingValue, currency)} total
         </Typography>
       )}
       {events.map((evt, i) => (
@@ -102,7 +108,6 @@ const EventDot = (props: any) => {
     <g>
       <circle cx={cx} cy={cy} r={size + 2} fill={color} opacity={0.2} />
       <circle cx={cx} cy={cy} r={size} fill={color} stroke="white" strokeWidth={2} />
-      {/* Show both colors for same-day buy+sell */}
       {hasBuy && hasSell && (
         <circle cx={cx} cy={cy} r={3} fill="#f44336" />
       )}
@@ -201,13 +206,29 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
     return points;
   }, [timeline, timeframe]);
 
-  const valueRange = useMemo(() => {
-    const values = chartData.filter(d => d.holdingValue != null).map(d => d.holdingValue!);
-    if (values.length === 0) return { min: 0, max: 100 };
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const padding = (max - min) * 0.1 || 5;
-    return { min: Math.floor(min - padding), max: Math.ceil(max + padding) };
+  const priceRange = useMemo(() => {
+    const prices = chartData.filter(d => d.price != null).map(d => d.price!);
+    if (prices.length === 0) return { min: 0, max: 100 };
+
+    // Include strike prices in range calculation
+    const strikes = (timeline?.coveredCalls || []).map(cc => cc.strikePrice);
+    const allValues = [...prices, ...strikes];
+    const rangeMin = Math.min(...allValues);
+    const rangeMax = Math.max(...allValues);
+
+    const padding = (rangeMax - rangeMin) * 0.1 || 5;
+    return { min: Math.floor(rangeMin - padding), max: Math.ceil(rangeMax + padding) };
+  }, [chartData, timeline]);
+
+  // Current position summary from latest data point
+  const currentPosition = useMemo(() => {
+    const latest = [...chartData].reverse().find(d => d.price != null && d.quantity > 0);
+    if (!latest) return null;
+    return {
+      quantity: latest.quantity,
+      price: latest.price!,
+      totalValue: latest.holdingValue!
+    };
   }, [chartData]);
 
   if (loading) {
@@ -234,13 +255,22 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
     );
   }
 
+  const coveredCalls: CoveredCall[] = timeline?.coveredCalls || [];
+
   return (
     <Box>
-      {/* Header with timeframe selector */}
+      {/* Header with position summary and timeframe selector */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          {symbol} Holding Value
-        </Typography>
+        <Box>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+            {symbol} Price
+          </Typography>
+          {currentPosition && (
+            <Typography variant="caption" color="text.secondary">
+              {currentPosition.quantity} shares · {formatCurrency(currentPosition.totalValue, currency)} total
+            </Typography>
+          )}
+        </Box>
         <ToggleButtonGroup
           value={timeframe}
           exclusive
@@ -266,15 +296,31 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
             minTickGap={50}
           />
           <YAxis
-            domain={[valueRange.min, valueRange.max]}
+            domain={[priceRange.min, priceRange.max]}
             tick={{ fontSize: 11 }}
-            tickFormatter={(v: number) => v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`}
-            width={60}
+            tickFormatter={(v: number) => `$${v}`}
+            width={55}
           />
           <Tooltip content={<CustomTooltip currency={currency} />} />
+          {/* Covered call strike lines */}
+          {coveredCalls.map((cc, i) => (
+            <ReferenceLine
+              key={`cc-${i}`}
+              y={cc.strikePrice}
+              stroke="#ff9800"
+              strokeDasharray="6 3"
+              strokeWidth={2}
+              label={{
+                value: `Call $${cc.strikePrice} (exp ${formatExpiry(cc.expirationDate)})`,
+                position: 'right',
+                fill: '#ff9800',
+                fontSize: 11
+              }}
+            />
+          ))}
           <Line
             type="monotone"
-            dataKey="holdingValue"
+            dataKey="price"
             stroke="#2196f3"
             strokeWidth={2}
             dot={<EventDot />}
@@ -285,7 +331,7 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
       </ResponsiveContainer>
 
       {/* Legend */}
-      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 1 }}>
+      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 1, flexWrap: 'wrap' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
           <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#4caf50' }} />
           <Typography variant="caption">Buy</Typography>
@@ -298,6 +344,12 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
           <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: '#2196f3' }} />
           <Typography variant="caption">Dividend</Typography>
         </Box>
+        {coveredCalls.length > 0 && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box sx={{ width: 16, height: 2, bgcolor: '#ff9800', borderTop: '2px dashed #ff9800' }} />
+            <Typography variant="caption">Covered Call</Typography>
+          </Box>
+        )}
       </Box>
     </Box>
   );

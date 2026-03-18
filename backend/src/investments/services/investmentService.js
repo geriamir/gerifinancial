@@ -326,7 +326,28 @@ class InvestmentService {
       symbol: t.symbol
     }));
 
-    return { symbol: upperSymbol, priceHistory, events, days };
+    // Find covered calls (option holdings on this underlying symbol)
+    const investments = await Investment.find({ userId }).lean();
+    const coveredCalls = [];
+    for (const inv of investments) {
+      if (!inv.holdings) continue;
+      for (const h of inv.holdings) {
+        if (h.holdingType === 'option' && h.underlyingSymbol &&
+            h.underlyingSymbol.toUpperCase() === upperSymbol &&
+            h.putCall === 'CALL' && h.quantity < 0) {
+          coveredCalls.push({
+            strikePrice: h.strikePrice,
+            expirationDate: h.expirationDate,
+            putCall: h.putCall,
+            contracts: Math.abs(h.quantity),
+            multiplier: h.multiplier || 100,
+            symbol: h.symbol
+          });
+        }
+      }
+    }
+
+    return { symbol: upperSymbol, priceHistory, events, coveredCalls, days };
   }
 
   async getInvestmentById(investmentId, userId) {

@@ -9,7 +9,8 @@ import {
   SyncResult,
   InvestmentFilters,
   PortfolioCashBalances,
-  HoldingsPriceData
+  HoldingsPriceData,
+  HoldingTimeline
 } from './types/investment';
 
 
@@ -94,5 +95,11 @@ export const investmentApi = {
   deleteInvestment: async (investmentId: string): Promise<Investment> => {
     const response = await api.delete<{ investment: Investment }>(`/investments/${investmentId}`);
     return response.data.investment;
+  },
+
+  // Get holding timeline (price history + buy/sell events)
+  getHoldingTimeline: async (symbol: string, days: number = 365): Promise<HoldingTimeline> => {
+    const response = await api.get<HoldingTimeline>(`/investments/holdings/${encodeURIComponent(symbol)}/timeline?days=${days}`);
+    return response.data;
   }
 };
