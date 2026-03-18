@@ -335,13 +335,21 @@ class InvestmentService {
         if (h.holdingType === 'option' && h.underlyingSymbol &&
             h.underlyingSymbol.toUpperCase() === upperSymbol &&
             h.putCall === 'CALL' && h.quantity < 0) {
+          // Find when the option was sold
+          const optionTx = await InvestmentTransaction.findOne({
+            userId,
+            symbol: h.symbol,
+            transactionType: 'SELL'
+          }).sort({ executionDate: 1 }).lean();
+
           coveredCalls.push({
             strikePrice: h.strikePrice,
             expirationDate: h.expirationDate,
             putCall: h.putCall,
             contracts: Math.abs(h.quantity),
             multiplier: h.multiplier || 100,
-            symbol: h.symbol
+            symbol: h.symbol,
+            sellDate: optionTx ? optionTx.executionDate : null
           });
         }
       }

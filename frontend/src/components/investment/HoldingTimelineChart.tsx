@@ -15,10 +15,9 @@ import {
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
-  ReferenceLine
 } from 'recharts';
 import { investmentApi } from '../../services/api/investments';
-import { HoldingTimeline, TimelineEvent, CoveredCall } from '../../services/api/types/investment';
+import { HoldingTimeline, TimelineEvent } from '../../services/api/types/investment';
 import { formatCurrency } from '../../utils/formatters';
 
 interface HoldingTimelineChartProps {
@@ -30,6 +29,8 @@ interface ChartDataPoint {
   date: string;
   dateLabel: string;
   price: number | null;
+  projectedPrice: number | null;
+  strikePrice: number | null;
   quantity: number;
   holdingValue: number | null;
   buyEvent?: TimelineEvent;
@@ -47,7 +48,7 @@ const TIMEFRAMES = [
 
 const formatExpiry = (dateStr: string) => {
   const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' });
+  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
 const CustomTooltip = ({ active, payload, currency }: any) => {
@@ -56,18 +57,26 @@ const CustomTooltip = ({ active, payload, currency }: any) => {
   if (!data) return null;
 
   const events = [data.buyEvent, data.sellEvent, data.dividendEvent].filter(Boolean) as TimelineEvent[];
+  const displayPrice = data.price ?? data.projectedPrice;
+  const isProjected = data.price == null && data.projectedPrice != null;
 
   return (
     <Card sx={{ p: 1.5, maxWidth: 280 }}>
       <Typography variant="caption" color="text.secondary">{data.dateLabel}</Typography>
-      {data.price != null && (
+      {displayPrice != null && (
         <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>
-          {formatCurrency(data.price, currency)} / share
+          {formatCurrency(displayPrice, currency)} / share
+          {isProjected && <Typography component="span" variant="caption" color="text.secondary"> (projected)</Typography>}
         </Typography>
       )}
-      {data.holdingValue != null && data.quantity > 0 && (
+      {displayPrice != null && data.quantity > 0 && (
         <Typography variant="caption" display="block" color="text.secondary">
-          {data.quantity} shares · {formatCurrency(data.holdingValue, currency)} total
+          {data.quantity} shares · {formatCurrency(data.quantity * displayPrice, currency)} total
+        </Typography>
+      )}
+      {data.strikePrice != null && (
+        <Typography variant="caption" display="block" sx={{ color: '#ff9800', fontWeight: 500, mt: 0.5 }}>
+          Call strike: {formatCurrency(data.strikePrice, currency)}
         </Typography>
       )}
       {events.map((evt, i) => (
@@ -149,6 +158,21 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
       cutoffDate = cutoff.toISOString().split('T')[0];
     }
 
+    // Build covered call date ranges for strike line rendering
+    const coveredCalls = timeline.coveredCalls || [];
+    const ccRanges = coveredCalls.map(cc => ({
+      start: cc.sellDate ? new Date(cc.sellDate).toISOString().split('T')[0] : null,
+      end: new Date(cc.expirationDate).toISOString().split('T')[0],
+      strikePrice: cc.strikePrice
+    }));
+
+    const getStrikeForDate = (dateKey: string): number | null => {
+      for (const r of ccRanges) {
+        if (r.start && dateKey >= r.start && dateKey <= r.end) return r.strikePrice;
+      }
+      return null;
+    };
+
     // Build event lookup by date string (YYYY-MM-DD)
     const eventsByDate = new Map<string, TimelineEvent[]>();
     for (const evt of timeline.events) {
@@ -168,8 +192,10 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
       return {
         date: dateKey,
         dateLabel,
-        holdingValue: p.holdingValue,
         price: p.price,
+        projectedPrice: null,
+        strikePrice: getStrikeForDate(dateKey),
+        holdingValue: p.holdingValue,
         quantity: p.quantity,
         buyEvent: dayEvents.find(e => e.type === 'BUY'),
         sellEvent: dayEvents.find(e => e.type === 'SELL'),
@@ -187,8 +213,10 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
         points.push({
           date: dateKey,
           dateLabel,
-          holdingValue: null,
           price: evts[0]?.pricePerShare || null,
+          projectedPrice: null,
+          strikePrice: getStrikeForDate(dateKey),
+          holdingValue: null,
           quantity: 0,
           buyEvent: evts.find(e => e.type === 'BUY'),
           sellEvent: evts.find(e => e.type === 'SELL'),
@@ -198,6 +226,48 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
     });
 
     points.sort((a, b) => a.date.localeCompare(b.date));
+
+    // Extend with projected (dotted) line to the latest covered call expiry
+    if (coveredCalls.length > 0 && points.length > 0) {
+      const latestExpiry = coveredCalls.reduce((latest, cc) => {
+        const exp = new Date(cc.expirationDate).toISOString().split('T')[0];
+        return exp > latest ? exp : latest;
+      }, '');
+
+      const lastPoint = points[points.length - 1];
+      const lastDate = lastPoint.date;
+      const lastPrice = lastPoint.price;
+
+      if (latestExpiry > lastDate && lastPrice != null) {
+        // Set projectedPrice on the last real point to connect the lines
+        lastPoint.projectedPrice = lastPrice;
+
+        // Add projected points (weekdays only) from last real date to expiry
+        const current = new Date(lastDate);
+        current.setDate(current.getDate() + 1);
+        const expiryDate = new Date(latestExpiry);
+
+        while (current <= expiryDate) {
+          const day = current.getDay();
+          if (day !== 0 && day !== 6) {
+            const dateKey = current.toISOString().split('T')[0];
+            const dateLabel = current.toLocaleDateString('en-US', {
+              month: 'short', day: 'numeric', year: '2-digit'
+            });
+            points.push({
+              date: dateKey,
+              dateLabel,
+              price: null,
+              projectedPrice: lastPrice,
+              strikePrice: getStrikeForDate(dateKey),
+              holdingValue: null,
+              quantity: lastPoint.quantity
+            });
+          }
+          current.setDate(current.getDate() + 1);
+        }
+      }
+    }
 
     // Filter by timeframe
     if (cutoffDate) {
@@ -224,12 +294,24 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
   const currentPosition = useMemo(() => {
     const latest = [...chartData].reverse().find(d => d.price != null && d.quantity > 0);
     if (!latest) return null;
+    // Compute avg cost from the first covered call's parent holding data, or from timeline
+    const costBasis = timeline?.priceHistory?.length
+      ? (() => {
+          // Sum up all BUY transaction values and shares for avg cost
+          const buys = (timeline?.events || []).filter(e => e.type === 'BUY');
+          if (buys.length === 0) return null;
+          const totalCost = buys.reduce((sum, e) => sum + Math.abs(e.value), 0);
+          const totalShares = buys.reduce((sum, e) => sum + e.shares, 0);
+          return totalShares > 0 ? totalCost / totalShares : null;
+        })()
+      : null;
     return {
       quantity: latest.quantity,
       price: latest.price!,
-      totalValue: latest.holdingValue!
+      totalValue: latest.holdingValue!,
+      avgCost: costBasis
     };
-  }, [chartData]);
+  }, [chartData, timeline]);
 
   if (loading) {
     return (
@@ -255,7 +337,7 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
     );
   }
 
-  const coveredCalls: CoveredCall[] = timeline?.coveredCalls || [];
+  const coveredCalls = timeline?.coveredCalls || [];
 
   return (
     <Box>
@@ -268,6 +350,7 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
           {currentPosition && (
             <Typography variant="caption" color="text.secondary">
               {currentPosition.quantity} shares · {formatCurrency(currentPosition.totalValue, currency)} total
+              {currentPosition.avgCost != null && ` · Avg Cost: ${formatCurrency(currentPosition.avgCost, currency)}`}
             </Typography>
           )}
         </Box>
@@ -302,22 +385,7 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
             width={55}
           />
           <Tooltip content={<CustomTooltip currency={currency} />} />
-          {/* Covered call strike lines */}
-          {coveredCalls.map((cc, i) => (
-            <ReferenceLine
-              key={`cc-${i}`}
-              y={cc.strikePrice}
-              stroke="#ff9800"
-              strokeDasharray="6 3"
-              strokeWidth={2}
-              label={{
-                value: `Call $${cc.strikePrice} (exp ${formatExpiry(cc.expirationDate)})`,
-                position: 'right',
-                fill: '#ff9800',
-                fontSize: 11
-              }}
-            />
-          ))}
+          {/* Stock price line (solid) */}
           <Line
             type="monotone"
             dataKey="price"
@@ -325,8 +393,32 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
             strokeWidth={2}
             dot={<EventDot />}
             activeDot={{ r: 4, fill: '#2196f3' }}
+            connectNulls={false}
+          />
+          {/* Projected price line (dotted, extends to expiry) */}
+          <Line
+            type="monotone"
+            dataKey="projectedPrice"
+            stroke="#2196f3"
+            strokeWidth={2}
+            strokeDasharray="4 4"
+            dot={false}
+            activeDot={false}
             connectNulls
           />
+          {/* Covered call strike line (only between sell date and expiry) */}
+          {coveredCalls.length > 0 && (
+            <Line
+              type="stepAfter"
+              dataKey="strikePrice"
+              stroke="#ff9800"
+              strokeWidth={2}
+              strokeDasharray="6 3"
+              dot={false}
+              activeDot={false}
+              connectNulls
+            />
+          )}
         </LineChart>
       </ResponsiveContainer>
 
@@ -345,10 +437,18 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
           <Typography variant="caption">Dividend</Typography>
         </Box>
         {coveredCalls.length > 0 && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Box sx={{ width: 16, height: 2, bgcolor: '#ff9800', borderTop: '2px dashed #ff9800' }} />
-            <Typography variant="caption">Covered Call</Typography>
-          </Box>
+          <>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ width: 16, height: 0, borderTop: '2px dashed #ff9800' }} />
+              <Typography variant="caption">
+                Call ${coveredCalls[0].strikePrice} (exp {formatExpiry(coveredCalls[0].expirationDate)})
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ width: 16, height: 0, borderTop: '2px dashed #2196f3' }} />
+              <Typography variant="caption">Projected</Typography>
+            </Box>
+          </>
         )}
       </Box>
     </Box>

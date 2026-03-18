@@ -190,7 +190,7 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
           </Typography>
           
           {account.holdings.length > 0 && (
-            <Tooltip title={expanded ? 'Hide holdings' : 'Show holdings'}>
+            <Tooltip title={expanded ? 'Hide positions' : 'Show positions'}>
               <IconButton onClick={() => setExpanded(!expanded)} size="small">
                 {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
               </IconButton>
@@ -199,168 +199,219 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
         </Box>
       </Box>
 
-      {/* Holdings Details */}
+      {/* Positions Details */}
       {account.holdings.length > 0 && (
         <Collapse in={expanded} timeout="auto" unmountOnExit>
           <Divider sx={{ my: 1 }} />
           <Box sx={{ px: 1, pb: 1 }}>
-            <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-              Holdings ({account.holdings.length})
-            </Typography>
-            
-            <Box sx={{ display: 'grid', gap: 1 }}>
-              {account.holdings.map((holding, index) => {
-                const isOption = holding.holdingType === 'option';
-                const isShort = holding.quantity < 0;
-                const lookupSymbol = (holding.underlyingSymbol || holding.symbol || '').toUpperCase();
-                const displaySymbol = isOption && holding.underlyingSymbol
-                  ? holding.underlyingSymbol
-                  : holding.symbol;
+            {(() => {
+              // Group holdings into positions: stock + linked options by underlying symbol
+              const positions = new Map<string, { stock?: Holding; options: Holding[] }>();
+              for (const h of account.holdings) {
+                if (h.holdingType === 'option' && h.underlyingSymbol) {
+                  const key = h.underlyingSymbol.toUpperCase();
+                  if (!positions.has(key)) positions.set(key, { options: [] });
+                  positions.get(key)!.options.push(h);
+                } else {
+                  const key = (h.symbol || '').toUpperCase();
+                  if (!positions.has(key)) positions.set(key, { options: [] });
+                  positions.get(key)!.stock = h;
+                }
+              }
+              const positionCount = positions.size;
+              const positionEntries: [string, { stock?: Holding; options: Holding[] }][] = [];
+              positions.forEach((val, key) => positionEntries.push([key, val]));
 
-                const formatExpiry = (dateStr?: string) => {
-                  if (!dateStr) return '';
-                  const d = new Date(dateStr);
-                  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: '2-digit' });
-                };
+              return (
+                <>
+                  <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+                    Positions ({positionCount})
+                  </Typography>
+                  <Box sx={{ display: 'grid', gap: 1 }}>
+                    {positionEntries.map(([posSymbol, position]) => {
+                      const holding = position.stock || position.options[0];
+                      const isStandaloneOption = !position.stock && position.options.length > 0;
+                      const lookupSymbol = posSymbol;
+                      const displaySymbol = posSymbol;
 
-                const optionLabel = isOption
-                  ? `${holding.putCall === 'CALL' ? 'Call' : 'Put'} ${formatCurrency(holding.strikePrice || 0, account.currency)} ${formatExpiry(holding.expirationDate)}`
-                  : null;
+                      // Gain/loss from cost basis (stock only)
+                      const mktValue = holding.marketValue || 0;
+                      const costBasis = holding.costBasis;
+                      const gainLoss = costBasis != null ? mktValue - costBasis : null;
+                      const gainLossPercent = costBasis != null && costBasis !== 0
+                        ? ((mktValue - costBasis) / Math.abs(costBasis)) * 100
+                        : null;
+                      const isGain = gainLoss != null && gainLoss >= 0;
 
-                // Gain/loss from cost basis
-                const costBasis = holding.costBasis;
-                const mktValue = holding.marketValue || 0;
-                const gainLoss = costBasis != null ? mktValue - costBasis : null;
-                const gainLossPercent = costBasis != null && costBasis !== 0
-                  ? ((mktValue - costBasis) / Math.abs(costBasis)) * 100
-                  : null;
-                const isGain = gainLoss != null && gainLoss >= 0;
+                      // Daily price change
+                      const priceData = holdingsPriceData[lookupSymbol];
+                      const dailyChange = priceData?.change || 0;
+                      const dailyChangePercent = priceData?.changePercent || 0;
+                      const hasDailyChange = priceData != null && dailyChange !== 0;
+                      const isDailyGain = dailyChange >= 0;
 
-                // Daily price change from stock price service
-                const priceData = !isOption ? holdingsPriceData[lookupSymbol] : null;
-                const dailyChange = priceData?.change || 0;
-                const dailyChangePercent = priceData?.changePercent || 0;
-                const hasDailyChange = priceData != null && dailyChange !== 0;
-                const isDailyGain = dailyChange >= 0;
+                      // Use market price from StockPrice service, not IBKR sync snapshot
+                      const currentPrice = priceData?.price ?? holding.currentPrice;
+                      const avgCost = costBasis != null && holding.quantity !== 0
+                        ? Math.abs(costBasis) / Math.abs(holding.quantity)
+                        : null;
 
-                const isSelected = selectedSymbol === lookupSymbol;
+                      const isSelected = selectedSymbol === lookupSymbol;
 
-                return (
-                  <Box key={`${holding.symbol}-${index}`}>
-                    <Box
-                      onClick={() => !isOption && setSelectedSymbol(isSelected ? null : lookupSymbol)}
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        p: 1.5,
-                        backgroundColor: isSelected ? 'action.selected' : 'grey.50',
-                        borderRadius: 1,
-                        cursor: isOption ? 'default' : 'pointer',
-                        '&:hover': !isOption ? { backgroundColor: 'action.hover' } : {}
-                      }}
-                    >
-                    {/* Left: Symbol, name, quantity */}
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {displaySymbol}
-                        </Typography>
-                        {isShort && (
-                          <Chip label="Short" size="small" color="warning" sx={{ height: 20, fontSize: '0.7rem' }} />
-                        )}
-                        <Chip
-                          label={holding.holdingType}
-                          size="small"
-                          variant="outlined"
-                          sx={{ height: 20, fontSize: '0.7rem' }}
-                        />
-                      </Box>
-                      {isOption && optionLabel ? (
-                        <Typography variant="caption" color="text.secondary">
-                          {optionLabel}
-                        </Typography>
-                      ) : holding.name && (
-                        <Typography variant="caption" color="text.secondary">
-                          {holding.name}
-                        </Typography>
-                      )}
-                      <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
-                        <Typography variant="caption">
-                          {isOption ? 'Contracts' : 'Qty'}: {Math.abs(holding.quantity).toLocaleString()}
-                        </Typography>
-                        {holding.currentPrice != null && holding.currentPrice > 0 && (
-                          <Typography variant="caption">
-                            Price: {formatCurrency(holding.currentPrice, holding.currency || account.currency)}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Box>
-
-                    {/* Center: Daily change */}
-                    <Box sx={{ textAlign: 'center', minWidth: 100, px: 1 }}>
-                      {hasDailyChange && (
-                        <>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                            {isDailyGain
-                              ? <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main' }} />
-                              : <TrendingDownIcon sx={{ fontSize: 16, color: 'error.main' }} />
-                            }
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 600 }}
-                              color={isDailyGain ? 'success.main' : 'error.main'}
-                            >
-                              {dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(2)}%
-                            </Typography>
-                          </Box>
-                          <Typography variant="caption" color="text.secondary">
-                            {dailyChange >= 0 ? '+' : ''}{formatCurrency(dailyChange, account.currency)}
-                          </Typography>
-                        </>
-                      )}
-                    </Box>
-                    
-                    {/* Right: Market value + Gain/Loss */}
-                    <Box sx={{ textAlign: 'right', minWidth: 120 }}>
-                      {mktValue != null && (
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {formatCurrency(mktValue, holding.currency || account.currency)}
-                        </Typography>
-                      )}
-                      {gainLoss != null && (
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
-                          {isGain
-                            ? <TrendingUpIcon sx={{ fontSize: 14, color: 'success.main' }} />
-                            : <TrendingDownIcon sx={{ fontSize: 14, color: 'error.main' }} />
-                          }
-                          <Typography
-                            variant="caption"
-                            color={isGain ? 'success.main' : 'error.main'}
-                            sx={{ fontWeight: 500 }}
+                      return (
+                        <Box key={posSymbol}>
+                          <Box
+                            onClick={() => setSelectedSymbol(isSelected ? null : lookupSymbol)}
+                            sx={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              p: 1.5,
+                              backgroundColor: isSelected ? 'action.selected' : 'grey.50',
+                              borderRadius: position.options.length > 0 ? '4px 4px 0 0' : 1,
+                              cursor: 'pointer',
+                              '&:hover': { backgroundColor: 'action.hover' }
+                            }}
                           >
-                            {gainLoss >= 0 ? '+' : ''}{formatCurrency(gainLoss, account.currency)}
-                            {gainLossPercent != null && ` (${gainLossPercent >= 0 ? '+' : ''}${gainLossPercent.toFixed(1)}%)`}
-                          </Typography>
+                            {/* Left: Symbol, name, quantity */}
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {displaySymbol}
+                                </Typography>
+                                <Chip
+                                  label={isStandaloneOption ? 'option' : 'stock'}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ height: 20, fontSize: '0.7rem' }}
+                                />
+                              </Box>
+                              {holding.name && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {holding.name}
+                                </Typography>
+                              )}
+                              <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
+                                <Typography variant="caption">
+                                  Qty: {Math.abs(holding.quantity).toLocaleString()}
+                                </Typography>
+                                {currentPrice != null && currentPrice > 0 && (
+                                  <Typography variant="caption">
+                                    Price: {formatCurrency(currentPrice, holding.currency || account.currency)}
+                                  </Typography>
+                                )}
+                                {avgCost != null && (
+                                  <Typography variant="caption" color="text.secondary">
+                                    Avg Cost: {formatCurrency(avgCost, holding.currency || account.currency)}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Box>
+
+                            {/* Center: Daily change */}
+                            <Box sx={{ textAlign: 'center', minWidth: 100, px: 1 }}>
+                              {hasDailyChange && (
+                                <>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                                    {isDailyGain
+                                      ? <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                                      : <TrendingDownIcon sx={{ fontSize: 16, color: 'error.main' }} />
+                                    }
+                                    <Typography
+                                      variant="body2"
+                                      sx={{ fontWeight: 600 }}
+                                      color={isDailyGain ? 'success.main' : 'error.main'}
+                                    >
+                                      {dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(2)}%
+                                    </Typography>
+                                  </Box>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {dailyChange >= 0 ? '+' : ''}{formatCurrency(dailyChange, account.currency)}
+                                  </Typography>
+                                </>
+                              )}
+                            </Box>
+
+                            {/* Right: Market value + Gain/Loss */}
+                            <Box sx={{ textAlign: 'right', minWidth: 120 }}>
+                              {mktValue != null && (
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {formatCurrency(mktValue, holding.currency || account.currency)}
+                                </Typography>
+                              )}
+                              {gainLoss != null && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+                                  {isGain
+                                    ? <TrendingUpIcon sx={{ fontSize: 14, color: 'success.main' }} />
+                                    : <TrendingDownIcon sx={{ fontSize: 14, color: 'error.main' }} />
+                                  }
+                                  <Typography
+                                    variant="caption"
+                                    color={isGain ? 'success.main' : 'error.main'}
+                                    sx={{ fontWeight: 500 }}
+                                  >
+                                    {gainLoss >= 0 ? '+' : ''}{formatCurrency(gainLoss, account.currency)}
+                                    {gainLossPercent != null && ` (${gainLossPercent >= 0 ? '+' : ''}${gainLossPercent.toFixed(1)}%)`}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {costBasis != null && (
+                                <Typography variant="caption" color="text.secondary">
+                                  Cost: {formatCurrency(Math.abs(costBasis), holding.currency || account.currency)}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+
+                          {/* Linked options displayed under the stock */}
+                          {position.options.length > 0 && position.stock && (
+                            <Box sx={{
+                              backgroundColor: 'grey.100',
+                              borderRadius: '0 0 4px 4px',
+                              borderTop: '1px dashed',
+                              borderColor: 'divider',
+                              px: 1.5,
+                              py: 1
+                            }}>
+                              {position.options.map((opt, oi) => {
+                                const isShort = opt.quantity < 0;
+                                const formatExp = (dateStr?: string) => {
+                                  if (!dateStr) return '';
+                                  const d = new Date(dateStr);
+                                  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+                                };
+                                const optLabel = `${opt.putCall === 'CALL' ? 'Call' : 'Put'} ${formatCurrency(opt.strikePrice || 0, account.currency)} exp ${formatExp(opt.expirationDate)}`;
+
+                                return (
+                                  <Box key={`opt-${oi}`} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      {isShort && <Chip label="Short" size="small" color="warning" sx={{ height: 18, fontSize: '0.65rem' }} />}
+                                      <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                                        {optLabel}
+                                      </Typography>
+                                    </Box>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {Math.abs(opt.quantity)} contract{Math.abs(opt.quantity) !== 1 ? 's' : ''}
+                                    </Typography>
+                                  </Box>
+                                );
+                              })}
+                            </Box>
+                          )}
+
+                          {/* Timeline chart for selected position */}
+                          {isSelected && (
+                            <Box sx={{ p: 1.5, pt: 0 }}>
+                              <HoldingTimelineChart symbol={lookupSymbol} currency={account.currency} />
+                            </Box>
+                          )}
                         </Box>
-                      )}
-                      {costBasis != null && (
-                        <Typography variant="caption" color="text.secondary">
-                          Cost: {formatCurrency(Math.abs(costBasis), holding.currency || account.currency)}
-                        </Typography>
-                      )}
-                    </Box>
-                    </Box>
-                    {/* Timeline chart for selected holding */}
-                    {isSelected && (
-                      <Box sx={{ p: 1.5, pt: 0 }}>
-                        <HoldingTimelineChart symbol={lookupSymbol} currency={account.currency} />
-                      </Box>
-                    )}
+                      );
+                    })}
                   </Box>
-                );
-              })}
-            </Box>
+                </>
+              );
+            })()}
           </Box>
         </Collapse>
       )}

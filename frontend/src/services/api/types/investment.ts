@@ -49,6 +49,7 @@ export interface CoveredCall {
   contracts: number;
   multiplier: number;
   symbol: string;
+  sellDate: string | null;
 }
 
 export interface HoldingTimeline {

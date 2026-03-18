@@ -184,7 +184,7 @@ export const InvestmentPortfolioCard: React.FC<InvestmentPortfolioCardProps> = (
             {portfolioSummary.topHoldings && portfolioSummary.topHoldings.length > 0 && (
               <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-                  Top Holdings
+                  Top Positions
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   {portfolioSummary.topHoldings.slice(0, 5).map((holding) => (
