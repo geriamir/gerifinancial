@@ -3,7 +3,9 @@ export interface Holding {
   name?: string;
   quantity: number;
   price?: number;
+  currentPrice?: number;
   marketValue?: number;
+  costBasis?: number;
   currency: string;
   sector?: string;
   holdingType: 'stock' | 'bond' | 'etf' | 'mutual_fund' | 'option' | 'future' | 'other';
@@ -14,6 +16,15 @@ export interface Holding {
   putCall?: 'CALL' | 'PUT';
   multiplier?: number;
 }
+
+export interface HoldingPriceData {
+  price: number;
+  change: number;
+  changePercent: number;
+  date: string;
+}
+
+export type HoldingsPriceData = Record<string, HoldingPriceData>;
 
 export interface Investment {
   _id: string;
@@ -127,6 +138,7 @@ export interface InvestmentContextState {
   portfolioTrends: PortfolioTrend[];
   performanceMetrics: PerformanceMetrics | null;
   portfolioCashBalances: PortfolioCashBalances;
+  holdingsPriceData: HoldingsPriceData;
   loading: boolean;
   error: string | null;
 }

@@ -15,14 +15,17 @@ import {
 import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  AccountBalance as AccountIcon
+  AccountBalance as AccountIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon
 } from '@mui/icons-material';
-import { Investment, Holding, PortfolioCashBalances } from '../../services/api/types/investment';
+import { Investment, Holding, PortfolioCashBalances, HoldingsPriceData } from '../../services/api/types/investment';
 import { formatCurrency } from '../../utils/formatters';
 
 interface InvestmentAccountListProps {
   investments: Investment[];
   portfolioCashBalances: PortfolioCashBalances;
+  holdingsPriceData: HoldingsPriceData;
   loading: boolean;
   onRefresh: () => void;
 }
@@ -81,9 +84,10 @@ function groupByBankAccount(investments: Investment[], portfolioCashBalances: Po
 
 interface GroupedAccountItemProps {
   account: GroupedAccount;
+  holdingsPriceData: HoldingsPriceData;
 }
 
-const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account }) => {
+const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdingsPriceData }) => {
   const [expanded, setExpanded] = React.useState(false);
 
   const formatLastUpdated = (date: Date) => {
@@ -206,6 +210,7 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account }) => {
               {account.holdings.map((holding, index) => {
                 const isOption = holding.holdingType === 'option';
                 const isShort = holding.quantity < 0;
+                const lookupSymbol = (holding.underlyingSymbol || holding.symbol || '').toUpperCase();
                 const displaySymbol = isOption && holding.underlyingSymbol
                   ? holding.underlyingSymbol
                   : holding.symbol;
@@ -220,19 +225,36 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account }) => {
                   ? `${holding.putCall === 'CALL' ? 'Call' : 'Put'} ${formatCurrency(holding.strikePrice || 0, account.currency)} ${formatExpiry(holding.expirationDate)}`
                   : null;
 
+                // Gain/loss from cost basis
+                const costBasis = holding.costBasis;
+                const mktValue = holding.marketValue || 0;
+                const gainLoss = costBasis != null ? mktValue - costBasis : null;
+                const gainLossPercent = costBasis != null && costBasis !== 0
+                  ? ((mktValue - costBasis) / Math.abs(costBasis)) * 100
+                  : null;
+                const isGain = gainLoss != null && gainLoss >= 0;
+
+                // Daily price change from stock price service
+                const priceData = !isOption ? holdingsPriceData[lookupSymbol] : null;
+                const dailyChange = priceData?.change || 0;
+                const dailyChangePercent = priceData?.changePercent || 0;
+                const hasDailyChange = priceData != null && dailyChange !== 0;
+                const isDailyGain = dailyChange >= 0;
+
                 return (
                   <Box
                     key={`${holding.symbol}-${index}`}
                     sx={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center',
-                      p: 1,
+                      alignItems: 'flex-start',
+                      p: 1.5,
                       backgroundColor: 'grey.50',
                       borderRadius: 1
                     }}
                   >
-                    <Box>
+                    {/* Left: Symbol, name, quantity */}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
                           {displaySymbol}
@@ -240,6 +262,12 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account }) => {
                         {isShort && (
                           <Chip label="Short" size="small" color="warning" sx={{ height: 20, fontSize: '0.7rem' }} />
                         )}
+                        <Chip
+                          label={holding.holdingType}
+                          size="small"
+                          variant="outlined"
+                          sx={{ height: 20, fontSize: '0.7rem' }}
+                        />
                       </Box>
                       {isOption && optionLabel ? (
                         <Typography variant="caption" color="text.secondary">
@@ -254,34 +282,66 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account }) => {
                         <Typography variant="caption">
                           {isOption ? 'Contracts' : 'Qty'}: {Math.abs(holding.quantity).toLocaleString()}
                         </Typography>
-                        {holding.price && (
+                        {holding.currentPrice != null && holding.currentPrice > 0 && (
                           <Typography variant="caption">
-                            Price: {formatCurrency(holding.price, holding.currency || account.currency)}
+                            Price: {formatCurrency(holding.currentPrice, holding.currency || account.currency)}
                           </Typography>
-                        )}
-                        {holding.sector && (
-                          <Chip
-                            label={holding.sector}
-                            size="small"
-                            variant="outlined"
-                            sx={{ height: 20, fontSize: '0.7rem' }}
-                          />
                         )}
                       </Box>
                     </Box>
+
+                    {/* Center: Daily change */}
+                    <Box sx={{ textAlign: 'center', minWidth: 100, px: 1 }}>
+                      {hasDailyChange && (
+                        <>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                            {isDailyGain
+                              ? <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                              : <TrendingDownIcon sx={{ fontSize: 16, color: 'error.main' }} />
+                            }
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 600 }}
+                              color={isDailyGain ? 'success.main' : 'error.main'}
+                            >
+                              {dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(2)}%
+                            </Typography>
+                          </Box>
+                          <Typography variant="caption" color="text.secondary">
+                            {dailyChange >= 0 ? '+' : ''}{formatCurrency(dailyChange, account.currency)}
+                          </Typography>
+                        </>
+                      )}
+                    </Box>
                     
-                    <Box sx={{ textAlign: 'right' }}>
-                      {holding.marketValue != null && (
+                    {/* Right: Market value + Gain/Loss */}
+                    <Box sx={{ textAlign: 'right', minWidth: 120 }}>
+                      {mktValue != null && (
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {formatCurrency(holding.marketValue, holding.currency || account.currency)}
+                          {formatCurrency(mktValue, holding.currency || account.currency)}
                         </Typography>
                       )}
-                      <Chip
-                        label={holding.holdingType}
-                        size="small"
-                        variant="outlined"
-                        sx={{ mt: 0.5 }}
-                      />
+                      {gainLoss != null && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+                          {isGain
+                            ? <TrendingUpIcon sx={{ fontSize: 14, color: 'success.main' }} />
+                            : <TrendingDownIcon sx={{ fontSize: 14, color: 'error.main' }} />
+                          }
+                          <Typography
+                            variant="caption"
+                            color={isGain ? 'success.main' : 'error.main'}
+                            sx={{ fontWeight: 500 }}
+                          >
+                            {gainLoss >= 0 ? '+' : ''}{formatCurrency(gainLoss, account.currency)}
+                            {gainLossPercent != null && ` (${gainLossPercent >= 0 ? '+' : ''}${gainLossPercent.toFixed(1)}%)`}
+                          </Typography>
+                        </Box>
+                      )}
+                      {costBasis != null && (
+                        <Typography variant="caption" color="text.secondary">
+                          Cost: {formatCurrency(Math.abs(costBasis), holding.currency || account.currency)}
+                        </Typography>
+                      )}
                     </Box>
                   </Box>
                 );
@@ -297,6 +357,7 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account }) => {
 export const InvestmentAccountList: React.FC<InvestmentAccountListProps> = ({
   investments,
   portfolioCashBalances,
+  holdingsPriceData,
   loading,
   onRefresh
 }) => {
@@ -341,6 +402,7 @@ export const InvestmentAccountList: React.FC<InvestmentAccountListProps> = ({
               <GroupedAccountItem
                 key={account.bankAccountId}
                 account={account}
+                holdingsPriceData={holdingsPriceData}
               />
             ))}
           </List>

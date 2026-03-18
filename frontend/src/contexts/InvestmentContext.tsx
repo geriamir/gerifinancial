@@ -7,7 +7,8 @@ import {
   PerformanceMetrics,
   InvestmentContextState,
   InvestmentFilters,
-  PortfolioCashBalances
+  PortfolioCashBalances,
+  HoldingsPriceData
 } from '../services/api/types/investment';
 
 interface InvestmentContextType extends InvestmentContextState {
@@ -28,6 +29,7 @@ interface InvestmentContextType extends InvestmentContextState {
   getInvestmentsByBankAccount: (bankAccountId: string) => Investment[];
   getTotalPortfolioValue: () => number;
   portfolioCashBalances: PortfolioCashBalances;
+  holdingsPriceData: HoldingsPriceData;
 }
 
 type InvestmentAction =
@@ -38,6 +40,7 @@ type InvestmentAction =
   | { type: 'SET_PORTFOLIO_TRENDS'; payload: PortfolioTrend[] }
   | { type: 'SET_PERFORMANCE_METRICS'; payload: PerformanceMetrics }
   | { type: 'SET_PORTFOLIO_CASH_BALANCES'; payload: PortfolioCashBalances }
+  | { type: 'SET_HOLDINGS_PRICE_DATA'; payload: HoldingsPriceData }
   | { type: 'UPDATE_INVESTMENT'; payload: Investment }
   | { type: 'REMOVE_INVESTMENT'; payload: string };
 
@@ -47,6 +50,7 @@ const initialState: InvestmentContextState = {
   portfolioTrends: [],
   performanceMetrics: null,
   portfolioCashBalances: {},
+  holdingsPriceData: {},
   loading: false,
   error: null
 };
@@ -73,6 +77,9 @@ function investmentReducer(state: InvestmentContextState, action: InvestmentActi
     
     case 'SET_PORTFOLIO_CASH_BALANCES':
       return { ...state, portfolioCashBalances: action.payload };
+    
+    case 'SET_HOLDINGS_PRICE_DATA':
+      return { ...state, holdingsPriceData: action.payload };
     
     case 'UPDATE_INVESTMENT':
       return {
@@ -123,9 +130,10 @@ export const InvestmentProvider: React.FC<InvestmentProviderProps> = ({ children
   const refreshInvestments = useCallback(async (filters?: InvestmentFilters) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      const { investments, portfolioCashBalances } = await investmentApi.getUserInvestments(filters);
+      const { investments, portfolioCashBalances, holdingsPriceData } = await investmentApi.getUserInvestments(filters);
       dispatch({ type: 'SET_INVESTMENTS', payload: investments });
       dispatch({ type: 'SET_PORTFOLIO_CASH_BALANCES', payload: portfolioCashBalances });
+      dispatch({ type: 'SET_HOLDINGS_PRICE_DATA', payload: holdingsPriceData });
     } catch (error) {
       handleError(error, 'refresh investments');
     }

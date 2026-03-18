@@ -48,6 +48,8 @@ class InvestmentService {
           marketValue: value,
           currency: investmentData.currency || INVESTMENT_CONSTANTS.DEFAULT_CURRENCY,
           holdingType: investmentData.holdingType || INVESTMENT_CONSTANTS.HOLDING_TYPES.STOCK,
+          // Cost basis from source
+          ...(investmentData.costBasis != null && { costBasis: investmentData.costBasis }),
           // Option-specific fields (only set when present)
           ...(investmentData.underlyingSymbol && { underlyingSymbol: investmentData.underlyingSymbol }),
           ...(investmentData.strikePrice != null && { strikePrice: investmentData.strikePrice }),
@@ -216,6 +218,33 @@ class InvestmentService {
         cashBalance: (result[key]?.cashBalance || 0) + (p.cashBalance || 0),
         currency: p.currency
       };
+    }
+    return result;
+  }
+
+  // Returns a map of symbol -> { price, change, changePercent } from the StockPrice collection
+  async getHoldingsPriceData(userId) {
+    const investments = await Investment.findByUser(userId);
+    const symbols = new Set();
+    for (const inv of investments) {
+      for (const h of inv.holdings || []) {
+        const sym = h.underlyingSymbol || h.symbol;
+        if (sym && h.holdingType !== 'option') symbols.add(sym.toUpperCase());
+      }
+    }
+
+    const StockPrice = require('../models/StockPrice');
+    const result = {};
+    for (const symbol of symbols) {
+      const sp = await StockPrice.findOne({ symbol, isActive: true }).sort({ date: -1 });
+      if (sp) {
+        result[symbol] = {
+          price: sp.price,
+          change: sp.change || 0,
+          changePercent: sp.changePercent || 0,
+          date: sp.date
+        };
+      }
     }
     return result;
   }

@@ -19,7 +19,10 @@ router.get('/', async (req, res) => {
     // Include portfolio-level cash balances (cash is not an investment, it belongs to the account)
     const portfolioCashBalances = await investmentService.getPortfolioCashBalances(req.user.id);
     
-    res.json({ investments, portfolioCashBalances });
+    // Include latest stock price data for holdings
+    const holdingsPriceData = await investmentService.getHoldingsPriceData(req.user.id);
+    
+    res.json({ investments, portfolioCashBalances, holdingsPriceData });
   } catch (error) {
     logger.error('Error fetching investments:', error);
     res.status(500).json({ error: error.message });

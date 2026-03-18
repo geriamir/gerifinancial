@@ -41,7 +41,9 @@ const holdingSchema = new mongoose.Schema({
   strikePrice: { type: Number },
   expirationDate: { type: Date },
   putCall: { type: String, enum: ['CALL', 'PUT'] },
-  multiplier: { type: Number }
+  multiplier: { type: Number },
+  // Cost basis from source (e.g., IBKR costBasisMoney)
+  costBasis: { type: Number }
 }, { _id: false });
 
 const investmentSchema = new mongoose.Schema({

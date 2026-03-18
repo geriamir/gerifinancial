@@ -18,6 +18,7 @@ const Investments: React.FC = () => {
     portfolioSummary,
     performanceMetrics,
     portfolioCashBalances,
+    holdingsPriceData,
     loading,
     error,
     refreshInvestments,
@@ -110,6 +111,7 @@ const Investments: React.FC = () => {
         <InvestmentAccountList
           investments={investments}
           portfolioCashBalances={portfolioCashBalances}
+          holdingsPriceData={holdingsPriceData}
           loading={loading}
           onRefresh={handleRefresh}
         />
