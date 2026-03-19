@@ -35,7 +35,7 @@ export interface TimelinePricePoint {
 
 export interface TimelineEvent {
   date: string;
-  type: 'BUY' | 'SELL' | 'DIVIDEND' | 'OTHER';
+  type: 'BUY' | 'SELL' | 'DIVIDEND' | 'INTEREST' | 'FEE' | 'DEPOSIT' | 'WITHDRAWAL' | 'OTHER';
   shares: number;
   pricePerShare: number;
   value: number;
