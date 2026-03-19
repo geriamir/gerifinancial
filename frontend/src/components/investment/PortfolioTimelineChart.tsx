@@ -98,7 +98,7 @@ export const PortfolioTimelineChart: React.FC<PortfolioTimelineChartProps> = ({ 
       setError(null);
       try {
         const selectedTf = TIMEFRAMES.find(t => t.label === timeframe);
-        const days = selectedTf?.days || 365;
+        const days = selectedTf?.days ?? 365;
         const data = await investmentApi.getPortfolioTimeline(days);
         setTimeline(data);
       } catch (err: any) {
