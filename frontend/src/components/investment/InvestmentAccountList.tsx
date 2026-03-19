@@ -15,27 +15,82 @@ import {
 import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
-  AccountBalance as AccountIcon
+  AccountBalance as AccountIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon
 } from '@mui/icons-material';
-import { Investment } from '../../services/api/types/investment';
+import { Investment, Holding, PortfolioCashBalances, HoldingsPriceData } from '../../services/api/types/investment';
 import { formatCurrency } from '../../utils/formatters';
+import { HoldingTimelineChart } from './HoldingTimelineChart';
 
 interface InvestmentAccountListProps {
   investments: Investment[];
+  portfolioCashBalances: PortfolioCashBalances;
+  holdingsPriceData: HoldingsPriceData;
   loading: boolean;
   onRefresh: () => void;
 }
 
-interface InvestmentAccountItemProps {
-  investment: Investment;
+interface GroupedAccount {
+  bankAccountId: string;
+  accountName: string;
+  accountType: string;
+  currency: string;
+  totalValue: number;
+  totalMarketValue: number;
+  cashBalance: number;
+  lastUpdated: Date;
+  holdings: Holding[];
 }
 
-const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investment }) => {
-  const [expanded, setExpanded] = React.useState(false);
+function groupByBankAccount(investments: Investment[], portfolioCashBalances: PortfolioCashBalances): GroupedAccount[] {
+  const groups = new Map<string, GroupedAccount>();
 
-  const handleExpandClick = () => {
-    setExpanded(!expanded);
-  };
+  for (const inv of investments) {
+    // bankAccountId may be a populated object or a plain string
+    const key = typeof inv.bankAccountId === 'object'
+      ? (inv.bankAccountId as any)._id
+      : inv.bankAccountId;
+    const existing = groups.get(key);
+
+    if (existing) {
+      existing.totalValue += inv.totalValue || 0;
+      existing.totalMarketValue += inv.totalMarketValue || 0;
+      existing.holdings.push(...inv.holdings);
+      if (new Date(inv.lastUpdated) > new Date(existing.lastUpdated)) {
+        existing.lastUpdated = inv.lastUpdated;
+      }
+    } else {
+      const bankName = typeof inv.bankAccountId === 'object'
+        ? (inv.bankAccountId as any).name
+        : undefined;
+      // Use portfolio-level cash balance from the Portfolio document
+      const portfolioCash = portfolioCashBalances[key]?.cashBalance || 0;
+      groups.set(key, {
+        bankAccountId: key,
+        accountName: bankName || inv.accountName || `Account ${inv.accountNumber}`,
+        accountType: inv.accountType,
+        currency: inv.currency,
+        totalValue: (inv.totalValue || 0) + portfolioCash,
+        totalMarketValue: inv.totalMarketValue || 0,
+        cashBalance: portfolioCash,
+        lastUpdated: inv.lastUpdated,
+        holdings: [...inv.holdings]
+      });
+    }
+  }
+
+  return Array.from(groups.values());
+}
+
+interface GroupedAccountItemProps {
+  account: GroupedAccount;
+  holdingsPriceData: HoldingsPriceData;
+}
+
+const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdingsPriceData }) => {
+  const [expanded, setExpanded] = React.useState(false);
+  
 
   const formatLastUpdated = (date: Date) => {
     const now = new Date();
@@ -85,12 +140,12 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
         <Box sx={{ flex: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              {investment.accountName || `Account ${investment.accountNumber}`}
+              {account.accountName}
             </Typography>
             <Chip
-              label={investment.accountType}
+              label={account.accountType}
               size="small"
-              color={getAccountTypeColor(investment.accountType) as any}
+              color={getAccountTypeColor(account.accountType) as any}
               variant="outlined"
             />
           </Box>
@@ -98,17 +153,17 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
           <Box sx={{ display: 'flex', gap: 3, alignItems: 'center' }}>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                {formatCurrency(investment.totalValue)}
+                {formatCurrency(account.totalValue, account.currency)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Total Value
               </Typography>
             </Box>
             
-            {investment.totalMarketValue > 0 && (
+            {account.totalMarketValue > 0 && (
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {formatCurrency(investment.totalMarketValue)}
+                  {formatCurrency(account.totalMarketValue, account.currency)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Investments
@@ -116,10 +171,10 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
               </Box>
             )}
             
-            {investment.cashBalance > 0 && (
+            {account.cashBalance > 0 && (
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {formatCurrency(investment.cashBalance)}
+                  {formatCurrency(account.cashBalance, account.currency)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   Cash
@@ -131,12 +186,12 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="caption" color="text.secondary">
-            {formatLastUpdated(investment.lastUpdated)}
+            {formatLastUpdated(account.lastUpdated)}
           </Typography>
           
-          {investment.holdings.length > 0 && (
-            <Tooltip title={expanded ? 'Hide holdings' : 'Show holdings'}>
-              <IconButton onClick={handleExpandClick} size="small">
+          {account.holdings.length > 0 && (
+            <Tooltip title={expanded ? 'Hide positions' : 'Show positions'}>
+              <IconButton onClick={() => setExpanded(!expanded)} size="small">
                 {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
               </IconButton>
             </Tooltip>
@@ -144,73 +199,214 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
         </Box>
       </Box>
 
-      {/* Holdings Details */}
-      {investment.holdings.length > 0 && (
+      {/* Positions Details */}
+      {account.holdings.length > 0 && (
         <Collapse in={expanded} timeout="auto" unmountOnExit>
           <Divider sx={{ my: 1 }} />
           <Box sx={{ px: 1, pb: 1 }}>
-            <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-              Holdings ({investment.holdings.length})
-            </Typography>
-            
-            <Box sx={{ display: 'grid', gap: 1 }}>
-              {investment.holdings.map((holding, index) => (
-                <Box
-                  key={`${holding.symbol}-${index}`}
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    p: 1,
-                    backgroundColor: 'grey.50',
-                    borderRadius: 1
-                  }}
-                >
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {holding.symbol}
-                    </Typography>
-                    {holding.name && (
-                      <Typography variant="caption" color="text.secondary">
-                        {holding.name}
-                      </Typography>
-                    )}
-                    <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
-                      <Typography variant="caption">
-                        Qty: {holding.quantity.toLocaleString()}
-                      </Typography>
-                      {holding.price && (
-                        <Typography variant="caption">
-                          Price: {formatCurrency(holding.price)}
-                        </Typography>
-                      )}
-                      {holding.sector && (
-                        <Chip
-                          label={holding.sector}
-                          size="small"
-                          variant="outlined"
-                          sx={{ height: 20, fontSize: '0.7rem' }}
-                        />
-                      )}
-                    </Box>
+            {(() => {
+              // Group holdings into positions: stock + linked options by underlying symbol
+              const positions = new Map<string, { stock?: Holding; options: Holding[] }>();
+              for (const h of account.holdings) {
+                if (h.holdingType === 'option' && h.underlyingSymbol) {
+                  const key = h.underlyingSymbol.toUpperCase();
+                  if (!positions.has(key)) positions.set(key, { options: [] });
+                  positions.get(key)!.options.push(h);
+                } else {
+                  const key = (h.symbol || '').toUpperCase();
+                  if (!positions.has(key)) positions.set(key, { options: [] });
+                  positions.get(key)!.stock = h;
+                }
+              }
+              const positionCount = positions.size;
+              const positionEntries: [string, { stock?: Holding; options: Holding[] }][] = [];
+              positions.forEach((val, key) => positionEntries.push([key, val]));
+
+              return (
+                <>
+                  <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+                    Positions ({positionCount})
+                  </Typography>
+                  <Box sx={{ display: 'grid', gap: 1 }}>
+                    {positionEntries.map(([posSymbol, position]) => {
+                      const holding = position.stock || position.options[0];
+                      const isStandaloneOption = !position.stock && position.options.length > 0;
+                      const lookupSymbol = posSymbol;
+                      const displaySymbol = posSymbol;
+
+                      // Daily price change
+                      const priceData = holdingsPriceData[lookupSymbol];
+                      const dailyChange = priceData?.change || 0;
+                      const dailyChangePercent = priceData?.changePercent || 0;
+                      const hasDailyChange = priceData != null && dailyChange !== 0;
+                      const isDailyGain = dailyChange >= 0;
+
+                      // Use market price from StockPrice service, not IBKR sync snapshot
+                      const currentPrice = priceData?.price ?? holding.currentPrice;
+                      const costBasis = holding.costBasis;
+                      const avgCost = costBasis != null && holding.quantity !== 0
+                        ? Math.abs(costBasis) / Math.abs(holding.quantity)
+                        : null;
+
+                      // Compute market value and gain/loss from live price
+                      const mktValue = currentPrice != null
+                        ? currentPrice * Math.abs(holding.quantity)
+                        : (holding.marketValue || 0);
+                      const gainLoss = costBasis != null ? mktValue - costBasis : null;
+                      const gainLossPercent = costBasis != null && costBasis !== 0
+                        ? ((mktValue - costBasis) / Math.abs(costBasis)) * 100
+                        : null;
+                      const isGain = gainLoss != null && gainLoss >= 0;
+
+                      return (
+                        <Box key={posSymbol}>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              p: 1.5,
+                              backgroundColor: 'grey.50',
+                              borderRadius: position.options.length > 0 ? '4px 4px 0 0' : 1,
+                            }}
+                          >
+                            {/* Left: Symbol, name, quantity */}
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {displaySymbol}
+                                </Typography>
+                                <Chip
+                                  label={isStandaloneOption ? 'option' : 'stock'}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ height: 20, fontSize: '0.7rem' }}
+                                />
+                              </Box>
+                              {holding.name && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {holding.name}
+                                </Typography>
+                              )}
+                              <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
+                                <Typography variant="caption">
+                                  Qty: {Math.abs(holding.quantity).toLocaleString()}
+                                </Typography>
+                                {currentPrice != null && currentPrice > 0 && (
+                                  <Typography variant="caption">
+                                    Price: {formatCurrency(currentPrice, holding.currency || account.currency)}
+                                  </Typography>
+                                )}
+                                {avgCost != null && (
+                                  <Typography variant="caption" color="text.secondary">
+                                    Avg Cost: {formatCurrency(avgCost, holding.currency || account.currency)}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Box>
+
+                            {/* Center: Daily change */}
+                            <Box sx={{ textAlign: 'center', minWidth: 100, px: 1 }}>
+                              {hasDailyChange && (
+                                <>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                                    {isDailyGain
+                                      ? <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main' }} />
+                                      : <TrendingDownIcon sx={{ fontSize: 16, color: 'error.main' }} />
+                                    }
+                                    <Typography
+                                      variant="body2"
+                                      sx={{ fontWeight: 600, direction: 'ltr', unicodeBidi: 'bidi-override' }}
+                                      color={isDailyGain ? 'success.main' : 'error.main'}
+                                    >
+                                      {dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(2)}%
+                                    </Typography>
+                                  </Box>
+                                  <Typography variant="caption" color="text.secondary" sx={{ direction: 'ltr', unicodeBidi: 'bidi-override' }}>
+                                    {dailyChange >= 0 ? '+' : ''}{formatCurrency(dailyChange, account.currency)}
+                                  </Typography>
+                                </>
+                              )}
+                            </Box>
+
+                            {/* Right: Market value + Gain/Loss */}
+                            <Box sx={{ textAlign: 'right', minWidth: 120 }}>
+                              {mktValue != null && (
+                                <Typography variant="body2" sx={{ fontWeight: 600, direction: 'ltr', unicodeBidi: 'bidi-override' }}>
+                                  {formatCurrency(mktValue, holding.currency || account.currency)}
+                                </Typography>
+                              )}
+                              {gainLoss != null && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+                                  {isGain
+                                    ? <TrendingUpIcon sx={{ fontSize: 14, color: 'success.main' }} />
+                                    : <TrendingDownIcon sx={{ fontSize: 14, color: 'error.main' }} />
+                                  }
+                                  <Typography
+                                    variant="caption"
+                                    color={isGain ? 'success.main' : 'error.main'}
+                                    sx={{ fontWeight: 500, direction: 'ltr', unicodeBidi: 'bidi-override' }}
+                                  >
+                                    {gainLoss >= 0 ? '+' : ''}{formatCurrency(gainLoss, account.currency)}
+                                    {gainLossPercent != null && ` (${gainLossPercent >= 0 ? '+' : ''}${gainLossPercent.toFixed(1)}%)`}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {costBasis != null && (
+                                <Typography variant="caption" color="text.secondary" sx={{ direction: 'ltr', unicodeBidi: 'bidi-override' }}>
+                                  Cost: {formatCurrency(Math.abs(costBasis), holding.currency || account.currency)}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+
+                          {/* Linked options displayed under the stock */}
+                          {position.options.length > 0 && position.stock && (
+                            <Box sx={{
+                              backgroundColor: 'grey.100',
+                              borderRadius: '0 0 4px 4px',
+                              borderTop: '1px dashed',
+                              borderColor: 'divider',
+                              px: 1.5,
+                              py: 1
+                            }}>
+                              {position.options.map((opt, oi) => {
+                                const isShort = opt.quantity < 0;
+                                const formatExp = (dateStr?: string) => {
+                                  if (!dateStr) return '';
+                                  const d = new Date(dateStr);
+                                  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+                                };
+                                const optLabel = `${opt.putCall === 'CALL' ? 'Call' : 'Put'} ${formatCurrency(opt.strikePrice || 0, account.currency)} exp ${formatExp(opt.expirationDate)}`;
+
+                                return (
+                                  <Box key={`opt-${oi}`} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      {isShort && <Chip label="Short" size="small" color="warning" sx={{ height: 18, fontSize: '0.65rem' }} />}
+                                      <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                                        {optLabel}
+                                      </Typography>
+                                    </Box>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {Math.abs(opt.quantity)} contract{Math.abs(opt.quantity) !== 1 ? 's' : ''}
+                                    </Typography>
+                                  </Box>
+                                );
+                              })}
+                            </Box>
+                          )}
+
+                          {/* Timeline chart for position */}
+                          <Box sx={{ p: 1.5, pt: 0 }}>
+                            <HoldingTimelineChart symbol={lookupSymbol} currency={account.currency} />
+                          </Box>
+                        </Box>
+                      );
+                    })}
                   </Box>
-                  
-                  <Box sx={{ textAlign: 'right' }}>
-                    {holding.marketValue && (
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(holding.marketValue)}
-                      </Typography>
-                    )}
-                    <Chip
-                      label={holding.holdingType}
-                      size="small"
-                      variant="outlined"
-                      sx={{ mt: 0.5 }}
-                    />
-                  </Box>
-                </Box>
-              ))}
-            </Box>
+                </>
+              );
+            })()}
           </Box>
         </Collapse>
       )}
@@ -220,11 +416,15 @@ const InvestmentAccountItem: React.FC<InvestmentAccountItemProps> = ({ investmen
 
 export const InvestmentAccountList: React.FC<InvestmentAccountListProps> = ({
   investments,
+  portfolioCashBalances,
+  holdingsPriceData,
   loading,
   onRefresh
 }) => {
   const activeInvestments = investments.filter(inv => inv.status === 'active');
-  const totalValue = activeInvestments.reduce((sum, inv) => sum + inv.totalValue, 0);
+  const grouped = groupByBankAccount(activeInvestments, portfolioCashBalances);
+  const totalValue = grouped.reduce((sum, g) => sum + g.totalValue, 0);
+  const currency = grouped.length === 1 ? grouped[0].currency : undefined;
 
   return (
     <Card>
@@ -237,7 +437,7 @@ export const InvestmentAccountList: React.FC<InvestmentAccountListProps> = ({
               Investment Accounts
             </Typography>
             <Chip
-              label={`${activeInvestments.length} account${activeInvestments.length !== 1 ? 's' : ''}`}
+              label={`${grouped.length} account${grouped.length !== 1 ? 's' : ''}`}
               size="small"
               variant="outlined"
             />
@@ -246,7 +446,7 @@ export const InvestmentAccountList: React.FC<InvestmentAccountListProps> = ({
           {totalValue > 0 && (
             <Box sx={{ textAlign: 'right' }}>
               <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                {formatCurrency(totalValue)}
+                {formatCurrency(totalValue, currency)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Total Value
@@ -256,12 +456,13 @@ export const InvestmentAccountList: React.FC<InvestmentAccountListProps> = ({
         </Box>
 
         {/* Investment List */}
-        {activeInvestments.length > 0 ? (
+        {grouped.length > 0 ? (
           <List sx={{ p: 0 }}>
-            {activeInvestments.map((investment) => (
-              <InvestmentAccountItem
-                key={investment._id}
-                investment={investment}
+            {grouped.map((account) => (
+              <GroupedAccountItem
+                key={account.bankAccountId}
+                account={account}
+                holdingsPriceData={holdingsPriceData}
               />
             ))}
           </List>

@@ -3,10 +3,61 @@ export interface Holding {
   name?: string;
   quantity: number;
   price?: number;
+  currentPrice?: number;
   marketValue?: number;
+  costBasis?: number;
   currency: string;
   sector?: string;
-  holdingType: 'stock' | 'bond' | 'etf' | 'mutual_fund' | 'other';
+  holdingType: 'stock' | 'bond' | 'etf' | 'mutual_fund' | 'option' | 'future' | 'other';
+  // Option-specific fields
+  underlyingSymbol?: string;
+  strikePrice?: number;
+  expirationDate?: string;
+  putCall?: 'CALL' | 'PUT';
+  multiplier?: number;
+}
+
+export interface HoldingPriceData {
+  price: number;
+  change: number;
+  changePercent: number;
+  date: string;
+}
+
+export type HoldingsPriceData = Record<string, HoldingPriceData>;
+
+export interface TimelinePricePoint {
+  date: string;
+  price: number;
+  quantity: number;
+  holdingValue: number;
+}
+
+export interface TimelineEvent {
+  date: string;
+  type: 'BUY' | 'SELL' | 'DIVIDEND' | 'INTEREST' | 'FEE' | 'DEPOSIT' | 'WITHDRAWAL' | 'OTHER';
+  shares: number;
+  pricePerShare: number;
+  value: number;
+  symbol: string;
+}
+
+export interface CoveredCall {
+  strikePrice: number;
+  expirationDate: string;
+  putCall: 'CALL' | 'PUT';
+  contracts: number;
+  multiplier: number;
+  symbol: string;
+  sellDate: string | null;
+}
+
+export interface HoldingTimeline {
+  symbol: string;
+  priceHistory: TimelinePricePoint[];
+  events: TimelineEvent[];
+  coveredCalls: CoveredCall[];
+  days: number;
 }
 
 export interface Investment {
@@ -48,6 +99,7 @@ export interface PortfolioSummary {
   totalCashBalance: number;
   totalValue: number;
   accountCount: number;
+  currency?: string;
   lastUpdated: Date | null;
   topHoldings: Array<{
     symbol: string;
@@ -70,6 +122,19 @@ export interface PortfolioTrend {
   dayChange: number;
   dayChangePercent: number;
   accountCount: number;
+}
+
+export interface PortfolioTimelinePoint {
+  date: string;
+  cash: number;
+  total: number;
+  [symbol: string]: number | string;
+}
+
+export interface PortfolioTimeline {
+  symbols: string[];
+  series: PortfolioTimelinePoint[];
+  cashBalance: number;
 }
 
 export interface PerformanceMetrics {
@@ -107,11 +172,20 @@ export interface InvestmentFilters {
   status?: string;
 }
 
+export interface PortfolioCashBalance {
+  cashBalance: number;
+  currency: string;
+}
+
+export type PortfolioCashBalances = Record<string, PortfolioCashBalance>;
+
 export interface InvestmentContextState {
   investments: Investment[];
   portfolioSummary: PortfolioSummary | null;
   portfolioTrends: PortfolioTrend[];
   performanceMetrics: PerformanceMetrics | null;
+  portfolioCashBalances: PortfolioCashBalances;
+  holdingsPriceData: HoldingsPriceData;
   loading: boolean;
   error: string | null;
 }

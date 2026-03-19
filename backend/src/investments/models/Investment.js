@@ -12,8 +12,7 @@ const holdingSchema = new mongoose.Schema({
   },
   quantity: {
     type: Number,
-    required: true,
-    min: 0
+    required: true
   },
   currentPrice: {
     type: Number,
@@ -22,8 +21,7 @@ const holdingSchema = new mongoose.Schema({
   },
   marketValue: {
     type: Number,
-    required: false,
-    min: 0
+    required: false
   },
   currency: {
     type: String,
@@ -37,7 +35,15 @@ const holdingSchema = new mongoose.Schema({
     type: String,
     enum: Object.values(INVESTMENT_CONSTANTS.HOLDING_TYPES),
     default: INVESTMENT_CONSTANTS.HOLDING_TYPES.STOCK
-  }
+  },
+  // Option-specific fields
+  underlyingSymbol: { type: String },
+  strikePrice: { type: Number },
+  expirationDate: { type: Date },
+  putCall: { type: String, enum: ['CALL', 'PUT'] },
+  multiplier: { type: Number },
+  // Cost basis from source (e.g., IBKR costBasisMoney)
+  costBasis: { type: Number }
 }, { _id: false });
 
 const investmentSchema = new mongoose.Schema({
@@ -87,7 +93,6 @@ const investmentSchema = new mongoose.Schema({
   holdings: [holdingSchema],
   totalMarketValue: {
     type: Number,
-    min: 0,
     default: 0
   },
   cashBalance: {
@@ -110,7 +115,9 @@ const investmentSchema = new mongoose.Schema({
     required: false
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
 // Indexes for efficient queries
@@ -186,7 +193,8 @@ investmentSchema.statics.getPortfolioSummary = async function(userId) {
         totalMarketValue: { $sum: '$totalMarketValue' },
         totalCashBalance: { $sum: '$cashBalance' },
         accountCount: { $sum: 1 },
-        lastUpdated: { $max: '$lastUpdated' }
+        lastUpdated: { $max: '$lastUpdated' },
+        currencies: { $addToSet: '$currency' }
       }
     },
     {
@@ -197,20 +205,27 @@ investmentSchema.statics.getPortfolioSummary = async function(userId) {
         totalCashBalance: 1,
         totalValue: { $add: ['$totalBalance', '$totalMarketValue', '$totalCashBalance'] },
         accountCount: 1,
-        lastUpdated: 1
+        lastUpdated: 1,
+        currencies: 1
       }
     }
   ];
 
   const result = await this.aggregate(pipeline);
-  return result[0] || {
+  const summary = result[0] || {
     totalBalance: 0,
     totalMarketValue: 0,
     totalCashBalance: 0,
     totalValue: 0,
     accountCount: 0,
-    lastUpdated: null
+    lastUpdated: null,
+    currencies: []
   };
+
+  // Use single currency if all accounts share one, otherwise default to ILS
+  summary.currency = summary.currencies?.length === 1 ? summary.currencies[0] : 'ILS';
+  delete summary.currencies;
+  return summary;
 };
 
 // Static method to get holdings summary across all accounts

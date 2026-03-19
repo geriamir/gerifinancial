@@ -15,7 +15,14 @@ router.get('/', async (req, res) => {
     const options = bankAccountId ? { bankAccountId } : {};
     
     const investments = await investmentService.getUserInvestments(req.user.id, options);
-    res.json({ investments });
+    
+    // Include portfolio-level cash balances (cash is not an investment, it belongs to the account)
+    const portfolioCashBalances = await investmentService.getPortfolioCashBalances(req.user.id);
+    
+    // Include latest stock price data for holdings
+    const holdingsPriceData = await investmentService.getHoldingsPriceData(req.user.id);
+    
+    res.json({ investments, portfolioCashBalances, holdingsPriceData });
   } catch (error) {
     logger.error('Error fetching investments:', error);
     res.status(500).json({ error: error.message });
@@ -61,6 +68,20 @@ router.get('/portfolio/performance', async (req, res) => {
     res.json({ performance });
   } catch (error) {
     logger.error('Error fetching performance metrics:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/portfolio/timeline', async (req, res) => {
+  try {
+    const { days = 365 } = req.query;
+    const timeline = await investmentService.getPortfolioTimeline(
+      req.user.id,
+      parseInt(days)
+    );
+    res.json(timeline);
+  } catch (error) {
+    logger.error('Error fetching portfolio timeline:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -165,6 +186,23 @@ router.get('/holdings/:symbol/history', async (req, res) => {
     res.json({ history });
   } catch (error) {
     logger.error('Error fetching holdings history:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get holding timeline: stock price history + buy/sell events
+router.get('/holdings/:symbol/timeline', async (req, res) => {
+  try {
+    const { days = 365 } = req.query;
+    const symbol = req.params.symbol.toUpperCase();
+    const timeline = await investmentService.getHoldingTimeline(
+      req.user.id,
+      symbol,
+      parseInt(days)
+    );
+    res.json(timeline);
+  } catch (error) {
+    logger.error('Error fetching holding timeline:', error);
     res.status(500).json({ error: error.message });
   }
 });

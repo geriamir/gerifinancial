@@ -7,20 +7,28 @@ import {
   HoldingHistory,
   InvestmentSnapshot,
   SyncResult,
-  InvestmentFilters
+  InvestmentFilters,
+  PortfolioCashBalances,
+  HoldingsPriceData,
+  HoldingTimeline,
+  PortfolioTimeline
 } from './types/investment';
 
 
 export const investmentApi = {
   // Get user's investments
-  getUserInvestments: async (filters?: InvestmentFilters): Promise<Investment[]> => {
+  getUserInvestments: async (filters?: InvestmentFilters): Promise<{ investments: Investment[]; portfolioCashBalances: PortfolioCashBalances; holdingsPriceData: HoldingsPriceData }> => {
     const params = new URLSearchParams();
     if (filters?.bankAccountId) params.append('bankAccountId', filters.bankAccountId);
     if (filters?.accountType) params.append('accountType', filters.accountType);
     if (filters?.status) params.append('status', filters.status);
     
-    const response = await api.get<{ investments: Investment[] }>(`/investments?${params.toString()}`);
-    return response.data.investments;
+    const response = await api.get<{ investments: Investment[]; portfolioCashBalances: PortfolioCashBalances; holdingsPriceData: HoldingsPriceData }>(`/investments?${params.toString()}`);
+    return {
+      investments: response.data.investments,
+      portfolioCashBalances: response.data.portfolioCashBalances || {},
+      holdingsPriceData: response.data.holdingsPriceData || {}
+    };
   },
 
   // Get investment by ID
@@ -57,6 +65,11 @@ export const investmentApi = {
     return response.data.performance;
   },
 
+  getPortfolioTimeline: async (days: number = 365): Promise<PortfolioTimeline> => {
+    const response = await api.get<PortfolioTimeline>(`/investments/portfolio/timeline?days=${days}`);
+    return response.data;
+  },
+
   getHoldingsHistory: async (symbol: string, days: number = 90): Promise<HoldingHistory[]> => {
     const response = await api.get<{ history: HoldingHistory[] }>(`/investments/holdings/${symbol}/history?days=${days}`);
     return response.data.history;
@@ -88,5 +101,11 @@ export const investmentApi = {
   deleteInvestment: async (investmentId: string): Promise<Investment> => {
     const response = await api.delete<{ investment: Investment }>(`/investments/${investmentId}`);
     return response.data.investment;
+  },
+
+  // Get holding timeline (price history + buy/sell events)
+  getHoldingTimeline: async (symbol: string, days: number = 365): Promise<HoldingTimeline> => {
+    const response = await api.get<HoldingTimeline>(`/investments/holdings/${encodeURIComponent(symbol)}/timeline?days=${days}`);
+    return response.data;
   }
 };

@@ -18,7 +18,8 @@ const STRATEGY_DISPLAY_NAMES: Record<string, string> = {
   'checking-accounts': 'Checking',
   'investment-portfolios': 'Investments',
   'foreign-currency': 'Foreign Currency',
-  'mercury-checking': 'Mercury Checking'
+  'mercury-checking': 'Mercury Checking',
+  'ibkr-flex': 'IBKR Flex'
 };
 
 interface AccountScrapingProps {

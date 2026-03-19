@@ -10,7 +10,6 @@ const investmentTransactionSchema = new mongoose.Schema({
   investmentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Investment',
-    required: true,
     index: true
   },
   bankAccountId: {
@@ -60,7 +59,7 @@ const investmentTransactionSchema = new mongoose.Schema({
     required: true,
     validate: {
       validator: function(v) {
-        return typeof v === 'number' && !isNaN(v) && v >= 0;
+        return typeof v === 'number' && !isNaN(v) && isFinite(v);
       },
       message: props => `${props.value} is not a valid transaction value!`
     }
@@ -93,7 +92,7 @@ const investmentTransactionSchema = new mongoose.Schema({
     min: 0,
     validate: {
       validator: function(v) {
-        return typeof v === 'number' && !isNaN(v) && v > 0;
+        return typeof v === 'number' && !isNaN(v) && v >= 0;
       },
       message: props => `${props.value} is not a valid price!`
     }
@@ -102,7 +101,7 @@ const investmentTransactionSchema = new mongoose.Schema({
   // Derived fields
   transactionType: {
     type: String,
-    enum: ['BUY', 'SELL', 'DIVIDEND', 'OTHER'],
+    enum: ['BUY', 'SELL', 'DIVIDEND', 'INTEREST', 'FEE', 'DEPOSIT', 'WITHDRAWAL', 'OTHER'],
     required: true,
     index: true
   },
@@ -111,6 +110,13 @@ const investmentTransactionSchema = new mongoose.Schema({
   rawData: {
     type: mongoose.Schema.Types.Mixed,
     required: false
+  },
+  
+  // External unique ID from source (e.g., IBKR tradeId)
+  externalId: {
+    type: String,
+    required: false,
+    index: true
   }
 }, {
   timestamps: true
@@ -122,7 +128,7 @@ investmentTransactionSchema.index({ userId: 1, symbol: 1, executionDate: -1 });
 investmentTransactionSchema.index({ bankAccountId: 1, executionDate: -1 });
 investmentTransactionSchema.index({ paperId: 1, executionDate: -1 });
 
-// Unique constraint to prevent duplicate transactions
+// Non-unique compound index for fallback dedup queries (application-level dedup)
 investmentTransactionSchema.index({ 
   userId: 1, 
   investmentId: 1, 
@@ -130,7 +136,13 @@ investmentTransactionSchema.index({
   executionDate: 1, 
   amount: 1, 
   value: 1 
-}, { unique: true });
+});
+
+// Unique constraint on external source ID (e.g., IBKR tradeId)
+investmentTransactionSchema.index(
+  { userId: 1, bankAccountId: 1, externalId: 1 },
+  { unique: true, sparse: true }
+);
 
 // Virtual for transaction direction (buy/sell indicator)
 investmentTransactionSchema.virtual('direction').get(function() {

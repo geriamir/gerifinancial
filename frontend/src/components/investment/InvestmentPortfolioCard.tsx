@@ -106,7 +106,7 @@ export const InvestmentPortfolioCard: React.FC<InvestmentPortfolioCardProps> = (
             {/* Total Value */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="h3" component="div" sx={{ fontWeight: 'bold', mb: 1 }}>
-                {formatCurrency(portfolioSummary.totalValue)}
+                {formatCurrency(portfolioSummary.totalValue, portfolioSummary.currency)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Total Portfolio Value
@@ -122,7 +122,7 @@ export const InvestmentPortfolioCard: React.FC<InvestmentPortfolioCardProps> = (
             }}>
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {formatCurrency(portfolioSummary.totalMarketValue)}
+                  {formatCurrency(portfolioSummary.totalMarketValue, portfolioSummary.currency)}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Market Investments
@@ -130,7 +130,7 @@ export const InvestmentPortfolioCard: React.FC<InvestmentPortfolioCardProps> = (
               </Box>
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {formatCurrency(portfolioSummary.totalCashBalance)}
+                  {formatCurrency(portfolioSummary.totalCashBalance, portfolioSummary.currency)}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Cash Balance
@@ -141,7 +141,7 @@ export const InvestmentPortfolioCard: React.FC<InvestmentPortfolioCardProps> = (
                   {portfolioSummary.accountCount}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Investment Accounts
+                  Positions
                 </Typography>
               </Box>
             </Box>
@@ -184,13 +184,13 @@ export const InvestmentPortfolioCard: React.FC<InvestmentPortfolioCardProps> = (
             {portfolioSummary.topHoldings && portfolioSummary.topHoldings.length > 0 && (
               <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
-                  Top Holdings
+                  Top Positions
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   {portfolioSummary.topHoldings.slice(0, 5).map((holding) => (
                     <Chip
                       key={holding.symbol}
-                      label={`${holding.symbol} (${formatCurrency(holding.totalMarketValue)})`}
+                      label={`${holding.symbol} (${formatCurrency(holding.totalMarketValue, portfolioSummary.currency)})`}
                       size="small"
                       variant="outlined"
                     />

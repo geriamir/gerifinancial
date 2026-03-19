@@ -11,7 +11,7 @@ const bankAccountSchema = new mongoose.Schema({
   bankId: {
     type: String,
     required: true,
-    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury'] // Supported banks
+    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury', 'ibkr'] // Supported banks
   },
   defaultCurrency: {
     type: String,
@@ -25,15 +25,23 @@ const bankAccountSchema = new mongoose.Schema({
   credentials: {
     username: {
       type: String,
-      required: function() { return this.bankId !== 'mercury'; }
+      required: function() { return this.bankId !== 'mercury' && this.bankId !== 'ibkr'; }
     },
     password: {
       type: String,
-      required: function() { return this.bankId !== 'mercury'; }
+      required: function() { return this.bankId !== 'mercury' && this.bankId !== 'ibkr'; }
     },
     apiToken: {
       type: String,
       required: function() { return this.bankId === 'mercury'; }
+    },
+    flexToken: {
+      type: String,
+      required: function() { return this.bankId === 'ibkr'; }
+    },
+    queryId: {
+      type: String,
+      required: function() { return this.bankId === 'ibkr'; }
     }
   },
   // Per-strategy sync tracking
@@ -54,6 +62,11 @@ const bankAccountSchema = new mongoose.Schema({
       status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
     },
     'mercury-checking': {
+      lastScraped: { type: Date, default: null },
+      lastAttempted: { type: Date, default: null },
+      status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
+    },
+    'ibkr-flex': {
       lastScraped: { type: Date, default: null },
       lastAttempted: { type: Date, default: null },
       status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
@@ -205,6 +218,11 @@ bankAccountSchema.pre('save', function(next) {
     if (this.isModified('credentials.apiToken') && this.credentials.apiToken) {
       if (!isEncrypted(this.credentials.apiToken)) {
         this.credentials.apiToken = encrypt(this.credentials.apiToken);
+      }
+    }
+    if (this.isModified('credentials.flexToken') && this.credentials.flexToken) {
+      if (!isEncrypted(this.credentials.flexToken)) {
+        this.credentials.flexToken = encrypt(this.credentials.flexToken);
       }
     }
     next();
