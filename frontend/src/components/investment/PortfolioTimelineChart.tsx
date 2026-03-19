@@ -212,9 +212,10 @@ export const PortfolioTimelineChart: React.FC<PortfolioTimelineChartProps> = ({ 
           <YAxis
             tick={{ fontSize: 11 }}
             tickFormatter={(v: number) => {
-              if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
-              if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
-              return `$${v}`;
+              const sym = currency === 'ILS' ? '₪' : currency === 'EUR' ? '€' : '$';
+              if (v >= 1000000) return `${sym}${(v / 1000000).toFixed(1)}M`;
+              if (v >= 1000) return `${sym}${(v / 1000).toFixed(0)}K`;
+              return `${sym}${v}`;
             }}
             width={60}
           />

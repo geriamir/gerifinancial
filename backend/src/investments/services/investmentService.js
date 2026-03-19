@@ -233,18 +233,29 @@ class InvestmentService {
       }
     }
 
+    if (symbols.size === 0) return {};
+
     const StockPrice = require('../models/StockPrice');
+    const latestPrices = await StockPrice.aggregate([
+      { $match: { symbol: { $in: [...symbols] }, isActive: true } },
+      { $sort: { date: -1 } },
+      { $group: {
+        _id: '$symbol',
+        price: { $first: '$price' },
+        change: { $first: '$change' },
+        changePercent: { $first: '$changePercent' },
+        date: { $first: '$date' }
+      }}
+    ]);
+
     const result = {};
-    for (const symbol of symbols) {
-      const sp = await StockPrice.findOne({ symbol, isActive: true }).sort({ date: -1 });
-      if (sp) {
-        result[symbol] = {
-          price: sp.price,
-          change: sp.change || 0,
-          changePercent: sp.changePercent || 0,
-          date: sp.date
-        };
-      }
+    for (const sp of latestPrices) {
+      result[sp._id] = {
+        price: sp.price,
+        change: sp.change || 0,
+        changePercent: sp.changePercent || 0,
+        date: sp.date
+      };
     }
     return result;
   }
@@ -261,7 +272,7 @@ class InvestmentService {
     }).sort({ executionDate: 1 }).lean();
 
     if (allTransactions.length === 0) {
-      return { symbol: upperSymbol, priceHistory: [], events: [], days };
+      return { symbol: upperSymbol, priceHistory: [], events: [], coveredCalls: [], days };
     }
 
     // Start date is the first transaction
@@ -329,19 +340,38 @@ class InvestmentService {
     // Find covered calls (option holdings on this underlying symbol)
     const investments = await Investment.find({ userId }).lean();
     const coveredCalls = [];
+    const optionSymbols = [];
     for (const inv of investments) {
       if (!inv.holdings) continue;
       for (const h of inv.holdings) {
         if (h.holdingType === 'option' && h.underlyingSymbol &&
             h.underlyingSymbol.toUpperCase() === upperSymbol &&
             h.putCall === 'CALL' && h.quantity < 0) {
-          // Find when the option was sold
-          const optionTx = await InvestmentTransaction.findOne({
-            userId,
-            symbol: h.symbol,
-            transactionType: 'SELL'
-          }).sort({ executionDate: 1 }).lean();
+          optionSymbols.push(h.symbol);
+        }
+      }
+    }
 
+    // Prefetch all option SELL transactions in one query
+    const optionSellTxns = optionSymbols.length > 0
+      ? await InvestmentTransaction.find({
+          userId,
+          symbol: { $in: optionSymbols },
+          transactionType: 'SELL'
+        }).sort({ executionDate: 1 }).lean()
+      : [];
+    const optionSellMap = new Map();
+    for (const tx of optionSellTxns) {
+      if (!optionSellMap.has(tx.symbol)) optionSellMap.set(tx.symbol, tx);
+    }
+
+    for (const inv of investments) {
+      if (!inv.holdings) continue;
+      for (const h of inv.holdings) {
+        if (h.holdingType === 'option' && h.underlyingSymbol &&
+            h.underlyingSymbol.toUpperCase() === upperSymbol &&
+            h.putCall === 'CALL' && h.quantity < 0) {
+          const optionTx = optionSellMap.get(h.symbol);
           coveredCalls.push({
             strikePrice: h.strikePrice,
             expirationDate: h.expirationDate,
@@ -375,7 +405,7 @@ class InvestmentService {
     const symbols = [...symbolSet];
 
     if (symbols.length === 0) {
-      return { symbols: [], series: [] };
+      return { symbols: [], series: [], cashBalance: 0 };
     }
 
     // Get current cash balance from Portfolio documents
@@ -411,12 +441,19 @@ class InvestmentService {
       cashChanges[dateKey] = (cashChanges[dateKey] || 0) + (t.value || 0);
     }
 
+    // Pre-group transactions by symbol for efficient lookup
+    const txBySymbol = new Map();
+    for (const t of allTransactions) {
+      if (!txBySymbol.has(t.symbol)) txBySymbol.set(t.symbol, []);
+      txBySymbol.get(t.symbol).push(t);
+    }
+
     // For each symbol, build daily holdingValue series
     const symbolSeries = {};
     let earliestDate = null;
 
     for (const symbol of symbols) {
-      const transactions = allTransactions.filter(t => t.symbol === symbol);
+      const transactions = txBySymbol.get(symbol) || [];
       if (transactions.length === 0) continue;
 
       const firstTxDate = new Date(transactions[0].executionDate);
