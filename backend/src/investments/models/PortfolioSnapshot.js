@@ -11,8 +11,7 @@ const portfolioSnapshotInvestmentSchema = new mongoose.Schema({
   },
   quantity: {
     type: Number,
-    required: true,
-    min: 0
+    required: true
   },
   price: {
     type: Number,
@@ -21,8 +20,7 @@ const portfolioSnapshotInvestmentSchema = new mongoose.Schema({
   },
   marketValue: {
     type: Number,
-    required: false,
-    min: 0
+    required: false
   },
   currency: {
     type: String,
@@ -34,7 +32,7 @@ const portfolioSnapshotInvestmentSchema = new mongoose.Schema({
   },
   investmentType: {
     type: String,
-    enum: ['stock', 'bond', 'etf', 'mutual_fund', 'commodity', 'cash', 'other'],
+    enum: ['stock', 'bond', 'etf', 'mutual_fund', 'commodity', 'cash', 'option', 'future', 'other'],
     default: 'stock'
   }
 }, { _id: false });

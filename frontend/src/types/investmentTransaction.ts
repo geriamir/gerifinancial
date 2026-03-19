@@ -42,7 +42,7 @@ export interface InvestmentTransaction {
   };
 }
 
-export type TransactionType = 'BUY' | 'SELL' | 'DIVIDEND' | 'OTHER';
+export type TransactionType = 'BUY' | 'SELL' | 'DIVIDEND' | 'INTEREST' | 'FEE' | 'DEPOSIT' | 'WITHDRAWAL' | 'OTHER';
 
 // API Response Types
 
@@ -273,20 +273,28 @@ export interface UseCostBasisResult {
 
 // Constants
 
-export const TRANSACTION_TYPES: TransactionType[] = ['BUY', 'SELL', 'DIVIDEND', 'OTHER'];
+export const TRANSACTION_TYPES: TransactionType[] = ['BUY', 'SELL', 'DIVIDEND', 'INTEREST', 'FEE', 'DEPOSIT', 'WITHDRAWAL', 'OTHER'];
 
 export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   BUY: 'Buy',
   SELL: 'Sell',
   DIVIDEND: 'Dividend',
+  INTEREST: 'Interest',
+  FEE: 'Fee',
+  DEPOSIT: 'Deposit',
+  WITHDRAWAL: 'Withdrawal',
   OTHER: 'Other'
 };
 
 export const TRANSACTION_TYPE_COLORS: Record<TransactionType, string> = {
-  BUY: '#4caf50',    // Green
-  SELL: '#f44336',   // Red
-  DIVIDEND: '#2196f3', // Blue
-  OTHER: '#ff9800'   // Orange
+  BUY: '#4caf50',       // Green
+  SELL: '#f44336',      // Red
+  DIVIDEND: '#2196f3',  // Blue
+  INTEREST: '#00bcd4',  // Cyan
+  FEE: '#ff9800',       // Orange
+  DEPOSIT: '#4caf50',   // Green
+  WITHDRAWAL: '#f44336', // Red
+  OTHER: '#9e9e9e'      // Grey
 };
 
 export const DEFAULT_TRANSACTION_FILTERS: InvestmentTransactionFilters = {

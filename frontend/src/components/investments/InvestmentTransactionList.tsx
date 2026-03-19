@@ -26,7 +26,10 @@ import {
   AttachMoney as DividendIcon,
   SwapHoriz as OtherIcon,
   FilterList as FilterIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  AccountBalanceWallet as DepositIcon,
+  RemoveCircleOutline as FeeIcon,
+  Savings as InterestIcon
 } from '@mui/icons-material';
 import { format, parseISO } from 'date-fns';
 import {
@@ -49,8 +52,14 @@ const TRANSACTION_ICONS: Record<TransactionType, React.ReactElement> = {
   BUY: <TrendingUpIcon fontSize="small" />,
   SELL: <TrendingDownIcon fontSize="small" />,
   DIVIDEND: <DividendIcon fontSize="small" />,
+  INTEREST: <InterestIcon fontSize="small" />,
+  FEE: <FeeIcon fontSize="small" />,
+  DEPOSIT: <DepositIcon fontSize="small" />,
+  WITHDRAWAL: <DepositIcon fontSize="small" />,
   OTHER: <OtherIcon fontSize="small" />
 };
+
+const CASH_TRANSACTION_TYPES: TransactionType[] = ['DIVIDEND', 'INTEREST', 'FEE', 'DEPOSIT', 'WITHDRAWAL'];
 
 export const InvestmentTransactionList: React.FC<InvestmentTransactionListProps> = ({
   investmentId,
@@ -116,7 +125,7 @@ export const InvestmentTransactionList: React.FC<InvestmentTransactionListProps>
   };
 
   const formatShares = (amount: number, transactionType: TransactionType) => {
-    if (transactionType === 'DIVIDEND') return '';
+    if (CASH_TRANSACTION_TYPES.includes(transactionType)) return '';
     
     const absAmount = Math.abs(amount);
     return `${absAmount.toLocaleString()} ${absAmount === 1 ? 'share' : 'shares'}`;
@@ -153,10 +162,12 @@ export const InvestmentTransactionList: React.FC<InvestmentTransactionListProps>
       <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
         <Box>
           <Typography variant="h6" component="div">
-            {transaction.symbol}
+            {transaction.transactionType === 'DEPOSIT' || transaction.transactionType === 'WITHDRAWAL'
+              ? '' : transaction.symbol}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {transaction.paperName}
+            {transaction.transactionType === 'DEPOSIT' || transaction.transactionType === 'WITHDRAWAL'
+              ? '' : transaction.paperName}
           </Typography>
         </Box>
         <Box display="flex" alignItems="center" gap={1}>
@@ -325,14 +336,16 @@ export const InvestmentTransactionList: React.FC<InvestmentTransactionListProps>
                 {/* Symbol */}
                 <TableCell>
                   <Typography variant="body2" fontWeight="medium">
-                    {transaction.symbol}
+                    {transaction.transactionType === 'DEPOSIT' || transaction.transactionType === 'WITHDRAWAL' 
+                      ? '' : transaction.symbol}
                   </Typography>
                 </TableCell>
 
                 {/* Security Name */}
                 <TableCell>
                   <Typography variant="body2" noWrap>
-                    {transaction.paperName}
+                    {transaction.transactionType === 'DEPOSIT' || transaction.transactionType === 'WITHDRAWAL'
+                      ? '' : transaction.paperName}
                   </Typography>
                 </TableCell>
 

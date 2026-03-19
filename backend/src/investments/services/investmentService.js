@@ -266,7 +266,7 @@ class InvestmentService {
 
     // Start date is the first transaction
     const firstTxDate = new Date(allTransactions[0].executionDate);
-    firstTxDate.setHours(0, 0, 0, 0);
+    firstTxDate.setUTCHours(0, 0, 0, 0);
 
     // Build cumulative position timeline from transactions
     const positionChanges = allTransactions.map(t => ({
@@ -356,6 +356,168 @@ class InvestmentService {
     }
 
     return { symbol: upperSymbol, priceHistory, events, coveredCalls, days };
+  }
+
+  async getPortfolioTimeline(userId, days = 365) {
+    const StockPrice = require('../models/StockPrice');
+    const Portfolio = require('../models/Portfolio');
+
+    // Get all holdings (exclude options — use underlying)
+    const investments = await Investment.findByUser(userId);
+    const symbolSet = new Set();
+    for (const inv of investments) {
+      for (const h of (inv.holdings || [])) {
+        if (h.holdingType !== 'option' && h.holdingType !== 'future' && h.symbol) {
+          symbolSet.add(h.symbol.toUpperCase());
+        }
+      }
+    }
+    const symbols = [...symbolSet];
+
+    if (symbols.length === 0) {
+      return { symbols: [], series: [] };
+    }
+
+    // Get current cash balance from Portfolio documents
+    const cashAgg = await Portfolio.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(userId), status: 'active' } },
+      { $group: { _id: null, totalCash: { $sum: '$cashBalance' } } }
+    ]);
+    const currentCash = cashAgg[0]?.totalCash || 0;
+
+    // Compute cutoff date
+    const cutoffDate = new Date();
+    if (days > 0) {
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+    } else {
+      cutoffDate.setFullYear(2000);
+    }
+    cutoffDate.setUTCHours(0, 0, 0, 0);
+
+    // Get ALL transactions to reconstruct cash timeline
+    // value field sign convention: BUY=negative (cash out), SELL/DIVIDEND=positive (cash in)
+    const allTransactions = await InvestmentTransaction.find({
+      userId
+    }).sort({ executionDate: 1 }).lean();
+
+    // Compute initial cash: currentCash = initialCash + sum(all values)
+    const totalTxValue = allTransactions.reduce((sum, t) => sum + (t.value || 0), 0);
+    const initialCash = currentCash - totalTxValue;
+
+    // Build daily cash changes from transactions
+    const cashChanges = {};
+    for (const t of allTransactions) {
+      const dateKey = new Date(t.executionDate).toISOString().split('T')[0];
+      cashChanges[dateKey] = (cashChanges[dateKey] || 0) + (t.value || 0);
+    }
+
+    // For each symbol, build daily holdingValue series
+    const symbolSeries = {};
+    let earliestDate = null;
+
+    for (const symbol of symbols) {
+      const transactions = allTransactions.filter(t => t.symbol === symbol);
+      if (transactions.length === 0) continue;
+
+      const firstTxDate = new Date(transactions[0].executionDate);
+      firstTxDate.setUTCHours(0, 0, 0, 0);
+      if (!earliestDate || firstTxDate < earliestDate) earliestDate = firstTxDate;
+
+      const positionChanges = transactions.map(t => ({
+        date: new Date(t.executionDate).toISOString().split('T')[0],
+        amount: t.amount
+      }));
+
+      const queryStart = firstTxDate < cutoffDate ? cutoffDate : firstTxDate;
+      let prices = await StockPrice.find({
+        symbol, date: { $gte: queryStart }, isActive: true
+      }).sort({ date: 1 }).lean();
+
+      if (prices.length === 0) {
+        try {
+          const stockPriceService = require('../../rsu/services/stockPriceService');
+          await stockPriceService.populateHistoricalPrices(symbol, queryStart, new Date());
+          prices = await StockPrice.find({
+            symbol, date: { $gte: queryStart }, isActive: true
+          }).sort({ date: 1 }).lean();
+        } catch (err) {
+          logger.warn(`Could not populate prices for ${symbol}: ${err.message}`);
+        }
+      }
+
+      // Apply transactions up to queryStart to get starting quantity
+      let cumulativeQty = 0;
+      let txIdx = 0;
+      const queryStartKey = queryStart.toISOString().split('T')[0];
+      while (txIdx < positionChanges.length && positionChanges[txIdx].date < queryStartKey) {
+        cumulativeQty += positionChanges[txIdx].amount;
+        txIdx++;
+      }
+
+      const series = {};
+      for (const p of prices) {
+        const dateKey = new Date(p.date).toISOString().split('T')[0];
+        while (txIdx < positionChanges.length && positionChanges[txIdx].date <= dateKey) {
+          cumulativeQty += positionChanges[txIdx].amount;
+          txIdx++;
+        }
+        series[dateKey] = cumulativeQty * p.price;
+      }
+
+      if (Object.keys(series).length > 0) {
+        symbolSeries[symbol] = series;
+      }
+    }
+
+    // Merge all symbols into unified date-keyed timeline
+    const allDates = new Set();
+    for (const series of Object.values(symbolSeries)) {
+      for (const date of Object.keys(series)) {
+        allDates.add(date);
+      }
+    }
+    const sortedDates = [...allDates].sort();
+    const activeSymbols = Object.keys(symbolSeries);
+
+    // Build cumulative cash at each date
+    const cashChangeKeys = Object.keys(cashChanges).sort();
+    let cumulativeCashValue = initialCash;
+    let cashIdx = 0;
+
+    // Advance cash to the cutoff date
+    const cutoffKey = cutoffDate.toISOString().split('T')[0];
+    while (cashIdx < cashChangeKeys.length && cashChangeKeys[cashIdx] < cutoffKey) {
+      cumulativeCashValue += cashChanges[cashChangeKeys[cashIdx]];
+      cashIdx++;
+    }
+
+    // Build output series with forward-filled values
+    const lastValues = {};
+    for (const sym of activeSymbols) lastValues[sym] = 0;
+    let lastCash = cumulativeCashValue;
+
+    const result = sortedDates.map(date => {
+      // Apply cash changes up to and including this date
+      while (cashIdx < cashChangeKeys.length && cashChangeKeys[cashIdx] <= date) {
+        cumulativeCashValue += cashChanges[cashChangeKeys[cashIdx]];
+        cashIdx++;
+      }
+      lastCash = cumulativeCashValue;
+
+      const point = { date };
+      let total = 0;
+      for (const sym of activeSymbols) {
+        const val = symbolSeries[sym][date];
+        if (val !== undefined) lastValues[sym] = val;
+        point[sym] = lastValues[sym];
+        total += lastValues[sym];
+      }
+      point.cash = lastCash;
+      point.total = total + lastCash;
+      return point;
+    });
+
+    return { symbols: activeSymbols, series: result, cashBalance: currentCash };
   }
 
   async getInvestmentById(investmentId, userId) {
@@ -694,8 +856,24 @@ class InvestmentService {
     for (const transactionData of investmentTransactions) {
       try {
         // Find matching investment by paperId
-        const matchingInvestment = investmentMap.get(transactionData.paperId);
+        let matchingInvestment = investmentMap.get(transactionData.paperId);
         
+        // For cash transactions (amount=0), also try matching by symbol in holdings
+        if (!matchingInvestment && transactionData.amount === 0 && transactionData.symbol) {
+          for (const inv of investments) {
+            const hasSymbol = (inv.holdings || []).some(h => 
+              h.symbol && h.symbol.toUpperCase() === transactionData.symbol.toUpperCase()
+            );
+            if (hasSymbol) { matchingInvestment = inv; break; }
+          }
+        }
+        
+        // For account-level cash transactions (interest, fees) with no holding match,
+        // use the first investment as a fallback — they still affect account cash
+        if (!matchingInvestment && transactionData.amount === 0 && investments.length > 0) {
+          matchingInvestment = investments[0];
+        }
+
         if (!matchingInvestment) {
           logger.warn(`No matching investment found for paperId: ${transactionData.paperId}, symbol: ${transactionData.symbol}`);
           results.errors.push({
@@ -714,8 +892,8 @@ class InvestmentService {
             bankAccountId: bankAccount._id,
             externalId: transactionData.externalId
           });
-        }
-        if (!existingTransaction) {
+        } else {
+          // Fallback dedup only when no externalId — match on full signature
           existingTransaction = await InvestmentTransaction.findOne({
             userId: bankAccount.userId,
             investmentId: matchingInvestment._id,
@@ -731,8 +909,9 @@ class InvestmentService {
           continue;
         }
 
-        // Classify transaction type
-        const transactionType = InvestmentTransaction.classifyTransactionType(transactionData.amount);
+        // Use provided transactionType (from IBKR cash classification) or classify from amount
+        const transactionType = transactionData.transactionType || 
+          InvestmentTransaction.classifyTransactionType(transactionData.amount);
 
         // Create new investment transaction
         const newTransaction = new InvestmentTransaction({

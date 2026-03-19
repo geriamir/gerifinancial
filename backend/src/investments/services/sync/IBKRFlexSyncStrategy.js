@@ -196,6 +196,7 @@ class IBKRFlexSyncStrategy extends BaseSyncStrategy {
         executionDate: new Date(this.parseDate(ct.reportDate || ct.dateTime)),
         executablePrice: 0,
         externalId: ct.transactionID || null,
+        transactionType: this.classifyCashTransactionType(ct),
         rawData: ct
       });
     }
@@ -206,15 +207,30 @@ class IBKRFlexSyncStrategy extends BaseSyncStrategy {
   buildCashDescription(ct) {
     const type = (ct.type || '').toUpperCase();
     const symbol = ct.symbol || '';
+    const amount = parseFloat(ct.amount || 0);
 
     if (type.includes('DIVIDEND')) return `Dividend: ${symbol}`;
     if (type.includes('WITHHOLDING')) return `Tax Withholding: ${symbol}`;
     if (type.includes('INTEREST')) return `Interest: ${symbol || 'Account'}`;
     if (type.includes('COMMISSION')) return `Commission: ${symbol}`;
     if (type.includes('FEE')) return `Fee: ${ct.description || symbol}`;
-    if (type.includes('DEPOSIT')) return `Deposit`;
-    if (type.includes('WITHDRAWAL')) return `Withdrawal`;
+    if (type.includes('DEPOSIT') || type.includes('WITHDRAWAL')) {
+      return amount >= 0 ? 'Deposit' : 'Withdrawal';
+    }
     return ct.description || `${type}: ${symbol}`.trim();
+  }
+
+  classifyCashTransactionType(ct) {
+    const type = (ct.type || '').toUpperCase();
+    const amount = parseFloat(ct.amount || 0);
+    if (type.includes('DIVIDEND') || type.includes('PAYMENT IN LIEU')) return 'DIVIDEND';
+    if (type.includes('WITHHOLDING') || type.includes('TAX')) return 'FEE';
+    if (type.includes('INTEREST')) return 'INTEREST';
+    if (type.includes('COMMISSION') || type.includes('FEE')) return 'FEE';
+    if (type.includes('DEPOSIT') || type.includes('WITHDRAWAL')) {
+      return amount >= 0 ? 'DEPOSIT' : 'WITHDRAWAL';
+    }
+    return 'OTHER';
   }
 
   mapAssetClass(assetCategory) {

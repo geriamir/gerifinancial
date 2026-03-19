@@ -10,7 +10,8 @@ import {
   InvestmentFilters,
   PortfolioCashBalances,
   HoldingsPriceData,
-  HoldingTimeline
+  HoldingTimeline,
+  PortfolioTimeline
 } from './types/investment';
 
 
@@ -62,6 +63,11 @@ export const investmentApi = {
   getPerformanceMetrics: async (days: number = 30): Promise<PerformanceMetrics> => {
     const response = await api.get<{ performance: PerformanceMetrics }>(`/investments/portfolio/performance?days=${days}`);
     return response.data.performance;
+  },
+
+  getPortfolioTimeline: async (days: number = 365): Promise<PortfolioTimeline> => {
+    const response = await api.get<PortfolioTimeline>(`/investments/portfolio/timeline?days=${days}`);
+    return response.data;
   },
 
   getHoldingsHistory: async (symbol: string, days: number = 90): Promise<HoldingHistory[]> => {

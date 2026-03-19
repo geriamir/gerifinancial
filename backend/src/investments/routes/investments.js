@@ -72,6 +72,20 @@ router.get('/portfolio/performance', async (req, res) => {
   }
 });
 
+router.get('/portfolio/timeline', async (req, res) => {
+  try {
+    const { days = 365 } = req.query;
+    const timeline = await investmentService.getPortfolioTimeline(
+      req.user.id,
+      parseInt(days)
+    );
+    res.json(timeline);
+  } catch (error) {
+    logger.error('Error fetching portfolio timeline:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get all investment transactions for user
 router.get('/transactions', async (req, res) => {
   try {

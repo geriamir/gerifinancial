@@ -4,26 +4,25 @@ import {
   Typography,
   Alert,
   CircularProgress,
-  Fade
+  Fade,
+  Card,
+  CardContent
 } from '@mui/material';
 import { useInvestment } from '../contexts/InvestmentContext';
-import { InvestmentPortfolioCard } from '../components/investment/InvestmentPortfolioCard';
 import { InvestmentAccountList } from '../components/investment/InvestmentAccountList';
-import { PerformanceMetrics } from '../components/investment/PerformanceMetrics';
 import { InvestmentTransactionList } from '../components/investments/InvestmentTransactionList';
+import { PortfolioTimelineChart } from '../components/investment/PortfolioTimelineChart';
 
 const Investments: React.FC = () => {
   const {
     investments,
     portfolioSummary,
-    performanceMetrics,
     portfolioCashBalances,
     holdingsPriceData,
     loading,
     error,
     refreshInvestments,
     refreshPortfolioSummary,
-    getPerformanceMetrics,
     clearError
   } = useInvestment();
 
@@ -32,8 +31,7 @@ const Investments: React.FC = () => {
       try {
         await Promise.all([
           refreshInvestments(),
-          refreshPortfolioSummary(),
-          getPerformanceMetrics(30)
+          refreshPortfolioSummary()
         ]);
       } catch (error) {
         console.error('Failed to load investment data:', error);
@@ -41,14 +39,13 @@ const Investments: React.FC = () => {
     };
 
     loadInvestmentData();
-  }, [refreshInvestments, refreshPortfolioSummary, getPerformanceMetrics]);
+  }, [refreshInvestments, refreshPortfolioSummary]);
 
   const handleRefresh = async () => {
     clearError();
     await Promise.all([
       refreshInvestments(),
-      refreshPortfolioSummary(),
-      getPerformanceMetrics(30)
+      refreshPortfolioSummary()
     ]);
   };
 
@@ -92,19 +89,13 @@ const Investments: React.FC = () => {
 
       {/* Main Content */}
       <Box sx={{ display: 'grid', gap: 3 }}>
-        {/* Portfolio Overview Card */}
-        <InvestmentPortfolioCard
-          portfolioSummary={portfolioSummary}
-          loading={loading}
-          onRefresh={handleRefresh}
-        />
-
-        {/* Performance Metrics */}
-        {performanceMetrics && (
-          <PerformanceMetrics
-            metrics={performanceMetrics}
-            loading={loading}
-          />
+        {/* Portfolio Timeline Chart */}
+        {investments.length > 0 && (
+          <Card>
+            <CardContent>
+              <PortfolioTimelineChart currency={portfolioSummary?.currency || 'USD'} />
+            </CardContent>
+          </Card>
         )}
 
         {/* Investment Accounts List */}

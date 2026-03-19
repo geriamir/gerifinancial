@@ -124,6 +124,19 @@ export interface PortfolioTrend {
   accountCount: number;
 }
 
+export interface PortfolioTimelinePoint {
+  date: string;
+  cash: number;
+  total: number;
+  [symbol: string]: number | string;
+}
+
+export interface PortfolioTimeline {
+  symbols: string[];
+  series: PortfolioTimelinePoint[];
+  cashBalance: number;
+}
+
 export interface PerformanceMetrics {
   totalGain: number;
   totalGainPercent: number;

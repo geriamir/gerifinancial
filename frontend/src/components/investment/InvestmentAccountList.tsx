@@ -90,7 +90,7 @@ interface GroupedAccountItemProps {
 
 const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdingsPriceData }) => {
   const [expanded, setExpanded] = React.useState(false);
-  const [selectedSymbol, setSelectedSymbol] = React.useState<string | null>(null);
+  
 
   const formatLastUpdated = (date: Date) => {
     const now = new Date();
@@ -258,21 +258,16 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
                         : null;
                       const isGain = gainLoss != null && gainLoss >= 0;
 
-                      const isSelected = selectedSymbol === lookupSymbol;
-
                       return (
                         <Box key={posSymbol}>
                           <Box
-                            onClick={() => setSelectedSymbol(isSelected ? null : lookupSymbol)}
                             sx={{
                               display: 'flex',
                               justifyContent: 'space-between',
                               alignItems: 'flex-start',
                               p: 1.5,
-                              backgroundColor: isSelected ? 'action.selected' : 'grey.50',
+                              backgroundColor: 'grey.50',
                               borderRadius: position.options.length > 0 ? '4px 4px 0 0' : 1,
-                              cursor: 'pointer',
-                              '&:hover': { backgroundColor: 'action.hover' }
                             }}
                           >
                             {/* Left: Symbol, name, quantity */}
@@ -321,13 +316,13 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
                                     }
                                     <Typography
                                       variant="body2"
-                                      sx={{ fontWeight: 600, direction: 'ltr', unicodeBidi: 'embed' }}
+                                      sx={{ fontWeight: 600, direction: 'ltr', unicodeBidi: 'bidi-override' }}
                                       color={isDailyGain ? 'success.main' : 'error.main'}
                                     >
                                       {dailyChangePercent >= 0 ? '+' : ''}{dailyChangePercent.toFixed(2)}%
                                     </Typography>
                                   </Box>
-                                  <Typography variant="caption" color="text.secondary" sx={{ direction: 'ltr', unicodeBidi: 'embed' }}>
+                                  <Typography variant="caption" color="text.secondary" sx={{ direction: 'ltr', unicodeBidi: 'bidi-override' }}>
                                     {dailyChange >= 0 ? '+' : ''}{formatCurrency(dailyChange, account.currency)}
                                   </Typography>
                                 </>
@@ -337,7 +332,7 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
                             {/* Right: Market value + Gain/Loss */}
                             <Box sx={{ textAlign: 'right', minWidth: 120 }}>
                               {mktValue != null && (
-                                <Typography variant="body2" sx={{ fontWeight: 600, direction: 'ltr', unicodeBidi: 'embed' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, direction: 'ltr', unicodeBidi: 'bidi-override' }}>
                                   {formatCurrency(mktValue, holding.currency || account.currency)}
                                 </Typography>
                               )}
@@ -350,7 +345,7 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
                                   <Typography
                                     variant="caption"
                                     color={isGain ? 'success.main' : 'error.main'}
-                                    sx={{ fontWeight: 500, direction: 'ltr', unicodeBidi: 'embed' }}
+                                    sx={{ fontWeight: 500, direction: 'ltr', unicodeBidi: 'bidi-override' }}
                                   >
                                     {gainLoss >= 0 ? '+' : ''}{formatCurrency(gainLoss, account.currency)}
                                     {gainLossPercent != null && ` (${gainLossPercent >= 0 ? '+' : ''}${gainLossPercent.toFixed(1)}%)`}
@@ -358,7 +353,7 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
                                 </Box>
                               )}
                               {costBasis != null && (
-                                <Typography variant="caption" color="text.secondary" sx={{ direction: 'ltr', unicodeBidi: 'embed' }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ direction: 'ltr', unicodeBidi: 'bidi-override' }}>
                                   Cost: {formatCurrency(Math.abs(costBasis), holding.currency || account.currency)}
                                 </Typography>
                               )}
@@ -401,12 +396,10 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
                             </Box>
                           )}
 
-                          {/* Timeline chart for selected position */}
-                          {isSelected && (
-                            <Box sx={{ p: 1.5, pt: 0 }}>
-                              <HoldingTimelineChart symbol={lookupSymbol} currency={account.currency} />
-                            </Box>
-                          )}
+                          {/* Timeline chart for position */}
+                          <Box sx={{ p: 1.5, pt: 0 }}>
+                            <HoldingTimelineChart symbol={lookupSymbol} currency={account.currency} />
+                          </Box>
                         </Box>
                       );
                     })}

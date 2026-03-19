@@ -33,9 +33,9 @@ interface ChartDataPoint {
   strikePrice: number | null;
   quantity: number;
   holdingValue: number | null;
-  buyEvent?: TimelineEvent;
-  sellEvent?: TimelineEvent;
-  dividendEvent?: TimelineEvent;
+  buyEvents: TimelineEvent[];
+  sellEvents: TimelineEvent[];
+  dividendEvents: TimelineEvent[];
 }
 
 const TIMEFRAMES = [
@@ -56,9 +56,32 @@ const CustomTooltip = ({ active, payload, currency }: any) => {
   const data = payload[0]?.payload as ChartDataPoint;
   if (!data) return null;
 
-  const events = [data.buyEvent, data.sellEvent, data.dividendEvent].filter(Boolean) as TimelineEvent[];
   const displayPrice = data.price ?? data.projectedPrice;
   const isProjected = data.price == null && data.projectedPrice != null;
+
+  const renderEventGroup = (events: TimelineEvent[], type: string, color: string) => {
+    if (events.length === 0) return null;
+    const totalShares = events.reduce((sum, e) => sum + e.shares, 0);
+    const totalValue = events.reduce((sum, e) => sum + Math.abs(e.value), 0);
+    const avgPrice = totalShares > 0 ? totalValue / totalShares : 0;
+    return (
+      <Box sx={{ mt: 1, pt: 1, borderTop: 1, borderColor: 'divider' }}>
+        <Typography
+          variant="caption"
+          sx={{ fontWeight: 600 }}
+          color={color}
+        >
+          {type} {events.length > 1 ? `(${events.length} transactions)` : ''}
+        </Typography>
+        <Typography variant="caption" display="block">
+          {totalShares} shares @ avg {formatCurrency(avgPrice, currency)}
+        </Typography>
+        <Typography variant="caption" display="block">
+          Total: {formatCurrency(totalValue, currency)}
+        </Typography>
+      </Box>
+    );
+  };
 
   return (
     <Card sx={{ p: 1.5, maxWidth: 280 }}>
@@ -79,23 +102,9 @@ const CustomTooltip = ({ active, payload, currency }: any) => {
           Call strike: {formatCurrency(data.strikePrice, currency)}
         </Typography>
       )}
-      {events.map((evt, i) => (
-        <Box key={i} sx={{ mt: 1, pt: 1, borderTop: 1, borderColor: 'divider' }}>
-          <Typography
-            variant="caption"
-            sx={{ fontWeight: 600 }}
-            color={evt.type === 'BUY' ? 'success.main' : evt.type === 'SELL' ? 'error.main' : 'info.main'}
-          >
-            {evt.type}
-          </Typography>
-          <Typography variant="caption" display="block">
-            {evt.shares} shares @ {formatCurrency(evt.pricePerShare, currency)}
-          </Typography>
-          <Typography variant="caption" display="block">
-            Total: {formatCurrency(Math.abs(evt.value), currency)}
-          </Typography>
-        </Box>
-      ))}
+      {renderEventGroup(data.buyEvents, 'BUY', 'success.main')}
+      {renderEventGroup(data.sellEvents, 'SELL', 'error.main')}
+      {renderEventGroup(data.dividendEvents, 'DIVIDEND', 'info.main')}
     </Card>
   );
 };
@@ -104,9 +113,9 @@ const EventDot = (props: any) => {
   const { cx, cy, payload } = props;
   if (!cx || !cy) return null;
 
-  const hasBuy = !!payload?.buyEvent;
-  const hasSell = !!payload?.sellEvent;
-  const hasDividend = !!payload?.dividendEvent;
+  const hasBuy = payload?.buyEvents?.length > 0;
+  const hasSell = payload?.sellEvents?.length > 0;
+  const hasDividend = payload?.dividendEvents?.length > 0;
 
   if (!hasBuy && !hasSell && !hasDividend) return null;
 
@@ -197,9 +206,9 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
         strikePrice: getStrikeForDate(dateKey),
         holdingValue: p.holdingValue,
         quantity: p.quantity,
-        buyEvent: dayEvents.find(e => e.type === 'BUY'),
-        sellEvent: dayEvents.find(e => e.type === 'SELL'),
-        dividendEvent: dayEvents.find(e => e.type === 'DIVIDEND')
+        buyEvents: dayEvents.filter(e => e.type === 'BUY'),
+        sellEvents: dayEvents.filter(e => e.type === 'SELL'),
+        dividendEvents: dayEvents.filter(e => e.type === 'DIVIDEND')
       };
     });
 
@@ -218,9 +227,9 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
           strikePrice: getStrikeForDate(dateKey),
           holdingValue: null,
           quantity: 0,
-          buyEvent: evts.find(e => e.type === 'BUY'),
-          sellEvent: evts.find(e => e.type === 'SELL'),
-          dividendEvent: evts.find(e => e.type === 'DIVIDEND')
+          buyEvents: evts.filter(e => e.type === 'BUY'),
+          sellEvents: evts.filter(e => e.type === 'SELL'),
+          dividendEvents: evts.filter(e => e.type === 'DIVIDEND')
         });
       }
     });
@@ -261,7 +270,10 @@ export const HoldingTimelineChart: React.FC<HoldingTimelineChartProps> = ({ symb
               projectedPrice: lastPrice,
               strikePrice: getStrikeForDate(dateKey),
               holdingValue: null,
-              quantity: lastPoint.quantity
+              quantity: lastPoint.quantity,
+              buyEvents: [],
+              sellEvents: [],
+              dividendEvents: []
             });
           }
           current.setDate(current.getDate() + 1);
