@@ -248,7 +248,7 @@ const iconConfigCache = new Map<string, CategoryIconConfig>();
  * Normalize a name for matching (lowercase, remove special chars, etc.)
  */
 const normalizeName = (name: string): string => {
-  return name.toLowerCase()
+  return (name || '').toLowerCase()
     .replace(/[^a-z0-9\s]/g, '')
     .replace(/\s+/g, ' ')
     .trim();

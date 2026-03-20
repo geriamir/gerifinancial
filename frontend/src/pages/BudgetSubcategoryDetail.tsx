@@ -356,31 +356,28 @@ const BudgetSubcategoryDetail: React.FC = () => {
                 return incomeCategoryId === incomeCat._id;
               });
 
-              let actualAmount = 0; // Income budgets don't store actualAmount, need to calculate
+              let actualAmount = 0;
               const budgetedAmount = existingBudget?.amount || 0;
 
-              // If no existing budget, calculate actual amount from transactions
-              if (!existingBudget) {
-                try {
-                  const startDate = new Date(yearNum, monthNum - 1, 1);
-                  const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
-                  
-                  const transactionsResult = await transactionsApi.getTransactions({
-                    startDate,
-                    endDate,
-                    category: incomeCat._id,
-                    limit: 1000,
-                    useProcessedDate: true
-                  });
-                  
-                  // Sum all transaction amounts for this income category
-                  actualAmount = transactionsResult.transactions.reduce((sum, transaction) => {
-                    return sum + Math.abs(transaction.amount || 0);
-                  }, 0);
-                } catch (transactionError) {
-                  console.error(`Error fetching transactions for income category ${incomeCat.name}:`, transactionError);
-                  actualAmount = 0;
-                }
+              // Always calculate actual amount from transactions for income categories
+              try {
+                const startDate = new Date(yearNum, monthNum - 1, 1);
+                const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
+                
+                const transactionsResult = await transactionsApi.getTransactions({
+                  startDate,
+                  endDate,
+                  category: incomeCat._id,
+                  limit: 1000,
+                  useProcessedDate: true
+                });
+                
+                actualAmount = transactionsResult.transactions.reduce((sum, transaction) => {
+                  return sum + Math.abs(transaction.amount || 0);
+                }, 0);
+              } catch (transactionError) {
+                console.error(`Error fetching transactions for income category ${incomeCat.name}:`, transactionError);
+                actualAmount = 0;
               }
 
               return {
