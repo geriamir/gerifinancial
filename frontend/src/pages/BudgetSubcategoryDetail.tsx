@@ -146,37 +146,27 @@ const BudgetSubcategoryDetail: React.FC = () => {
             return incomeCategoryId === categoryId;
           });
 
-          if (incomeCategory) {
-            categoryName = typeof incomeCategory.categoryId === 'object' 
-              ? (incomeCategory.categoryId as any)?.name || 'Unknown Income'
-              : incomeCategory.categoryId || 'Unknown Income';
-            subcategoryName = 'Income';
-            budgetedAmount = incomeCategory.amount || 0;
-            // Income budgets don't store actualAmount, need to calculate from transactions
-            actualAmount = 0;
-          } else {
-            // No income budget exists, get category name from API
-            try {
-              const userCategories = await categoriesApi.getUserCategories();
-              const category = userCategories.find(cat => cat._id === categoryId);
-              
-              if (category) {
-                categoryName = category.name;
-                subcategoryName = 'Income';
-                budgetedAmount = 0;
-                actualAmount = 0;
-              } else {
-                setError('Income category not found');
-                setLoading(false);
-                return;
-              }
-            } catch (err) {
-              console.error('Error fetching income category data:', err);
-              setError('Failed to load income category information');
+          // Always resolve category name from API for reliable display
+          try {
+            const userCategories = await categoriesApi.getUserCategories();
+            const category = userCategories.find(cat => cat._id === categoryId);
+            
+            if (category) {
+              categoryName = category.name;
+            } else {
+              setError('Income category not found');
               setLoading(false);
               return;
             }
+          } catch (err) {
+            console.error('Error fetching income category data:', err);
+            setError('Failed to load income category information');
+            setLoading(false);
+            return;
           }
+
+          subcategoryName = 'Income';
+          budgetedAmount = incomeCategory?.amount || 0;
 
           // Always calculate actual amount from transactions for income categories
           try {
@@ -345,9 +335,34 @@ const BudgetSubcategoryDetail: React.FC = () => {
             });
           }
 
+          // Fetch all income transactions for the month in one call, then group by category
+          const startDate = new Date(yearNum, monthNum - 1, 1);
+          const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
+          
+          let incomeActualsByCategory: Record<string, number> = {};
+          try {
+            const transactionsResult = await transactionsApi.getTransactions({
+              startDate,
+              endDate,
+              type: 'Income',
+              limit: 1000,
+              useProcessedDate: true
+            });
+            
+            transactionsResult.transactions.forEach(tx => {
+              const catId = typeof tx.category === 'object' 
+                ? (tx.category as any)?._id 
+                : tx.category;
+              if (catId) {
+                incomeActualsByCategory[catId] = (incomeActualsByCategory[catId] || 0) + Math.abs(tx.amount || 0);
+              }
+            });
+          } catch (transactionError) {
+            console.error('Error fetching income transactions:', transactionError);
+          }
+
           // Create tabs for all income categories
-          const tabs: SubcategoryTab[] = await Promise.all(
-            orderedIncomeCategories.map(async (incomeCat) => {
+          const tabs: SubcategoryTab[] = orderedIncomeCategories.map((incomeCat) => {
               // Try to find existing budget data for this income category
               const existingBudget = currentMonthlyBudget?.otherIncomeBudgets?.find(income => {
                 const incomeCategoryId = typeof income.categoryId === 'object'
@@ -356,41 +371,13 @@ const BudgetSubcategoryDetail: React.FC = () => {
                 return incomeCategoryId === incomeCat._id;
               });
 
-              let actualAmount = 0; // Income budgets don't store actualAmount, need to calculate
-              const budgetedAmount = existingBudget?.amount || 0;
-
-              // If no existing budget, calculate actual amount from transactions
-              if (!existingBudget) {
-                try {
-                  const startDate = new Date(yearNum, monthNum - 1, 1);
-                  const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
-                  
-                  const transactionsResult = await transactionsApi.getTransactions({
-                    startDate,
-                    endDate,
-                    category: incomeCat._id,
-                    limit: 1000,
-                    useProcessedDate: true
-                  });
-                  
-                  // Sum all transaction amounts for this income category
-                  actualAmount = transactionsResult.transactions.reduce((sum, transaction) => {
-                    return sum + Math.abs(transaction.amount || 0);
-                  }, 0);
-                } catch (transactionError) {
-                  console.error(`Error fetching transactions for income category ${incomeCat.name}:`, transactionError);
-                  actualAmount = 0;
-                }
-              }
-
               return {
                 id: incomeCat._id,
                 name: incomeCat.name,
-                actualAmount,
-                budgetedAmount
+                actualAmount: incomeActualsByCategory[incomeCat._id] || 0,
+                budgetedAmount: existingBudget?.amount || 0
               };
-            })
-          );
+            });
 
           setSubcategoryTabs(tabs);
         } else {

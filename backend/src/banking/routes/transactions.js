@@ -5,6 +5,7 @@ const { Category, SubCategory, Transaction, Tag } = require('../models');
 const transactionService = require('../services/transactionService');
 const categoryAIService = require('../services/categoryAIService');
 const tagService = require('../services/tagService');
+const { findSalaryCategory, adjustForSalaryEarlyPayment } = require('../../monthly-budgets/services/salaryAttributionHelper');
 
 // Get transactions with pagination and filtering
 router.get('/', auth, async (req, res) => {
@@ -43,6 +44,20 @@ router.get('/', auth, async (req, res) => {
     };
     
     const result = await transactionService.getTransactions(query);
+
+    // Adjust salary transactions for budget views (early-payment attribution)
+    if (query.useProcessedDate && query.startDate && query.category) {
+      const salaryCategory = await findSalaryCategory(req.user._id);
+      if (salaryCategory && query.category === salaryCategory._id.toString()) {
+        const year = query.startDate.getFullYear();
+        const month = query.startDate.getMonth() + 1;
+        result.transactions = await adjustForSalaryEarlyPayment(
+          result.transactions, req.user._id, year, month, {}, salaryCategory
+        );
+        result.total = result.transactions.length;
+        result.hasMore = false;
+      }
+    }
 
     res.json(result);
   } catch (error) {
