@@ -22,10 +22,13 @@ async function findSalaryCategory(userId) {
  * @param {number} year - Budget year
  * @param {number} month - Budget month (1-indexed)
  * @param {Object} extraFilters - Additional MongoDB filters (e.g., excludeFromBudgetCalculation)
+ * @param {Object} [salaryCategory] - Pre-fetched salary category to avoid duplicate DB lookup
  * @returns {Array} Adjusted transactions array
  */
-async function adjustForSalaryEarlyPayment(transactions, userId, year, month, extraFilters = {}) {
-  const salaryCategory = await findSalaryCategory(userId);
+async function adjustForSalaryEarlyPayment(transactions, userId, year, month, extraFilters = {}, salaryCategory = null) {
+  if (!salaryCategory) {
+    salaryCategory = await findSalaryCategory(userId);
+  }
   if (!salaryCategory) return transactions;
 
   const salaryCategoryId = salaryCategory._id.toString();

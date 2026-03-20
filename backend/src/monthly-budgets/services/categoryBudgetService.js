@@ -306,7 +306,7 @@ class CategoryBudgetService {
       // Only adjust for salary early-payment when viewing the Salary category
       const salaryCategory = await findSalaryCategory(userId);
       if (salaryCategory && categoryId.toString() === salaryCategory._id.toString()) {
-        transactions = await adjustForSalaryEarlyPayment(transactions, userId, year, month);
+        transactions = await adjustForSalaryEarlyPayment(transactions, userId, year, month, {}, salaryCategory);
       }
 
       const actualAmount = transactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);

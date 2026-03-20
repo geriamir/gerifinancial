@@ -52,7 +52,7 @@ router.get('/', auth, async (req, res) => {
         const year = query.startDate.getFullYear();
         const month = query.startDate.getMonth() + 1;
         result.transactions = await adjustForSalaryEarlyPayment(
-          result.transactions, req.user._id, year, month
+          result.transactions, req.user._id, year, month, {}, salaryCategory
         );
         result.total = result.transactions.length;
         result.hasMore = false;
