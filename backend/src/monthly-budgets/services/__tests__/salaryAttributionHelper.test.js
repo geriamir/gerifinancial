@@ -41,9 +41,7 @@ describe('salaryAttributionHelper', () => {
     it('should keep mid-month salary in the same month', async () => {
       Category.findOne.mockResolvedValue({ _id: salaryCategoryId, name: 'Salary', type: 'Income' });
       Transaction.find.mockReturnValue({
-        populate: jest.fn().mockReturnValue({
-          populate: jest.fn().mockResolvedValue([])
-        })
+        populate: jest.fn().mockResolvedValue([])
       });
 
       const midMonthSalary = makeTx('2026-06-10', salaryCategoryId);
@@ -56,9 +54,7 @@ describe('salaryAttributionHelper', () => {
     it('should exclude salary from last 5 days of month (belongs to next month)', async () => {
       Category.findOne.mockResolvedValue({ _id: salaryCategoryId, name: 'Salary', type: 'Income' });
       Transaction.find.mockReturnValue({
-        populate: jest.fn().mockReturnValue({
-          populate: jest.fn().mockResolvedValue([])
-        })
+        populate: jest.fn().mockResolvedValue([])
       });
 
       const otherCategoryId = new mongoose.Types.ObjectId();
@@ -79,9 +75,7 @@ describe('salaryAttributionHelper', () => {
 
       const earlySalaryTx = makeTx('2026-05-28', salaryCategoryId);
       Transaction.find.mockReturnValue({
-        populate: jest.fn().mockReturnValue({
-          populate: jest.fn().mockResolvedValue([earlySalaryTx])
-        })
+        populate: jest.fn().mockResolvedValue([earlySalaryTx])
       });
 
       const regularTx = makeTx('2026-06-05', new mongoose.Types.ObjectId());
@@ -95,9 +89,7 @@ describe('salaryAttributionHelper', () => {
     it('should handle salary on the boundary day correctly', async () => {
       Category.findOne.mockResolvedValue({ _id: salaryCategoryId, name: 'Salary', type: 'Income' });
       Transaction.find.mockReturnValue({
-        populate: jest.fn().mockReturnValue({
-          populate: jest.fn().mockResolvedValue([])
-        })
+        populate: jest.fn().mockResolvedValue([])
       });
 
       // June has 30 days. Late window starts at June 26 (July 1 - 5 days).
@@ -116,9 +108,7 @@ describe('salaryAttributionHelper', () => {
     it('should query early salary with correct date range', async () => {
       Category.findOne.mockResolvedValue({ _id: salaryCategoryId, name: 'Salary', type: 'Income' });
       Transaction.find.mockReturnValue({
-        populate: jest.fn().mockReturnValue({
-          populate: jest.fn().mockResolvedValue([])
-        })
+        populate: jest.fn().mockResolvedValue([])
       });
 
       await adjustForSalaryEarlyPayment([], mockUserId, 2026, 6);
@@ -140,9 +130,7 @@ describe('salaryAttributionHelper', () => {
     it('should pass extra filters to early salary query', async () => {
       Category.findOne.mockResolvedValue({ _id: salaryCategoryId, name: 'Salary', type: 'Income' });
       Transaction.find.mockReturnValue({
-        populate: jest.fn().mockReturnValue({
-          populate: jest.fn().mockResolvedValue([])
-        })
+        populate: jest.fn().mockResolvedValue([])
       });
 
       const extraFilters = { excludeFromBudgetCalculation: { $ne: true } };
@@ -155,9 +143,7 @@ describe('salaryAttributionHelper', () => {
     it('should handle January correctly (early window in previous year December)', async () => {
       Category.findOne.mockResolvedValue({ _id: salaryCategoryId, name: 'Salary', type: 'Income' });
       Transaction.find.mockReturnValue({
-        populate: jest.fn().mockReturnValue({
-          populate: jest.fn().mockResolvedValue([])
-        })
+        populate: jest.fn().mockResolvedValue([])
       });
 
       await adjustForSalaryEarlyPayment([], mockUserId, 2026, 1);
@@ -177,9 +163,7 @@ describe('salaryAttributionHelper', () => {
     it('should handle February correctly (late window in short month)', async () => {
       Category.findOne.mockResolvedValue({ _id: salaryCategoryId, name: 'Salary', type: 'Income' });
       Transaction.find.mockReturnValue({
-        populate: jest.fn().mockReturnValue({
-          populate: jest.fn().mockResolvedValue([])
-        })
+        populate: jest.fn().mockResolvedValue([])
       });
 
       // February 2026 has 28 days, March 1 - 5 = Feb 24

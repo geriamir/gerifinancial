@@ -55,7 +55,7 @@ async function adjustForSalaryEarlyPayment(transactions, userId, year, month, ex
     category: salaryCategory._id,
     processedDate: { $gte: earlyWindowStart, $lte: earlyWindowEnd },
     ...extraFilters
-  }).populate('category', 'type').populate('subCategory', 'name');
+  }).populate('category subCategory tags');
 
   return [...filtered, ...earlySalaryTxns];
 }
