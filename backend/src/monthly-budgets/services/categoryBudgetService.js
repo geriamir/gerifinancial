@@ -293,28 +293,20 @@ class CategoryBudgetService {
 
       const budgetedAmount = budget.getAmountForMonth(month);
 
-      // Get actual amount from transactions
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59);
 
-      const actualResult = await Transaction.aggregate([
-        {
-          $match: {
-            userId,
-            processedDate: { $gte: startDate, $lte: endDate },
-            category: categoryId,
-            ...(subCategoryId && { subCategory: subCategoryId })
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: { $abs: '$amount' } }
-          }
-        }
-      ]);
+      let transactions = await Transaction.find({
+        userId,
+        processedDate: { $gte: startDate, $lte: endDate },
+        category: categoryId,
+        ...(subCategoryId && { subCategory: subCategoryId })
+      }).populate('category', 'type').populate('subCategory', 'name');
 
-      const actualAmount = actualResult.length > 0 ? actualResult[0].total : 0;
+      // Adjust for salary arriving up to 5 days before month start
+      transactions = await adjustForSalaryEarlyPayment(transactions, userId, year, month);
+
+      const actualAmount = transactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
       const variance = actualAmount - budgetedAmount;
 
       return {
