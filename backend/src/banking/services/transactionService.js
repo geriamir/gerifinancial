@@ -71,6 +71,12 @@ class TransactionService {
       }
       
       const duplicate = await Transaction.findOne(query);
+
+      // Backfill uniqueId on existing transactions matched via fallback
+      if (duplicate && uniqueId && !duplicate.uniqueId) {
+        duplicate.uniqueId = uniqueId;
+        await duplicate.save();
+      }
       
       return duplicate;
     } catch (error) {
