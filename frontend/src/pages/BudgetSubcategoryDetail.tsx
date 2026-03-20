@@ -335,9 +335,34 @@ const BudgetSubcategoryDetail: React.FC = () => {
             });
           }
 
+          // Fetch all income transactions for the month in one call, then group by category
+          const startDate = new Date(yearNum, monthNum - 1, 1);
+          const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
+          
+          let incomeActualsByCategory: Record<string, number> = {};
+          try {
+            const transactionsResult = await transactionsApi.getTransactions({
+              startDate,
+              endDate,
+              type: 'Income',
+              limit: 1000,
+              useProcessedDate: true
+            });
+            
+            transactionsResult.transactions.forEach(tx => {
+              const catId = typeof tx.category === 'object' 
+                ? (tx.category as any)?._id 
+                : tx.category;
+              if (catId) {
+                incomeActualsByCategory[catId] = (incomeActualsByCategory[catId] || 0) + Math.abs(tx.amount || 0);
+              }
+            });
+          } catch (transactionError) {
+            console.error('Error fetching income transactions:', transactionError);
+          }
+
           // Create tabs for all income categories
-          const tabs: SubcategoryTab[] = await Promise.all(
-            orderedIncomeCategories.map(async (incomeCat) => {
+          const tabs: SubcategoryTab[] = orderedIncomeCategories.map((incomeCat) => {
               // Try to find existing budget data for this income category
               const existingBudget = currentMonthlyBudget?.otherIncomeBudgets?.find(income => {
                 const incomeCategoryId = typeof income.categoryId === 'object'
@@ -346,38 +371,13 @@ const BudgetSubcategoryDetail: React.FC = () => {
                 return incomeCategoryId === incomeCat._id;
               });
 
-              let actualAmount = 0;
-              const budgetedAmount = existingBudget?.amount || 0;
-
-              // Always calculate actual amount from transactions for income categories
-              try {
-                const startDate = new Date(yearNum, monthNum - 1, 1);
-                const endDate = new Date(yearNum, monthNum, 0, 23, 59, 59);
-                
-                const transactionsResult = await transactionsApi.getTransactions({
-                  startDate,
-                  endDate,
-                  category: incomeCat._id,
-                  limit: 1000,
-                  useProcessedDate: true
-                });
-                
-                actualAmount = transactionsResult.transactions.reduce((sum, transaction) => {
-                  return sum + Math.abs(transaction.amount || 0);
-                }, 0);
-              } catch (transactionError) {
-                console.error(`Error fetching transactions for income category ${incomeCat.name}:`, transactionError);
-                actualAmount = 0;
-              }
-
               return {
                 id: incomeCat._id,
                 name: incomeCat.name,
-                actualAmount,
-                budgetedAmount
+                actualAmount: incomeActualsByCategory[incomeCat._id] || 0,
+                budgetedAmount: existingBudget?.amount || 0
               };
-            })
-          );
+            });
 
           setSubcategoryTabs(tabs);
         } else {
