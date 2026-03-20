@@ -4,6 +4,7 @@ const logger = require('../../shared/utils/logger');
 const yearlyBudgetService = require('./yearlyBudgetService');
 const budgetCalculationService = require('./budgetCalculationService');
 const { projectBudgetService, BUDGET_STATUS } = require('../../project-budgets');
+const { adjustForSalaryEarlyPayment } = require('./salaryAttributionHelper');
 
 class BudgetService {
   // ============================================
@@ -348,11 +349,14 @@ class BudgetService {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59);
 
-      const transactions = await Transaction.find({
+      let transactions = await Transaction.find({
         userId,
         processedDate: { $gte: startDate, $lte: endDate },
         category: { $ne: null }
       }).populate('category', 'type').populate('subCategory', 'name');
+
+      // Adjust for salary arriving up to 5 days before month start
+      transactions = await adjustForSalaryEarlyPayment(transactions, userId, year, month);
 
       let totalActualIncome = 0;
       let totalActualExpenses = 0;
@@ -696,12 +700,17 @@ class BudgetService {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59);
 
-      const transactions = await Transaction.find({
+      const exclusionFilter = { excludeFromBudgetCalculation: { $ne: true } };
+
+      let transactions = await Transaction.find({
         userId,
         processedDate: { $gte: startDate, $lte: endDate },
         category: { $ne: null },
-        excludeFromBudgetCalculation: { $ne: true } // Exclude marked transactions
+        ...exclusionFilter
       }).populate('category', 'type').populate('subCategory', 'name');
+
+      // Adjust for salary arriving up to 5 days before month start
+      transactions = await adjustForSalaryEarlyPayment(transactions, userId, year, month, exclusionFilter);
 
       let totalActualIncome = 0;
       let totalActualExpenses = 0;
