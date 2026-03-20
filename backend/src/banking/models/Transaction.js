@@ -11,6 +11,11 @@ const transactionSchema = new mongoose.Schema({
   originalIdentifier: {
     type: String,
   },
+  // Stable unique ID from the scraper (e.g., hash of multiple fields)
+  uniqueId: {
+    type: String,
+    index: true,
+  },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
