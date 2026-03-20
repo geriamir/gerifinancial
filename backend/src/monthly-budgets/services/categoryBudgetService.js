@@ -1,7 +1,7 @@
 const { CategoryBudget } = require('../models');
 const { Category, SubCategory, Transaction } = require('../../banking');
 const logger = require('../../shared/utils/logger');
-const { adjustForSalaryEarlyPayment } = require('./salaryAttributionHelper');
+const { adjustForSalaryEarlyPayment, findSalaryCategory } = require('./salaryAttributionHelper');
 
 class CategoryBudgetService {
   
@@ -303,8 +303,11 @@ class CategoryBudgetService {
         ...(subCategoryId && { subCategory: subCategoryId })
       }).populate('category', 'type').populate('subCategory', 'name');
 
-      // Adjust for salary arriving up to 5 days before month start
-      transactions = await adjustForSalaryEarlyPayment(transactions, userId, year, month);
+      // Only adjust for salary early-payment when viewing the Salary category
+      const salaryCategory = await findSalaryCategory(userId);
+      if (salaryCategory && categoryId.toString() === salaryCategory._id.toString()) {
+        transactions = await adjustForSalaryEarlyPayment(transactions, userId, year, month);
+      }
 
       const actualAmount = transactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
       const variance = actualAmount - budgetedAmount;
