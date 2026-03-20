@@ -146,37 +146,27 @@ const BudgetSubcategoryDetail: React.FC = () => {
             return incomeCategoryId === categoryId;
           });
 
-          if (incomeCategory) {
-            categoryName = typeof incomeCategory.categoryId === 'object' 
-              ? (incomeCategory.categoryId as any)?.name || 'Unknown Income'
-              : incomeCategory.categoryId || 'Unknown Income';
-            subcategoryName = 'Income';
-            budgetedAmount = incomeCategory.amount || 0;
-            // Income budgets don't store actualAmount, need to calculate from transactions
-            actualAmount = 0;
-          } else {
-            // No income budget exists, get category name from API
-            try {
-              const userCategories = await categoriesApi.getUserCategories();
-              const category = userCategories.find(cat => cat._id === categoryId);
-              
-              if (category) {
-                categoryName = category.name;
-                subcategoryName = 'Income';
-                budgetedAmount = 0;
-                actualAmount = 0;
-              } else {
-                setError('Income category not found');
-                setLoading(false);
-                return;
-              }
-            } catch (err) {
-              console.error('Error fetching income category data:', err);
-              setError('Failed to load income category information');
+          // Always resolve category name from API for reliable display
+          try {
+            const userCategories = await categoriesApi.getUserCategories();
+            const category = userCategories.find(cat => cat._id === categoryId);
+            
+            if (category) {
+              categoryName = category.name;
+            } else {
+              setError('Income category not found');
               setLoading(false);
               return;
             }
+          } catch (err) {
+            console.error('Error fetching income category data:', err);
+            setError('Failed to load income category information');
+            setLoading(false);
+            return;
           }
+
+          subcategoryName = 'Income';
+          budgetedAmount = incomeCategory?.amount || 0;
 
           // Always calculate actual amount from transactions for income categories
           try {
