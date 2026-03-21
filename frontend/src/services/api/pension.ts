@@ -38,14 +38,14 @@ export const pensionApi = {
     return response.data;
   },
 
-  initiateOtp: async (bankAccountId: string, connection: 'sms' | 'email', destination: string): Promise<{ message: string; connection: string }> => {
-    const response = await api.post('/pension/sync/initiate', { bankAccountId, connection, destination });
+  initiateOtp: async (bankAccountId: string): Promise<{ message: string; connection: string; destination: string }> => {
+    const response = await api.post('/pension/sync/initiate', { bankAccountId });
     return response.data;
   },
 
-  verifyAndSync: async (bankAccountId: string, otp: string, connection: 'sms' | 'email', destination: string): Promise<PensionSyncResult> => {
+  verifyAndSync: async (bankAccountId: string, otp: string): Promise<PensionSyncResult> => {
     const response = await api.post<PensionSyncResult>('/pension/sync/verify', {
-      bankAccountId, otp, connection, destination
+      bankAccountId, otp
     });
     return response.data;
   }

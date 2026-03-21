@@ -56,6 +56,9 @@
     "mongoose": "^8.16.0",
     "natural": "^6.12.0",
     "node-cron": "^3.0.3",
+    "puppeteer": "^24.40.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "string-similarity": "^4.0.4",
     "winston": "^3.11.0",
     "xml2js": "^0.6.2"

@@ -230,6 +230,8 @@ class ScrapingSchedulerService {
         ? ['mercury-checking']
         : account.bankId === 'ibkr'
         ? ['ibkr-flex']
+        : account.bankId === 'phoenix'
+        ? [] // Phoenix requires OTP — no automatic sync
         : ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
       const strategiesNeedingSync = [];
 

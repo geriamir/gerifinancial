@@ -82,6 +82,10 @@ const pensionAccountSchema = new mongoose.Schema({
     enum: ['active', 'inactive', 'closed'],
     default: 'active'
   },
+  owner: {
+    type: String,
+    default: null
+  },
   employerName: {
     type: String,
     default: null

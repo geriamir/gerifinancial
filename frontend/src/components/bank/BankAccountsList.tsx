@@ -53,9 +53,19 @@ const getStrategyDisplayName = (strategyKey: string): string => {
     'investment-portfolios': 'Investments',
     'foreign-currency': 'Foreign Currency',
     'mercury-checking': 'Mercury Checking',
-    'ibkr-flex': 'IBKR Flex'
+    'ibkr-flex': 'IBKR Flex',
+    'phoenix-pension': 'Phoenix Pension'
   };
   return names[strategyKey] || strategyKey;
+};
+
+const getBankStrategies = (bankId: string): string[] => {
+  switch (bankId) {
+    case 'mercury': return ['mercury-checking'];
+    case 'ibkr': return ['ibkr-flex'];
+    case 'phoenix': return ['phoenix-pension'];
+    default: return ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
+  }
 };
 
 export const BankAccountsList: React.FC = () => {
@@ -191,7 +201,7 @@ export const BankAccountsList: React.FC = () => {
                       </Typography>
                     )}
                     {account.strategySync && Object.entries(account.strategySync)
-                      .filter(([, sync]) => sync?.status === 'failed')
+                      .filter(([strategy, sync]) => sync?.status === 'failed' && getBankStrategies(account.bankId).includes(strategy))
                       .map(([strategy]) => (
                         <Typography key={strategy} color="error" variant="caption" display="block">
                           {getStrategyDisplayName(strategy)} sync failed
@@ -205,6 +215,7 @@ export const BankAccountsList: React.FC = () => {
                     )}
                     <AccountScraping
                       accountId={account._id}
+                      bankId={account.bankId}
                       lastScraped={account.lastScraped}
                       strategySync={account.strategySync}
                       isDisabled={account.status !== 'active'}

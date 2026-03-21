@@ -58,6 +58,8 @@ class QueuedDataSyncService {
       ? ['mercury-checking']
       : bankAccount.bankId === 'ibkr'
       ? ['ibkr-flex']
+      : bankAccount.bankId === 'phoenix'
+      ? [] // Phoenix requires OTP — sync via pension OTP flow, not queue
       : ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
     
     // Determine job priority based on account or options
@@ -189,7 +191,7 @@ class QueuedDataSyncService {
       throw new Error(`Bank account not found: ${bankAccountId}`);
     }
 
-    const validStrategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency', 'mercury-checking', 'ibkr-flex'];
+    const validStrategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency', 'mercury-checking', 'ibkr-flex', 'phoenix-pension'];
     if (!validStrategies.includes(strategyName)) {
       throw new Error(`Invalid strategy: ${strategyName}. Valid strategies: ${validStrategies.join(', ')}`);
     }

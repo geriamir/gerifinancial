@@ -42,6 +42,10 @@ const bankAccountSchema = new mongoose.Schema({
     queryId: {
       type: String,
       required: function() { return this.bankId === 'ibkr'; }
+    },
+    phoneOrEmail: {
+      type: String,
+      required: function() { return this.bankId === 'phoenix'; }
     }
   },
   // Per-strategy sync tracking

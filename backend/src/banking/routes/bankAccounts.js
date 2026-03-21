@@ -25,6 +25,10 @@ router.post('/', auth, async (req, res) => {
       if (!name || !credentials?.apiToken) {
         return res.status(400).json({ error: 'Missing required fields: name and API token are required for Mercury' });
       }
+    } else if (bankId === 'phoenix') {
+      if (!name || !credentials?.username || !credentials?.phoneOrEmail) {
+        return res.status(400).json({ error: 'Missing required fields: name, ID number, and phone/email are required for Phoenix' });
+      }
     } else if (bankId === 'ibkr') {
       if (!name || !credentials?.flexToken || !credentials?.queryId) {
         return res.status(400).json({ error: 'Missing required fields: name, Flex token, and Query ID are required for Interactive Brokers' });
@@ -42,7 +46,8 @@ router.post('/', auth, async (req, res) => {
       password: credentials.password,
       apiToken: credentials.apiToken,
       flexToken: credentials.flexToken,
-      queryId: credentials.queryId
+      queryId: credentials.queryId,
+      phoneOrEmail: credentials.phoneOrEmail
     });
 
     // Return without sensitive data

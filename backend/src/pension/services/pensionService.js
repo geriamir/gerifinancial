@@ -39,7 +39,7 @@ class PensionService {
    * @param {string} bankAccountId - MongoDB bankAccount ID for Phoenix connection
    * @returns {Object} { synced: number, errors: string[] }
    */
-  async processAllProducts(allProducts, userId, bankAccountId) {
+  async processAllProducts(allProducts, userId, bankAccountId, ownerName = null) {
     const results = { synced: 0, errors: [] };
 
     for (const [category, products] of Object.entries(allProducts)) {
@@ -48,7 +48,7 @@ class PensionService {
 
       for (const product of products) {
         try {
-          await this.upsertAccount(product, productType, userId, bankAccountId);
+          await this.upsertAccount(product, productType, userId, bankAccountId, ownerName);
           results.synced++;
         } catch (err) {
           const msg = `Failed to sync ${category}/${product.policyNumber || 'unknown'}: ${err.message}`;
@@ -65,7 +65,7 @@ class PensionService {
    * Upsert a single pension account from an allUserProducts list item.
    * These items contain basic info: policyNumber, policyName, balance, status.
    */
-  async upsertAccount(product, productType, userId, bankAccountId) {
+  async upsertAccount(product, productType, userId, bankAccountId, ownerName = null) {
     const policyId = product.policyNumber || product.policyId;
     if (!policyId) throw new Error('Product has no policyNumber');
 
@@ -78,6 +78,7 @@ class PensionService {
       productType,
       policyName: product.policyName || product.name || 'Unknown',
       policyNickname: product.policyNickname || null,
+      owner: ownerName,
       balance,
       currency: product.totalSaving?.currency === '₪' ? 'ILS' : (product.totalSaving?.currency || 'ILS'),
       status: 'active',

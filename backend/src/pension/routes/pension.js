@@ -109,12 +109,12 @@ router.get('/history', async (req, res) => {
 
 /**
  * POST /api/pension/sync/initiate
- * Initiate OTP for Phoenix login
- * Body: { bankAccountId, connection: 'sms'|'email', destination: '+972...' }
+ * Start browser-based Phoenix login — triggers OTP SMS.
+ * Body: { bankAccountId }
  */
 router.post('/sync/initiate', async (req, res) => {
   try {
-    const { bankAccountId, connection, destination } = req.body;
+    const { bankAccountId } = req.body;
 
     const bankAccount = await BankAccount.findOne({
       _id: bankAccountId,
@@ -128,9 +128,11 @@ router.post('/sync/initiate', async (req, res) => {
 
     const client = new PhoenixApiClient();
     const idNumber = bankAccount.credentials.username;
-    await client.initiateOtp(idNumber, connection, destination);
+    const phoneOrEmail = bankAccount.credentials.phoneOrEmail;
 
-    res.json({ message: 'OTP sent successfully', connection });
+    await client.startLogin(idNumber, phoneOrEmail, bankAccountId);
+
+    res.json({ message: 'OTP sent via SMS', destination: 'SMS' });
   } catch (error) {
     logger.error('Error initiating Phoenix OTP:', error);
     res.status(500).json({ error: `Failed to initiate OTP: ${error.message}` });
@@ -139,12 +141,13 @@ router.post('/sync/initiate', async (req, res) => {
 
 /**
  * POST /api/pension/sync/verify
- * Verify OTP and sync Phoenix data
- * Body: { bankAccountId, otp, connection, destination }
+ * Complete OTP login and sync Phoenix data.
+ * Uses XHR interception — the Angular app fetches data after login and we capture it.
+ * Body: { bankAccountId, otp }
  */
 router.post('/sync/verify', async (req, res) => {
   try {
-    const { bankAccountId, otp, connection, destination } = req.body;
+    const { bankAccountId, otp } = req.body;
 
     const bankAccount = await BankAccount.findOne({
       _id: bankAccountId,
@@ -156,43 +159,33 @@ router.post('/sync/verify', async (req, res) => {
       return res.status(404).json({ error: 'Phoenix bank account not found' });
     }
 
-    // Authenticate
+    // Complete login + intercept all data from browser
     const client = new PhoenixApiClient();
-    await client.verifyOtp(otp, connection, destination);
+    const { allProducts, details, ownerName } = await client.completeLoginAndSync(bankAccountId, otp);
 
-    // Fetch all products
-    const allProducts = await client.getAllProducts();
+    // Process all products into PensionAccount records + snapshots
     const results = await pensionService.processAllProducts(
       allProducts,
       req.user.id,
-      bankAccountId
+      bankAccountId,
+      ownerName
     );
 
-    // Fetch details for savings products
-    const savingsCategories = ['gemel', 'gemelInvestment', 'hishtalmut', 'lifeSaving', 'pension', 'pizuim'];
+    // Process captured detail data
     let detailCount = 0;
-
-    for (const category of savingsCategories) {
-      const products = allProducts[category];
-      if (!Array.isArray(products)) continue;
-
-      for (const product of products) {
-        const policyNum = product.policyNumber || product.policyId;
-        if (!policyNum) continue;
-
-        try {
-          const detail = await client.getAccountDetail(policyNum);
-          await pensionService.processAccountDetail(detail, policyNum);
-          detailCount++;
-        } catch (err) {
-          logger.warn(`Failed to fetch detail for ${policyNum}: ${err.message}`);
-          results.errors.push(`Detail: ${policyNum}: ${err.message}`);
-        }
+    for (const [policyNum, detailData] of Object.entries(details)) {
+      try {
+        await pensionService.processAccountDetail(detailData, policyNum);
+        detailCount++;
+      } catch (err) {
+        logger.warn(`Failed to process detail for ${policyNum}: ${err.message}`);
+        results.errors.push(`Detail: ${policyNum}: ${err.message}`);
       }
     }
 
-    // Update strategy sync
+    // Update strategy sync and clear stale errors
     bankAccount.updateStrategySync('phoenix-pension', true);
+    bankAccount.lastError = undefined;
     await bankAccount.save();
 
     res.json({

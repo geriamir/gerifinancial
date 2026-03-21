@@ -45,6 +45,7 @@ export interface AddBankAccountDto {
     apiToken?: string;
     flexToken?: string;
     queryId?: string;
+    phoneOrEmail?: string;
   };
 }
 

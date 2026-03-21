@@ -23,9 +23,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
-  ToggleButton,
-  ToggleButtonGroup
+  TextField
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -258,9 +256,8 @@ interface SyncDialogProps {
 
 const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose, onSyncComplete }) => {
   const [step, setStep] = useState<'config' | 'otp' | 'syncing' | 'done'>('config');
-  const [connection, setConnection] = useState<'sms' | 'email'>('sms');
-  const [destination, setDestination] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
+  const [otpDestination, setOtpDestination] = useState('');
   const [otp, setOtp] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ synced: number; errors: string[] } | null>(null);
@@ -268,7 +265,8 @@ const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose, onSyncComplete }
   const handleInitiateOtp = async () => {
     try {
       setError(null);
-      await pensionApi.initiateOtp(bankAccountId, connection, destination);
+      const response = await pensionApi.initiateOtp(bankAccountId);
+      setOtpDestination(response.destination || '');
       setStep('otp');
     } catch (err: any) {
       setError(err.response?.data?.error || err.message);
@@ -279,7 +277,7 @@ const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose, onSyncComplete }
     try {
       setError(null);
       setStep('syncing');
-      const syncResult = await pensionApi.verifyAndSync(bankAccountId, otp, connection, destination);
+      const syncResult = await pensionApi.verifyAndSync(bankAccountId, otp);
       setResult({ synced: syncResult.synced, errors: syncResult.errors });
       setStep('done');
       onSyncComplete();
@@ -292,6 +290,7 @@ const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose, onSyncComplete }
   const handleClose = () => {
     setStep('config');
     setOtp('');
+    setOtpDestination('');
     setError(null);
     setResult(null);
     onClose();
@@ -312,28 +311,14 @@ const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose, onSyncComplete }
               helperText="The bank account ID configured for Phoenix"
               fullWidth
             />
-            <ToggleButtonGroup
-              value={connection}
-              exclusive
-              onChange={(_, v) => v && setConnection(v)}
-              fullWidth
-            >
-              <ToggleButton value="sms">SMS</ToggleButton>
-              <ToggleButton value="email">Email</ToggleButton>
-            </ToggleButtonGroup>
-            <TextField
-              label={connection === 'sms' ? 'Phone Number' : 'Email Address'}
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              placeholder={connection === 'sms' ? '+972...' : 'email@example.com'}
-              fullWidth
-            />
           </Box>
         )}
 
         {step === 'otp' && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <Typography>Enter the OTP code sent to your {connection === 'sms' ? 'phone' : 'email'}:</Typography>
+            <Typography>
+              Enter the OTP code sent to {otpDestination || 'your phone/email'}:
+            </Typography>
             <TextField
               label="OTP Code"
               value={otp}
@@ -369,7 +354,7 @@ const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose, onSyncComplete }
           {step === 'done' ? 'Close' : 'Cancel'}
         </Button>
         {step === 'config' && (
-          <Button variant="contained" onClick={handleInitiateOtp} disabled={!bankAccountId || !destination}>
+          <Button variant="contained" onClick={handleInitiateOtp} disabled={!bankAccountId}>
             Send OTP
           </Button>
         )}

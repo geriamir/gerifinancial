@@ -21,7 +21,8 @@ export const CREDIT_CARD_PROVIDERS: SupportedBank[] = [
 // API-based banks (no browser scraping needed)
 export const API_BANKS: SupportedBank[] = [
   { id: 'mercury', name: 'Mercury' },
-  { id: 'ibkr', name: 'Interactive Brokers' }
+  { id: 'ibkr', name: 'Interactive Brokers' },
+  { id: 'phoenix', name: 'Phoenix Insurance (הפניקס)' }
 ];
 
 // All supported banks (for backward compatibility)

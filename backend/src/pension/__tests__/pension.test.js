@@ -31,6 +31,9 @@ describe('PensionAccount Model', () => {
   });
 
   test('should enforce unique policyId', async () => {
+    // Ensure indexes are created
+    await PensionAccount.ensureIndexes();
+    
     await PensionAccount.create({
       userId, bankAccountId, provider: 'phoenix',
       productType: 'gemel', policyId: 'UNIQUE-001', policyName: 'Fund A'
