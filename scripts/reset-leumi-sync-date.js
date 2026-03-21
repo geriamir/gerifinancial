@@ -58,7 +58,7 @@ async function main() {
 
     // Find Leumi accounts
     const leumiAccounts = await bankAccounts.find({
-      bankId: { $in: ['leumi', 'leumiCard'] }
+      bankId: { $in: ['leumi'] }
     }).toArray();
 
     if (leumiAccounts.length === 0) {
