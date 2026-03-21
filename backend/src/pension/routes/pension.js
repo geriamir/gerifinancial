@@ -175,7 +175,7 @@ router.post('/sync/verify', async (req, res) => {
     let detailCount = 0;
     for (const [policyNum, detailData] of Object.entries(details)) {
       try {
-        await pensionService.processAccountDetail(detailData, policyNum);
+        await pensionService.processAccountDetail(detailData, policyNum, req.user.id);
         detailCount++;
       } catch (err) {
         logger.warn(`Failed to process detail for ${policyNum}: ${err.message}`);
@@ -196,6 +196,16 @@ router.post('/sync/verify', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error during Phoenix sync:', error);
+    // Update strategy sync status on failure
+    try {
+      const bankAccount = await BankAccount.findOne({ _id: req.body.bankAccountId, userId: req.user.id });
+      if (bankAccount) {
+        bankAccount.updateStrategySync('phoenix-pension', false, error.message);
+        await bankAccount.save();
+      }
+    } catch (updateErr) {
+      logger.error('Failed to update strategy sync status:', updateErr);
+    }
     res.status(500).json({ error: `Phoenix sync failed: ${error.message}` });
   }
 });

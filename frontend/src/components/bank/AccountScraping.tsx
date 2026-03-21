@@ -19,6 +19,7 @@ import { pensionApi } from '../../services/api/pension';
 import { format } from 'date-fns';
 import { track } from '../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
+import { getBankStrategies } from '../../constants/banks';
 
 interface ScrapeResult {
   message: string;
@@ -34,15 +35,6 @@ const STRATEGY_DISPLAY_NAMES: Record<string, string> = {
   'mercury-checking': 'Mercury Checking',
   'ibkr-flex': 'IBKR Flex',
   'phoenix-pension': 'Phoenix Pension'
-};
-
-const getBankStrategies = (bankId?: string): string[] => {
-  switch (bankId) {
-    case 'mercury': return ['mercury-checking'];
-    case 'ibkr': return ['ibkr-flex'];
-    case 'phoenix': return ['phoenix-pension'];
-    default: return ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
-  }
 };
 
 interface AccountScrapingProps {

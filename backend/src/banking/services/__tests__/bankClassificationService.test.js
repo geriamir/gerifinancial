@@ -77,7 +77,7 @@ describe('BankClassificationService', () => {
   });
   
   describe('getAllSupportedBanks', () => {
-    test('should return all supported banks (checking + credit)', () => {
+    test('should return all supported banks (checking + credit + api + otp)', () => {
       const allBanks = BankClassificationService.getAllSupportedBanks();
       const expectedBanks = ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury', 'phoenix'];
       expect(allBanks).toEqual(expectedBanks);
@@ -225,10 +225,11 @@ describe('BankClassificationService', () => {
         const isChecking = BankClassificationService.isCheckingBank(bank);
         const isCredit = BankClassificationService.isCreditCardProvider(bank);
         const isApi = BankClassificationService.isApiBank(bank);
+        const isOtp = BankClassificationService.isOtpBank(bank);
         
         // Each bank should be exactly one type
-        expect(isChecking || isCredit || isApi).toBe(true);
-        expect([isChecking, isCredit, isApi].filter(Boolean).length).toBe(1);
+        expect(isChecking || isCredit || isApi || isOtp).toBe(true);
+        expect([isChecking, isCredit, isApi, isOtp].filter(Boolean).length).toBe(1);
       });
     });
   });

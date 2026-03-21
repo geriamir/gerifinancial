@@ -87,7 +87,7 @@ class PensionService {
     };
 
     const account = await PensionAccount.findOneAndUpdate(
-      { policyId },
+      { userId, policyId },
       { $set: data },
       { upsert: true, new: true }
     );
@@ -110,8 +110,8 @@ class PensionService {
    * @param {Object} detail - Response from getAccountDetail()
    * @param {string} policyId - The policy number
    */
-  async processAccountDetail(detail, policyId) {
-    const account = await PensionAccount.findOne({ policyId });
+  async processAccountDetail(detail, policyId, userId) {
+    const account = await PensionAccount.findOne({ userId, policyId });
     if (!account) {
       throw new Error(`PensionAccount not found for policyId: ${policyId}`);
     }

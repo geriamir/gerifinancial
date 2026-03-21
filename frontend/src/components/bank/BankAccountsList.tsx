@@ -22,7 +22,7 @@ import {
 } from '@mui/icons-material';
 import { bankAccountsApi } from '../../services/api/bank';
 import { BankAccount } from '../../services/api/types';
-import { SUPPORTED_BANKS } from '../../constants/banks';
+import { SUPPORTED_BANKS, getBankStrategies } from '../../constants/banks';
 import { BankAccountForm } from './BankAccountForm';
 import { UpdateCredentialsDialog } from './UpdateCredentialsDialog';
 import { track } from '../../utils/analytics';
@@ -57,15 +57,6 @@ const getStrategyDisplayName = (strategyKey: string): string => {
     'phoenix-pension': 'Phoenix Pension'
   };
   return names[strategyKey] || strategyKey;
-};
-
-const getBankStrategies = (bankId: string): string[] => {
-  switch (bankId) {
-    case 'mercury': return ['mercury-checking'];
-    case 'ibkr': return ['ibkr-flex'];
-    case 'phoenix': return ['phoenix-pension'];
-    default: return ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
-  }
 };
 
 export const BankAccountsList: React.FC = () => {

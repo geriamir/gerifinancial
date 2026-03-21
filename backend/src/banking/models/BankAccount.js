@@ -234,6 +234,11 @@ bankAccountSchema.pre('save', function(next) {
         this.credentials.flexToken = encrypt(this.credentials.flexToken);
       }
     }
+    if (this.isModified('credentials.phoneOrEmail') && this.credentials.phoneOrEmail) {
+      if (!isEncrypted(this.credentials.phoneOrEmail)) {
+        this.credentials.phoneOrEmail = encrypt(this.credentials.phoneOrEmail);
+      }
+    }
     next();
   } catch (error) {
     next(error);

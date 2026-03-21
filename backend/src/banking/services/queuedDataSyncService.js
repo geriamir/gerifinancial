@@ -191,7 +191,7 @@ class QueuedDataSyncService {
       throw new Error(`Bank account not found: ${bankAccountId}`);
     }
 
-    const validStrategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency', 'mercury-checking', 'ibkr-flex', 'phoenix-pension'];
+    const validStrategies = ['checking-accounts', 'investment-portfolios', 'foreign-currency', 'mercury-checking', 'ibkr-flex'];
     if (!validStrategies.includes(strategyName)) {
       throw new Error(`Invalid strategy: ${strategyName}. Valid strategies: ${validStrategies.join(', ')}`);
     }
