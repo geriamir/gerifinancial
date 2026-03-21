@@ -11,7 +11,7 @@ const bankAccountSchema = new mongoose.Schema({
   bankId: {
     type: String,
     required: true,
-    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury', 'ibkr'] // Supported banks
+    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury', 'ibkr', 'phoenix'] // Supported banks
   },
   defaultCurrency: {
     type: String,
@@ -29,7 +29,7 @@ const bankAccountSchema = new mongoose.Schema({
     },
     password: {
       type: String,
-      required: function() { return this.bankId !== 'mercury' && this.bankId !== 'ibkr'; }
+      required: function() { return this.bankId !== 'mercury' && this.bankId !== 'ibkr' && this.bankId !== 'phoenix'; }
     },
     apiToken: {
       type: String,
@@ -67,6 +67,11 @@ const bankAccountSchema = new mongoose.Schema({
       status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
     },
     'ibkr-flex': {
+      lastScraped: { type: Date, default: null },
+      lastAttempted: { type: Date, default: null },
+      status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
+    },
+    'phoenix-pension': {
       lastScraped: { type: Date, default: null },
       lastAttempted: { type: Date, default: null },
       status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }

@@ -45,7 +45,7 @@ class BankClassificationService {
    * @returns {string[]} Array of API bank IDs
    */
   static getApiBanks() {
-    return ['mercury'];
+    return ['mercury', 'phoenix'];
   }
   
   /**

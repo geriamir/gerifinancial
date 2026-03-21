@@ -34,6 +34,7 @@ const investmentRoutes = require('./investments/routes/investments');
 const portfolioRoutes = require('./investments/routes/portfolios');
 const foreignCurrencyRoutes = require('./foreign-currency/routes/foreignCurrency');
 const onboardingRoutes = require('./onboarding/routes/onboarding');
+const pensionRoutes = require('./pension/routes/pension');
 const eventsRoutes = require('./shared/routes/events');
 const testRoutes = require('./shared/routes/test');
 
@@ -154,6 +155,7 @@ app.use('/api/investments', investmentRoutes);
 app.use('/api/portfolios', portfolioRoutes);
 app.use('/api/foreign-currency', foreignCurrencyRoutes);
 app.use('/api/onboarding', onboardingRoutes);
+app.use('/api/pension', pensionRoutes);
 app.use('/api/events', eventsRoutes);
 
 // Test routes (enabled in test and e2e environments)

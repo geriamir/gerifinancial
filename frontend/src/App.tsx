@@ -21,6 +21,7 @@ import BudgetsPage from './pages/Budgets';
 import BudgetSubcategoryDetail from './pages/BudgetSubcategoryDetail';
 import RSUs from './pages/RSUs';
 import Investments from './pages/Investments';
+import Pension from './pages/Pension';
 import Projects from './pages/Projects';
 import Banks from './pages/Banks';
 import ForeignCurrency from './pages/ForeignCurrency';
@@ -89,6 +90,7 @@ const App: React.FC = () => {
               <Route path="budgets/income/:year/:month/:categoryId" element={<BudgetSubcategoryDetail />} />
               <Route path="rsus" element={<RSUs />} />
               <Route path="investments" element={<Investments />} />
+              <Route path="pension" element={<Pension />} />
               <Route path="banks" element={<Banks />} />
               <Route path="projects" element={<Projects />} />
               <Route path="projects/:projectId" element={<Projects />} />
