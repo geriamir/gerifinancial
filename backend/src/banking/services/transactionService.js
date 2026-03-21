@@ -27,18 +27,26 @@ class TransactionService {
    * @returns {Promise<Object|null>} - Existing transaction if duplicate found, null otherwise
    */
   async findPotentialDuplicate(transactionData) {
-    const { accountId, userId, date, amount, description, memo } = transactionData;
-    
-    // Create date range for same day (handles timezone variations and exact time differences)
-    const transactionDate = new Date(date);
-    const startOfDay = new Date(transactionDate);
-    startOfDay.setUTCHours(0, 0, 0, 0);
-    const endOfDay = new Date(transactionDate);
-    endOfDay.setUTCHours(23, 59, 59, 999);
+    const { accountId, userId, date, amount, description, memo, uniqueId } = transactionData;
     
     try {
-      // Query for exact match on account, user, date (within same day), amount, description, and memo
-      // This uses the existing index: { accountId: 1, date: 1, amount: 1, description: 1 }
+      // If uniqueId is available, use it as the primary dedup method
+      if (uniqueId) {
+        const duplicate = await Transaction.findOne({
+          accountId: convertToObjectId(accountId),
+          userId: convertToObjectId(userId),
+          uniqueId,
+        });
+        if (duplicate) return duplicate;
+      }
+
+      // Fallback: multi-field matching for transactions without uniqueId
+      const transactionDate = new Date(date);
+      const startOfDay = new Date(transactionDate);
+      startOfDay.setUTCHours(0, 0, 0, 0);
+      const endOfDay = new Date(transactionDate);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+
       const query = {
         accountId: convertToObjectId(accountId),
         userId: convertToObjectId(userId),
@@ -50,15 +58,12 @@ class TransactionService {
         description: description
       };
       
-      // Include memo in duplicate check if provided
-      // Memo can be in either the memo field or rawData.memo field
       if (memo) {
         query.$or = [
           { 'rawData.memo': memo },
           { memo: memo }
         ];
       } else {
-        // If no memo provided, only match transactions that also have no memo
         query.$and = [
           { $or: [{ 'rawData.memo': { $exists: false } }, { 'rawData.memo': null }] },
           { $or: [{ memo: { $exists: false } }, { memo: null }] }
@@ -66,11 +71,16 @@ class TransactionService {
       }
       
       const duplicate = await Transaction.findOne(query);
+
+      // Backfill uniqueId on existing transactions matched via fallback
+      if (duplicate && uniqueId && !duplicate.uniqueId) {
+        duplicate.uniqueId = uniqueId;
+        await duplicate.save();
+      }
       
       return duplicate;
     } catch (error) {
       logger.error('Error checking for duplicate transaction:', error);
-      // Return null on error to allow transaction creation (fail open)
       return null;
     }
   }
@@ -139,7 +149,8 @@ class TransactionService {
             date: transactionDate,
             amount: transaction.chargedAmount,
             description: transaction.description,
-            memo: transaction.rawData?.memo || transaction.memo || null
+            memo: transaction.rawData?.memo || transaction.memo || null,
+            uniqueId: transaction.uniqueId || null
           });
 
           if (existingTransaction) {
@@ -162,6 +173,7 @@ class TransactionService {
 
           const savedTx = await Transaction.create({
             identifier: transaction.identifier,
+            uniqueId: transaction.uniqueId || null,
             accountId: bankAccount._id,
             userId: bankAccount.userId,
             creditCardId: creditCard?._id || null, // Link transaction to specific credit card
