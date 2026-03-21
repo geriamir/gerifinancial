@@ -215,7 +215,8 @@ class DataSyncService {
       newAccounts: 0,
       updatedAccounts: 0,
       newTransactions: 0,
-      errors: []
+      errors: [],
+      mostRecentTransactionDate: null
     };
 
     try {
@@ -293,6 +294,12 @@ class DataSyncService {
                 await newTransaction.save();
                 transactionsProcessed++;
                 results.newTransactions++;
+
+                // Track the most recent transaction date for lastScraped
+                const txDate = new Date(transaction.date);
+                if (!results.mostRecentTransactionDate || txDate > results.mostRecentTransactionDate) {
+                  results.mostRecentTransactionDate = txDate;
+                }
                 
                 logger.debug(`Created foreign currency transaction: ${transaction.currency} ${transaction.amount} - ${transaction.description}`);
               }
