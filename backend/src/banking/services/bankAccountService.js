@@ -3,6 +3,7 @@ const bankScraperService = require('./bankScraperService');
 const queuedDataSyncService = require('./queuedDataSyncService');
 const logger = require('../../shared/utils/logger');
 const bankAccountEvents = require('./bankAccountEvents');
+const ForeignCurrencyAccount = require('../../foreign-currency/models/ForeignCurrencyAccount');
 
 class BankAccountService {
   async create(userId, { bankId, name, username, password, apiToken, flexToken, queryId }) {
@@ -312,7 +313,7 @@ class BankAccountService {
       throw new Error('Bank account not found');
     }
 
-    // Find the actual latest transaction date for this account (exclude future-dated installments)
+    // Find the actual latest regular transaction date for this account (exclude future-dated installments)
     const latestTransaction = await Transaction.findOne({
       accountId,
       date: { $lte: new Date() }
@@ -321,25 +322,41 @@ class BankAccountService {
       .select('date')
       .lean();
 
-    const oldLastScraped = bankAccount.lastScraped;
-    let newLastScraped;
-
-    if (latestTransaction) {
-      newLastScraped = new Date(latestTransaction.date);
-    } else {
-      // No transactions at all — reset to 6 months back
-      newLastScraped = new Date();
-      newLastScraped.setMonth(newLastScraped.getMonth() - 6);
+    // Find the latest foreign currency transaction date separately
+    const foreignAccounts = await ForeignCurrencyAccount.find({ bankAccountId: accountId }).select('_id').lean();
+    let latestForeignDate = null;
+    if (foreignAccounts.length > 0) {
+      const foreignAccountIds = foreignAccounts.map(fa => fa._id);
+      const latestForeignTx = await Transaction.findOne({
+        accountId: { $in: foreignAccountIds },
+        date: { $lte: new Date() }
+      })
+        .sort({ date: -1 })
+        .select('date')
+        .lean();
+      if (latestForeignTx) {
+        latestForeignDate = new Date(latestForeignTx.date);
+      }
     }
 
-    // Update lastScraped on the account
-    bankAccount.lastScraped = newLastScraped;
+    const oldLastScraped = bankAccount.lastScraped;
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    // Also reset strategy-level lastScraped dates
+    const regularDate = latestTransaction ? new Date(latestTransaction.date) : null;
+
+    // Update lastScraped on the account (use regular transaction date or fallback)
+    bankAccount.lastScraped = regularDate || sixMonthsAgo;
+
+    // Set strategy-level lastScraped dates independently
     if (bankAccount.strategySync) {
       for (const strategy of Object.keys(bankAccount.strategySync.toObject ? bankAccount.strategySync.toObject() : bankAccount.strategySync)) {
         if (bankAccount.strategySync[strategy]?.lastScraped) {
-          bankAccount.strategySync[strategy].lastScraped = newLastScraped;
+          if (strategy === 'foreign-currency') {
+            bankAccount.strategySync[strategy].lastScraped = latestForeignDate || sixMonthsAgo;
+          } else {
+            bankAccount.strategySync[strategy].lastScraped = regularDate || sixMonthsAgo;
+          }
         }
       }
       bankAccount.markModified('strategySync');
@@ -347,7 +364,7 @@ class BankAccountService {
 
     await bankAccount.save();
 
-    logger.info(`Recovered lastScraped for account ${accountId}: ${oldLastScraped?.toISOString() || 'null'} → ${newLastScraped.toISOString()}`);
+    logger.info(`Recovered lastScraped for account ${accountId}: ${oldLastScraped?.toISOString() || 'null'} → regular: ${(regularDate || sixMonthsAgo).toISOString()}, foreign: ${(latestForeignDate || sixMonthsAgo).toISOString()}`);
 
     // Queue a new scrape from the corrected date
     const scrapeResult = await queuedDataSyncService.queueBankAccountSync(accountId, { priority: 'high' });
@@ -357,8 +374,10 @@ class BankAccountService {
       accountId,
       accountName: bankAccount.name,
       previousLastScraped: oldLastScraped,
-      correctedLastScraped: newLastScraped,
+      correctedLastScraped: regularDate || sixMonthsAgo,
+      correctedForeignLastScraped: latestForeignDate || sixMonthsAgo,
       latestTransactionDate: latestTransaction?.date || null,
+      latestForeignTransactionDate: latestForeignDate,
       queuedJobs: scrapeResult.queuedJobs,
       totalJobs: scrapeResult.totalJobs
     };
