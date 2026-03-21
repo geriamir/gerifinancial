@@ -293,7 +293,7 @@ describe('PensionService', () => {
       }
     };
 
-    const updated = await pensionService.processAccountDetail(detail, 'DET-001');
+    const updated = await pensionService.processAccountDetail(detail, 'DET-001', userId);
 
     expect(updated.balance).toBe(536000);
     expect(updated.investmentRoutes).toHaveLength(1);
