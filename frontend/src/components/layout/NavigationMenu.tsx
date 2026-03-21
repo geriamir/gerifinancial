@@ -26,7 +26,8 @@ import {
   TrendingUp as InvestmentIcon,
   CurrencyExchange as ForeignCurrencyIcon,
   Assignment as ProjectIcon,
-  CreditCard as BankingIcon
+  CreditCard as BankingIcon,
+  Shield as PensionIcon
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -44,6 +45,7 @@ const navigationItems: NavigationItem[] = [
   { title: 'Projects', path: '/projects', icon: <ProjectIcon /> },
   { title: 'RSUs', path: '/rsus', icon: <RSUIcon /> },
   { title: 'Investments', path: '/investments', icon: <InvestmentIcon /> },
+  { title: 'Pension & Savings', path: '/pension', icon: <PensionIcon /> },
   { title: 'Foreign Currency', path: '/foreign-currency', icon: <ForeignCurrencyIcon /> }
 ];
 

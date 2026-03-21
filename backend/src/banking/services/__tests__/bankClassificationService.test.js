@@ -79,7 +79,7 @@ describe('BankClassificationService', () => {
   describe('getAllSupportedBanks', () => {
     test('should return all supported banks (checking + credit)', () => {
       const allBanks = BankClassificationService.getAllSupportedBanks();
-      const expectedBanks = ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury'];
+      const expectedBanks = ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury', 'phoenix'];
       expect(allBanks).toEqual(expectedBanks);
     });
     
