@@ -195,6 +195,24 @@ describe('TransactionService', () => {
 
       expect(result.mostRecentTransactionDate).toBeNull();
     });
+
+    it('should not advance mostRecentTransactionDate from pending transactions', async () => {
+      const completedDate = new Date('2026-02-15');
+      const pendingDate = new Date('2026-03-10');
+
+      const accounts = [{
+        txns: [
+          { identifier: 'completed-tx', date: completedDate, chargedAmount: -100, description: 'Completed purchase', currency: 'ILS', status: 'completed' },
+          { identifier: 'pending-tx', date: pendingDate, chargedAmount: -200, description: 'Pending purchase', currency: 'ILS', status: 'pending' }
+        ]
+      }];
+
+      const result = await transactionService.processScrapedTransactions(accounts, mockBankAccount);
+
+      expect(result.mostRecentTransactionDate).toEqual(completedDate);
+      expect(result.skippedPending).toBe(1);
+      expect(result.newTransactions).toBe(1);
+    });
   });
 
   describe('findPotentialDuplicate - uniqueId', () => {

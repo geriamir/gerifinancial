@@ -130,16 +130,17 @@ class TransactionService {
         try {
           const transactionDate = new Date(transaction.date);
           
-          // Track the most recent transaction date (exclude future-dated installments)
-          if (transactionDate <= now && (!results.mostRecentTransactionDate || transactionDate > results.mostRecentTransactionDate)) {
-            results.mostRecentTransactionDate = transactionDate;
-          }
-          
           // Skip transactions with pending status from scraper
           if (transaction.status === 'pending') {
             logger.info(`Skipping pending transaction: ${transaction.description}, date: ${transactionDate}`);
             results.skippedPending++;
             continue;
+          }
+
+          // Track the most recent transaction date (exclude future-dated installments)
+          // Must be AFTER pending check so lastScraped doesn't advance past unskipped transactions
+          if (transactionDate <= now && (!results.mostRecentTransactionDate || transactionDate > results.mostRecentTransactionDate)) {
+            results.mostRecentTransactionDate = transactionDate;
           }
 
           // Check for duplicate using multi-field matching (more reliable than identifier alone)
