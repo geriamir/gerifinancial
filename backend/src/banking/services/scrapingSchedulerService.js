@@ -148,7 +148,11 @@ class ScrapingSchedulerService {
    */
   async initiateFirstSync(bankAccount) {
     // OTP-based banks require manual login — skip automatic first sync
-    if (bankAccount.isOtpBank()) {
+    const isOtpBank = typeof bankAccount.isOtpBank === 'function'
+      ? bankAccount.isOtpBank()
+      : false;
+
+    if (isOtpBank) {
       logger.info(`Skipping automatic first sync for OTP-based account: ${bankAccount.name}`);
       return;
     }
