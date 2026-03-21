@@ -6,7 +6,7 @@ const bankAccountEvents = require('./bankAccountEvents');
 const ForeignCurrencyAccount = require('../../foreign-currency/models/ForeignCurrencyAccount');
 
 class BankAccountService {
-  async create(userId, { bankId, name, username, password, apiToken, flexToken, queryId }) {
+  async create(userId, { bankId, name, username, password, apiToken, flexToken, queryId, phoneOrEmail }) {
     let credentials;
 
     if (bankId === 'mercury') {
@@ -15,6 +15,9 @@ class BankAccountService {
     } else if (bankId === 'ibkr') {
       // IBKR uses Flex Web Service token + query ID
       credentials = { flexToken, queryId };
+    } else if (bankId === 'phoenix') {
+      // Phoenix uses ID number + phone/email for OTP-based auth
+      credentials = { username, phoneOrEmail };
     } else {
       // Israeli banks use username/password with browser scraping
       await bankScraperService.validateCredentials(bankId, { username, password });

@@ -56,13 +56,30 @@ class BankClassificationService {
   static isApiBank(bankId) {
     return this.getApiBanks().includes(bankId);
   }
+
+  /**
+   * Get list of OTP-based banks (browser automation with OTP login)
+   * @returns {string[]} Array of OTP bank IDs
+   */
+  static getOtpBanks() {
+    return ['phoenix'];
+  }
+
+  /**
+   * Check if a bank ID uses OTP-based authentication
+   * @param {string} bankId - Bank identifier
+   * @returns {boolean} True if it's an OTP-based bank
+   */
+  static isOtpBank(bankId) {
+    return this.getOtpBanks().includes(bankId);
+  }
   
   /**
    * Get all supported banks (checking + credit card + API)
    * @returns {string[]} Array of all supported bank IDs
    */
   static getAllSupportedBanks() {
-    return [...this.getCheckingBanks(), ...this.getCreditCardProviders(), ...this.getApiBanks()];
+    return [...this.getCheckingBanks(), ...this.getCreditCardProviders(), ...this.getApiBanks(), ...this.getOtpBanks()];
   }
   
   /**
@@ -88,6 +105,9 @@ class BankClassificationService {
     }
     if (this.isApiBank(bankId)) {
       return 'api';
+    }
+    if (this.isOtpBank(bankId)) {
+      return 'otp';
     }
     return null;
   }

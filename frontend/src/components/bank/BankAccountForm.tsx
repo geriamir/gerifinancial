@@ -41,7 +41,8 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
     password: '',
     apiToken: '',
     flexToken: '',
-    queryId: ''
+    queryId: '',
+    phoneOrEmail: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -76,6 +77,8 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
       let credentials;
       if (formData.bankId === 'ibkr') {
         credentials = { flexToken: formData.flexToken, queryId: formData.queryId };
+      } else if (formData.bankId === 'phoenix') {
+        credentials = { username: formData.username, phoneOrEmail: formData.phoneOrEmail };
       } else if (isApiBank(formData.bankId)) {
         credentials = { apiToken: formData.apiToken };
       } else {
@@ -119,7 +122,8 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
       password: '',
       apiToken: '',
       flexToken: '',
-      queryId: ''
+      queryId: '',
+      phoneOrEmail: ''
     });
     setError('');
   };
@@ -216,6 +220,29 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
                 onChange={handleInputChange}
                 required
                 helperText="The numeric ID shown next to your Activity Flex Query"
+              />
+            </>
+          ): formData.bankId === 'phoenix' ? (
+            <>
+              <TextField
+                fullWidth
+                margin="normal"
+                label="ID Number (תעודת זהות)"
+                name="username"
+                value={formData.username}
+                onChange={handleInputChange}
+                required
+                helperText="Your Israeli ID number used to log in to Phoenix portal"
+              />
+              <TextField
+                fullWidth
+                margin="normal"
+                label="Phone Number or Email"
+                name="phoneOrEmail"
+                value={formData.phoneOrEmail}
+                onChange={handleInputChange}
+                required
+                helperText="Phone (+972...) or email for OTP verification during sync"
               />
             </>
           ): isApiBank(formData.bankId) ? (

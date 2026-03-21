@@ -11,3 +11,4 @@ export { portfolioApi } from './portfolios';
 export * from './rsus';
 export * from './onboarding';
 export * from './foreignCurrency';
+export { pensionApi } from './pension';

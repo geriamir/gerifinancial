@@ -1,11 +1,25 @@
 import React, { useState } from 'react';
-import { Button, CircularProgress, Typography, Stack, Alert } from '@mui/material';
+import {
+  Button,
+  CircularProgress,
+  Typography,
+  Stack,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Box
+} from '@mui/material';
 import { FindReplace as RecoverIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { bankAccountsApi } from '../../services/api/bank';
+import { pensionApi } from '../../services/api/pension';
 import { format } from 'date-fns';
 import { track } from '../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
+import { getBankStrategies } from '../../constants/banks';
 
 interface ScrapeResult {
   message: string;
@@ -19,11 +33,13 @@ const STRATEGY_DISPLAY_NAMES: Record<string, string> = {
   'investment-portfolios': 'Investments',
   'foreign-currency': 'Foreign Currency',
   'mercury-checking': 'Mercury Checking',
-  'ibkr-flex': 'IBKR Flex'
+  'ibkr-flex': 'IBKR Flex',
+  'phoenix-pension': 'Phoenix Pension'
 };
 
 interface AccountScrapingProps {
   accountId: string;
+  bankId?: string;
   lastScraped: string | null;
   strategySync?: {
     [key: string]: {
@@ -37,7 +53,8 @@ interface AccountScrapingProps {
 }
 
 export const AccountScraping: React.FC<AccountScrapingProps> = ({ 
-  accountId, 
+  accountId,
+  bankId,
   lastScraped,
   strategySync,
   isDisabled,
@@ -49,7 +66,19 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
   const [recoverMessage, setRecoverMessage] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  // Phoenix OTP state
+  const [otpDialogOpen, setOtpDialogOpen] = useState(false);
+  const [otpStep, setOtpStep] = useState<'sending' | 'input' | 'syncing'>('sending');
+  const [otpDestination, setOtpDestination] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+
   const handleScrape = async () => {
+    if (bankId === 'phoenix') {
+      handlePhoenixScrape();
+      return;
+    }
+
     setIsLoading(true);
     track(BANK_ACCOUNT_EVENTS.SCRAPE, { accountId });
     try {
@@ -64,6 +93,44 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handlePhoenixScrape = async () => {
+    setOtpDialogOpen(true);
+    setOtpStep('sending');
+    setOtpError(null);
+    setOtp('');
+    try {
+      const response = await pensionApi.initiateOtp(accountId);
+      setOtpDestination(response.destination || '');
+      setOtpStep('input');
+    } catch (err: any) {
+      setOtpError(err.response?.data?.error || err.message);
+      setOtpStep('input');
+    }
+  };
+
+  const handleOtpVerify = async () => {
+    try {
+      setOtpError(null);
+      setOtpStep('syncing');
+      const result = await pensionApi.verifyAndSync(accountId, otp);
+      setScrapeResult({
+        message: `Phoenix sync: ${result.synced} accounts synced, ${result.detailsFetched} details fetched`,
+        totalJobs: result.synced
+      });
+      setOtpDialogOpen(false);
+      onScrapingComplete?.();
+    } catch (err: any) {
+      setOtpError(err.response?.data?.error || err.message);
+      setOtpStep('input');
+    }
+  };
+
+  const handleOtpClose = () => {
+    setOtpDialogOpen(false);
+    setOtp('');
+    setOtpError(null);
   };
 
   const handleVerifyClick = () => {
@@ -87,8 +154,9 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
     }
   };
 
+  const relevantStrategies = getBankStrategies(bankId);
   const activeStrategies = strategySync 
-    ? Object.entries(strategySync).filter(([, s]) => s && s.status !== 'never')
+    ? Object.entries(strategySync).filter(([key, s]) => s && s.status !== 'never' && relevantStrategies.includes(key))
     : [];
 
   return (
@@ -119,7 +187,7 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
           disabled={isLoading || isDisabled}
           startIcon={isLoading ? <CircularProgress size={20} /> : undefined}
         >
-          {isLoading ? 'Scraping...' : 'Scrape Now'}
+          {isLoading ? 'Scraping...' : bankId === 'phoenix' ? 'Sync (OTP)' : 'Scrape Now'}
         </Button>
 
         {scrapeResult && (
@@ -133,16 +201,18 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
           </Button>
         )}
 
-        <Button
-          variant="text"
-          size="small"
-          color="secondary"
-          onClick={handleRecover}
-          disabled={isRecovering || isLoading || isDisabled}
-          startIcon={isRecovering ? <CircularProgress size={16} /> : <RecoverIcon />}
-        >
-          {isRecovering ? 'Recovering...' : 'Missing Transactions'}
-        </Button>
+        {bankId !== 'phoenix' && (
+          <Button
+            variant="text"
+            size="small"
+            color="secondary"
+            onClick={handleRecover}
+            disabled={isRecovering || isLoading || isDisabled}
+            startIcon={isRecovering ? <CircularProgress size={16} /> : <RecoverIcon />}
+          >
+            {isRecovering ? 'Recovering...' : 'Missing Transactions'}
+          </Button>
+        )}
       </Stack>
 
       {recoverMessage && (
@@ -157,6 +227,52 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
           {scrapeResult.totalJobs != null && ` (${scrapeResult.totalJobs} job(s) queued)`}
         </Alert>
       )}
+
+      {/* Phoenix OTP Dialog */}
+      <Dialog open={otpDialogOpen} onClose={handleOtpClose} maxWidth="sm" fullWidth>
+        <DialogTitle>Phoenix Insurance — OTP Verification</DialogTitle>
+        <DialogContent>
+          {otpError && <Alert severity="error" sx={{ mb: 2 }}>{otpError}</Alert>}
+
+          {otpStep === 'sending' && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 3 }}>
+              <CircularProgress size={36} />
+              <Typography sx={{ mt: 2 }}>Sending OTP code...</Typography>
+            </Box>
+          )}
+
+          {otpStep === 'input' && (
+            <Box sx={{ mt: 1 }}>
+              <Typography sx={{ mb: 2 }}>
+                Enter the OTP code sent to {otpDestination || 'your phone/email'}:
+              </Typography>
+              <TextField
+                label="OTP Code"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && otp) handleOtpVerify(); }}
+                autoFocus
+                fullWidth
+              />
+            </Box>
+          )}
+
+          {otpStep === 'syncing' && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 3 }}>
+              <CircularProgress size={36} />
+              <Typography sx={{ mt: 2 }}>Syncing Phoenix pension data...</Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleOtpClose}>Cancel</Button>
+          {otpStep === 'input' && (
+            <Button variant="contained" onClick={handleOtpVerify} disabled={!otp}>
+              Verify & Sync
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 };

@@ -22,7 +22,7 @@ import {
 } from '@mui/icons-material';
 import { bankAccountsApi } from '../../services/api/bank';
 import { BankAccount } from '../../services/api/types';
-import { SUPPORTED_BANKS } from '../../constants/banks';
+import { SUPPORTED_BANKS, getBankStrategies } from '../../constants/banks';
 import { BankAccountForm } from './BankAccountForm';
 import { UpdateCredentialsDialog } from './UpdateCredentialsDialog';
 import { track } from '../../utils/analytics';
@@ -53,7 +53,8 @@ const getStrategyDisplayName = (strategyKey: string): string => {
     'investment-portfolios': 'Investments',
     'foreign-currency': 'Foreign Currency',
     'mercury-checking': 'Mercury Checking',
-    'ibkr-flex': 'IBKR Flex'
+    'ibkr-flex': 'IBKR Flex',
+    'phoenix-pension': 'Phoenix Pension'
   };
   return names[strategyKey] || strategyKey;
 };
@@ -191,7 +192,7 @@ export const BankAccountsList: React.FC = () => {
                       </Typography>
                     )}
                     {account.strategySync && Object.entries(account.strategySync)
-                      .filter(([, sync]) => sync?.status === 'failed')
+                      .filter(([strategy, sync]) => sync?.status === 'failed' && getBankStrategies(account.bankId).includes(strategy))
                       .map(([strategy]) => (
                         <Typography key={strategy} color="error" variant="caption" display="block">
                           {getStrategyDisplayName(strategy)} sync failed
@@ -205,6 +206,7 @@ export const BankAccountsList: React.FC = () => {
                     )}
                     <AccountScraping
                       accountId={account._id}
+                      bankId={account.bankId}
                       lastScraped={account.lastScraped}
                       strategySync={account.strategySync}
                       isDisabled={account.status !== 'active'}

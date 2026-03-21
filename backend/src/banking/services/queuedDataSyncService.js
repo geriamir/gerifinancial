@@ -58,6 +58,8 @@ class QueuedDataSyncService {
       ? ['mercury-checking']
       : bankAccount.bankId === 'ibkr'
       ? ['ibkr-flex']
+      : bankAccount.bankId === 'phoenix'
+      ? [] // Phoenix requires OTP — sync via pension OTP flow, not queue
       : ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
     
     // Determine job priority based on account or options

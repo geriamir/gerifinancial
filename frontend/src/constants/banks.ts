@@ -18,21 +18,27 @@ export const CREDIT_CARD_PROVIDERS: SupportedBank[] = [
   { id: 'isracard', name: 'Isracard' }
 ];
 
-// API-based banks (no browser scraping needed)
+// API-based banks (token-based REST API, no browser scraping)
 export const API_BANKS: SupportedBank[] = [
   { id: 'mercury', name: 'Mercury' },
   { id: 'ibkr', name: 'Interactive Brokers' }
+];
+
+// OTP-based banks (browser automation with OTP login)
+export const OTP_BANKS: SupportedBank[] = [
+  { id: 'phoenix', name: 'Phoenix Insurance (הפניקס)' }
 ];
 
 // All supported banks (for backward compatibility)
 export const SUPPORTED_BANKS: SupportedBank[] = [
   ...CHECKING_ACCOUNT_BANKS,
   ...CREDIT_CARD_PROVIDERS,
-  ...API_BANKS
+  ...API_BANKS,
+  ...OTP_BANKS
 ];
 
 // Helper functions for bank classification
-export const getBankType = (bankId: string): 'checking' | 'credit' | 'api' | null => {
+export const getBankType = (bankId: string): 'checking' | 'credit' | 'api' | 'otp' | null => {
   if (CHECKING_ACCOUNT_BANKS.some(bank => bank.id === bankId)) {
     return 'checking';
   }
@@ -41,6 +47,9 @@ export const getBankType = (bankId: string): 'checking' | 'credit' | 'api' | nul
   }
   if (API_BANKS.some(bank => bank.id === bankId)) {
     return 'api';
+  }
+  if (OTP_BANKS.some(bank => bank.id === bankId)) {
+    return 'otp';
   }
   return null;
 };
@@ -57,8 +66,22 @@ export const isApiBank = (bankId: string): boolean => {
   return API_BANKS.some(bank => bank.id === bankId);
 };
 
-export const getBanksByType = (type: 'checking' | 'credit' | 'api'): SupportedBank[] => {
+export const isOtpBank = (bankId: string): boolean => {
+  return OTP_BANKS.some(bank => bank.id === bankId);
+};
+
+export const getBankStrategies = (bankId?: string): string[] => {
+  switch (bankId) {
+    case 'mercury': return ['mercury-checking'];
+    case 'ibkr': return ['ibkr-flex'];
+    case 'phoenix': return ['phoenix-pension'];
+    default: return ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
+  }
+};
+
+export const getBanksByType = (type: 'checking' | 'credit' | 'api' | 'otp'): SupportedBank[] => {
   if (type === 'checking') return CHECKING_ACCOUNT_BANKS;
   if (type === 'credit') return CREDIT_CARD_PROVIDERS;
+  if (type === 'otp') return OTP_BANKS;
   return API_BANKS;
 };

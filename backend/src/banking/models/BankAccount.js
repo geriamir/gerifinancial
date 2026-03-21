@@ -11,7 +11,7 @@ const bankAccountSchema = new mongoose.Schema({
   bankId: {
     type: String,
     required: true,
-    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury', 'ibkr'] // Supported banks
+    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury', 'ibkr', 'phoenix'] // Supported banks
   },
   defaultCurrency: {
     type: String,
@@ -29,7 +29,7 @@ const bankAccountSchema = new mongoose.Schema({
     },
     password: {
       type: String,
-      required: function() { return this.bankId !== 'mercury' && this.bankId !== 'ibkr'; }
+      required: function() { return this.bankId !== 'mercury' && this.bankId !== 'ibkr' && this.bankId !== 'phoenix'; }
     },
     apiToken: {
       type: String,
@@ -42,6 +42,10 @@ const bankAccountSchema = new mongoose.Schema({
     queryId: {
       type: String,
       required: function() { return this.bankId === 'ibkr'; }
+    },
+    phoneOrEmail: {
+      type: String,
+      required: function() { return this.bankId === 'phoenix'; }
     }
   },
   // Per-strategy sync tracking
@@ -67,6 +71,11 @@ const bankAccountSchema = new mongoose.Schema({
       status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
     },
     'ibkr-flex': {
+      lastScraped: { type: Date, default: null },
+      lastAttempted: { type: Date, default: null },
+      status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
+    },
+    'phoenix-pension': {
       lastScraped: { type: Date, default: null },
       lastAttempted: { type: Date, default: null },
       status: { type: String, enum: ['success', 'failed', 'never'], default: 'never' }
@@ -223,6 +232,11 @@ bankAccountSchema.pre('save', function(next) {
     if (this.isModified('credentials.flexToken') && this.credentials.flexToken) {
       if (!isEncrypted(this.credentials.flexToken)) {
         this.credentials.flexToken = encrypt(this.credentials.flexToken);
+      }
+    }
+    if (this.isModified('credentials.phoneOrEmail') && this.credentials.phoneOrEmail) {
+      if (!isEncrypted(this.credentials.phoneOrEmail)) {
+        this.credentials.phoneOrEmail = encrypt(this.credentials.phoneOrEmail);
       }
     }
     next();
