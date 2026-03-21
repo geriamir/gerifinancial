@@ -90,7 +90,11 @@ class ScrapingSchedulerService {
    */
   scheduleAccount(account) {
     // OTP-based banks (e.g., Phoenix) require manual login — skip scheduling
-    if (account.isOtpBank()) {
+    const isOtpAccount = typeof account.isOtpBank === 'function'
+      ? account.isOtpBank()
+      : account.bankId === 'phoenix';
+
+    if (isOtpAccount) {
       logger.info(`Skipping scheduled scraping for OTP-based account ${account._id} (${account.bankId})`);
       return;
     }
