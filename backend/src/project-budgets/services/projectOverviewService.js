@@ -1,6 +1,7 @@
 const { CurrencyExchange, currencyExchangeService } = require('../../foreign-currency');
 const unplannedExpenseService = require('./unplannedExpenseService');
 const { Category, SubCategory, Transaction, installmentGroupingUtils } = require('../../banking');
+const logger = require('../../shared/utils/logger');
 
 /**
  * Service for handling project budget overview calculations and recommendations
@@ -28,7 +29,7 @@ class ProjectOverviewService {
     for (const transaction of populatedTransactions) {
       // Ensure transaction exists and has an amount
       if (!transaction || typeof transaction.amount !== 'number') {
-        console.warn(`Invalid transaction in allocated transactions: ${transaction ? transaction._id : 'null'}`);
+        logger.warn(`Invalid transaction in allocated transactions: ${transaction ? transaction._id : 'null'}`);
         continue;
       }
 
@@ -49,7 +50,7 @@ class ProjectOverviewService {
           // Re-apply sign after conversion
           convertedAmount = transaction.amount < 0 ? conversionResult.convertedAmount : -conversionResult.convertedAmount;
         } catch (error) {
-          console.warn(`Currency conversion failed for transaction ${transaction._id}:`, error.message);
+          logger.warn(`Currency conversion failed for transaction ${transaction._id}:`, error.message);
         }
       }
       
@@ -90,11 +91,10 @@ class ProjectOverviewService {
           
           totalBudgetConverted += budgetedConverted;
           totalPaidConverted += actualAmount; // actualAmount is already in project currency
-          console.log(`Converted ${budget.budgetedAmount} ${budget.currency} to ${budgetedConverted} ${project.currency}`);
         }
       } catch (error) {
         // If conversion fails, use original amounts as fallback
-        console.warn(`Currency conversion failed for ${budget.currency} to ${project.currency}:`, error.message);
+        logger.warn(`Currency conversion failed for ${budget.currency} to ${project.currency}:`, error.message);
         const actualAmount = await this.calculateActualAmountForBudget(budget, project.currency);
         totalBudgetConverted += budget.budgetedAmount;
         totalPaidConverted += actualAmount;
@@ -140,11 +140,10 @@ class ProjectOverviewService {
           
           totalFundingConverted += expectedConverted;
           totalAvailableFundingConverted += availableConverted;
-          console.log(`Converted funding ${source.expectedAmount} ${source.currency} to ${expectedConverted} ${project.currency}`);
         }
       } catch (error) {
         // If conversion fails, use original amounts as fallback
-        console.warn(`Funding currency conversion failed for ${source.currency} to ${project.currency}:`, error.message);
+        logger.warn(`Funding currency conversion failed for ${source.currency} to ${project.currency}:`, error.message);
         totalFundingConverted += source.expectedAmount;
         totalAvailableFundingConverted += source.availableAmount;
       }
@@ -170,11 +169,10 @@ class ProjectOverviewService {
     const expenseSubCategory = unplannedExpense.subCategory;
     
     if (!expenseCategory || !expenseSubCategory) {
-      console.warn('Expense missing category or subcategory data for recommendations');
+      logger.warn('Expense missing category or subcategory data for recommendations');
       return [];
     }
     
-    console.log(`Getting recommendations for unplanned expense: ${unplannedExpense.transactionId}`);
     
     // Iterate through all planned budget categories to find matches
     for (const budget of project.categoryBudgets) {
@@ -206,7 +204,7 @@ class ProjectOverviewService {
           subCategoryName = subCategory ? subCategory.name : 'Unknown';
         }
       } catch (error) {
-        console.warn('Error getting category/subcategory names for recommendation:', error.message);
+        logger.warn('Error getting category/subcategory names for recommendation:', error.message);
       }
       
       // Extract the actual ObjectId from populated objects for comparison
@@ -214,7 +212,6 @@ class ProjectOverviewService {
       const budgetCategoryId = budget.categoryId._id || budget.categoryId;
       
       // Only exact subcategory match
-      console.log(`Checking exact match for subcategory: ${expenseSubCategory._id} vs ${budgetSubCategoryId.toString()}`);
       if (budgetSubCategoryId.toString() === expenseSubCategory._id.toString()) {
         confidence = 95;
         reason = `Exact match: ${expenseSubCategory.name}`;
@@ -256,7 +253,6 @@ class ProjectOverviewService {
    * @returns {Object} - Object containing expenses and total
    */
   async getUnplannedExpenses(project) {
-    console.log(`Getting unplanned expenses for project: ${project._id}, with tag ${project.projectTag}`);
     
     if (!project.projectTag) {
       return {
@@ -271,7 +267,6 @@ class ProjectOverviewService {
       tags: project.projectTag,
     }).populate('category').populate('subCategory');
 
-    console.log(`Found ${transactions.length} transactions tagged with ${project.projectTag}`);
 
     const unplannedExpenses = [];
     let totalUnplannedInProjectCurrency = 0;
@@ -289,12 +284,10 @@ class ProjectOverviewService {
       );
       
       if (isAllocated) {
-        console.log(`Skipping transaction ${transaction._id} - already allocated to planned category`);
         continue;
       }
 
       // Only unallocated transactions tagged with the project are considered unplanned
-      console.log(`Processing unplanned transaction ${transaction._id} category: ${transaction.category.name}/${transaction.subCategory.name}`);
       
       {
         // Use the installment grouping utility to handle this transaction
@@ -382,10 +375,9 @@ class ProjectOverviewService {
         exchangeRate = conversionResult.exchangeRate;
         
         if (conversionResult.fallback) {
-          console.log(`Used fallback rate for transaction ${transaction._id}: ${conversionResult.source} (${conversionResult.daysDifference} days difference)`);
         }
       } catch (error) {
-        console.warn(`Currency conversion failed for transaction ${transaction._id}:`, error.message);
+        logger.warn(`Currency conversion failed for transaction ${transaction._id}:`, error.message);
       }
     }
     
@@ -400,7 +392,6 @@ class ProjectOverviewService {
    * @returns {Object} - Object containing expenses with recommendations and total
    */
   async getUnplannedExpensesWithRecommendations(project) {
-    console.log(`Getting unplanned expenses with recommendations for project: ${project._id}`);
     
     // First get the basic unplanned expenses
     const unplannedResult = await this.getUnplannedExpenses(project);
@@ -428,7 +419,6 @@ class ProjectOverviewService {
    * @returns {Object} - Object containing grouped allocated transactions for each budget item
    */
   async getPlannedExpensesGrouped(project) {
-    console.log(`Getting planned expenses with grouping for project: ${project._id}`);
     
     const plannedExpenses = {};
     
@@ -448,7 +438,6 @@ class ProjectOverviewService {
         _id: { $in: budget.allocatedTransactions }
       }).populate('category').populate('subCategory');
       
-      console.log(`Found ${allocatedTransactions.length} allocated transactions for budget ${budget._id}`);
       
       // Process regular transactions with currency conversion
       const processRegularTransaction = async (transaction) => {
@@ -469,10 +458,9 @@ class ProjectOverviewService {
             exchangeRate = conversionResult.exchangeRate;
             
             if (conversionResult.fallback) {
-              console.log(`Used fallback rate for transaction ${transaction._id}: ${conversionResult.source} (${conversionResult.daysDifference} days difference)`);
             }
           } catch (error) {
-            console.warn(`Currency conversion failed for transaction ${transaction._id}:`, error.message);
+            logger.warn(`Currency conversion failed for transaction ${transaction._id}:`, error.message);
           }
         }
         
@@ -505,7 +493,6 @@ class ProjectOverviewService {
         expenseCount: groupingResult.groupedTransactions.length
       };
       
-      console.log(`Processed ${groupingResult.groupedTransactions.length} grouped expenses for budget ${budget._id}, total: ${groupingResult.totalAmount}`);
     }
     
     return plannedExpenses;
@@ -559,9 +546,8 @@ class ProjectOverviewService {
               project.currency
             );
             varianceInProjectCurrency = actualInProjectCurrency - budgetedInProjectCurrency;
-            console.log(`Converted ${budget.budgetedAmount} ${budget.currency} to ${budgetedInProjectCurrency} ${project.currency}`);
           } catch (error) {
-            console.warn(`Currency conversion failed for ${budget.currency} to ${project.currency}:`, error.message);
+            logger.warn(`Currency conversion failed for ${budget.currency} to ${project.currency}:`, error.message);
           }
         }
         
