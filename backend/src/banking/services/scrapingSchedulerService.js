@@ -89,6 +89,12 @@ class ScrapingSchedulerService {
    * Schedule scraping for a specific bank account
    */
   scheduleAccount(account) {
+    // OTP-based banks (e.g., Phoenix) require manual login — skip scheduling
+    if (account.isOtpBank()) {
+      logger.info(`Skipping scheduled scraping for OTP-based account ${account._id} (${account.bankId})`);
+      return;
+    }
+
     // Run daily at 3 AM
     const job = cron.schedule('0 3 * * *', async () => {
       try {
@@ -141,6 +147,12 @@ class ScrapingSchedulerService {
    * Initiate first sync for a newly created account using queue system
    */
   async initiateFirstSync(bankAccount) {
+    // OTP-based banks require manual login — skip automatic first sync
+    if (bankAccount.isOtpBank()) {
+      logger.info(`Skipping automatic first sync for OTP-based account: ${bankAccount.name}`);
+      return;
+    }
+
     try {
       logger.info(`Initiating first sync for new bank account: ${bankAccount.name} (${bankAccount._id})`);
 

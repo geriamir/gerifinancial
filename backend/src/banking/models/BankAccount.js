@@ -341,6 +341,12 @@ bankAccountSchema.methods.updateStrategySync = function(strategyName, success, e
   }
 };
 
+// OTP-based banks require manual login and cannot be auto-scheduled
+const OTP_BANKS = ['phoenix'];
+bankAccountSchema.methods.isOtpBank = function() {
+  return OTP_BANKS.includes(this.bankId);
+};
+
 // Check if strategy needs sync based on schedule
 bankAccountSchema.methods.strategyNeedsSync = function(strategyName, hoursThreshold = 24) {
   const strategyData = this.strategySync?.[strategyName];
