@@ -14,7 +14,6 @@ const transactionSchema = new mongoose.Schema({
   // Stable unique ID from the scraper (e.g., hash of multiple fields)
   uniqueId: {
     type: String,
-    index: true,
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -206,6 +205,12 @@ transactionSchema.index({ category: 1, date: -1 });
 // New indexes for budget functionality
 transactionSchema.index({ tags: 1 }); // For project and tag-based queries
 transactionSchema.index({ userId: 1, processedDate: -1 }); // For user budget calculations
+
+// Compound partial index for uniqueId dedup lookups — only indexes non-null values
+transactionSchema.index(
+  { accountId: 1, userId: 1, uniqueId: 1 },
+  { partialFilterExpression: { uniqueId: { $type: 'string' } } }
+);
 
 // Helper method to categorize a transaction
 transactionSchema.methods.categorize = async function(categoryId, subCategoryId, method = CategorizationMethod.MANUAL, reasoning = null) {
