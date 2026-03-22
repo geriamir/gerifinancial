@@ -246,12 +246,12 @@ class ScrapingSchedulerService {
    */
   async accountNeedsStartupScraping(account) {
     try {
-      const strategies = account.bankId === 'mercury'
+      const strategies = account.isOtpBank()
+        ? [] // OTP banks require manual login — no automatic sync
+        : account.bankId === 'mercury'
         ? ['mercury-checking']
         : account.bankId === 'ibkr'
         ? ['ibkr-flex']
-        : account.bankId === 'phoenix'
-        ? [] // Phoenix requires OTP — no automatic sync
         : ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
       const strategiesNeedingSync = [];
 

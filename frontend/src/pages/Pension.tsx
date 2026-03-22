@@ -253,6 +253,12 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ account, onBack }) => {
 };
 
 // ─── Sync Dialog ────────────────────────────────────────────────
+interface OtpBankAccount {
+  _id: string;
+  bankId: string;
+  name: string;
+}
+
 interface SyncDialogProps {
   open: boolean;
   onClose: () => void;
@@ -262,16 +268,30 @@ interface SyncDialogProps {
 const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose, onSyncComplete }) => {
   const [step, setStep] = useState<'config' | 'otp' | 'syncing' | 'done'>('config');
   const [bankAccountId, setBankAccountId] = useState('');
-  const [otpDestination, setOtpDestination] = useState('');
+  const [otpAccounts, setOtpAccounts] = useState<OtpBankAccount[]>([]);
   const [otp, setOtp] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ synced: number; errors: string[] } | null>(null);
 
+  useEffect(() => {
+    if (open) {
+      // Fetch OTP bank accounts when dialog opens
+      import('../services/api/bank').then(({ bankAccountsApi }) => {
+        bankAccountsApi.getAll().then((accounts: any[]) => {
+          const otp = accounts.filter((a: any) =>
+            ['phoenix', 'clal'].includes(a.bankId) && a.status === 'active'
+          );
+          setOtpAccounts(otp);
+          if (otp.length === 1) setBankAccountId(otp[0]._id);
+        }).catch(() => {});
+      });
+    }
+  }, [open]);
+
   const handleInitiateOtp = async () => {
     try {
       setError(null);
-      const response = await pensionApi.initiateOtp(bankAccountId);
-      setOtpDestination(response.destination || '');
+      await pensionApi.initiateOtp(bankAccountId);
       setStep('otp');
     } catch (err: any) {
       setError(err.response?.data?.error || err.message);
@@ -295,34 +315,53 @@ const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose, onSyncComplete }
   const handleClose = () => {
     setStep('config');
     setOtp('');
-    setOtpDestination('');
+    setBankAccountId('');
     setError(null);
     setResult(null);
     onClose();
   };
 
+  const selectedAccount = otpAccounts.find(a => a._id === bankAccountId);
+  const providerLabel = selectedAccount
+    ? selectedAccount.bankId.charAt(0).toUpperCase() + selectedAccount.bankId.slice(1)
+    : '';
+
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Sync Phoenix Insurance (הפניקס)</DialogTitle>
+      <DialogTitle>Sync Pension Provider</DialogTitle>
       <DialogContent>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
         {step === 'config' && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-            <TextField
-              label="Phoenix Bank Account ID"
-              value={bankAccountId}
-              onChange={(e) => setBankAccountId(e.target.value)}
-              helperText="The bank account ID configured for Phoenix"
-              fullWidth
-            />
+            {otpAccounts.length === 0 ? (
+              <Alert severity="info">
+                No pension provider accounts found. Add a Phoenix or Clal account in the Banks page first.
+              </Alert>
+            ) : (
+              <TextField
+                select
+                label="Pension Provider Account"
+                value={bankAccountId}
+                onChange={(e) => setBankAccountId(e.target.value)}
+                fullWidth
+                SelectProps={{ native: true }}
+              >
+                <option value="">Select an account...</option>
+                {otpAccounts.map(acc => (
+                  <option key={acc._id} value={acc._id}>
+                    {acc.name} ({acc.bankId.charAt(0).toUpperCase() + acc.bankId.slice(1)})
+                  </option>
+                ))}
+              </TextField>
+            )}
           </Box>
         )}
 
         {step === 'otp' && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <Typography>
-              Enter the OTP code sent to {otpDestination || 'your phone/email'}:
+              Enter the OTP code sent to your phone ({providerLabel}):
             </Typography>
             <TextField
               label="OTP Code"
@@ -337,7 +376,7 @@ const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose, onSyncComplete }
         {step === 'syncing' && (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
             <CircularProgress size={48} />
-            <Typography sx={{ mt: 2 }}>Syncing Phoenix data...</Typography>
+            <Typography sx={{ mt: 2 }}>Syncing {providerLabel} data...</Typography>
           </Box>
         )}
 

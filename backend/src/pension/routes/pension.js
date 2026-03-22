@@ -5,8 +5,12 @@ const auth = require('../../shared/middleware/auth');
 const logger = require('../../shared/utils/logger');
 const { PensionAccount, PensionSnapshot } = require('../models');
 const PhoenixApiClient = require('../services/phoenixApiClient');
+const ClalApiClient = require('../services/clalApiClient');
 const pensionService = require('../services/pensionService');
+const clalDataMapper = require('../services/clalDataMapper');
 const BankAccount = require('../../banking/models/BankAccount');
+
+const OTP_PROVIDERS = ['phoenix', 'clal'];
 
 // All routes require auth
 router.use(auth);
@@ -146,7 +150,7 @@ router.get('/history', async (req, res) => {
 
 /**
  * POST /api/pension/sync/initiate
- * Start browser-based Phoenix login — triggers OTP SMS.
+ * Start browser-based OTP login for a pension provider.
  * Body: { bankAccountId }
  */
 router.post('/sync/initiate', async (req, res) => {
@@ -156,14 +160,14 @@ router.post('/sync/initiate', async (req, res) => {
     const bankAccount = await BankAccount.findOne({
       _id: bankAccountId,
       userId: req.user.id,
-      bankId: 'phoenix'
+      bankId: { $in: OTP_PROVIDERS }
     });
 
     if (!bankAccount) {
-      return res.status(404).json({ error: 'Phoenix bank account not found' });
+      return res.status(404).json({ error: 'OTP pension bank account not found' });
     }
 
-    const client = new PhoenixApiClient();
+    const client = bankAccount.bankId === 'clal' ? new ClalApiClient() : new PhoenixApiClient();
     const idNumber = bankAccount.credentials.username;
     const phoneOrEmail = bankAccount.credentials.phoneOrEmail;
 
@@ -171,15 +175,14 @@ router.post('/sync/initiate', async (req, res) => {
 
     res.json({ message: 'OTP sent via SMS', destination: 'SMS' });
   } catch (error) {
-    logger.error('Error initiating Phoenix OTP:', error);
+    logger.error('Error initiating OTP:', error);
     res.status(500).json({ error: `Failed to initiate OTP: ${error.message}` });
   }
 });
 
 /**
  * POST /api/pension/sync/verify
- * Complete OTP login and sync Phoenix data.
- * Uses XHR interception — the Angular app fetches data after login and we capture it.
+ * Complete OTP login and sync pension data.
  * Body: { bankAccountId, otp }
  */
 router.post('/sync/verify', async (req, res) => {
@@ -189,61 +192,76 @@ router.post('/sync/verify', async (req, res) => {
     const bankAccount = await BankAccount.findOne({
       _id: bankAccountId,
       userId: req.user.id,
-      bankId: 'phoenix'
+      bankId: { $in: OTP_PROVIDERS }
     });
 
     if (!bankAccount) {
-      return res.status(404).json({ error: 'Phoenix bank account not found' });
+      return res.status(404).json({ error: 'OTP pension bank account not found' });
     }
 
-    // Complete login + intercept all data from browser
-    const client = new PhoenixApiClient();
-    const { allProducts, details, ownerName } = await client.completeLoginAndSync(bankAccountId, otp);
-
-    // Process all products into PensionAccount records + snapshots
-    const results = await pensionService.processAllProducts(
-      allProducts,
-      req.user.id,
-      bankAccountId,
-      ownerName
-    );
-
-    // Process captured detail data
+    const provider = bankAccount.bankId;
+    const strategyName = `${provider}-pension`;
+    let results;
     let detailCount = 0;
-    for (const [policyNum, detailData] of Object.entries(details)) {
-      try {
-        await pensionService.processAccountDetail(detailData, policyNum, req.user.id);
-        detailCount++;
-      } catch (err) {
-        logger.warn(`Failed to process detail for ${policyNum}: ${err.message}`);
-        results.errors.push(`Detail: ${policyNum}: ${err.message}`);
+
+    if (provider === 'clal') {
+      const client = new ClalApiClient();
+      const { portfolioData, ownerName } = await client.completeLoginAndSync(bankAccountId, otp);
+
+      results = await clalDataMapper.processPortfolioData(
+        portfolioData,
+        req.user.id,
+        bankAccountId,
+        ownerName
+      );
+    } else {
+      // Phoenix
+      const client = new PhoenixApiClient();
+      const { allProducts, details, ownerName } = await client.completeLoginAndSync(bankAccountId, otp);
+
+      results = await pensionService.processAllProducts(
+        allProducts,
+        req.user.id,
+        bankAccountId,
+        ownerName
+      );
+
+      // Process captured detail data (Phoenix-specific)
+      for (const [policyNum, detailData] of Object.entries(details)) {
+        try {
+          await pensionService.processAccountDetail(detailData, policyNum, req.user.id);
+          detailCount++;
+        } catch (err) {
+          logger.warn(`Failed to process detail for ${policyNum}: ${err.message}`);
+          results.errors.push(`Detail: ${policyNum}: ${err.message}`);
+        }
       }
     }
 
     // Update strategy sync and clear stale errors
-    bankAccount.updateStrategySync('phoenix-pension', true);
+    bankAccount.updateStrategySync(strategyName, true);
     bankAccount.lastError = undefined;
     await bankAccount.save();
 
     res.json({
-      message: 'Phoenix sync completed',
+      message: `${provider} sync completed`,
       synced: results.synced,
       detailsFetched: detailCount,
       errors: results.errors
     });
   } catch (error) {
-    logger.error('Error during Phoenix sync:', error);
-    // Update strategy sync status on failure
+    logger.error('Error during pension sync:', error);
     try {
       const bankAccount = await BankAccount.findOne({ _id: req.body.bankAccountId, userId: req.user.id });
       if (bankAccount) {
-        bankAccount.updateStrategySync('phoenix-pension', false, error.message);
+        const strategyName = `${bankAccount.bankId}-pension`;
+        bankAccount.updateStrategySync(strategyName, false, error.message);
         await bankAccount.save();
       }
     } catch (updateErr) {
       logger.error('Failed to update strategy sync status:', updateErr);
     }
-    res.status(500).json({ error: `Phoenix sync failed: ${error.message}` });
+    res.status(500).json({ error: `Pension sync failed: ${error.message}` });
   }
 });
 

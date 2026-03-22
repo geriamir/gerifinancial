@@ -46,7 +46,7 @@ const bankAccountSchema = new mongoose.Schema({
     },
     phoneOrEmail: {
       type: String,
-      required: function() { return this.bankId === 'phoenix'; }
+      required: function() { return ['phoenix', 'clal'].includes(this.bankId); }
     }
   },
   // Per-strategy sync tracking
