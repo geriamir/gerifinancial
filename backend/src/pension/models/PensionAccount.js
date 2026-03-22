@@ -144,9 +144,11 @@ pensionAccountSchema.statics.getSummary = async function(userId) {
         accounts: {
           $push: {
             _id: '$_id',
+            policyId: '$policyId',
             policyName: '$policyName',
             balance: '$balance',
             provider: '$provider',
+            owner: '$owner',
             employerName: '$employerName'
           }
         }

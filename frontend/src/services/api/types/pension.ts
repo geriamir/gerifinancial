@@ -49,6 +49,7 @@ export interface PensionAccount {
   balance: number;
   currency: string;
   status: string;
+  owner: string | null;
   employerName: string | null;
   startDate: string | null;
   investmentRoutes: PensionInvestmentRoute[];
@@ -80,9 +81,11 @@ export interface PensionSummaryGroup {
   accountCount: number;
   accounts: {
     _id: string;
+    policyId: string;
     policyName: string;
     balance: number;
     provider: string;
+    owner: string | null;
     employerName: string | null;
   }[];
 }
@@ -101,14 +104,14 @@ export interface PensionSyncResult {
 }
 
 export const PRODUCT_TYPE_LABELS: Record<PensionProductType, string> = {
-  gemel: 'קופת גמל',
-  hishtalmut: 'קרן השתלמות',
-  pension: 'פנסיה',
-  lifeSaving: 'ביטוח מנהלים',
-  pizuim: 'פיצויים',
-  health: 'ביטוח בריאות',
-  life: 'ביטוח חיים',
-  other: 'אחר'
+  gemel: 'Provident Fund',
+  hishtalmut: 'Education Fund',
+  pension: 'Pension',
+  lifeSaving: 'Life Insurance Savings',
+  pizuim: 'Severance',
+  health: 'Health Insurance',
+  life: 'Life Insurance',
+  other: 'Other'
 };
 
 export const PRODUCT_TYPE_COLORS: Record<PensionProductType, string> = {

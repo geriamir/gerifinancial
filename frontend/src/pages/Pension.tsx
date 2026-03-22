@@ -71,7 +71,7 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ account, onBack }) => {
       </Button>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-        <Typography variant="h5">{account.policyName}</Typography>
+        <Typography variant="h5">{account.policyId}</Typography>
         <Chip
           label={PRODUCT_TYPE_LABELS[account.productType] || account.productType}
           sx={{ backgroundColor: PRODUCT_TYPE_COLORS[account.productType], color: 'white' }}
@@ -89,8 +89,13 @@ const AccountDetail: React.FC<AccountDetailProps> = ({ account, onBack }) => {
               <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
                 {formatCurrency(account.balance)}
               </Typography>
-              {account.employerName && (
+              {account.owner && (
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Owner: {account.owner}
+                </Typography>
+              )}
+              {account.employerName && (
+                <Typography variant="body2" color="text.secondary">
                   Employer: {account.employerName}
                 </Typography>
               )}
@@ -393,12 +398,29 @@ const Pension: React.FC = () => {
     loadData();
   }, [loadData]);
 
+  // Handle browser back button
+  useEffect(() => {
+    const handlePopState = () => {
+      setSelectedAccount(null);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   const handleAccountClick = async (accountId: string) => {
     try {
       const account = await pensionApi.getAccount(accountId);
+      window.history.pushState({ accountId }, '');
       setSelectedAccount(account);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load account details');
+    }
+  };
+
+  const handleBack = () => {
+    setSelectedAccount(null);
+    if (window.history.state?.accountId) {
+      window.history.back();
     }
   };
 
@@ -414,7 +436,7 @@ const Pension: React.FC = () => {
   if (selectedAccount) {
     return (
       <Box sx={{ p: 3 }}>
-        <AccountDetail account={selectedAccount} onBack={() => setSelectedAccount(null)} />
+        <AccountDetail account={selectedAccount} onBack={handleBack} />
       </Box>
     );
   }
@@ -505,6 +527,7 @@ const Pension: React.FC = () => {
                       <TableHead>
                         <TableRow>
                           <TableCell>Account</TableCell>
+                          <TableCell>Owner</TableCell>
                           <TableCell>Provider</TableCell>
                           <TableCell>Employer</TableCell>
                           <TableCell align="right">Balance</TableCell>
@@ -518,7 +541,8 @@ const Pension: React.FC = () => {
                             sx={{ cursor: 'pointer' }}
                             onClick={() => handleAccountClick(acc._id)}
                           >
-                            <TableCell>{acc.policyName}</TableCell>
+                            <TableCell>{acc.policyId}</TableCell>
+                            <TableCell>{acc.owner || '—'}</TableCell>
                             <TableCell>
                               <Chip label={acc.provider} size="small" />
                             </TableCell>

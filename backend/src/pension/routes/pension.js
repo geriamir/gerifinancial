@@ -49,6 +49,29 @@ router.get('/accounts', async (req, res) => {
 });
 
 /**
+ * PATCH /api/pension/accounts/bulk-update-owner
+ * Set owner on all pension accounts for the current user that don't have one
+ */
+router.patch('/accounts/bulk-update-owner', async (req, res) => {
+  try {
+    const { owner } = req.body;
+    if (!owner) {
+      return res.status(400).json({ error: 'owner is required' });
+    }
+
+    const result = await PensionAccount.updateMany(
+      { userId: req.user.id, $or: [{ owner: null }, { owner: { $exists: false } }] },
+      { $set: { owner } }
+    );
+
+    res.json({ updated: result.modifiedCount });
+  } catch (error) {
+    logger.error('Error bulk-updating pension account owner:', error);
+    res.status(500).json({ error: 'Failed to update pension accounts' });
+  }
+});
+
+/**
  * GET /api/pension/accounts/:id
  * Get detailed pension account info
  */
@@ -67,6 +90,34 @@ router.get('/accounts/:id', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching pension account:', error);
     res.status(500).json({ error: 'Failed to fetch pension account' });
+  }
+});
+
+/**
+ * PATCH /api/pension/accounts/:id
+ * Update editable fields on a pension account (e.g., owner, policyNickname)
+ */
+router.patch('/accounts/:id', async (req, res) => {
+  try {
+    const { owner, policyNickname } = req.body;
+    const update = {};
+    if (owner !== undefined) update.owner = owner;
+    if (policyNickname !== undefined) update.policyNickname = policyNickname;
+
+    const account = await PensionAccount.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.id },
+      { $set: update },
+      { new: true }
+    );
+
+    if (!account) {
+      return res.status(404).json({ error: 'Pension account not found' });
+    }
+
+    res.json(account);
+  } catch (error) {
+    logger.error('Error updating pension account:', error);
+    res.status(500).json({ error: 'Failed to update pension account' });
   }
 });
 
