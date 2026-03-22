@@ -6,6 +6,22 @@ puppeteer.use(StealthPlugin());
 
 const CLAL_LOGIN_URL = 'https://www.clalbit.co.il/';
 const PORTFOLIO_DATA_URL = 'GetPortfolioHomeData';
+const PENSION_DETAIL_URL = 'PensionSurface/GetPensionPolicy';
+const LIFE_DETAIL_URL = 'LifeInsuranceSurface/GetLifePolicy';
+
+// Maps portfolio category keys to detail page URL paths and XHR endpoints
+const DETAIL_CONFIG = {
+  PortfolioDataPensionFundation: {
+    urlPath: '/portfolio/pensionportfolio/',
+    urlParams: (item) => `?txtPolicyId=${encodeURIComponent(item.PolicyIdEncrypted)}&numType=0&txtExpired=false`,
+    xhrMatch: PENSION_DETAIL_URL
+  },
+  PortfolioDataLifeInsList: {
+    urlPath: '/portfolio/lifeinsurance/',
+    urlParams: (item) => `?txtPolicyId=${encodeURIComponent(item.PolicyIdEncrypted)}&txtFinancialSaving=${item.FinancialSaving || '0'}&txtExpired=false`,
+    xhrMatch: LIFE_DETAIL_URL
+  }
+};
 
 // In-memory store for browser sessions awaiting OTP
 const pendingSessions = new Map();
@@ -236,11 +252,73 @@ class ClalApiClient {
         throw new Error(portfolioData?.ErrorMessage || 'Clal API returned unsuccessful response');
       }
 
-      return { portfolioData, ownerName: null };
+      // Keep browser open for detail fetching — caller must call closeBrowser()
+      return { portfolioData, ownerName: null, browser, page };
+    } catch (error) {
+      await browser.close().catch(() => {});
+      throw error;
     } finally {
       pendingSessions.delete(sessionId);
-      await browser.close().catch(() => {});
+    }
+  }
+
+  /**
+   * Step 3: Fetch detail data for each account from the portfolio.
+   * Navigates to each account's detail page and intercepts the detail XHR.
+   */
+  async fetchAccountDetails(page, portfolioData) {
+    const details = {};
+
+    for (const [category, config] of Object.entries(DETAIL_CONFIG)) {
+      const items = portfolioData[category];
+      if (!Array.isArray(items) || items.length === 0) continue;
+
+      for (const item of items) {
+        const policyId = String(item.PolicyId || item.ItemId);
+        if (!item.PolicyIdEncrypted) {
+          logger.warn(`Clal: skipping detail for ${policyId} — no PolicyIdEncrypted`);
+          continue;
+        }
+
+        try {
+          const detailUrl = `https://www.clalbit.co.il${config.urlPath}${config.urlParams(item)}`;
+          logger.info(`Clal: fetching detail for ${policyId} (${category})`);
+
+          // Set up XHR interceptor before navigation
+          const detailPromise = page.waitForResponse(
+            res => res.url().includes(config.xhrMatch) && res.ok(),
+            { timeout: 30000 }
+          );
+
+          await page.goto(detailUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+
+          const detailResponse = await detailPromise;
+          const detailData = await detailResponse.json();
+
+          if (detailData?.IsSuccess !== false) {
+            details[policyId] = { data: detailData, category };
+            logger.info(`Clal: captured detail for ${policyId}`);
+          } else {
+            logger.warn(`Clal: detail API returned error for ${policyId}: ${detailData?.ErrorMessage}`);
+          }
+        } catch (err) {
+          logger.warn(`Clal: failed to fetch detail for ${policyId}: ${err.message}`);
+        }
+      }
+    }
+
+    return details;
+  }
+
+  /**
+   * Close the browser session after all detail fetching is complete.
+   */
+  async closeBrowser(browser) {
+    try {
+      await browser.close();
       logger.info('Clal: browser closed');
+    } catch (err) {
+      logger.warn(`Clal: error closing browser: ${err.message}`);
     }
   }
 

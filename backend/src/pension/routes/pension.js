@@ -206,7 +206,7 @@ router.post('/sync/verify', async (req, res) => {
 
     if (provider === 'clal') {
       const client = new ClalApiClient();
-      const { portfolioData, ownerName } = await client.completeLoginAndSync(bankAccountId, otp);
+      const { portfolioData, ownerName, browser, page } = await client.completeLoginAndSync(bankAccountId, otp);
 
       results = await clalDataMapper.processPortfolioData(
         portfolioData,
@@ -214,6 +214,25 @@ router.post('/sync/verify', async (req, res) => {
         bankAccountId,
         ownerName
       );
+
+      // Fetch detail data for each account while browser is still open
+      try {
+        const details = await client.fetchAccountDetails(page, portfolioData);
+        for (const [policyId, { data: detailData, category }] of Object.entries(details)) {
+          try {
+            await clalDataMapper.processAccountDetail(detailData, category, policyId, req.user.id);
+            detailCount++;
+          } catch (err) {
+            logger.warn(`Failed to process Clal detail for ${policyId}: ${err.message}`);
+            results.errors.push(`Detail: ${policyId}: ${err.message}`);
+          }
+        }
+      } catch (err) {
+        logger.warn(`Failed to fetch Clal account details: ${err.message}`);
+        results.errors.push(`Detail fetch: ${err.message}`);
+      } finally {
+        await client.closeBrowser(browser);
+      }
     } else {
       // Phoenix
       const client = new PhoenixApiClient();
