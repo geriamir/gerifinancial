@@ -460,7 +460,7 @@ const Pension: React.FC = () => {
           startIcon={<SyncIcon />}
           onClick={() => setSyncDialogOpen(true)}
         >
-          Sync Phoenix
+          Sync Accounts
         </Button>
       </Box>
 
@@ -479,7 +479,7 @@ const Pension: React.FC = () => {
               Connect your Phoenix Insurance account to start tracking your pension and savings.
             </Typography>
             <Button variant="contained" startIcon={<SyncIcon />} onClick={() => setSyncDialogOpen(true)}>
-              Connect Phoenix
+              Connect Provider
             </Button>
           </CardContent>
         </Card>
