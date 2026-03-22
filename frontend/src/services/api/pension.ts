@@ -48,5 +48,10 @@ export const pensionApi = {
       bankAccountId, otp
     });
     return response.data;
+  },
+
+  updateAccount: async (id: string, data: { owner?: string | null; policyNickname?: string | null }): Promise<PensionAccount> => {
+    const response = await api.patch<PensionAccount>(`/pension/accounts/${id}`, data);
+    return response.data;
   }
 };

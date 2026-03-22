@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const auth = require('../../shared/middleware/auth');
 const logger = require('../../shared/utils/logger');
 const { PensionAccount, PensionSnapshot } = require('../models');
@@ -67,6 +68,42 @@ router.get('/accounts/:id', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching pension account:', error);
     res.status(500).json({ error: 'Failed to fetch pension account' });
+  }
+});
+
+/**
+ * PATCH /api/pension/accounts/:id
+ * Update editable fields on a pension account (e.g., owner, policyNickname)
+ */
+router.patch('/accounts/:id', async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid account ID' });
+    }
+
+    const { owner, policyNickname } = req.body;
+    const update = {};
+    if (owner !== undefined) update.owner = owner;
+    if (policyNickname !== undefined) update.policyNickname = policyNickname;
+
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ error: 'At least one of owner or policyNickname must be provided' });
+    }
+
+    const account = await PensionAccount.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.id },
+      { $set: update },
+      { new: true }
+    );
+
+    if (!account) {
+      return res.status(404).json({ error: 'Pension account not found' });
+    }
+
+    res.json(account);
+  } catch (error) {
+    logger.error('Error updating pension account:', error);
+    res.status(500).json({ error: 'Failed to update pension account' });
   }
 });
 

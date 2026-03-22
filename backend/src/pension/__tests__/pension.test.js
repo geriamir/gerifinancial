@@ -115,8 +115,8 @@ describe('PensionAccount Model', () => {
 
   test('getSummary should group by product type', async () => {
     await PensionAccount.create([
-      { userId, bankAccountId, provider: 'phoenix', productType: 'gemel', policyId: 'S1', policyName: 'Gemel A', balance: 300000 },
-      { userId, bankAccountId, provider: 'phoenix', productType: 'gemel', policyId: 'S2', policyName: 'Gemel B', balance: 200000 },
+      { userId, bankAccountId, provider: 'phoenix', productType: 'gemel', policyId: 'S1', policyName: 'Gemel A', balance: 300000, owner: 'Test Owner' },
+      { userId, bankAccountId, provider: 'phoenix', productType: 'gemel', policyId: 'S2', policyName: 'Gemel B', balance: 200000, owner: 'Test Owner' },
       { userId, bankAccountId, provider: 'phoenix', productType: 'hishtalmut', policyId: 'S3', policyName: 'Hish A', balance: 500000 }
     ]);
 
@@ -126,10 +126,14 @@ describe('PensionAccount Model', () => {
     const gemelGroup = summary.find(g => g.productType === 'gemel');
     expect(gemelGroup.totalBalance).toBe(500000);
     expect(gemelGroup.accountCount).toBe(2);
+    expect(gemelGroup.accounts[0]).toHaveProperty('policyId');
+    expect(gemelGroup.accounts[0]).toHaveProperty('owner', 'Test Owner');
 
     const hishGroup = summary.find(g => g.productType === 'hishtalmut');
     expect(hishGroup.totalBalance).toBe(500000);
     expect(hishGroup.accountCount).toBe(1);
+    expect(hishGroup.accounts[0].policyId).toBe('S3');
+    expect(hishGroup.accounts[0].owner).toBeNull();
   });
 });
 
