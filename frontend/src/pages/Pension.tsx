@@ -398,10 +398,20 @@ const Pension: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  // Handle browser back button
+  // Handle browser back/forward navigation
   useEffect(() => {
-    const handlePopState = () => {
-      setSelectedAccount(null);
+    const handlePopState = async (event: PopStateEvent) => {
+      const accountId = event.state?.accountId;
+      if (accountId) {
+        try {
+          const account = await pensionApi.getAccount(accountId);
+          setSelectedAccount(account);
+        } catch {
+          setSelectedAccount(null);
+        }
+      } else {
+        setSelectedAccount(null);
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);

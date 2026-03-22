@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const auth = require('../../shared/middleware/auth');
 const logger = require('../../shared/utils/logger');
 const { PensionAccount, PensionSnapshot } = require('../models');
@@ -49,29 +50,6 @@ router.get('/accounts', async (req, res) => {
 });
 
 /**
- * PATCH /api/pension/accounts/bulk-update-owner
- * Set owner on all pension accounts for the current user that don't have one
- */
-router.patch('/accounts/bulk-update-owner', async (req, res) => {
-  try {
-    const { owner } = req.body;
-    if (!owner) {
-      return res.status(400).json({ error: 'owner is required' });
-    }
-
-    const result = await PensionAccount.updateMany(
-      { userId: req.user.id, $or: [{ owner: null }, { owner: { $exists: false } }] },
-      { $set: { owner } }
-    );
-
-    res.json({ updated: result.modifiedCount });
-  } catch (error) {
-    logger.error('Error bulk-updating pension account owner:', error);
-    res.status(500).json({ error: 'Failed to update pension accounts' });
-  }
-});
-
-/**
  * GET /api/pension/accounts/:id
  * Get detailed pension account info
  */
@@ -99,10 +77,18 @@ router.get('/accounts/:id', async (req, res) => {
  */
 router.patch('/accounts/:id', async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid account ID' });
+    }
+
     const { owner, policyNickname } = req.body;
     const update = {};
     if (owner !== undefined) update.owner = owner;
     if (policyNickname !== undefined) update.policyNickname = policyNickname;
+
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ error: 'At least one of owner or policyNickname must be provided' });
+    }
 
     const account = await PensionAccount.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },

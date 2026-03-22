@@ -50,13 +50,8 @@ export const pensionApi = {
     return response.data;
   },
 
-  updateAccount: async (id: string, data: { owner?: string; policyNickname?: string }): Promise<PensionAccount> => {
+  updateAccount: async (id: string, data: { owner?: string | null; policyNickname?: string | null }): Promise<PensionAccount> => {
     const response = await api.patch<PensionAccount>(`/pension/accounts/${id}`, data);
-    return response.data;
-  },
-
-  bulkUpdateOwner: async (owner: string): Promise<{ updated: number }> => {
-    const response = await api.patch<{ updated: number }>('/pension/accounts/bulk-update-owner', { owner });
     return response.data;
   }
 };
