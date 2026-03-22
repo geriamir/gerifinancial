@@ -208,5 +208,41 @@ describe('ScrapingSchedulerService', () => {
       expect(scrapingSchedulerService.jobs.size).toBe(jobsBefore + 1);
       expect(scrapingSchedulerService.jobs.has(regularAccount._id.toString())).toBeTruthy();
     });
+
+    it('should not initiate first sync for OTP-based banks', async () => {
+      const queuedDataSyncService = require('../queuedDataSyncService');
+      const spy = jest.spyOn(queuedDataSyncService, 'queueBankAccountSync');
+
+      const phoenixAccount = await BankAccount.create({
+        userId: testUser._id,
+        bankId: 'phoenix',
+        name: 'Phoenix Pension',
+        credentials: { username: '123456789', phoneOrEmail: '0501234567' },
+        status: 'active'
+      });
+
+      await scrapingSchedulerService.initiateFirstSync(phoenixAccount);
+
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('should initiate first sync for non-OTP banks', async () => {
+      const queuedDataSyncService = require('../queuedDataSyncService');
+      const spy = jest.spyOn(queuedDataSyncService, 'queueBankAccountSync');
+
+      const regularAccount = await BankAccount.create({
+        userId: testUser._id,
+        bankId: 'hapoalim',
+        name: 'Regular Bank',
+        credentials: { username: 'test', password: 'pass' },
+        status: 'active'
+      });
+
+      await scrapingSchedulerService.initiateFirstSync(regularAccount);
+
+      expect(spy).toHaveBeenCalledWith(regularAccount._id, expect.objectContaining({ reason: 'first_sync' }));
+      spy.mockRestore();
+    });
   });
 });
