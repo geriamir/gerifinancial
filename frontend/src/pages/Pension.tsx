@@ -544,7 +544,7 @@ const Pension: React.FC = () => {
                             <TableCell>{acc.policyId}</TableCell>
                             <TableCell>{acc.owner || '—'}</TableCell>
                             <TableCell>
-                              <Chip label={acc.provider} size="small" />
+                              <Chip label={acc.provider.charAt(0).toUpperCase() + acc.provider.slice(1)} size="small" />
                             </TableCell>
                             <TableCell>{acc.employerName || '—'}</TableCell>
                             <TableCell align="right" sx={{ fontWeight: 'medium' }}>
