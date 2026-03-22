@@ -120,7 +120,7 @@ const pensionAccountSchema = new mongoose.Schema({
 pensionAccountSchema.index({ userId: 1, provider: 1 });
 pensionAccountSchema.index({ userId: 1, productType: 1 });
 pensionAccountSchema.index({ userId: 1, bankAccountId: 1 });
-pensionAccountSchema.index({ userId: 1, policyId: 1 }, { unique: true });
+pensionAccountSchema.index({ userId: 1, provider: 1, policyId: 1 }, { unique: true });
 
 // Static: find all pension accounts for a user
 pensionAccountSchema.statics.findByUser = function(userId, options = {}) {

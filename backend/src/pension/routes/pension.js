@@ -10,7 +10,7 @@ const pensionService = require('../services/pensionService');
 const clalDataMapper = require('../services/clalDataMapper');
 const BankAccount = require('../../banking/models/BankAccount');
 
-const OTP_PROVIDERS = ['phoenix', 'clal'];
+const { OTP_BANKS: OTP_PROVIDERS } = require('../../banking/constants/enums');
 
 // All routes require auth
 router.use(auth);
@@ -253,7 +253,7 @@ router.post('/sync/verify', async (req, res) => {
     logger.error('Error during pension sync:', error);
     try {
       const bankAccount = await BankAccount.findOne({ _id: req.body.bankAccountId, userId: req.user.id });
-      if (bankAccount) {
+      if (bankAccount && bankAccount.isOtpBank()) {
         const strategyName = `${bankAccount.bankId}-pension`;
         bankAccount.updateStrategySync(strategyName, false, error.message);
         await bankAccount.save();

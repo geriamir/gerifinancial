@@ -12,18 +12,6 @@ const CLAL_CATEGORY_MAP = {
   PortfolioDataHealthList: 'health'
 };
 
-// Categories to skip (not pension/savings-related)
-const SKIP_CATEGORIES = [
-  'PortfolioDataAppartmentList',
-  'PortfolioDataCarList',
-  'PortfolioPersonalAccidentList',
-  'PortfolioBusinessPolicyList',
-  'PortfolioDavidShildPolicyList',
-  'PortfolioDataCyberList',
-  'PortfolioDataNahalList',
-  'PortfolioGemelWithdrawFundsList'
-];
-
 /**
  * Parse Clal date strings like "01.07.2010" or "30/06/2026" to Date objects.
  */
@@ -41,7 +29,7 @@ function parseClalDate(dateStr) {
  * Different categories use different field names.
  */
 function extractBalance(item) {
-  return item.BalanceTotalSum || item.RevenueSum || item.DisposalValue_Num || 0;
+  return item.BalanceTotalSum ?? item.RevenueSum ?? item.DisposalValue_Num ?? 0;
 }
 
 /**
@@ -82,8 +70,11 @@ class ClalDataMapper {
   }
 
   async upsertAccount(item, productType, category, userId, bankAccountId, ownerName) {
-    const policyId = String(item.PolicyId);
-    if (!policyId) throw new Error('Clal item has no PolicyId');
+    const rawPolicyId = item.PolicyId;
+    if (rawPolicyId == null || rawPolicyId === '') {
+      throw new Error('Clal item has no PolicyId');
+    }
+    const policyId = String(rawPolicyId);
 
     const balance = extractBalance(item);
     const policyName = extractPolicyName(item, category);
@@ -107,7 +98,7 @@ class ClalDataMapper {
     };
 
     const account = await PensionAccount.findOneAndUpdate(
-      { userId, policyId },
+      { userId, provider: 'clal', policyId },
       { $set: data },
       { upsert: true, new: true }
     );

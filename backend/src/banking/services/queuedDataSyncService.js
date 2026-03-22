@@ -54,12 +54,12 @@ class QueuedDataSyncService {
     logger.info(`Queueing sync jobs for bank account ${bankAccount.name} (${bankAccountId})`);
 
     const jobIds = [];
-    const strategies = bankAccount.bankId === 'mercury'
+    const strategies = bankAccount.isOtpBank()
+      ? [] // OTP banks require manual login — sync via pension OTP flow, not queue
+      : bankAccount.bankId === 'mercury'
       ? ['mercury-checking']
       : bankAccount.bankId === 'ibkr'
       ? ['ibkr-flex']
-      : bankAccount.bankId === 'phoenix'
-      ? [] // Phoenix requires OTP — sync via pension OTP flow, not queue
       : ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
     
     // Determine job priority based on account or options

@@ -39,6 +39,7 @@ import {
   PRODUCT_TYPE_LABELS,
   PRODUCT_TYPE_COLORS
 } from '../services/api/types/pension';
+import { OTP_BANKS } from '../constants/banks';
 
 const formatCurrency = (amount: number | null, currency = 'ILS'): string => {
   if (amount == null) return '—';
@@ -274,18 +275,23 @@ const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose, onSyncComplete }
   const [result, setResult] = useState<{ synced: number; errors: string[] } | null>(null);
 
   useEffect(() => {
-    if (open) {
-      // Fetch OTP bank accounts when dialog opens
-      import('../services/api/bank').then(({ bankAccountsApi }) => {
-        bankAccountsApi.getAll().then((accounts: any[]) => {
-          const otp = accounts.filter((a: any) =>
-            ['phoenix', 'clal'].includes(a.bankId) && a.status === 'active'
-          );
-          setOtpAccounts(otp);
-          if (otp.length === 1) setBankAccountId(otp[0]._id);
-        }).catch(() => {});
+    if (!open) return;
+    setError(null);
+    setOtpAccounts([]);
+    setBankAccountId('');
+
+    import('../services/api/bank').then(({ bankAccountsApi }) => {
+      bankAccountsApi.getAll().then((accounts: any[]) => {
+        const otp = accounts.filter((a: any) =>
+          OTP_BANKS.includes(a.bankId) && a.status === 'active'
+        );
+        setOtpAccounts(otp);
+        if (otp.length === 1) setBankAccountId(otp[0]._id);
+      }).catch((err: any) => {
+        console.error('Failed to load OTP bank accounts', err);
+        setError('Failed to load pension provider accounts. Please try again.');
       });
-    }
+    });
   }, [open]);
 
   const handleInitiateOtp = async () => {
