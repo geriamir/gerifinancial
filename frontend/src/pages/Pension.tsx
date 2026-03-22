@@ -523,14 +523,14 @@ const Pension: React.FC = () => {
                   </Box>
 
                   <TableContainer component={Paper} variant="outlined">
-                    <Table size="small">
+                    <Table size="small" sx={{ tableLayout: 'fixed' }}>
                       <TableHead>
                         <TableRow>
-                          <TableCell>Account</TableCell>
-                          <TableCell>Owner</TableCell>
-                          <TableCell>Provider</TableCell>
-                          <TableCell>Employer</TableCell>
-                          <TableCell align="right">Balance</TableCell>
+                          <TableCell sx={{ width: '30%' }}>Account</TableCell>
+                          <TableCell sx={{ width: '18%' }}>Owner</TableCell>
+                          <TableCell sx={{ width: '14%' }}>Provider</TableCell>
+                          <TableCell sx={{ width: '20%' }}>Employer</TableCell>
+                          <TableCell sx={{ width: '18%' }} align="right">Balance</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
