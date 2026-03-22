@@ -283,6 +283,7 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
           )}
 
           {error && <FormHelperText error>{error}</FormHelperText>}
+          <button type="submit" style={{ display: 'none' }} />
         </form>
       </DialogContent>
       <DialogActions>
