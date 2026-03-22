@@ -1,3 +1,6 @@
+// Unmock scrapingSchedulerService to test real behavior (global mock in setup.js)
+jest.unmock('../scrapingSchedulerService');
+
 // Mock node-cron BEFORE everything else
 const mockCronCallback = jest.fn();
 const mockStop = jest.fn();
@@ -13,6 +16,13 @@ jest.mock('node-cron', () => ({
 
 // Mock dependencies BEFORE importing the service
 jest.mock('../transactionService');
+jest.mock('../dataSyncService');
+jest.mock('../queuedDataSyncService');
+jest.mock('../bankAccountEvents', () => ({
+  on: jest.fn(),
+  emit: jest.fn(),
+  removeAllListeners: jest.fn()
+}));
 jest.mock('../../../shared/utils/logger', () => ({
   info: jest.fn(),
   error: jest.fn(),
@@ -104,7 +114,8 @@ describe('ScrapingSchedulerService', () => {
         userId: testUser._id,
         name: 'Test Account',
         credentials: { username: 'test', password: 'pass' },
-        status: 'active'
+        status: 'active',
+        isOtpBank: () => false
       };
       
       scrapingSchedulerService.scheduleAccount(mockAccount);
@@ -122,7 +133,8 @@ describe('ScrapingSchedulerService', () => {
         userId: testUser._id,
         name: 'Test Account',
         credentials: { username: 'test', password: 'pass' },
-        status: 'active'
+        status: 'active',
+        isOtpBank: () => false
       };
       scrapingSchedulerService.scheduleAccount(mockAccount);
       
@@ -142,7 +154,8 @@ describe('ScrapingSchedulerService', () => {
           userId: testUser._id,
           name: 'Test Account 1',
           credentials: { username: 'test1', password: 'pass1' },
-          status: 'active'
+          status: 'active',
+          isOtpBank: () => false
         },
         { 
           _id: '2', 
@@ -150,7 +163,8 @@ describe('ScrapingSchedulerService', () => {
           userId: testUser._id,
           name: 'Test Account 2',
           credentials: { username: 'test2', password: 'pass2' },
-          status: 'active'
+          status: 'active',
+          isOtpBank: () => false
         }
       ];
 
@@ -163,25 +177,72 @@ describe('ScrapingSchedulerService', () => {
     });
   });
 
-  describe('job execution', () => {
-    it('should verify job scheduling works correctly', () => {
-      // Setup test data
-      const mockAccount = { 
-        _id: '1', 
-        bankId: 'hapoalim',
+  describe('OTP bank handling', () => {
+    it('should not schedule a job for OTP-based banks', async () => {
+      const phoenixAccount = await BankAccount.create({
         userId: testUser._id,
-        name: 'Test Account',
+        bankId: 'phoenix',
+        name: 'Phoenix Pension',
+        credentials: { username: '123456789', phoneOrEmail: '0501234567' },
+        status: 'active'
+      });
+
+      const jobsBefore = scrapingSchedulerService.jobs.size;
+      scrapingSchedulerService.scheduleAccount(phoenixAccount);
+
+      expect(scrapingSchedulerService.jobs.size).toBe(jobsBefore);
+    });
+
+    it('should schedule jobs for non-OTP banks', async () => {
+      const regularAccount = await BankAccount.create({
+        userId: testUser._id,
+        bankId: 'hapoalim',
+        name: 'Regular Bank',
         credentials: { username: 'test', password: 'pass' },
         status: 'active'
-      };
+      });
 
-      // Verify that scheduleAccount creates a job
-      scrapingSchedulerService.scheduleAccount(mockAccount);
-      expect(scrapingSchedulerService.jobs.has('1')).toBeTruthy();
-      
-      // Verify the job can be stopped
-      scrapingSchedulerService.stopAccount('1');
-      expect(scrapingSchedulerService.jobs.has('1')).toBeFalsy();
+      const jobsBefore = scrapingSchedulerService.jobs.size;
+      scrapingSchedulerService.scheduleAccount(regularAccount);
+
+      expect(scrapingSchedulerService.jobs.size).toBe(jobsBefore + 1);
+      expect(scrapingSchedulerService.jobs.has(regularAccount._id.toString())).toBeTruthy();
+    });
+
+    it('should not initiate first sync for OTP-based banks', async () => {
+      const queuedDataSyncService = require('../queuedDataSyncService');
+      const spy = jest.spyOn(queuedDataSyncService, 'queueBankAccountSync');
+
+      const phoenixAccount = await BankAccount.create({
+        userId: testUser._id,
+        bankId: 'phoenix',
+        name: 'Phoenix Pension',
+        credentials: { username: '123456789', phoneOrEmail: '0501234567' },
+        status: 'active'
+      });
+
+      await scrapingSchedulerService.initiateFirstSync(phoenixAccount);
+
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('should initiate first sync for non-OTP banks', async () => {
+      const queuedDataSyncService = require('../queuedDataSyncService');
+      const spy = jest.spyOn(queuedDataSyncService, 'queueBankAccountSync');
+
+      const regularAccount = await BankAccount.create({
+        userId: testUser._id,
+        bankId: 'hapoalim',
+        name: 'Regular Bank',
+        credentials: { username: 'test', password: 'pass' },
+        status: 'active'
+      });
+
+      await scrapingSchedulerService.initiateFirstSync(regularAccount);
+
+      expect(spy).toHaveBeenCalledWith(regularAccount._id, expect.objectContaining({ reason: 'first_sync' }));
+      spy.mockRestore();
     });
   });
 });

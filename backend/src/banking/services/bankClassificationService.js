@@ -1,4 +1,5 @@
 const logger = require('../../shared/utils/logger');
+const { OTP_BANKS } = require('../constants/enums');
 
 /**
  * Service for classifying bank accounts and credit card providers
@@ -62,7 +63,7 @@ class BankClassificationService {
    * @returns {string[]} Array of OTP bank IDs
    */
   static getOtpBanks() {
-    return ['phoenix'];
+    return OTP_BANKS;
   }
 
   /**

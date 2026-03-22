@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { encrypt, decrypt } = require('../../shared/utils/encryption');
 const logger = require('../../shared/utils/logger');
+const { OTP_BANKS } = require('../constants/enums');
 
 const bankAccountSchema = new mongoose.Schema({
   userId: {
@@ -339,6 +340,11 @@ bankAccountSchema.methods.updateStrategySync = function(strategyName, success, e
       };
     }
   }
+};
+
+// OTP-based banks require manual login and cannot be auto-scheduled
+bankAccountSchema.methods.isOtpBank = function() {
+  return OTP_BANKS.includes(this.bankId);
 };
 
 // Check if strategy needs sync based on schedule
