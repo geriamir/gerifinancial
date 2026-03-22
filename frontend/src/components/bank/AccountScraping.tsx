@@ -75,7 +75,7 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
   const [otpError, setOtpError] = useState<string | null>(null);
 
   const handleScrape = async () => {
-    if (isOtpBank(bankId)) {
+    if (bankId && isOtpBank(bankId)) {
       handlePhoenixScrape();
       return;
     }
@@ -188,7 +188,7 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
           disabled={isLoading || isDisabled}
           startIcon={isLoading ? <CircularProgress size={20} /> : undefined}
         >
-          {isLoading ? 'Scraping...' : isOtpBank(bankId) ? 'Sync (OTP)' : 'Scrape Now'}
+          {isLoading ? 'Scraping...' : (bankId && isOtpBank(bankId)) ? 'Sync (OTP)' : 'Scrape Now'}
         </Button>
 
         {scrapeResult && (
@@ -202,7 +202,7 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
           </Button>
         )}
 
-        {!isOtpBank(bankId) && (
+        {!(bankId && isOtpBank(bankId)) && (
           <Button
             variant="text"
             size="small"
