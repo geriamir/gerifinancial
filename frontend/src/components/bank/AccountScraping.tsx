@@ -229,9 +229,9 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
         </Alert>
       )}
 
-      {/* Phoenix OTP Dialog */}
+      {/* OTP Sync Dialog */}
       <Dialog open={otpDialogOpen} onClose={handleOtpClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Phoenix Insurance — OTP Verification</DialogTitle>
+        <DialogTitle>Pension Sync — OTP Verification</DialogTitle>
         <DialogContent>
           {otpError && <Alert severity="error" sx={{ mb: 2 }}>{otpError}</Alert>}
 
@@ -261,7 +261,7 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
           {otpStep === 'syncing' && (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 3 }}>
               <CircularProgress size={36} />
-              <Typography sx={{ mt: 2 }}>Syncing Phoenix pension data...</Typography>
+              <Typography sx={{ mt: 2 }}>Syncing pension data...</Typography>
             </Box>
           )}
         </DialogContent>

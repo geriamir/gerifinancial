@@ -11,6 +11,7 @@ const clalDataMapper = require('../services/clalDataMapper');
 const BankAccount = require('../../banking/models/BankAccount');
 
 const { OTP_BANKS: OTP_PROVIDERS } = require('../../banking/constants/enums');
+const { decrypt } = require('../../shared/utils/encryption');
 
 // All routes require auth
 router.use(auth);
@@ -169,7 +170,7 @@ router.post('/sync/initiate', async (req, res) => {
 
     const client = bankAccount.bankId === 'clal' ? new ClalApiClient() : new PhoenixApiClient();
     const idNumber = bankAccount.credentials.username;
-    const phoneOrEmail = bankAccount.credentials.phoneOrEmail;
+    const phoneOrEmail = decrypt(bankAccount.credentials.phoneOrEmail);
 
     await client.startLogin(idNumber, phoneOrEmail, bankAccountId);
 

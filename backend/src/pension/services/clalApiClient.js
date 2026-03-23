@@ -58,102 +58,42 @@ class ClalApiClient {
       await page.goto(CLAL_LOGIN_URL, { waitUntil: 'networkidle2', timeout: 45000 });
       logger.info(`Clal login: on page ${page.url()}`);
 
-      // Click "לחשבון שלך" button to open login form
-      const loginClicked = await page.evaluate(() => {
-        for (const el of document.querySelectorAll('a, button, span, div')) {
-          if (el.textContent?.trim().includes('לחשבון שלך')) {
-            el.click();
-            return true;
-          }
-        }
-        return false;
-      });
-      if (!loginClicked) throw new Error('Could not find "לחשבון שלך" button');
+      // Wait for campaign popup to appear (it loads after a short delay)
+      try {
+        await page.waitForSelector('#ZA_CAMP_CLOSE_BUTTON', { timeout: 3000 });
+        await page.click('#ZA_CAMP_CLOSE_BUTTON');
+        logger.info('Clal login: dismissed popup');
+        await new Promise(r => setTimeout(r, 500));
+      } catch (_) {
+        // No popup appeared — continue
+      }
+
+      // Click "לחשבון שלך" button to open login form — use evaluate to bypass any overlay
+      await page.waitForSelector('#macro-login-btn', { visible: true, timeout: 15000 });
+      await new Promise(r => setTimeout(r, 1000));
+      await page.evaluate(() => document.querySelector('#macro-login-btn').click());
       logger.info('Clal login: clicked login button');
 
       // Wait for login form to appear
-      await page.waitForFunction(() => {
-        const inputs = document.querySelectorAll('input[type="text"], input[type="tel"], input[type="number"]');
-        return inputs.length >= 2;
-      }, { timeout: 15000 });
+      await page.waitForSelector('input[formcontrolname="tz"]', { timeout: 15000 });
 
-      // Fill ID number — look for ID field (ת.ז.)
-      const idFilled = await page.evaluate((id) => {
-        for (const input of document.querySelectorAll('input')) {
-          const placeholder = (input.placeholder || '').toLowerCase();
-          const label = input.closest('label')?.textContent || '';
-          const ariaLabel = input.getAttribute('aria-label') || '';
-          if (placeholder.includes('ת.ז') || placeholder.includes('תעודת זהות') ||
-              label.includes('ת.ז') || ariaLabel.includes('ת.ז') ||
-              placeholder.includes('מספר זהות') || input.id?.includes('id')) {
-            input.value = '';
-            input.focus();
-            return true;
-          }
-        }
-        // Fallback: first visible text/tel input
-        const inputs = document.querySelectorAll('input:not([type="hidden"])');
-        if (inputs.length > 0) { inputs[0].focus(); return true; }
-        return false;
-      }, idNumber);
+      // Fill ID number (ת.ז.)
+      await page.click('input[formcontrolname="tz"]');
+      await page.type('input[formcontrolname="tz"]', idNumber, { delay: 30 });
 
-      if (!idFilled) throw new Error('Could not find ID input field');
-      await page.keyboard.type(idNumber, { delay: 30 });
-
-      // Fill phone number
-      const phoneFilled = await page.evaluate((phone) => {
-        const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"])'));
-        // Look for phone field
-        for (const input of inputs) {
-          const placeholder = (input.placeholder || '');
-          const ariaLabel = input.getAttribute('aria-label') || '';
-          if (placeholder.includes('טלפון') || placeholder.includes('נייד') ||
-              ariaLabel.includes('טלפון') || input.type === 'tel') {
-            input.focus();
-            return true;
-          }
-        }
-        // Fallback: second visible input
-        if (inputs.length > 1) { inputs[1].focus(); return true; }
-        return false;
-      }, phoneOrEmail);
-
-      if (!phoneFilled) throw new Error('Could not find phone input field');
-      await page.keyboard.type(phoneOrEmail, { delay: 30 });
+      // Fill phone number (טלפון נייד)
+      await page.click('input[formcontrolname="mobile"]');
+      await page.type('input[formcontrolname="mobile"]', phoneOrEmail, { delay: 30 });
 
       logger.info('Clal login: filled ID + phone, triggering OTP');
 
-      // Click send OTP button
-      const otpTriggered = await page.evaluate(() => {
-        for (const btn of document.querySelectorAll('button, input[type="submit"], a')) {
-          const text = (btn.textContent || btn.value || '').trim();
-          if (text.includes('שלחו') || text.includes('שליחת קוד') || text.includes('כניסה') ||
-              text.includes('המשך') || text.includes('שלח')) {
-            btn.click();
-            return text;
-          }
-        }
-        return null;
-      });
+      // Click submit button (שליחה)
+      await page.waitForSelector('app-identification button[type="submit"]', { timeout: 5000 });
+      await page.click('app-identification button[type="submit"]');
+      logger.info('Clal login: clicked submit button');
 
-      if (!otpTriggered) {
-        logger.info('Clal login: no send button found, pressing Enter');
-        await page.keyboard.press('Enter');
-      } else {
-        logger.info(`Clal login: clicked OTP button: "${otpTriggered}"`);
-      }
-
-      // Wait for OTP input screen
-      await page.waitForFunction(() => {
-        for (const input of document.querySelectorAll('input')) {
-          if (input.placeholder?.includes('קוד') || input.type === 'tel' ||
-              input.type === 'number' || input.inputMode === 'numeric' ||
-              input.autocomplete === 'one-time-code') return true;
-        }
-        return document.body.innerText?.includes('הזינו את הקוד') ||
-               document.body.innerText?.includes('קוד אימות') ||
-               document.body.innerText?.includes('קוד חד פעמי');
-      }, { timeout: 30000 });
+      // Wait for OTP input screen (app-otp-login component replaces app-identification)
+      await page.waitForSelector('input[formcontrolname="otp"]', { timeout: 30000 });
 
       logger.info('Clal login: OTP screen appeared — SMS sent');
 
@@ -176,77 +116,70 @@ class ClalApiClient {
     const { browser, page } = session;
 
     try {
-      // Set up response interceptor BEFORE submitting OTP
-      const portfolioPromise = page.waitForResponse(
+      // Collect ALL GetPortfolioHomeData responses — the site fires multiple, only later ones have full data
+      const portfolioResponses = [];
+      page.on('response', async (res) => {
+        if (res.url().includes(PORTFOLIO_DATA_URL) && res.ok()) {
+          try {
+            const data = await res.json();
+            portfolioResponses.push(data);
+            const itemCount = ['PortfolioDataPensionFundation', 'PortfolioDataLifeInsList', 'PortfolioDataGemelList']
+              .reduce((sum, k) => sum + (Array.isArray(data[k]) ? data[k].length : 0), 0);
+            logger.info(`Clal: captured GetPortfolioHomeData response #${portfolioResponses.length} (${itemCount} pension/life/gemel items)`);
+          } catch (_) {}
+        }
+      });
+
+      // Enter OTP — type into field then submit via form
+      const otpInput = await page.waitForSelector('input[formcontrolname="otp"]', { timeout: 5000 });
+      await otpInput.click({ clickCount: 3 });
+      await otpInput.type(otp, { delay: 50 });
+
+      // Trigger Angular change detection and submit form programmatically
+      await page.evaluate(() => {
+        const input = document.querySelector('input[formcontrolname="otp"]');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        // Submit the form directly
+        const form = document.querySelector('app-otp-login form');
+        if (form) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      });
+      logger.info('Clal: OTP submitted, waiting for portfolio data...');
+
+      // Wait for first portfolio response
+      await page.waitForResponse(
         res => res.url().includes(PORTFOLIO_DATA_URL) && res.ok(),
         { timeout: 120000 }
       );
 
-      // Enter OTP
-      const otpInput = await page.evaluateHandle(() => {
-        for (const input of document.querySelectorAll('input')) {
-          if (input.type === 'hidden') continue;
-          if (input.placeholder?.includes('קוד') || input.type === 'tel' ||
-              input.type === 'number' || input.inputMode === 'numeric' ||
-              input.autocomplete === 'one-time-code') return input;
-        }
-        const texts = document.querySelectorAll('input[type="text"]');
-        return texts.length > 0 ? texts[texts.length - 1] : null;
+      // Navigate to portfolio page to trigger the full data load
+      logger.info('Clal: navigating to portfolio page for full data');
+      await page.goto('https://www.clalbit.co.il/portfolio/', {
+        waitUntil: 'networkidle2',
+        timeout: 45000
       });
 
-      if (!otpInput || !(await otpInput.asElement())) {
-        throw new Error('Could not find OTP input field');
-      }
+      // Wait a bit for any remaining XHRs to complete
+      await new Promise(r => setTimeout(r, 3000));
 
-      await otpInput.asElement().click({ clickCount: 3 });
-      await otpInput.asElement().type(otp, { delay: 50 });
-
-      // Submit OTP
-      const clicked = await page.evaluate(() => {
-        for (const btn of document.querySelectorAll('button, input[type="submit"]')) {
-          const text = (btn.textContent || btn.value || '').trim();
-          if (btn.disabled) continue;
-          if (text.includes('אימות') || text.includes('אישור') ||
-              text.includes('כניסה') || text.includes('שלח') ||
-              text.includes('אמת') || text.includes('המשך')) {
-            btn.click();
-            return text;
-          }
+      // Pick the response with the most pension/life/gemel items
+      let portfolioData = null;
+      let bestItemCount = -1;
+      for (const data of portfolioResponses) {
+        const itemCount = ['PortfolioDataPensionFundation', 'PortfolioDataLifeInsList', 'PortfolioDataGemelList']
+          .reduce((sum, k) => sum + (Array.isArray(data[k]) ? data[k].length : 0), 0);
+        if (itemCount > bestItemCount) {
+          bestItemCount = itemCount;
+          portfolioData = data;
         }
-        return null;
-      });
-
-      if (clicked) {
-        logger.info(`Clal: clicked OTP button: "${clicked}"`);
-      } else {
-        logger.info('Clal: no matching button found, pressing Enter');
-        await page.keyboard.press('Enter');
       }
 
-      logger.info('Clal: OTP submitted, waiting for portfolio data...');
-
-      // Wait for portfolio data XHR
-      let portfolioData;
-      try {
-        const portfolioResponse = await portfolioPromise;
-        portfolioData = await portfolioResponse.json();
-        logger.info(`Clal: captured GetPortfolioHomeData (status ${portfolioResponse.status()})`);
-      } catch (err) {
-        // If we didn't intercept it, try navigating to portfolio page
-        logger.info('Clal: XHR not intercepted during login, navigating to portfolio page');
-        await page.goto('https://www.clalbit.co.il/portfolio/', {
-          waitUntil: 'networkidle2',
-          timeout: 45000
-        });
-
-        const retryPromise = page.waitForResponse(
-          res => res.url().includes(PORTFOLIO_DATA_URL) && res.ok(),
-          { timeout: 30000 }
-        );
-        const retryResponse = await retryPromise;
-        portfolioData = await retryResponse.json();
-        logger.info('Clal: captured portfolio data on retry');
+      if (!portfolioData) {
+        // Fallback: use whatever we got
+        portfolioData = portfolioResponses[portfolioResponses.length - 1];
       }
+
+      logger.info(`Clal: using best portfolio response (${bestItemCount} items from ${portfolioResponses.length} total responses)`);
 
       if (!portfolioData?.IsSuccess) {
         throw new Error(portfolioData?.ErrorMessage || 'Clal API returned unsuccessful response');
@@ -269,6 +202,11 @@ class ClalApiClient {
   async fetchAccountDetails(page, portfolioData) {
     const details = {};
 
+    const categoriesToFetch = Object.keys(DETAIL_CONFIG).filter(
+      cat => Array.isArray(portfolioData[cat]) && portfolioData[cat].length > 0
+    );
+    logger.info(`Clal: fetching details for ${categoriesToFetch.length} categories`);
+
     for (const [category, config] of Object.entries(DETAIL_CONFIG)) {
       const items = portfolioData[category];
       if (!Array.isArray(items) || items.length === 0) continue;
@@ -284,6 +222,9 @@ class ClalApiClient {
           const detailUrl = `https://www.clalbit.co.il${config.urlPath}${config.urlParams(item)}`;
           logger.info(`Clal: fetching detail for ${policyId} (${category})`);
 
+          // Small delay between detail page navigations to let previous page settle
+          await new Promise(r => setTimeout(r, 1000));
+
           // Set up XHR interceptor before navigation
           const detailPromise = page.waitForResponse(
             res => res.url().includes(config.xhrMatch) && res.ok(),
@@ -293,7 +234,9 @@ class ClalApiClient {
           await page.goto(detailUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 
           const detailResponse = await detailPromise;
-          const detailData = await detailResponse.json();
+          // Use text() + JSON.parse — more reliable than json() when response body may be partially consumed
+          const detailText = await detailResponse.text();
+          const detailData = JSON.parse(detailText);
 
           if (detailData?.IsSuccess !== false) {
             details[policyId] = { data: detailData, category };
