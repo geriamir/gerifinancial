@@ -48,7 +48,8 @@ class BankScraperService {
 
     // Create a copy to avoid mutating the input parameter
     const startDateCopy = new Date(startDate);
-    startDateCopy.setDate(startDateCopy.getDate() + 1);
+    // Scan a week back to catch transactions that clear out of order
+    startDateCopy.setDate(startDateCopy.getDate() - 7);
 
     // Log the scraping strategy being used
     const isIncrementalScraping = !!startDate;
