@@ -15,7 +15,7 @@ const tagSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['project', 'custom'],
+    enum: ['project', 'real-estate', 'custom'],
     default: 'custom'
   },
   // For project tags, store additional project metadata
