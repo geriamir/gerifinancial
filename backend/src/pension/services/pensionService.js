@@ -87,7 +87,7 @@ class PensionService {
     };
 
     const account = await PensionAccount.findOneAndUpdate(
-      { userId, policyId },
+      { userId, provider: 'phoenix', policyId },
       { $set: data },
       { upsert: true, new: true }
     );

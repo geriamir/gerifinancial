@@ -23,7 +23,7 @@ const ScrapingSessionStatus = {
   ERROR: 'error'        // Failed with error
 };
 
-const OTP_BANKS = ['phoenix'];
+const OTP_BANKS = ['phoenix', 'clal'];
 
 module.exports = {
   CategorizationMethod,

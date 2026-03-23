@@ -54,7 +54,8 @@ const getStrategyDisplayName = (strategyKey: string): string => {
     'foreign-currency': 'Foreign Currency',
     'mercury-checking': 'Mercury Checking',
     'ibkr-flex': 'IBKR Flex',
-    'phoenix-pension': 'Phoenix Pension'
+    'phoenix-pension': 'Phoenix Pension',
+    'clal-pension': 'Clal Pension'
   };
   return names[strategyKey] || strategyKey;
 };

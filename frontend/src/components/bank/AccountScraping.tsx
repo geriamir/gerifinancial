@@ -19,7 +19,7 @@ import { pensionApi } from '../../services/api/pension';
 import { format } from 'date-fns';
 import { track } from '../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
-import { getBankStrategies } from '../../constants/banks';
+import { getBankStrategies, isOtpBank } from '../../constants/banks';
 
 interface ScrapeResult {
   message: string;
@@ -34,7 +34,8 @@ const STRATEGY_DISPLAY_NAMES: Record<string, string> = {
   'foreign-currency': 'Foreign Currency',
   'mercury-checking': 'Mercury Checking',
   'ibkr-flex': 'IBKR Flex',
-  'phoenix-pension': 'Phoenix Pension'
+  'phoenix-pension': 'Phoenix Pension',
+  'clal-pension': 'Clal Pension'
 };
 
 interface AccountScrapingProps {
@@ -74,7 +75,7 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
   const [otpError, setOtpError] = useState<string | null>(null);
 
   const handleScrape = async () => {
-    if (bankId === 'phoenix') {
+    if (bankId && isOtpBank(bankId)) {
       handlePhoenixScrape();
       return;
     }
@@ -116,7 +117,7 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
       setOtpStep('syncing');
       const result = await pensionApi.verifyAndSync(accountId, otp);
       setScrapeResult({
-        message: `Phoenix sync: ${result.synced} accounts synced, ${result.detailsFetched} details fetched`,
+        message: `Pension sync: ${result.synced} accounts synced, ${result.detailsFetched} details fetched`,
         totalJobs: result.synced
       });
       setOtpDialogOpen(false);
@@ -187,7 +188,7 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
           disabled={isLoading || isDisabled}
           startIcon={isLoading ? <CircularProgress size={20} /> : undefined}
         >
-          {isLoading ? 'Scraping...' : bankId === 'phoenix' ? 'Sync (OTP)' : 'Scrape Now'}
+          {isLoading ? 'Scraping...' : (bankId && isOtpBank(bankId)) ? 'Sync (OTP)' : 'Scrape Now'}
         </Button>
 
         {scrapeResult && (
@@ -201,7 +202,7 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
           </Button>
         )}
 
-        {bankId !== 'phoenix' && (
+        {!(bankId && isOtpBank(bankId)) && (
           <Button
             variant="text"
             size="small"
@@ -228,9 +229,9 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
         </Alert>
       )}
 
-      {/* Phoenix OTP Dialog */}
+      {/* OTP Sync Dialog */}
       <Dialog open={otpDialogOpen} onClose={handleOtpClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Phoenix Insurance — OTP Verification</DialogTitle>
+        <DialogTitle>Pension Sync — OTP Verification</DialogTitle>
         <DialogContent>
           {otpError && <Alert severity="error" sx={{ mb: 2 }}>{otpError}</Alert>}
 
@@ -260,7 +261,7 @@ export const AccountScraping: React.FC<AccountScrapingProps> = ({
           {otpStep === 'syncing' && (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 3 }}>
               <CircularProgress size={36} />
-              <Typography sx={{ mt: 2 }}>Syncing Phoenix pension data...</Typography>
+              <Typography sx={{ mt: 2 }}>Syncing pension data...</Typography>
             </Box>
           )}
         </DialogContent>

@@ -3,6 +3,7 @@ const BankAccount = require('../models/BankAccount');
 const auth = require('../../shared/middleware/auth');
 const bankAccountService = require('../services/bankAccountService.js');
 const { encrypt } = require('../../shared/utils/encryption');
+const { OTP_BANKS } = require('../constants/enums');
 
 const router = express.Router();
 
@@ -25,9 +26,9 @@ router.post('/', auth, async (req, res) => {
       if (!name || !credentials?.apiToken) {
         return res.status(400).json({ error: 'Missing required fields: name and API token are required for Mercury' });
       }
-    } else if (bankId === 'phoenix') {
+    } else if (OTP_BANKS.includes(bankId)) {
       if (!name || !credentials?.username || !credentials?.phoneOrEmail) {
-        return res.status(400).json({ error: 'Missing required fields: name, ID number, and phone/email are required for Phoenix' });
+        return res.status(400).json({ error: 'Missing required fields: name, ID number, and phone/email are required' });
       }
     } else if (bankId === 'ibkr') {
       if (!name || !credentials?.flexToken || !credentials?.queryId) {

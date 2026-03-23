@@ -26,7 +26,8 @@ export const API_BANKS: SupportedBank[] = [
 
 // OTP-based banks (browser automation with OTP login)
 export const OTP_BANKS: SupportedBank[] = [
-  { id: 'phoenix', name: 'Phoenix Insurance (הפניקס)' }
+  { id: 'phoenix', name: 'Phoenix Insurance (הפניקס)' },
+  { id: 'clal', name: 'Clal Insurance (כלל ביטוח)' }
 ];
 
 // All supported banks (for backward compatibility)
@@ -75,6 +76,7 @@ export const getBankStrategies = (bankId?: string): string[] => {
     case 'mercury': return ['mercury-checking'];
     case 'ibkr': return ['ibkr-flex'];
     case 'phoenix': return ['phoenix-pension'];
+    case 'clal': return ['clal-pension'];
     default: return ['checking-accounts', 'investment-portfolios', 'foreign-currency'];
   }
 };
