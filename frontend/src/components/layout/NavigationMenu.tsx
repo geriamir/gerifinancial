@@ -27,7 +27,8 @@ import {
   CurrencyExchange as ForeignCurrencyIcon,
   Assignment as ProjectIcon,
   CreditCard as BankingIcon,
-  Shield as PensionIcon
+  Shield as PensionIcon,
+  HomeWork as RealEstateIcon
 } from '@mui/icons-material';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -43,6 +44,7 @@ const navigationItems: NavigationItem[] = [
   { title: 'Banking & Cards', path: '/banks', icon: <BankingIcon /> },
   { title: 'Budgets', path: '/budgets', icon: <BudgetIcon /> },
   { title: 'Projects', path: '/projects', icon: <ProjectIcon /> },
+  { title: 'Real Estate', path: '/real-estate', icon: <RealEstateIcon /> },
   { title: 'RSUs', path: '/rsus', icon: <RSUIcon /> },
   { title: 'Investments', path: '/investments', icon: <InvestmentIcon /> },
   { title: 'Pension & Savings', path: '/pension', icon: <PensionIcon /> },
