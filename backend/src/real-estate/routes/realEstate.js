@@ -21,7 +21,8 @@ const validateId = (paramName) => (req, res, next) => {
  */
 router.get('/summary', async (req, res) => {
   try {
-    const summary = await realEstateService.getSummary(req.user.id);
+    const displayCurrency = req.query.currency || 'USD';
+    const summary = await realEstateService.getSummary(req.user.id, displayCurrency);
     res.json(summary);
   } catch (error) {
     logger.error('Error fetching real estate summary:', error);

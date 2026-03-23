@@ -1,5 +1,6 @@
 const logger = require('../../shared/utils/logger');
 const RealEstateInvestment = require('../models/RealEstateInvestment');
+const { currencyExchangeService } = require('../../foreign-currency');
 
 class RealEstateService {
   async create(userId, data) {
@@ -151,8 +152,22 @@ class RealEstateService {
     return investment;
   }
 
-  // Summary across all investments
-  async getSummary(userId) {
+  // Convert amount to target currency, returns original if conversion fails
+  async _convertAmount(amount, fromCurrency, toCurrency) {
+    if (!amount || fromCurrency === toCurrency) return amount;
+    try {
+      const result = await currencyExchangeService.convertAmount(
+        Math.abs(amount), fromCurrency, toCurrency, new Date(), true
+      );
+      return amount < 0 ? -result.convertedAmount : result.convertedAmount;
+    } catch (err) {
+      logger.warn(`Real estate: failed to convert ${fromCurrency} → ${toCurrency}: ${err.message}`);
+      return amount;
+    }
+  }
+
+  // Summary across all investments, converted to a common display currency
+  async getSummary(userId, displayCurrency = 'USD') {
     const investments = await RealEstateInvestment.find({ userId, status: { $in: ['active', 'sold'] } });
 
     const summary = {
@@ -163,18 +178,20 @@ class RealEstateService {
       totalEstimatedValue: 0,
       totalCommitments: 0,
       totalRentalIncome: 0,
-      totalFlipGains: 0
+      totalFlipGains: 0,
+      currency: displayCurrency
     };
 
     for (const inv of investments) {
+      const cur = inv.currency || 'USD';
       if (inv.status === 'active' && inv.type === 'flip') summary.activeFlips++;
       if (inv.status === 'active' && inv.type === 'rental') summary.activeRentals++;
-      summary.totalInvested += inv.totalInvestment || 0;
-      summary.totalEstimatedValue += inv.estimatedCurrentValue || 0;
-      summary.totalCommitments += inv.totalCommitted || 0;
-      summary.totalRentalIncome += inv.totalRentalIncome || 0;
+      summary.totalInvested += await this._convertAmount(inv.totalInvestment || 0, cur, displayCurrency);
+      summary.totalEstimatedValue += await this._convertAmount(inv.estimatedCurrentValue || 0, cur, displayCurrency);
+      summary.totalCommitments += await this._convertAmount(inv.totalCommitted || 0, cur, displayCurrency);
+      summary.totalRentalIncome += await this._convertAmount(inv.totalRentalIncome || 0, cur, displayCurrency);
       if (inv.type === 'flip' && inv.flipGain != null) {
-        summary.totalFlipGains += inv.flipGain;
+        summary.totalFlipGains += await this._convertAmount(inv.flipGain, cur, displayCurrency);
       }
     }
 

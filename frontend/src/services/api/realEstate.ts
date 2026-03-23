@@ -82,6 +82,7 @@ export interface RealEstateSummary {
   totalCommitments: number;
   totalRentalIncome: number;
   totalFlipGains: number;
+  currency: string;
 }
 
 class RealEstateApiService {
