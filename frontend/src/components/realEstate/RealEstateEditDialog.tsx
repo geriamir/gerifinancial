@@ -37,6 +37,7 @@ interface RealEstateEditDialogProps {
   onClose: () => void;
   onSuccess: (investment: RealEstateInvestment) => void;
   investment: RealEstateInvestment;
+  transactionsTotal?: number;
 }
 
 interface FundingSourceForm {
@@ -59,7 +60,8 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
   open,
   onClose,
   onSuccess,
-  investment
+  investment,
+  transactionsTotal
 }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -100,7 +102,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
         address: investment.address || '',
         description: investment.description || '',
         currency: investment.currency || 'USD',
-        totalInvestment: investment.totalInvestment || 0,
+        totalInvestment: investment.totalInvestment || transactionsTotal || 0,
         estimatedCurrentValue: investment.estimatedCurrentValue || 0,
         notes: investment.notes || '',
         salePrice: investment.salePrice || 0,
@@ -127,7 +129,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
       setErrors({});
       setSubmitError(null);
     }
-  }, [open, investment]);
+  }, [open, investment, transactionsTotal]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -303,6 +305,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
               type="number"
               value={formData.totalInvestment || ''}
               onChange={(e) => setFormData(prev => ({ ...prev, totalInvestment: parseFloat(e.target.value) || 0 }))}
+              helperText={transactionsTotal ? `From transactions: ${formatCurrency(transactionsTotal, formData.currency)}` : undefined}
               disabled={isSubmitting}
               inputProps={{ min: 0, step: 0.01 }}
             />

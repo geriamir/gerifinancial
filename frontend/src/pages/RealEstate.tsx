@@ -372,6 +372,7 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
   }
 
   const currency = investment.currency || 'USD';
+  const transactionsTotal = transactions.reduce((sum, txn) => sum + (txn.amount || 0), 0) * -1;
   const gainLoss = investment.type === 'flip' && investment.flipGain != null
     ? investment.flipGain
     : investment.estimatedCurrentValue - investment.totalInvestment;
@@ -439,6 +440,11 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
               <Typography variant="h5" fontWeight="bold">
                 {formatCurrency(investment.totalInvestment, currency)}
               </Typography>
+              {transactions.length > 0 && (
+                <Typography variant="body2" color="text.secondary" mt={0.5}>
+                  From transactions: {formatCurrency(transactionsTotal, currency)}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -679,6 +685,7 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
         onClose={() => setEditDialogOpen(false)}
         onSuccess={handleEditSuccess}
         investment={investment}
+        transactionsTotal={transactionsTotal}
       />
 
       <CommitmentDialog
