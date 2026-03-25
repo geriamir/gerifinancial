@@ -199,6 +199,29 @@ const realEstateInvestmentSchema = new mongoose.Schema({
     default: null,
     min: 0
   },
+  estimatedMonthlyRental: {
+    type: Number,
+    default: null,
+    min: 0
+  },
+  mortgagePercentage: {
+    type: Number,
+    default: null,
+    min: 0,
+    max: 100
+  },
+  mortgageInterestRate: {
+    type: Number,
+    default: null,
+    min: 0,
+    max: 100
+  },
+  mortgageTermYears: {
+    type: Number,
+    default: null,
+    min: 1,
+    max: 50
+  },
   tenantName: {
     type: String,
     trim: true,
@@ -264,6 +287,17 @@ realEstateInvestmentSchema.virtual('totalRentalIncome').get(function() {
   return this.rentalIncome
     .filter(r => r.received)
     .reduce((sum, r) => sum + (r.actualAmount ?? r.expectedAmount), 0);
+});
+
+realEstateInvestmentSchema.virtual('estimatedMonthlyMortgage').get(function() {
+  if (this.mortgagePercentage == null || this.mortgageInterestRate == null ||
+      this.mortgageTermYears == null || this.estimatedCurrentValue == null) return null;
+  if (this.mortgagePercentage === 0 || this.estimatedCurrentValue === 0) return 0;
+  const principal = this.estimatedCurrentValue * (this.mortgagePercentage / 100);
+  const monthlyRate = (this.mortgageInterestRate / 100) / 12;
+  if (monthlyRate === 0) return principal / (this.mortgageTermYears * 12);
+  const n = this.mortgageTermYears * 12;
+  return (principal * monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1);
 });
 
 realEstateInvestmentSchema.set('toJSON', { virtuals: true });

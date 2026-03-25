@@ -561,6 +561,40 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
               )}
             </Box>
           )}
+          {((investment.estimatedMonthlyRental != null && investment.estimatedMonthlyRental > 0) ||
+            (investment.mortgagePercentage != null && investment.mortgagePercentage > 0)) && (
+            <Box sx={{ p: 2, mb: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+              <Typography variant="subtitle2" fontWeight="bold" mb={1}>Financing Estimates</Typography>
+              {investment.estimatedMonthlyRental != null && investment.estimatedMonthlyRental > 0 && (
+                <Typography variant="body2" color="text.secondary">
+                  Estimated Monthly Rental: {formatCurrency(investment.estimatedMonthlyRental, currency)}
+                </Typography>
+              )}
+              {investment.mortgagePercentage != null && investment.mortgagePercentage > 0 && (
+                <>
+                  <Typography variant="body2" color="text.secondary">
+                    Mortgage: {investment.mortgagePercentage}% of value
+                    ({formatCurrency(investment.estimatedCurrentValue * (investment.mortgagePercentage / 100), currency)})
+                    {investment.mortgageInterestRate != null && ` at ${investment.mortgageInterestRate}% interest`}
+                    {investment.mortgageTermYears != null && ` for ${investment.mortgageTermYears} years`}
+                  </Typography>
+                  {investment.estimatedMonthlyMortgage != null && (
+                    <Typography variant="body2" color="text.secondary">
+                      Est. Monthly Mortgage Payment: {formatCurrency(investment.estimatedMonthlyMortgage, currency)}
+                    </Typography>
+                  )}
+                  {investment.estimatedMonthlyRental != null && investment.estimatedMonthlyRental > 0 && investment.estimatedMonthlyMortgage != null && (() => {
+                    const netCashFlow = investment.estimatedMonthlyRental - investment.estimatedMonthlyMortgage;
+                    return (
+                      <Typography variant="body2" fontWeight="bold" color={netCashFlow >= 0 ? 'success.main' : 'error.main'}>
+                        Net Monthly Cash Flow: {netCashFlow >= 0 ? '+' : ''}{formatCurrency(netCashFlow, currency)}
+                      </Typography>
+                    );
+                  })()}
+                </>
+              )}
+            </Box>
+          )}
           {investment.rentalIncome && investment.rentalIncome.length > 0 ? (
             <Table size="small">
               <TableHead>

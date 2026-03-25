@@ -18,6 +18,10 @@ export interface RealEstateInvestment {
   saleDate?: string;
   saleExpenses?: number;
   monthlyRent?: number;
+  estimatedMonthlyRental?: number;
+  mortgagePercentage?: number;
+  mortgageInterestRate?: number;
+  mortgageTermYears?: number;
   tenantName?: string;
   leaseStart?: string;
   leaseEnd?: string;
@@ -30,6 +34,7 @@ export interface RealEstateInvestment {
   totalPaidCommitments?: number;
   flipGain?: number | null;
   totalRentalIncome?: number;
+  estimatedMonthlyMortgage?: number | null;
   createdAt: string;
   updatedAt: string;
 }

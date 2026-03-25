@@ -79,7 +79,12 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
     monthlyRent: 0,
     tenantName: '',
     leaseStart: null as Date | null,
-    leaseEnd: null as Date | null
+    leaseEnd: null as Date | null,
+    // Rental estimation & financing
+    estimatedMonthlyRental: 0,
+    mortgagePercentage: 0,
+    mortgageInterestRate: 0,
+    mortgageTermYears: 25
   });
   const [fundingSources, setFundingSources] = useState<FundingSourceForm[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -104,7 +109,11 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
         monthlyRent: investment.monthlyRent || 0,
         tenantName: investment.tenantName || '',
         leaseStart: investment.leaseStart ? new Date(investment.leaseStart) : null,
-        leaseEnd: investment.leaseEnd ? new Date(investment.leaseEnd) : null
+        leaseEnd: investment.leaseEnd ? new Date(investment.leaseEnd) : null,
+        estimatedMonthlyRental: investment.estimatedMonthlyRental || 0,
+        mortgagePercentage: investment.mortgagePercentage || 0,
+        mortgageInterestRate: investment.mortgageInterestRate || 0,
+        mortgageTermYears: investment.mortgageTermYears || 25
       });
       setFundingSources(
         (investment.fundingSources || []).map(fs => ({
@@ -178,6 +187,10 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
         updateData.tenantName = formData.tenantName || undefined;
         updateData.leaseStart = formData.leaseStart?.toISOString() || undefined;
         updateData.leaseEnd = formData.leaseEnd?.toISOString() || undefined;
+        updateData.estimatedMonthlyRental = formData.estimatedMonthlyRental || undefined;
+        updateData.mortgagePercentage = formData.mortgagePercentage || undefined;
+        updateData.mortgageInterestRate = formData.mortgageInterestRate || undefined;
+        updateData.mortgageTermYears = formData.mortgageTermYears || undefined;
       }
 
       const updated = await realEstateApi.update(investment._id, updateData);
@@ -479,6 +492,76 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
                   slotProps={{ textField: { fullWidth: true } }}
                 />
               </Box>
+
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="subtitle1" fontWeight="bold">Financing Estimates</Typography>
+              <TextField
+                fullWidth
+                label="Estimated Monthly Rental"
+                type="number"
+                value={formData.estimatedMonthlyRental || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, estimatedMonthlyRental: parseFloat(e.target.value) || 0 }))}
+                helperText="Expected monthly rental income"
+                disabled={isSubmitting}
+                inputProps={{ min: 0, step: 0.01 }}
+              />
+              <Box display="flex" gap={2}>
+                <TextField
+                  fullWidth
+                  label="Mortgage %"
+                  type="number"
+                  value={formData.mortgagePercentage || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, mortgagePercentage: parseFloat(e.target.value) || 0 }))}
+                  helperText="% of property value financed"
+                  disabled={isSubmitting}
+                  inputProps={{ min: 0, max: 100, step: 0.1 }}
+                />
+                <TextField
+                  fullWidth
+                  label="Interest Rate (%)"
+                  type="number"
+                  value={formData.mortgageInterestRate || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, mortgageInterestRate: parseFloat(e.target.value) || 0 }))}
+                  helperText="Annual interest rate"
+                  disabled={isSubmitting}
+                  inputProps={{ min: 0, max: 100, step: 0.01 }}
+                />
+                <TextField
+                  fullWidth
+                  label="Term (Years)"
+                  type="number"
+                  value={formData.mortgageTermYears || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, mortgageTermYears: parseFloat(e.target.value) || 0 }))}
+                  disabled={isSubmitting}
+                  inputProps={{ min: 1, max: 50, step: 1 }}
+                />
+              </Box>
+              {formData.mortgagePercentage > 0 && formData.estimatedCurrentValue > 0 && (
+                <Box sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Mortgage Amount: {formatCurrency(formData.estimatedCurrentValue * (formData.mortgagePercentage / 100), formData.currency)}
+                    {formData.mortgageInterestRate > 0 && formData.mortgageTermYears > 0 && (() => {
+                      const principal = formData.estimatedCurrentValue * (formData.mortgagePercentage / 100);
+                      const monthlyRate = (formData.mortgageInterestRate / 100) / 12;
+                      const n = formData.mortgageTermYears * 12;
+                      const payment = (principal * monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1);
+                      return ` | Est. Monthly Payment: ${formatCurrency(payment, formData.currency)}`;
+                    })()}
+                  </Typography>
+                  {formData.estimatedMonthlyRental > 0 && formData.mortgageInterestRate > 0 && formData.mortgageTermYears > 0 && (() => {
+                    const principal = formData.estimatedCurrentValue * (formData.mortgagePercentage / 100);
+                    const monthlyRate = (formData.mortgageInterestRate / 100) / 12;
+                    const n = formData.mortgageTermYears * 12;
+                    const payment = (principal * monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1);
+                    const netIncome = formData.estimatedMonthlyRental - payment;
+                    return (
+                      <Typography variant="body2" color={netIncome >= 0 ? 'success.main' : 'error.main'} fontWeight="bold">
+                        Net Monthly Cash Flow: {netIncome >= 0 ? '+' : ''}{formatCurrency(netIncome, formData.currency)}
+                      </Typography>
+                    );
+                  })()}
+                </Box>
+              )}
             </>
           )}
         </Box>

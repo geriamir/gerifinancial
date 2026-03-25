@@ -13,12 +13,14 @@ import {
   Box,
   Typography,
   IconButton,
-  Alert
+  Alert,
+  Divider,
+  Chip
 } from '@mui/material';
 import { Close as CloseIcon, Save as SaveIcon } from '@mui/icons-material';
 import { RealEstateInvestment } from '../../services/api/realEstate';
 import { realEstateApi } from '../../services/api/realEstate';
-import { SUPPORTED_CURRENCIES } from '../../types/foreignCurrency';
+import { SUPPORTED_CURRENCIES, formatCurrency } from '../../types/foreignCurrency';
 
 interface RealEstateCreateDialogProps {
   open: boolean;
@@ -39,7 +41,12 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
     currency: 'USD',
     totalInvestment: 0,
     estimatedCurrentValue: 0,
-    notes: ''
+    notes: '',
+    // Rental estimation
+    estimatedMonthlyRental: 0,
+    mortgagePercentage: 0,
+    mortgageInterestRate: 0,
+    mortgageTermYears: 25
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,7 +63,11 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
         currency: 'USD',
         totalInvestment: 0,
         estimatedCurrentValue: 0,
-        notes: ''
+        notes: '',
+        estimatedMonthlyRental: 0,
+        mortgagePercentage: 0,
+        mortgageInterestRate: 0,
+        mortgageTermYears: 25
       });
       setErrors({});
       setSubmitError(null);
@@ -87,7 +98,7 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
     try {
       setIsSubmitting(true);
       setSubmitError(null);
-      const investment = await realEstateApi.create({
+      const createData: Partial<any> = {
         name: formData.name,
         type: formData.type,
         address: formData.address || undefined,
@@ -96,7 +107,16 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
         totalInvestment: formData.totalInvestment,
         estimatedCurrentValue: formData.estimatedCurrentValue,
         notes: formData.notes || undefined
-      });
+      };
+
+      if (formData.type === 'rental') {
+        if (formData.estimatedMonthlyRental) createData.estimatedMonthlyRental = formData.estimatedMonthlyRental;
+        if (formData.mortgagePercentage) createData.mortgagePercentage = formData.mortgagePercentage;
+        if (formData.mortgageInterestRate) createData.mortgageInterestRate = formData.mortgageInterestRate;
+        if (formData.mortgageTermYears) createData.mortgageTermYears = formData.mortgageTermYears;
+      }
+
+      const investment = await realEstateApi.create(createData);
       onSuccess(investment);
       onClose();
     } catch (error: any) {
@@ -221,6 +241,82 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
               inputProps={{ min: 0, step: 0.01 }}
             />
           </Box>
+
+          {formData.type === 'rental' && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="subtitle1" fontWeight="bold">
+                Rental & Financing Estimates <Chip label="Rental" size="small" color="secondary" sx={{ ml: 1 }} />
+              </Typography>
+              <TextField
+                fullWidth
+                label="Estimated Monthly Rental"
+                type="number"
+                value={formData.estimatedMonthlyRental || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, estimatedMonthlyRental: parseFloat(e.target.value) || 0 }))}
+                helperText="Expected monthly rental income"
+                disabled={isSubmitting}
+                inputProps={{ min: 0, step: 0.01 }}
+              />
+              <Box display="flex" gap={2}>
+                <TextField
+                  fullWidth
+                  label="Mortgage %"
+                  type="number"
+                  value={formData.mortgagePercentage || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, mortgagePercentage: parseFloat(e.target.value) || 0 }))}
+                  helperText="% of property value financed"
+                  disabled={isSubmitting}
+                  inputProps={{ min: 0, max: 100, step: 0.1 }}
+                />
+                <TextField
+                  fullWidth
+                  label="Interest Rate (%)"
+                  type="number"
+                  value={formData.mortgageInterestRate || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, mortgageInterestRate: parseFloat(e.target.value) || 0 }))}
+                  helperText="Annual interest rate"
+                  disabled={isSubmitting}
+                  inputProps={{ min: 0, max: 100, step: 0.01 }}
+                />
+                <TextField
+                  fullWidth
+                  label="Term (Years)"
+                  type="number"
+                  value={formData.mortgageTermYears || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, mortgageTermYears: parseFloat(e.target.value) || 0 }))}
+                  disabled={isSubmitting}
+                  inputProps={{ min: 1, max: 50, step: 1 }}
+                />
+              </Box>
+              {formData.mortgagePercentage > 0 && formData.estimatedCurrentValue > 0 && (
+                <Box sx={{ p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Mortgage Amount: {formatCurrency(formData.estimatedCurrentValue * (formData.mortgagePercentage / 100), formData.currency)}
+                    {formData.mortgageInterestRate > 0 && formData.mortgageTermYears > 0 && (() => {
+                      const principal = formData.estimatedCurrentValue * (formData.mortgagePercentage / 100);
+                      const monthlyRate = (formData.mortgageInterestRate / 100) / 12;
+                      const n = formData.mortgageTermYears * 12;
+                      const payment = (principal * monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1);
+                      return ` | Est. Monthly Payment: ${formatCurrency(payment, formData.currency)}`;
+                    })()}
+                  </Typography>
+                  {formData.estimatedMonthlyRental > 0 && formData.mortgageInterestRate > 0 && formData.mortgageTermYears > 0 && (() => {
+                    const principal = formData.estimatedCurrentValue * (formData.mortgagePercentage / 100);
+                    const monthlyRate = (formData.mortgageInterestRate / 100) / 12;
+                    const n = formData.mortgageTermYears * 12;
+                    const payment = (principal * monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1);
+                    const netIncome = formData.estimatedMonthlyRental - payment;
+                    return (
+                      <Typography variant="body2" color={netIncome >= 0 ? 'success.main' : 'error.main'} fontWeight="bold">
+                        Net Monthly Cash Flow: {netIncome >= 0 ? '+' : ''}{formatCurrency(netIncome, formData.currency)}
+                      </Typography>
+                    );
+                  })()}
+                </Box>
+              )}
+            </>
+          )}
 
           <TextField
             fullWidth
