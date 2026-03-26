@@ -11,6 +11,7 @@ export interface RealEstateInvestment {
   totalInvestment: number;
   estimatedCurrentValue: number;
   currency: string;
+  purchaseTaxRate?: number | null;
   fundingSources: FundingSource[];
   categoryBudgets: CategoryBudget[];
   installments: Installment[];
@@ -63,6 +64,9 @@ export interface Installment {
   description: string;
   installmentType: 'investment' | 'tax' | 'lawyer' | 'other';
   amount: number;
+  percentage?: number | null;
+  includeTax?: boolean;
+  taxPercentage?: number | null;
   currency: string;
   dueDate: string;
   status: 'pending' | 'paid' | 'overdue';

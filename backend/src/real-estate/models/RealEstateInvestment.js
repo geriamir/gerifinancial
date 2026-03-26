@@ -19,6 +19,22 @@ const installmentSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  percentage: {
+    type: Number,
+    default: null,
+    min: 0,
+    max: 100
+  },
+  includeTax: {
+    type: Boolean,
+    default: false
+  },
+  taxPercentage: {
+    type: Number,
+    default: null,
+    min: 0,
+    max: 100
+  },
   currency: {
     type: String,
     default: 'USD'
@@ -123,6 +139,12 @@ const realEstateInvestmentSchema = new mongoose.Schema({
     type: String,
     required: true,
     default: 'USD'
+  },
+  purchaseTaxRate: {
+    type: Number,
+    default: null,
+    min: 0,
+    max: 100
   },
 
   // Funding sources (same pattern as Projects)

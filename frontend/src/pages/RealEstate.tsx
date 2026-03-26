@@ -563,7 +563,16 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
                     <TableCell>
                       <Chip label={getInstallmentTypeLabel(inst.installmentType)} size="small" variant="outlined" />
                     </TableCell>
-                    <TableCell align="right">{formatCurrency(inst.amount, inst.currency || currency)}</TableCell>
+                    <TableCell align="right">
+                      {inst.percentage != null && inst.percentage > 0
+                        ? <>
+                            {inst.percentage}%
+                            {inst.includeTax && inst.taxPercentage ? ` +${inst.taxPercentage}% tax` : ''}
+                            {' '}({formatCurrency(inst.amount, inst.currency || currency)})
+                          </>
+                        : formatCurrency(inst.amount, inst.currency || currency)
+                      }
+                    </TableCell>
                     <TableCell>{new Date(inst.dueDate).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <Box display="flex" alignItems="center" gap={0.5}>
@@ -754,6 +763,9 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
         }}
         onSave={handleSaveInstallment}
         installment={editingInstallment}
+        estimatedCurrentValue={investment.estimatedCurrentValue}
+        currency={currency}
+        purchaseTaxRate={investment.purchaseTaxRate}
         transactions={transactions}
         onLinkTransaction={handleLinkTransaction}
         onUnlinkTransaction={handleUnlinkTransaction}

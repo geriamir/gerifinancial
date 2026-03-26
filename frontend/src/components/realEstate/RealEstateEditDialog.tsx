@@ -69,6 +69,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
     description: '',
     currency: 'USD',
     estimatedCurrentValue: 0,
+    purchaseTaxRate: 0,
     notes: '',
     // Flip-specific
     salePrice: 0,
@@ -100,6 +101,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
         description: investment.description || '',
         currency: investment.currency || 'USD',
         estimatedCurrentValue: investment.estimatedCurrentValue || 0,
+        purchaseTaxRate: investment.purchaseTaxRate || 0,
         notes: investment.notes || '',
         salePrice: investment.salePrice || 0,
         saleDate: investment.saleDate ? new Date(investment.saleDate) : null,
@@ -164,6 +166,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
         description: formData.description || undefined,
         currency: formData.currency,
         estimatedCurrentValue: formData.estimatedCurrentValue,
+        purchaseTaxRate: formData.purchaseTaxRate || undefined,
         notes: formData.notes || undefined,
         fundingSources: fundingSources.map(fs => ({
           type: fs.type,
@@ -302,6 +305,19 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
               onChange={(e) => setFormData(prev => ({ ...prev, estimatedCurrentValue: parseFloat(e.target.value) || 0 }))}
               disabled={isSubmitting}
               inputProps={{ min: 0, step: 0.01 }}
+            />
+            <TextField
+              fullWidth
+              label="Purchase Tax Rate (%)"
+              type="number"
+              value={formData.purchaseTaxRate || ''}
+              onChange={(e) => setFormData(prev => ({ ...prev, purchaseTaxRate: parseFloat(e.target.value) || 0 }))}
+              disabled={isSubmitting}
+              inputProps={{ min: 0, max: 100, step: 0.1 }}
+              helperText={formData.purchaseTaxRate > 0 && formData.estimatedCurrentValue > 0
+                ? `Tax: ${formatCurrency(formData.estimatedCurrentValue * (formData.purchaseTaxRate / 100), formData.currency)}`
+                : undefined
+              }
             />
           </Box>
 

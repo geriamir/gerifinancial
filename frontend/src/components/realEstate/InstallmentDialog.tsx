@@ -19,13 +19,20 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction
+  ListItemSecondaryAction,
+  ToggleButtonGroup,
+  ToggleButton,
+  InputAdornment,
+  Checkbox,
+  FormControlLabel
 } from '@mui/material';
 import {
   Close as CloseIcon,
   Save as SaveIcon,
   LinkOff as UnlinkIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  Percent as PercentIcon,
+  AttachMoney as AmountIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { Installment } from '../../services/api/realEstate';
@@ -43,6 +50,9 @@ interface InstallmentDialogProps {
   onClose: () => void;
   onSave: (data: Partial<Installment>) => Promise<void>;
   installment?: Installment | null;
+  estimatedCurrentValue?: number;
+  currency?: string;
+  purchaseTaxRate?: number | null;
   transactions?: any[];
   onLinkTransaction?: (installmentId: string, transactionId: string) => Promise<void>;
   onUnlinkTransaction?: (installmentId: string, transactionId: string) => Promise<void>;
@@ -53,6 +63,9 @@ const InstallmentDialog: React.FC<InstallmentDialogProps> = ({
   onClose,
   onSave,
   installment,
+  estimatedCurrentValue = 0,
+  currency: investmentCurrency = 'USD',
+  purchaseTaxRate: defaultTaxRate = 0,
   transactions = [],
   onLinkTransaction,
   onUnlinkTransaction
@@ -61,10 +74,15 @@ const InstallmentDialog: React.FC<InstallmentDialogProps> = ({
     description: '',
     installmentType: 'investment' as Installment['installmentType'],
     amount: 0,
+    percentage: null as number | null,
+    includeTax: false,
+    taxPercentage: null as number | null,
     currency: 'USD',
     dueDate: new Date(),
     notes: ''
   });
+  const percentageTypeDefault = (type: string) => type !== 'other';
+  const [usePercentage, setUsePercentage] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -74,20 +92,29 @@ const InstallmentDialog: React.FC<InstallmentDialogProps> = ({
 
   useEffect(() => {
     if (open && installment) {
+      const hasPercentage = installment.percentage != null && installment.percentage > 0;
+      setUsePercentage(hasPercentage || percentageTypeDefault(installment.installmentType || 'investment'));
       setFormData({
         description: installment.description || '',
         installmentType: installment.installmentType || 'investment',
         amount: installment.amount || 0,
-        currency: installment.currency || 'USD',
+        percentage: installment.percentage ?? null,
+        includeTax: installment.includeTax || false,
+        taxPercentage: installment.taxPercentage ?? (defaultTaxRate || null),
+        currency: installment.currency || investmentCurrency,
         dueDate: installment.dueDate ? new Date(installment.dueDate) : new Date(),
         notes: installment.notes || ''
       });
     } else if (open) {
+      setUsePercentage(true);
       setFormData({
         description: '',
         installmentType: 'investment',
         amount: 0,
-        currency: 'USD',
+        percentage: null,
+        includeTax: false,
+        taxPercentage: defaultTaxRate || null,
+        currency: investmentCurrency,
         dueDate: new Date(),
         notes: ''
       });
@@ -95,15 +122,24 @@ const InstallmentDialog: React.FC<InstallmentDialogProps> = ({
     setErrors({});
     setSubmitError(null);
     setShowTransactionPicker(false);
-  }, [open, installment]);
+  }, [open, installment, investmentCurrency, defaultTaxRate]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!formData.description.trim()) {
       newErrors.description = 'Description is required';
     }
-    if (!formData.amount || formData.amount <= 0) {
-      newErrors.amount = 'Amount must be greater than 0';
+    if (usePercentage) {
+      if (!formData.percentage || formData.percentage <= 0 || formData.percentage > 100) {
+        newErrors.percentage = 'Percentage must be between 0 and 100';
+      }
+      if (!estimatedCurrentValue || estimatedCurrentValue <= 0) {
+        newErrors.percentage = 'Property value must be set to use percentage';
+      }
+    } else {
+      if (!formData.amount || formData.amount <= 0) {
+        newErrors.amount = 'Amount must be greater than 0';
+      }
     }
     if (!formData.dueDate) {
       newErrors.dueDate = 'Due date is required';
@@ -117,10 +153,23 @@ const InstallmentDialog: React.FC<InstallmentDialogProps> = ({
     try {
       setIsSubmitting(true);
       setSubmitError(null);
+      let amount: number;
+      if (usePercentage) {
+        const baseAmount = estimatedCurrentValue * ((formData.percentage || 0) / 100);
+        const taxAmount = formData.includeTax && formData.taxPercentage
+          ? baseAmount * (formData.taxPercentage / 100)
+          : 0;
+        amount = baseAmount + taxAmount;
+      } else {
+        amount = formData.amount;
+      }
       await onSave({
         description: formData.description,
         installmentType: formData.installmentType,
-        amount: formData.amount,
+        amount,
+        percentage: usePercentage ? formData.percentage : null,
+        includeTax: formData.includeTax,
+        taxPercentage: formData.includeTax ? formData.taxPercentage : null,
         currency: formData.currency,
         dueDate: formData.dueDate.toISOString(),
         notes: formData.notes || undefined
@@ -175,7 +224,15 @@ const InstallmentDialog: React.FC<InstallmentDialogProps> = ({
               <InputLabel>Type</InputLabel>
               <Select
                 value={formData.installmentType}
-                onChange={(e) => setFormData(prev => ({ ...prev, installmentType: e.target.value as Installment['installmentType'] }))}
+                onChange={(e) => {
+                  const newType = e.target.value as Installment['installmentType'];
+                  setFormData(prev => ({
+                    ...prev,
+                    installmentType: newType,
+                    includeTax: newType !== 'investment' ? false : prev.includeTax
+                  }));
+                  setUsePercentage(percentageTypeDefault(newType));
+                }}
                 label="Type"
               >
                 {INSTALLMENT_TYPES.map((t) => (
@@ -185,35 +242,119 @@ const InstallmentDialog: React.FC<InstallmentDialogProps> = ({
             </FormControl>
           </Box>
 
-          <Box display="flex" gap={2}>
-            <TextField
-              fullWidth
-              label="Amount"
-              type="number"
-              value={formData.amount || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-              error={!!errors.amount}
-              helperText={errors.amount}
+          {/* Amount Mode Toggle */}
+          <Box display="flex" alignItems="center" gap={1}>
+            <ToggleButtonGroup
+              value={usePercentage ? 'percentage' : 'amount'}
+              exclusive
+              onChange={(_, val) => {
+                if (val !== null) setUsePercentage(val === 'percentage');
+              }}
+              size="small"
               disabled={isSubmitting}
-              required
-              inputProps={{ min: 0, step: 0.01 }}
-            />
-
-            <FormControl sx={{ minWidth: 120 }} disabled={isSubmitting}>
-              <InputLabel>Currency</InputLabel>
-              <Select
-                value={formData.currency}
-                onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
-                label="Currency"
-              >
-                {SUPPORTED_CURRENCIES.map((c) => (
-                  <MenuItem key={c.code} value={c.code}>
-                    {c.code} ({c.symbol})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            >
+              <ToggleButton value="amount">
+                <AmountIcon fontSize="small" sx={{ mr: 0.5 }} /> Fixed Amount
+              </ToggleButton>
+              <ToggleButton value="percentage" disabled={!estimatedCurrentValue || estimatedCurrentValue <= 0}>
+                <PercentIcon fontSize="small" sx={{ mr: 0.5 }} /> % of Value
+              </ToggleButton>
+            </ToggleButtonGroup>
           </Box>
+
+          {usePercentage ? (
+            <Box display="flex" flexDirection="column" gap={2}>
+              <TextField
+                fullWidth
+                label="Percentage of Property Value"
+                type="number"
+                value={formData.percentage ?? ''}
+                onChange={(e) => {
+                  const pct = parseFloat(e.target.value) || 0;
+                  setFormData(prev => ({ ...prev, percentage: pct }));
+                }}
+                error={!!errors.percentage}
+                helperText={errors.percentage || (() => {
+                  if (!formData.percentage || !estimatedCurrentValue) return undefined;
+                  const base = estimatedCurrentValue * (formData.percentage / 100);
+                  const tax = formData.includeTax && formData.taxPercentage
+                    ? base * (formData.taxPercentage / 100)
+                    : 0;
+                  const total = base + tax;
+                  return tax > 0
+                    ? `${formatCurrency(base, investmentCurrency)} + ${formatCurrency(tax, investmentCurrency)} tax = ${formatCurrency(total, investmentCurrency)}`
+                    : `= ${formatCurrency(base, investmentCurrency)}`;
+                })()}
+                disabled={isSubmitting}
+                required
+                inputProps={{ min: 0, max: 100, step: 0.1 }}
+                InputProps={{
+                  endAdornment: <InputAdornment position="end">%</InputAdornment>
+                }}
+              />
+
+              {formData.installmentType === 'investment' && (
+                <Box display="flex" alignItems="center" gap={1}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={formData.includeTax}
+                        onChange={(e) => setFormData(prev => ({ ...prev, includeTax: e.target.checked }))}
+                        disabled={isSubmitting}
+                        size="small"
+                      />
+                    }
+                    label="Include Tax"
+                  />
+                  {formData.includeTax && (
+                    <TextField
+                      label="Tax Rate"
+                      type="number"
+                      value={formData.taxPercentage ?? ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, taxPercentage: parseFloat(e.target.value) || 0 }))}
+                      disabled={isSubmitting}
+                      inputProps={{ min: 0, max: 100, step: 0.1 }}
+                      InputProps={{
+                        endAdornment: <InputAdornment position="end">%</InputAdornment>
+                      }}
+                      size="small"
+                      sx={{ width: 150 }}
+                    />
+                  )}
+                </Box>
+              )}
+            </Box>
+          ) : (
+            <Box display="flex" gap={2}>
+              <TextField
+                fullWidth
+                label="Amount"
+                type="number"
+                value={formData.amount || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                error={!!errors.amount}
+                helperText={errors.amount}
+                disabled={isSubmitting}
+                required
+                inputProps={{ min: 0, step: 0.01 }}
+              />
+
+              <FormControl sx={{ minWidth: 120 }} disabled={isSubmitting}>
+                <InputLabel>Currency</InputLabel>
+                <Select
+                  value={formData.currency}
+                  onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+                  label="Currency"
+                >
+                  {SUPPORTED_CURRENCIES.map((c) => (
+                    <MenuItem key={c.code} value={c.code}>
+                      {c.code} ({c.symbol})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          )}
 
           <DatePicker
             label="Due Date"

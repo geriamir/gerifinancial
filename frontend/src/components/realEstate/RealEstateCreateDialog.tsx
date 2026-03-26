@@ -40,6 +40,7 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
     description: '',
     currency: 'USD',
     estimatedCurrentValue: 0,
+    purchaseTaxRate: 0,
     notes: '',
     // Rental estimation
     estimatedMonthlyRental: 0,
@@ -61,6 +62,7 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
         description: '',
         currency: 'USD',
         estimatedCurrentValue: 0,
+        purchaseTaxRate: 0,
         notes: '',
         estimatedMonthlyRental: 0,
         mortgagePercentage: 0,
@@ -100,6 +102,7 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
         description: formData.description || undefined,
         currency: formData.currency,
         estimatedCurrentValue: formData.estimatedCurrentValue,
+        purchaseTaxRate: formData.purchaseTaxRate || undefined,
         notes: formData.notes || undefined
       };
 
@@ -220,6 +223,20 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
             helperText={errors.estimatedCurrentValue}
             disabled={isSubmitting}
             inputProps={{ min: 0, step: 0.01 }}
+          />
+
+          <TextField
+            fullWidth
+            label="Purchase Tax Rate"
+            type="number"
+            value={formData.purchaseTaxRate || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, purchaseTaxRate: parseFloat(e.target.value) || 0 }))}
+            disabled={isSubmitting}
+            inputProps={{ min: 0, max: 100, step: 0.1 }}
+            helperText={formData.purchaseTaxRate > 0 && formData.estimatedCurrentValue > 0
+              ? `Tax: ${formatCurrency(formData.estimatedCurrentValue * (formData.purchaseTaxRate / 100), formData.currency)}`
+              : 'Percentage of property value applied as purchase tax'
+            }
           />
 
           {formData.type === 'rental' && (
