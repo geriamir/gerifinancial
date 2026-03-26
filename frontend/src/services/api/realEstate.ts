@@ -130,8 +130,9 @@ class RealEstateApiService {
     await api.delete(`${this.baseUrl}/${id}`);
   }
 
-  async getSummary(): Promise<RealEstateSummary> {
-    const response = await api.get(`${this.baseUrl}/summary`);
+  async getSummary(currency?: string): Promise<RealEstateSummary> {
+    const params = currency ? `?currency=${currency}` : '';
+    const response = await api.get(`${this.baseUrl}/summary${params}`);
     return response.data;
   }
 

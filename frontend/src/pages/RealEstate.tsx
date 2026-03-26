@@ -106,7 +106,7 @@ const RealEstateList: React.FC<RealEstateListProps> = ({ onNavigateToDetail }) =
       if (statusFilter) filters.status = statusFilter;
       const [investmentsData, summaryData] = await Promise.all([
         realEstateApi.getAll(filters),
-        realEstateApi.getSummary()
+        realEstateApi.getSummary('ILS')
       ]);
       setInvestments(investmentsData);
       setSummary(summaryData);
