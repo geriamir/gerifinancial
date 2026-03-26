@@ -108,57 +108,93 @@ router.delete('/:id', validateId('id'), async (req, res) => {
   }
 });
 
-// --- Commitments ---
+// --- Installments ---
 
 /**
- * POST /api/real-estate/:id/commitments
+ * POST /api/real-estate/:id/installments
  */
-router.post('/:id/commitments', validateId('id'), async (req, res) => {
+router.post('/:id/installments', validateId('id'), async (req, res) => {
   try {
-    const investment = await realEstateService.addCommitment(req.params.id, req.user.id, req.body);
+    const investment = await realEstateService.addInstallment(req.params.id, req.user.id, req.body);
     if (!investment) {
       return res.status(404).json({ error: 'Investment not found' });
     }
     res.status(201).json(investment);
   } catch (error) {
-    logger.error('Error adding commitment:', error);
-    res.status(500).json({ error: 'Failed to add commitment' });
+    logger.error('Error adding installment:', error);
+    res.status(500).json({ error: 'Failed to add installment' });
   }
 });
 
 /**
- * PUT /api/real-estate/:id/commitments/:commitmentId
+ * PUT /api/real-estate/:id/installments/:installmentId
  */
-router.put('/:id/commitments/:commitmentId', validateId('id'), async (req, res) => {
+router.put('/:id/installments/:installmentId', validateId('id'), async (req, res) => {
   try {
-    const investment = await realEstateService.updateCommitment(
-      req.params.id, req.user.id, req.params.commitmentId, req.body
+    const investment = await realEstateService.updateInstallment(
+      req.params.id, req.user.id, req.params.installmentId, req.body
     );
     if (!investment) {
-      return res.status(404).json({ error: 'Investment or commitment not found' });
+      return res.status(404).json({ error: 'Investment or installment not found' });
     }
     res.json(investment);
   } catch (error) {
-    logger.error('Error updating commitment:', error);
-    res.status(500).json({ error: 'Failed to update commitment' });
+    logger.error('Error updating installment:', error);
+    res.status(500).json({ error: 'Failed to update installment' });
   }
 });
 
 /**
- * DELETE /api/real-estate/:id/commitments/:commitmentId
+ * DELETE /api/real-estate/:id/installments/:installmentId
  */
-router.delete('/:id/commitments/:commitmentId', validateId('id'), async (req, res) => {
+router.delete('/:id/installments/:installmentId', validateId('id'), async (req, res) => {
   try {
-    const investment = await realEstateService.deleteCommitment(
-      req.params.id, req.user.id, req.params.commitmentId
+    const investment = await realEstateService.deleteInstallment(
+      req.params.id, req.user.id, req.params.installmentId
     );
     if (!investment) {
-      return res.status(404).json({ error: 'Investment or commitment not found' });
+      return res.status(404).json({ error: 'Investment or installment not found' });
     }
     res.json(investment);
   } catch (error) {
-    logger.error('Error deleting commitment:', error);
-    res.status(500).json({ error: 'Failed to delete commitment' });
+    logger.error('Error deleting installment:', error);
+    res.status(500).json({ error: 'Failed to delete installment' });
+  }
+});
+
+/**
+ * POST /api/real-estate/:id/installments/:installmentId/link-transaction/:transactionId
+ */
+router.post('/:id/installments/:installmentId/link-transaction/:transactionId', validateId('id'), async (req, res) => {
+  try {
+    const investment = await realEstateService.linkTransactionToInstallment(
+      req.params.id, req.user.id, req.params.installmentId, req.params.transactionId
+    );
+    if (!investment) {
+      return res.status(404).json({ error: 'Investment or installment not found' });
+    }
+    res.json(investment);
+  } catch (error) {
+    logger.error('Error linking transaction to installment:', error);
+    res.status(500).json({ error: 'Failed to link transaction' });
+  }
+});
+
+/**
+ * DELETE /api/real-estate/:id/installments/:installmentId/link-transaction/:transactionId
+ */
+router.delete('/:id/installments/:installmentId/link-transaction/:transactionId', validateId('id'), async (req, res) => {
+  try {
+    const investment = await realEstateService.unlinkTransactionFromInstallment(
+      req.params.id, req.user.id, req.params.installmentId, req.params.transactionId
+    );
+    if (!investment) {
+      return res.status(404).json({ error: 'Investment or installment not found' });
+    }
+    res.json(investment);
+  } catch (error) {
+    logger.error('Error unlinking transaction from installment:', error);
+    res.status(500).json({ error: 'Failed to unlink transaction' });
   }
 });
 

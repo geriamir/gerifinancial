@@ -13,7 +13,7 @@ export interface RealEstateInvestment {
   currency: string;
   fundingSources: FundingSource[];
   categoryBudgets: CategoryBudget[];
-  commitments: Commitment[];
+  installments: Installment[];
   salePrice?: number;
   saleDate?: string;
   saleExpenses?: number;
@@ -30,8 +30,8 @@ export interface RealEstateInvestment {
   investmentTag?: any;
   notes?: string;
   // Virtuals
-  totalCommitted?: number;
-  totalPaidCommitments?: number;
+  totalPendingInstallments?: number;
+  totalPaidInstallments?: number;
   flipGain?: number | null;
   totalRentalIncome?: number;
   estimatedMonthlyMortgage?: number | null;
@@ -58,14 +58,16 @@ export interface CategoryBudget {
   description?: string;
 }
 
-export interface Commitment {
+export interface Installment {
   _id: string;
   description: string;
+  installmentType: 'investment' | 'tax' | 'lawyer' | 'other';
   amount: number;
   currency: string;
   dueDate: string;
   status: 'pending' | 'paid' | 'overdue';
   paidDate?: string;
+  linkedTransactions: string[];
   notes?: string;
 }
 
@@ -84,7 +86,7 @@ export interface RealEstateSummary {
   activeRentals: number;
   totalInvested: number;
   totalEstimatedValue: number;
-  totalCommitments: number;
+  totalInstallments: number;
   totalRentalIncome: number;
   totalFlipGains: number;
   currency: string;
@@ -125,19 +127,29 @@ class RealEstateApiService {
     return response.data;
   }
 
-  // Commitments
-  async addCommitment(investmentId: string, data: Partial<Commitment>): Promise<RealEstateInvestment> {
-    const response = await api.post(`${this.baseUrl}/${investmentId}/commitments`, data);
+  // Installments
+  async addInstallment(investmentId: string, data: Partial<Installment>): Promise<RealEstateInvestment> {
+    const response = await api.post(`${this.baseUrl}/${investmentId}/installments`, data);
     return response.data;
   }
 
-  async updateCommitment(investmentId: string, commitmentId: string, data: Partial<Commitment>): Promise<RealEstateInvestment> {
-    const response = await api.put(`${this.baseUrl}/${investmentId}/commitments/${commitmentId}`, data);
+  async updateInstallment(investmentId: string, installmentId: string, data: Partial<Installment>): Promise<RealEstateInvestment> {
+    const response = await api.put(`${this.baseUrl}/${investmentId}/installments/${installmentId}`, data);
     return response.data;
   }
 
-  async deleteCommitment(investmentId: string, commitmentId: string): Promise<RealEstateInvestment> {
-    const response = await api.delete(`${this.baseUrl}/${investmentId}/commitments/${commitmentId}`);
+  async deleteInstallment(investmentId: string, installmentId: string): Promise<RealEstateInvestment> {
+    const response = await api.delete(`${this.baseUrl}/${investmentId}/installments/${installmentId}`);
+    return response.data;
+  }
+
+  async linkTransactionToInstallment(investmentId: string, installmentId: string, transactionId: string): Promise<RealEstateInvestment> {
+    const response = await api.post(`${this.baseUrl}/${investmentId}/installments/${installmentId}/link-transaction/${transactionId}`);
+    return response.data;
+  }
+
+  async unlinkTransactionFromInstallment(investmentId: string, installmentId: string, transactionId: string): Promise<RealEstateInvestment> {
+    const response = await api.delete(`${this.baseUrl}/${investmentId}/installments/${installmentId}/link-transaction/${transactionId}`);
     return response.data;
   }
 

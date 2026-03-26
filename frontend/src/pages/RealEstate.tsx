@@ -46,13 +46,13 @@ import {
   realEstateApi,
   RealEstateInvestment,
   RealEstateSummary,
-  Commitment
+  Installment
 } from '../services/api/realEstate';
 import { formatCurrency } from '../types/foreignCurrency';
 import { foreignCurrencyApi } from '../services/api/foreignCurrency';
 import RealEstateCreateDialog from '../components/realEstate/RealEstateCreateDialog';
 import RealEstateEditDialog from '../components/realEstate/RealEstateEditDialog';
-import CommitmentDialog from '../components/realEstate/CommitmentDialog';
+import InstallmentDialog from '../components/realEstate/InstallmentDialog';
 
 const getStatusColor = (status: string): 'success' | 'info' | 'default' | 'error' | 'warning' => {
   switch (status) {
@@ -64,11 +64,21 @@ const getStatusColor = (status: string): 'success' | 'info' | 'default' | 'error
   }
 };
 
-const getCommitmentStatusIcon = (status: string) => {
+const getInstallmentStatusIcon = (status: string) => {
   switch (status) {
     case 'paid': return <PaidIcon fontSize="small" color="success" />;
     case 'overdue': return <OverdueIcon fontSize="small" color="error" />;
     default: return <PendingIcon fontSize="small" color="warning" />;
+  }
+};
+
+const getInstallmentTypeLabel = (type: string) => {
+  switch (type) {
+    case 'investment': return 'Investment';
+    case 'tax': return 'Tax';
+    case 'lawyer': return 'Lawyer';
+    case 'other': return 'Other';
+    default: return type;
   }
 };
 
@@ -120,7 +130,7 @@ const RealEstateList: React.FC<RealEstateListProps> = ({ onNavigateToDetail }) =
     { label: 'Estimated Value', value: formatCurrency(summary.totalEstimatedValue, summary.currency || 'USD') },
     { label: 'Active Flips', value: summary.activeFlips.toString() },
     { label: 'Active Rentals', value: summary.activeRentals.toString() },
-    { label: 'Total Commitments', value: formatCurrency(summary.totalCommitments, summary.currency || 'USD') },
+    { label: 'Total Installments', value: formatCurrency(summary.totalInstallments, summary.currency || 'USD') },
     { label: 'Rental Income', value: formatCurrency(summary.totalRentalIncome, summary.currency || 'USD') }
   ] : [];
 
@@ -281,8 +291,8 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [commitmentDialogOpen, setCommitmentDialogOpen] = useState(false);
-  const [editingCommitment, setEditingCommitment] = useState<Commitment | null>(null);
+  const [installmentDialogOpen, setInstallmentDialogOpen] = useState(false);
+  const [editingInstallment, setEditingInstallment] = useState<Installment | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -350,23 +360,41 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
     setInvestment(updated);
   };
 
-  const handleSaveCommitment = async (data: Partial<Commitment>) => {
-    if (editingCommitment) {
-      const updated = await realEstateApi.updateCommitment(investmentId, editingCommitment._id, data);
+  const handleSaveInstallment = async (data: Partial<Installment>) => {
+    if (editingInstallment) {
+      const updated = await realEstateApi.updateInstallment(investmentId, editingInstallment._id, data);
       setInvestment(updated);
     } else {
-      const updated = await realEstateApi.addCommitment(investmentId, data);
+      const updated = await realEstateApi.addInstallment(investmentId, data);
       setInvestment(updated);
     }
-    setEditingCommitment(null);
+    setEditingInstallment(null);
   };
 
-  const handleDeleteCommitment = async (commitmentId: string) => {
+  const handleDeleteInstallment = async (installmentId: string) => {
     try {
-      const updated = await realEstateApi.deleteCommitment(investmentId, commitmentId);
+      const updated = await realEstateApi.deleteInstallment(investmentId, installmentId);
       setInvestment(updated);
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to delete commitment');
+      setError(err?.response?.data?.message || 'Failed to delete installment');
+    }
+  };
+
+  const handleLinkTransaction = async (installmentId: string, transactionId: string) => {
+    try {
+      const updated = await realEstateApi.linkTransactionToInstallment(investmentId, installmentId, transactionId);
+      setInvestment(updated);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to link transaction');
+    }
+  };
+
+  const handleUnlinkTransaction = async (installmentId: string, transactionId: string) => {
+    try {
+      const updated = await realEstateApi.unlinkTransactionFromInstallment(investmentId, installmentId, transactionId);
+      setInvestment(updated);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to unlink transaction');
     }
   };
 
@@ -499,58 +527,66 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
         </Grid>
       </Grid>
 
-      {/* Commitments Section */}
+      {/* Installments Section */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6">Commitments</Typography>
+          <Typography variant="h6">Installments</Typography>
           <Button
             size="small"
             startIcon={<AddIcon />}
             onClick={() => {
-              setEditingCommitment(null);
-              setCommitmentDialogOpen(true);
+              setEditingInstallment(null);
+              setInstallmentDialogOpen(true);
             }}
           >
-            Add Commitment
+            Add Installment
           </Button>
         </Box>
-        {investment.commitments && investment.commitments.length > 0 ? (
+        {investment.installments && investment.installments.length > 0 ? (
           <>
             <Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>Description</TableCell>
+                  <TableCell>Type</TableCell>
                   <TableCell align="right">Amount</TableCell>
                   <TableCell>Due Date</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell align="center">Txns</TableCell>
                   <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {investment.commitments.map((c) => (
-                  <TableRow key={c._id}>
-                    <TableCell>{c.description}</TableCell>
-                    <TableCell align="right">{formatCurrency(c.amount, c.currency || currency)}</TableCell>
-                    <TableCell>{new Date(c.dueDate).toLocaleDateString()}</TableCell>
+                {investment.installments.map((inst) => (
+                  <TableRow key={inst._id}>
+                    <TableCell>{inst.description}</TableCell>
+                    <TableCell>
+                      <Chip label={getInstallmentTypeLabel(inst.installmentType)} size="small" variant="outlined" />
+                    </TableCell>
+                    <TableCell align="right">{formatCurrency(inst.amount, inst.currency || currency)}</TableCell>
+                    <TableCell>{new Date(inst.dueDate).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <Box display="flex" alignItems="center" gap={0.5}>
-                        {getCommitmentStatusIcon(c.status)}
-                        <Chip label={c.status} size="small" color={
-                          c.status === 'paid' ? 'success' : c.status === 'overdue' ? 'error' : 'warning'
+                        {getInstallmentStatusIcon(inst.status)}
+                        <Chip label={inst.status} size="small" color={
+                          inst.status === 'paid' ? 'success' : inst.status === 'overdue' ? 'error' : 'warning'
                         } variant="outlined" />
                       </Box>
+                    </TableCell>
+                    <TableCell align="center">
+                      {inst.linkedTransactions?.length || 0}
                     </TableCell>
                     <TableCell align="right">
                       <IconButton
                         size="small"
                         onClick={() => {
-                          setEditingCommitment(c);
-                          setCommitmentDialogOpen(true);
+                          setEditingInstallment(inst);
+                          setInstallmentDialogOpen(true);
                         }}
                       >
                         <EditIcon fontSize="small" />
                       </IconButton>
-                      <IconButton size="small" onClick={() => handleDeleteCommitment(c._id)} color="error">
+                      <IconButton size="small" onClick={() => handleDeleteInstallment(inst._id)} color="error">
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     </TableCell>
@@ -558,17 +594,17 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
                 ))}
               </TableBody>
             </Table>
-            {investment.totalCommitted != null && (
+            {investment.totalPendingInstallments != null && (
               <Box display="flex" justifyContent="flex-end" mt={1}>
                 <Typography variant="body2" color="text.secondary">
-                  Total Committed: {formatCurrency(investment.totalCommitted, currency)}
-                  {investment.totalPaidCommitments != null && ` | Paid: ${formatCurrency(investment.totalPaidCommitments, currency)}`}
+                  Pending: {formatCurrency(investment.totalPendingInstallments, currency)}
+                  {investment.totalPaidInstallments != null && ` | Paid: ${formatCurrency(investment.totalPaidInstallments, currency)}`}
                 </Typography>
               </Box>
             )}
           </>
         ) : (
-          <Typography variant="body2" color="text.secondary">No commitments yet.</Typography>
+          <Typography variant="body2" color="text.secondary">No installments yet.</Typography>
         )}
       </Paper>
 
@@ -710,14 +746,17 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
         investment={investment}
       />
 
-      <CommitmentDialog
-        open={commitmentDialogOpen}
+      <InstallmentDialog
+        open={installmentDialogOpen}
         onClose={() => {
-          setCommitmentDialogOpen(false);
-          setEditingCommitment(null);
+          setInstallmentDialogOpen(false);
+          setEditingInstallment(null);
         }}
-        onSave={handleSaveCommitment}
-        commitment={editingCommitment}
+        onSave={handleSaveInstallment}
+        installment={editingInstallment}
+        transactions={transactions}
+        onLinkTransaction={handleLinkTransaction}
+        onUnlinkTransaction={handleUnlinkTransaction}
       />
 
       {/* Delete Confirmation Dialog */}

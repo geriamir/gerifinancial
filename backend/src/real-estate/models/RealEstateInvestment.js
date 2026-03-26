@@ -1,12 +1,18 @@
 const mongoose = require('mongoose');
 const Tag = require('../../banking/models/Tag');
 
-const commitmentSchema = new mongoose.Schema({
+const installmentSchema = new mongoose.Schema({
   description: {
     type: String,
     required: true,
     trim: true,
     maxlength: 200
+  },
+  installmentType: {
+    type: String,
+    enum: ['investment', 'tax', 'lawyer', 'other'],
+    required: true,
+    default: 'investment'
   },
   amount: {
     type: Number,
@@ -30,6 +36,10 @@ const commitmentSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  linkedTransactions: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Transaction'
+  }],
   notes: {
     type: String,
     trim: true,
@@ -174,8 +184,8 @@ const realEstateInvestmentSchema = new mongoose.Schema({
     }
   }],
 
-  // Commitments (future installments)
-  commitments: [commitmentSchema],
+  // Installments (planned payments: investment, taxes, lawyer fees, etc.)
+  installments: [installmentSchema],
 
   // Flip-specific fields
   salePrice: {
@@ -266,16 +276,16 @@ realEstateInvestmentSchema.index({ userId: 1, status: 1 });
 realEstateInvestmentSchema.index({ userId: 1, type: 1 });
 
 // Virtuals
-realEstateInvestmentSchema.virtual('totalCommitted').get(function() {
-  return this.commitments
-    .filter(c => c.status === 'pending')
-    .reduce((sum, c) => sum + c.amount, 0);
+realEstateInvestmentSchema.virtual('totalPendingInstallments').get(function() {
+  return this.installments
+    .filter(i => i.status === 'pending')
+    .reduce((sum, i) => sum + i.amount, 0);
 });
 
-realEstateInvestmentSchema.virtual('totalPaidCommitments').get(function() {
-  return this.commitments
-    .filter(c => c.status === 'paid')
-    .reduce((sum, c) => sum + c.amount, 0);
+realEstateInvestmentSchema.virtual('totalPaidInstallments').get(function() {
+  return this.installments
+    .filter(i => i.status === 'paid')
+    .reduce((sum, i) => sum + i.amount, 0);
 });
 
 realEstateInvestmentSchema.virtual('flipGain').get(function() {
@@ -360,13 +370,13 @@ realEstateInvestmentSchema.methods.markSold = async function(salePrice, saleDate
   return this;
 };
 
-// Update overdue commitments
-realEstateInvestmentSchema.methods.updateOverdueCommitments = function() {
+// Update overdue installments
+realEstateInvestmentSchema.methods.updateOverdueInstallments = function() {
   const now = new Date();
   let changed = false;
-  for (const c of this.commitments) {
-    if (c.status === 'pending' && c.dueDate < now) {
-      c.status = 'overdue';
+  for (const i of this.installments) {
+    if (i.status === 'pending' && i.dueDate < now) {
+      i.status = 'overdue';
       changed = true;
     }
   }

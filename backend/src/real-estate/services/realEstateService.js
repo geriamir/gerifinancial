@@ -19,9 +19,9 @@ class RealEstateService {
   async getAll(userId, filters = {}) {
     const investments = await RealEstateInvestment.findByUser(userId, filters);
 
-    // Update overdue commitments on read
+    // Update overdue installments on read
     for (const inv of investments) {
-      if (inv.updateOverdueCommitments()) {
+      if (inv.updateOverdueInstallments()) {
         await inv.save();
       }
     }
@@ -38,7 +38,7 @@ class RealEstateService {
 
     if (!investment) return null;
 
-    if (investment.updateOverdueCommitments()) {
+    if (investment.updateOverdueInstallments()) {
       await investment.save();
     }
 
@@ -68,36 +68,64 @@ class RealEstateService {
     return investment;
   }
 
-  // Commitment management
-  async addCommitment(investmentId, userId, commitmentData) {
+  // Installment management
+  async addInstallment(investmentId, userId, installmentData) {
     const investment = await RealEstateInvestment.findOne({ _id: investmentId, userId });
     if (!investment) return null;
 
-    investment.commitments.push(commitmentData);
+    investment.installments.push(installmentData);
     await investment.save();
     return investment;
   }
 
-  async updateCommitment(investmentId, userId, commitmentId, updates) {
+  async updateInstallment(investmentId, userId, installmentId, updates) {
     const investment = await RealEstateInvestment.findOne({ _id: investmentId, userId });
     if (!investment) return null;
 
-    const commitment = investment.commitments.id(commitmentId);
-    if (!commitment) return null;
+    const installment = investment.installments.id(installmentId);
+    if (!installment) return null;
 
-    Object.assign(commitment, updates);
-    if (updates.status === 'paid' && !commitment.paidDate) {
-      commitment.paidDate = new Date();
+    Object.assign(installment, updates);
+    if (updates.status === 'paid' && !installment.paidDate) {
+      installment.paidDate = new Date();
     }
     await investment.save();
     return investment;
   }
 
-  async deleteCommitment(investmentId, userId, commitmentId) {
+  async deleteInstallment(investmentId, userId, installmentId) {
     const investment = await RealEstateInvestment.findOne({ _id: investmentId, userId });
     if (!investment) return null;
 
-    investment.commitments.pull(commitmentId);
+    investment.installments.pull(installmentId);
+    await investment.save();
+    return investment;
+  }
+
+  async linkTransactionToInstallment(investmentId, userId, installmentId, transactionId) {
+    const investment = await RealEstateInvestment.findOne({ _id: investmentId, userId });
+    if (!investment) return null;
+
+    const installment = investment.installments.id(installmentId);
+    if (!installment) return null;
+
+    if (!installment.linkedTransactions.includes(transactionId)) {
+      installment.linkedTransactions.push(transactionId);
+      await investment.save();
+    }
+    return investment;
+  }
+
+  async unlinkTransactionFromInstallment(investmentId, userId, installmentId, transactionId) {
+    const investment = await RealEstateInvestment.findOne({ _id: investmentId, userId });
+    if (!investment) return null;
+
+    const installment = investment.installments.id(installmentId);
+    if (!installment) return null;
+
+    installment.linkedTransactions = installment.linkedTransactions.filter(
+      id => id.toString() !== transactionId.toString()
+    );
     await investment.save();
     return investment;
   }
@@ -176,7 +204,7 @@ class RealEstateService {
       activeRentals: 0,
       totalInvested: 0,
       totalEstimatedValue: 0,
-      totalCommitments: 0,
+      totalInstallments: 0,
       totalRentalIncome: 0,
       totalFlipGains: 0,
       currency: displayCurrency
@@ -188,7 +216,7 @@ class RealEstateService {
       if (inv.status === 'active' && inv.type === 'rental') summary.activeRentals++;
       summary.totalInvested += await this._convertAmount(inv.totalInvestment || 0, cur, displayCurrency);
       summary.totalEstimatedValue += await this._convertAmount(inv.estimatedCurrentValue || 0, cur, displayCurrency);
-      summary.totalCommitments += await this._convertAmount(inv.totalCommitted || 0, cur, displayCurrency);
+      summary.totalInstallments += await this._convertAmount(inv.totalPendingInstallments || 0, cur, displayCurrency);
       summary.totalRentalIncome += await this._convertAmount(inv.totalRentalIncome || 0, cur, displayCurrency);
       if (inv.type === 'flip' && inv.flipGain != null) {
         summary.totalFlipGains += await this._convertAmount(inv.flipGain, cur, displayCurrency);
