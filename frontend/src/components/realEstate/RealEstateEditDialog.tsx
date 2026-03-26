@@ -37,7 +37,7 @@ interface RealEstateEditDialogProps {
   onClose: () => void;
   onSuccess: (investment: RealEstateInvestment) => void;
   investment: RealEstateInvestment;
-  transactionsTotal?: number;
+  transactionsTotalByCurrency?: Record<string, number>;
 }
 
 interface FundingSourceForm {
@@ -61,7 +61,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
   onClose,
   onSuccess,
   investment,
-  transactionsTotal
+  transactionsTotalByCurrency
 }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -102,7 +102,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
         address: investment.address || '',
         description: investment.description || '',
         currency: investment.currency || 'USD',
-        totalInvestment: investment.totalInvestment || transactionsTotal || 0,
+        totalInvestment: investment.totalInvestment || (transactionsTotalByCurrency && transactionsTotalByCurrency[investment.currency || 'USD']) || 0,
         estimatedCurrentValue: investment.estimatedCurrentValue || 0,
         notes: investment.notes || '',
         salePrice: investment.salePrice || 0,
@@ -129,7 +129,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
       setErrors({});
       setSubmitError(null);
     }
-  }, [open, investment, transactionsTotal]);
+  }, [open, investment, transactionsTotalByCurrency]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -305,7 +305,9 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
               type="number"
               value={formData.totalInvestment || ''}
               onChange={(e) => setFormData(prev => ({ ...prev, totalInvestment: parseFloat(e.target.value) || 0 }))}
-              helperText={transactionsTotal ? `From transactions: ${formatCurrency(transactionsTotal, formData.currency)}` : undefined}
+              helperText={transactionsTotalByCurrency && Object.keys(transactionsTotalByCurrency).length > 0
+                ? `From transactions: ${Object.entries(transactionsTotalByCurrency).map(([cur, total]) => formatCurrency(total, cur)).join(', ')}`
+                : undefined}
               disabled={isSubmitting}
               inputProps={{ min: 0, step: 0.01 }}
             />

@@ -372,7 +372,15 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
   }
 
   const currency = investment.currency || 'USD';
-  const transactionsTotal = transactions.reduce((sum, txn) => sum + (txn.amount || 0), 0) * -1;
+  const transactionsTotalByCurrency: Record<string, number> = {};
+  for (const txn of transactions) {
+    const txnCurrency = txn.currency || currency;
+    transactionsTotalByCurrency[txnCurrency] = (transactionsTotalByCurrency[txnCurrency] || 0) + (txn.amount || 0);
+  }
+  // Negate: expenses are negative, so flipping gives positive "invested" totals
+  for (const cur of Object.keys(transactionsTotalByCurrency)) {
+    transactionsTotalByCurrency[cur] *= -1;
+  }
   const gainLoss = investment.type === 'flip' && investment.flipGain != null
     ? investment.flipGain
     : investment.estimatedCurrentValue - investment.totalInvestment;
@@ -441,9 +449,16 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
                 {formatCurrency(investment.totalInvestment, currency)}
               </Typography>
               {transactions.length > 0 && (
-                <Typography variant="body2" color="text.secondary" mt={0.5}>
-                  From transactions: {formatCurrency(transactionsTotal, currency)}
-                </Typography>
+                <Box mt={0.5}>
+                  <Typography variant="body2" color="text.secondary">
+                    From transactions:
+                  </Typography>
+                  {Object.entries(transactionsTotalByCurrency).map(([cur, total]) => (
+                    <Typography key={cur} variant="body2" color="text.secondary">
+                      {formatCurrency(total, cur)}
+                    </Typography>
+                  ))}
+                </Box>
               )}
             </CardContent>
           </Card>
@@ -685,7 +700,7 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
         onClose={() => setEditDialogOpen(false)}
         onSuccess={handleEditSuccess}
         investment={investment}
-        transactionsTotal={transactionsTotal}
+        transactionsTotalByCurrency={transactionsTotalByCurrency}
       />
 
       <CommitmentDialog
