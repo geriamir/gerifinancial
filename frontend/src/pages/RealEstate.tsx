@@ -384,6 +384,8 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
     try {
       const updated = await realEstateApi.linkTransactionToInstallment(investmentId, installmentId, transactionId);
       setInvestment(updated);
+      const refreshed = updated.installments.find((i: Installment) => i._id === installmentId);
+      if (refreshed) setEditingInstallment(refreshed);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to link transaction');
     }
@@ -393,6 +395,8 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
     try {
       const updated = await realEstateApi.unlinkTransactionFromInstallment(investmentId, installmentId, transactionId);
       setInvestment(updated);
+      const refreshed = updated.installments.find((i: Installment) => i._id === installmentId);
+      if (refreshed) setEditingInstallment(refreshed);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to unlink transaction');
     }
