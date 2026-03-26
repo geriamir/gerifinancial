@@ -49,6 +49,7 @@ import {
   Commitment
 } from '../services/api/realEstate';
 import { formatCurrency } from '../types/foreignCurrency';
+import { foreignCurrencyApi } from '../services/api/foreignCurrency';
 import RealEstateCreateDialog from '../components/realEstate/RealEstateCreateDialog';
 import RealEstateEditDialog from '../components/realEstate/RealEstateEditDialog';
 import CommitmentDialog from '../components/realEstate/CommitmentDialog';
@@ -276,6 +277,7 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
   const navigate = useNavigate();
   const [investment, setInvestment] = useState<RealEstateInvestment | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [totalInvestmentConverted, setTotalInvestmentConverted] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -294,6 +296,33 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
       ]);
       setInvestment(inv);
       setTransactions(txns);
+
+      // Compute total investment converted to the investment's currency
+      const invCurrency = inv.currency || 'USD';
+      const totalsByCurrency: Record<string, number> = {};
+      for (const txn of txns) {
+        const txnCur = txn.currency || invCurrency;
+        totalsByCurrency[txnCur] = (totalsByCurrency[txnCur] || 0) + (txn.amount || 0);
+      }
+      let convertedTotal = 0;
+      for (const [cur, sum] of Object.entries(totalsByCurrency)) {
+        const negatedSum = sum * -1;
+        if (cur === invCurrency) {
+          convertedTotal += negatedSum;
+        } else {
+          try {
+            const result = await foreignCurrencyApi.convertCurrency({
+              amount: Math.abs(negatedSum),
+              fromCurrency: cur,
+              toCurrency: invCurrency
+            });
+            convertedTotal += negatedSum < 0 ? -result.convertedAmount : result.convertedAmount;
+          } catch {
+            convertedTotal += negatedSum;
+          }
+        }
+      }
+      setTotalInvestmentConverted(convertedTotal);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to load investment');
     } finally {
@@ -372,19 +401,9 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
   }
 
   const currency = investment.currency || 'USD';
-  const transactionsTotalByCurrency: Record<string, number> = {};
-  for (const txn of transactions) {
-    const txnCurrency = txn.currency || currency;
-    transactionsTotalByCurrency[txnCurrency] = (transactionsTotalByCurrency[txnCurrency] || 0) + (txn.amount || 0);
-  }
-  // Negate: expenses are negative, so flipping gives positive "invested" totals
-  for (const cur of Object.keys(transactionsTotalByCurrency)) {
-    transactionsTotalByCurrency[cur] *= -1;
-  }
-  const totalInvestmentFromTxns = transactionsTotalByCurrency[currency] || 0;
   const gainLoss = investment.type === 'flip' && investment.flipGain != null
     ? investment.flipGain
-    : investment.estimatedCurrentValue - totalInvestmentFromTxns;
+    : investment.estimatedCurrentValue - totalInvestmentConverted;
 
   return (
     <Box>
@@ -446,17 +465,9 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
           <Card>
             <CardContent>
               <Typography variant="body2" color="text.secondary">Total Investment</Typography>
-              {Object.keys(transactionsTotalByCurrency).length > 0 ? (
-                Object.entries(transactionsTotalByCurrency).map(([cur, total]) => (
-                  <Typography key={cur} variant="h5" fontWeight="bold">
-                    {formatCurrency(total, cur)}
-                  </Typography>
-                ))
-              ) : (
-                <Typography variant="h5" fontWeight="bold">
-                  {formatCurrency(0, currency)}
-                </Typography>
-              )}
+              <Typography variant="h5" fontWeight="bold">
+                {formatCurrency(totalInvestmentConverted, currency)}
+              </Typography>
             </CardContent>
           </Card>
         </Grid>
