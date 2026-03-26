@@ -247,7 +247,7 @@ const RealEstateList: React.FC<RealEstateListProps> = ({ onNavigateToDetail }) =
                         )}
                         <Box display="flex" justifyContent="space-between" alignItems="center" mt={2}>
                           <Typography variant="body2" color="text.secondary">
-                            Invested: {formatCurrency(inv.totalInvestment, inv.currency)}
+                            Invested: {formatCurrency(inv.actualInvested || inv.totalInvestment, inv.currency)}
                           </Typography>
                           <Chip
                             label={inv.status}

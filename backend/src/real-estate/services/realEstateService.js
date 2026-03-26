@@ -1,6 +1,7 @@
 const logger = require('../../shared/utils/logger');
 const RealEstateInvestment = require('../models/RealEstateInvestment');
 const { currencyExchangeService } = require('../../foreign-currency');
+const realEstateTransactionService = require('./realEstateTransactionService');
 
 class RealEstateService {
   async create(userId, data) {
@@ -19,14 +20,24 @@ class RealEstateService {
   async getAll(userId, filters = {}) {
     const investments = await RealEstateInvestment.findByUser(userId, filters);
 
-    // Update overdue installments on read
+    // Update overdue installments and compute transaction totals
+    const results = [];
     for (const inv of investments) {
       if (inv.updateOverdueInstallments()) {
         await inv.save();
       }
+      const invObj = inv.toJSON();
+      const txnTotals = await realEstateTransactionService.getTransactionTotals(inv._id, userId);
+      // Convert all currency totals to investment currency
+      let actualInvested = 0;
+      for (const [txnCur, amount] of Object.entries(txnTotals)) {
+        actualInvested += await this._convertAmount(amount, txnCur, inv.currency || 'USD');
+      }
+      invObj.actualInvested = actualInvested;
+      results.push(invObj);
     }
 
-    return investments;
+    return results;
   }
 
   async getById(investmentId, userId) {
@@ -226,7 +237,15 @@ class RealEstateService {
       const cur = inv.currency || 'USD';
       if (inv.status === 'active' && inv.type === 'flip') summary.activeFlips++;
       if (inv.status === 'active' && inv.type === 'rental') summary.activeRentals++;
-      summary.totalInvested += await this._convertAmount(inv.totalInvestment || 0, cur, displayCurrency);
+
+      // Compute actual invested from transactions
+      const txnTotals = await realEstateTransactionService.getTransactionTotals(inv._id, userId);
+      let investedForThis = 0;
+      for (const [txnCur, amount] of Object.entries(txnTotals)) {
+        investedForThis += await this._convertAmount(amount, txnCur, displayCurrency);
+      }
+      summary.totalInvested += investedForThis;
+
       summary.totalEstimatedValue += await this._convertAmount(inv.estimatedCurrentValue || 0, cur, displayCurrency);
       summary.totalInstallments += await this._convertAmount(inv.totalPendingInstallments || 0, cur, displayCurrency);
       summary.totalRentalIncome += await this._convertAmount(inv.totalRentalIncome || 0, cur, displayCurrency);

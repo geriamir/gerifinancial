@@ -38,6 +38,7 @@ export interface RealEstateInvestment {
   flipGain?: number | null;
   totalRentalIncome?: number;
   estimatedMonthlyMortgage?: number | null;
+  actualInvested?: number;
   createdAt: string;
   updatedAt: string;
 }

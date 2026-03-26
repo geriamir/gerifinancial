@@ -124,6 +124,28 @@ class RealEstateTransactionService {
 
     return { tagged };
   }
+
+  /**
+   * Get the total invested amount from transactions for an investment,
+   * grouped by currency. Transaction amounts are negative for expenses,
+   * so we negate to get positive invested totals.
+   */
+  async getTransactionTotals(investmentId, userId) {
+    const investment = await RealEstateInvestment.findOne({ _id: investmentId, userId });
+    if (!investment || !investment.investmentTag) return {};
+
+    const transactions = await Transaction.find({
+      userId,
+      tags: investment.investmentTag
+    });
+
+    const totalsByCurrency = {};
+    for (const txn of transactions) {
+      const cur = txn.currency || investment.currency || 'USD';
+      totalsByCurrency[cur] = (totalsByCurrency[cur] || 0) + ((txn.amount || 0) * -1);
+    }
+    return totalsByCurrency;
+  }
 }
 
 module.exports = new RealEstateTransactionService();
