@@ -56,6 +56,10 @@ const installmentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Transaction'
   }],
+  fundingSourceId: {
+    type: mongoose.Schema.Types.ObjectId,
+    default: null
+  },
   notes: {
     type: String,
     trim: true,

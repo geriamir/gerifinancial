@@ -551,13 +551,18 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
                   <TableCell>Type</TableCell>
                   <TableCell align="right">Amount</TableCell>
                   <TableCell>Due Date</TableCell>
+                  <TableCell>Funded By</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell align="center">Txns</TableCell>
                   <TableCell align="right">Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {investment.installments.map((inst) => (
+                {investment.installments.map((inst) => {
+                  const fundingSource = inst.fundingSourceId
+                    ? investment.fundingSources?.find(fs => fs._id === inst.fundingSourceId)
+                    : null;
+                  return (
                   <TableRow key={inst._id}>
                     <TableCell>{inst.description}</TableCell>
                     <TableCell>
@@ -574,6 +579,12 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
                       }
                     </TableCell>
                     <TableCell>{new Date(inst.dueDate).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      {fundingSource
+                        ? <Chip label={`${fundingSource.description} (${fundingSource.type})`} size="small" variant="outlined" color="info" />
+                        : <Typography variant="body2" color="text.secondary">—</Typography>
+                      }
+                    </TableCell>
                     <TableCell>
                       <Box display="flex" alignItems="center" gap={0.5}>
                         {getInstallmentStatusIcon(inst.status)}
@@ -600,7 +611,8 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
                       </IconButton>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
             {investment.totalPendingInstallments != null && (
@@ -766,6 +778,7 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
         estimatedCurrentValue={investment.estimatedCurrentValue}
         currency={currency}
         purchaseTaxRate={investment.purchaseTaxRate}
+        fundingSources={investment.fundingSources}
         transactions={transactions}
         onLinkTransaction={handleLinkTransaction}
         onUnlinkTransaction={handleUnlinkTransaction}

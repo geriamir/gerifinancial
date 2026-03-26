@@ -74,6 +74,7 @@ export interface Installment {
   status: 'pending' | 'paid' | 'overdue';
   paidDate?: string;
   linkedTransactions: string[];
+  fundingSourceId?: string | null;
   notes?: string;
 }
 

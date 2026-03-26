@@ -35,7 +35,7 @@ import {
   AttachMoney as AmountIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { Installment } from '../../services/api/realEstate';
+import { Installment, FundingSource } from '../../services/api/realEstate';
 import { SUPPORTED_CURRENCIES, formatCurrency } from '../../types/foreignCurrency';
 
 const INSTALLMENT_TYPES: { value: Installment['installmentType']; label: string }[] = [
@@ -53,6 +53,7 @@ interface InstallmentDialogProps {
   estimatedCurrentValue?: number;
   currency?: string;
   purchaseTaxRate?: number | null;
+  fundingSources?: FundingSource[];
   transactions?: any[];
   onLinkTransaction?: (installmentId: string, transactionId: string) => Promise<void>;
   onUnlinkTransaction?: (installmentId: string, transactionId: string) => Promise<void>;
@@ -66,6 +67,7 @@ const InstallmentDialog: React.FC<InstallmentDialogProps> = ({
   estimatedCurrentValue = 0,
   currency: investmentCurrency = 'USD',
   purchaseTaxRate: defaultTaxRate = 0,
+  fundingSources = [],
   transactions = [],
   onLinkTransaction,
   onUnlinkTransaction
@@ -78,6 +80,7 @@ const InstallmentDialog: React.FC<InstallmentDialogProps> = ({
     includeTax: false,
     taxPercentage: null as number | null,
     currency: 'USD',
+    fundingSourceId: '' as string,
     dueDate: new Date(),
     notes: ''
   });
@@ -102,6 +105,7 @@ const InstallmentDialog: React.FC<InstallmentDialogProps> = ({
         includeTax: installment.includeTax || false,
         taxPercentage: installment.taxPercentage ?? (defaultTaxRate || null),
         currency: installment.currency || investmentCurrency,
+        fundingSourceId: installment.fundingSourceId || '',
         dueDate: installment.dueDate ? new Date(installment.dueDate) : new Date(),
         notes: installment.notes || ''
       });
@@ -115,6 +119,7 @@ const InstallmentDialog: React.FC<InstallmentDialogProps> = ({
         includeTax: false,
         taxPercentage: defaultTaxRate || null,
         currency: investmentCurrency,
+        fundingSourceId: '',
         dueDate: new Date(),
         notes: ''
       });
@@ -171,6 +176,7 @@ const InstallmentDialog: React.FC<InstallmentDialogProps> = ({
         includeTax: formData.includeTax,
         taxPercentage: formData.includeTax ? formData.taxPercentage : null,
         currency: formData.currency,
+        fundingSourceId: formData.fundingSourceId || null,
         dueDate: formData.dueDate.toISOString(),
         notes: formData.notes || undefined
       });
@@ -372,6 +378,24 @@ const InstallmentDialog: React.FC<InstallmentDialogProps> = ({
               }
             }}
           />
+
+          {fundingSources.length > 0 && (
+            <FormControl fullWidth disabled={isSubmitting}>
+              <InputLabel>Funding Source</InputLabel>
+              <Select
+                value={formData.fundingSourceId}
+                onChange={(e) => setFormData(prev => ({ ...prev, fundingSourceId: e.target.value }))}
+                label="Funding Source"
+              >
+                <MenuItem value="">None</MenuItem>
+                {fundingSources.map((fs) => (
+                  <MenuItem key={fs._id} value={fs._id}>
+                    {fs.description} ({fs.type}) – {formatCurrency(fs.expectedAmount, fs.currency)}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
 
           <TextField
             fullWidth
