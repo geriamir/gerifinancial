@@ -40,9 +40,9 @@ export const TAX_PRESETS: TaxPreset[] = [
     notes: 'Mas Rechisha for sole residential property (brackets frozen through 2027)'
   },
   {
-    id: 'cy-resale',
+    id: 'cy-secondhand',
     country: 'Cyprus',
-    name: 'Cyprus – Resale (No VAT)',
+    name: 'Cyprus – Second-Hand (50% Discount)',
     currency: 'EUR',
     brackets: [
       { upTo: 85000, rate: 3 },
@@ -50,19 +50,27 @@ export const TAX_PRESETS: TaxPreset[] = [
       { upTo: Infinity, rate: 8 }
     ],
     discountPercent: 50,
-    notes: 'Transfer fees for resale properties; 50% discount typically applies'
+    notes: 'Transfer fees for second-hand properties; 50% discount typically applies'
   },
   {
-    id: 'cy-resale-full',
+    id: 'cy-secondhand-full',
     country: 'Cyprus',
-    name: 'Cyprus – Resale (Full Rate)',
+    name: 'Cyprus – Second-Hand (Full Rate)',
     currency: 'EUR',
     brackets: [
       { upTo: 85000, rate: 3 },
       { upTo: 170000, rate: 5 },
       { upTo: Infinity, rate: 8 }
     ],
-    notes: 'Transfer fees without 50% discount'
+    notes: 'Transfer fees for second-hand properties without 50% discount'
+  },
+  {
+    id: 'cy-newbuild',
+    country: 'Cyprus',
+    name: 'Cyprus – New Build (VAT)',
+    currency: 'EUR',
+    brackets: [],
+    notes: 'New builds: 19% VAT (or 5% reduced for primary residence). No transfer fees. Enter the applicable rate manually.'
   },
   {
     id: 'custom',
