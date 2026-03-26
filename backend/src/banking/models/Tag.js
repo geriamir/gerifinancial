@@ -15,7 +15,7 @@ const tagSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['project', 'custom'],
+    enum: ['project', 'real-estate', 'custom'],
     default: 'custom'
   },
   // For project tags, store additional project metadata
@@ -25,7 +25,7 @@ const tagSchema = new mongoose.Schema({
     endDate: Date,
     status: {
       type: String,
-      enum: ['planning', 'active', 'completed', 'cancelled'],
+      enum: ['planning', 'active', 'completed', 'cancelled', 'sold'],
       default: 'planning'
     }
   },

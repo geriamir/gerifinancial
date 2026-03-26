@@ -25,6 +25,7 @@ import Pension from './pages/Pension';
 import Projects from './pages/Projects';
 import Banks from './pages/Banks';
 import ForeignCurrency from './pages/ForeignCurrency';
+import RealEstate from './pages/RealEstate';
 import OnboardingPage from './pages/Onboarding';
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
@@ -94,6 +95,8 @@ const App: React.FC = () => {
               <Route path="banks" element={<Banks />} />
               <Route path="projects" element={<Projects />} />
               <Route path="projects/:projectId" element={<Projects />} />
+              <Route path="real-estate" element={<RealEstate />} />
+              <Route path="real-estate/:investmentId" element={<RealEstate />} />
               <Route path="foreign-currency" element={<ForeignCurrency />} />
               <Route path="foreign-currency/accounts/:accountNumber" element={<ForeignCurrency />} />
               <Route path="foreign-currency/accounts/:accountNumber/transactions" element={<ForeignCurrency />} />
