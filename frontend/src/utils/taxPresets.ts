@@ -69,8 +69,10 @@ export const TAX_PRESETS: TaxPreset[] = [
     country: 'Cyprus',
     name: 'Cyprus – New Build (VAT)',
     currency: 'EUR',
-    brackets: [],
-    notes: 'New builds: 19% VAT (or 5% reduced for primary residence). No transfer fees. Enter the applicable rate manually.'
+    brackets: [
+      { upTo: Infinity, rate: 19 }
+    ],
+    notes: 'New builds: 19% standard VAT. No transfer fees. Reduced 5% VAT may apply for primary residence.'
   },
   {
     id: 'custom',
