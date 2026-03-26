@@ -31,6 +31,7 @@ import {
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { RealEstateInvestment, FundingSource, realEstateApi } from '../../services/api/realEstate';
 import { SUPPORTED_CURRENCIES, formatCurrency } from '../../types/foreignCurrency';
+import { TAX_PRESETS, calculateProgressiveTax, calculateEffectiveRate, getTaxPreset } from '../../utils/taxPresets';
 
 interface RealEstateEditDialogProps {
   open: boolean;
@@ -69,6 +70,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
     description: '',
     currency: 'USD',
     estimatedCurrentValue: 0,
+    taxPresetId: 'custom',
     purchaseTaxRate: 0,
     notes: '',
     // Flip-specific
@@ -101,6 +103,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
         description: investment.description || '',
         currency: investment.currency || 'USD',
         estimatedCurrentValue: investment.estimatedCurrentValue || 0,
+        taxPresetId: investment.taxPresetId || 'custom',
         purchaseTaxRate: investment.purchaseTaxRate || 0,
         notes: investment.notes || '',
         salePrice: investment.salePrice || 0,
@@ -129,7 +132,20 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
     }
   }, [open, investment]);
 
-  const validateForm = (): boolean => {
+  // Recalculate effective tax rate when property value changes with a preset selected
+  useEffect(() => {
+    if (formData.taxPresetId && formData.taxPresetId !== 'custom' && formData.estimatedCurrentValue > 0) {
+      const preset = getTaxPreset(formData.taxPresetId);
+      if (preset && preset.brackets.length > 0) {
+        const effectiveRate = calculateEffectiveRate(
+          formData.estimatedCurrentValue, preset.brackets, preset.discountPercent
+        );
+        setFormData(prev => ({ ...prev, purchaseTaxRate: effectiveRate }));
+      }
+    }
+  }, [formData.estimatedCurrentValue, formData.taxPresetId]);
+
+  const validateForm= (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!formData.name.trim()) {
       newErrors.name = 'Name is required';
@@ -158,6 +174,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
     try {
       setIsSubmitting(true);
       setSubmitError(null);
+      const preset = getTaxPreset(formData.taxPresetId);
       const updateData: Partial<RealEstateInvestment> = {
         name: formData.name,
         type: formData.type,
@@ -167,6 +184,8 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
         currency: formData.currency,
         estimatedCurrentValue: formData.estimatedCurrentValue,
         purchaseTaxRate: formData.purchaseTaxRate || undefined,
+        taxPresetId: formData.taxPresetId !== 'custom' ? formData.taxPresetId : undefined,
+        country: preset && preset.id !== 'custom' ? preset.country : undefined,
         notes: formData.notes || undefined,
         fundingSources: fundingSources.map(fs => ({
           type: fs.type,
@@ -306,20 +325,66 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
               disabled={isSubmitting}
               inputProps={{ min: 0, step: 0.01 }}
             />
+          </Box>
+
+          <Box display="flex" gap={2}>
+            <FormControl fullWidth disabled={isSubmitting}>
+              <InputLabel>Tax Preset</InputLabel>
+              <Select
+                value={formData.taxPresetId}
+                onChange={(e) => {
+                  const presetId = e.target.value;
+                  const preset = getTaxPreset(presetId);
+                  if (preset && preset.brackets.length > 0 && formData.estimatedCurrentValue > 0) {
+                    const effectiveRate = calculateEffectiveRate(
+                      formData.estimatedCurrentValue, preset.brackets, preset.discountPercent
+                    );
+                    setFormData(prev => ({ ...prev, taxPresetId: presetId, purchaseTaxRate: effectiveRate }));
+                  } else {
+                    setFormData(prev => ({ ...prev, taxPresetId: presetId, purchaseTaxRate: presetId === 'custom' ? prev.purchaseTaxRate : 0 }));
+                  }
+                }}
+                label="Tax Preset"
+              >
+                {TAX_PRESETS.map((p) => (
+                  <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <TextField
               fullWidth
-              label="Purchase Tax Rate (%)"
+              label={formData.taxPresetId !== 'custom' ? 'Effective Tax Rate' : 'Purchase Tax Rate'}
               type="number"
               value={formData.purchaseTaxRate || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, purchaseTaxRate: parseFloat(e.target.value) || 0 }))}
+              onChange={(e) => setFormData(prev => ({ ...prev, purchaseTaxRate: parseFloat(e.target.value) || 0, taxPresetId: 'custom' }))}
               disabled={isSubmitting}
               inputProps={{ min: 0, max: 100, step: 0.1 }}
-              helperText={formData.purchaseTaxRate > 0 && formData.estimatedCurrentValue > 0
-                ? `Tax: ${formatCurrency(formData.estimatedCurrentValue * (formData.purchaseTaxRate / 100), formData.currency)}`
-                : undefined
-              }
+              helperText={(() => {
+                const preset = getTaxPreset(formData.taxPresetId);
+                if (preset && preset.brackets.length > 0 && formData.estimatedCurrentValue > 0) {
+                  const totalTax = calculateProgressiveTax(
+                    formData.estimatedCurrentValue, preset.brackets, preset.discountPercent
+                  );
+                  return `Tax: ${formatCurrency(totalTax, formData.currency)} (${formData.purchaseTaxRate}% effective)`;
+                }
+                if (formData.purchaseTaxRate > 0 && formData.estimatedCurrentValue > 0) {
+                  return `Tax: ${formatCurrency(formData.estimatedCurrentValue * (formData.purchaseTaxRate / 100), formData.currency)}`;
+                }
+                return undefined;
+              })()}
             />
           </Box>
+          {(() => {
+            const preset = getTaxPreset(formData.taxPresetId);
+            if (preset?.notes) {
+              return (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: -1.5 }}>
+                  {preset.notes}
+                </Typography>
+              );
+            }
+            return null;
+          })()}
 
           <TextField
             fullWidth

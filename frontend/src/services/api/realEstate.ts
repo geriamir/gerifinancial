@@ -12,6 +12,8 @@ export interface RealEstateInvestment {
   estimatedCurrentValue: number;
   currency: string;
   purchaseTaxRate?: number | null;
+  country?: string;
+  taxPresetId?: string;
   fundingSources: FundingSource[];
   categoryBudgets: CategoryBudget[];
   installments: Installment[];

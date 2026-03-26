@@ -146,6 +146,18 @@ const realEstateInvestmentSchema = new mongoose.Schema({
     min: 0,
     max: 100
   },
+  country: {
+    type: String,
+    trim: true,
+    maxlength: 100,
+    default: null
+  },
+  taxPresetId: {
+    type: String,
+    trim: true,
+    maxlength: 50,
+    default: null
+  },
 
   // Funding sources (same pattern as Projects)
   fundingSources: [{
