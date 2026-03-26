@@ -700,7 +700,6 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
         onClose={() => setEditDialogOpen(false)}
         onSuccess={handleEditSuccess}
         investment={investment}
-        transactionsTotalByCurrency={transactionsTotalByCurrency}
       />
 
       <CommitmentDialog

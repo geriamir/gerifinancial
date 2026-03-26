@@ -39,7 +39,6 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
     address: '',
     description: '',
     currency: 'USD',
-    totalInvestment: 0,
     estimatedCurrentValue: 0,
     notes: '',
     // Rental estimation
@@ -61,7 +60,6 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
         address: '',
         description: '',
         currency: 'USD',
-        totalInvestment: 0,
         estimatedCurrentValue: 0,
         notes: '',
         estimatedMonthlyRental: 0,
@@ -83,9 +81,6 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
     if (!formData.type) {
       newErrors.type = 'Type is required';
     }
-    if (formData.totalInvestment < 0) {
-      newErrors.totalInvestment = 'Total investment cannot be negative';
-    }
     if (formData.estimatedCurrentValue < 0) {
       newErrors.estimatedCurrentValue = 'Estimated value cannot be negative';
     }
@@ -104,7 +99,6 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
         address: formData.address || undefined,
         description: formData.description || undefined,
         currency: formData.currency,
-        totalInvestment: formData.totalInvestment,
         estimatedCurrentValue: formData.estimatedCurrentValue,
         notes: formData.notes || undefined
       };
@@ -216,31 +210,17 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
             rows={2}
           />
 
-          <Box display="flex" gap={2}>
-            <TextField
-              fullWidth
-              label="Total Investment"
-              type="number"
-              value={formData.totalInvestment || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, totalInvestment: parseFloat(e.target.value) || 0 }))}
-              error={!!errors.totalInvestment}
-              helperText={errors.totalInvestment}
-              disabled={isSubmitting}
-              inputProps={{ min: 0, step: 0.01 }}
-            />
-
-            <TextField
-              fullWidth
-              label="Estimated Current Value"
-              type="number"
-              value={formData.estimatedCurrentValue || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, estimatedCurrentValue: parseFloat(e.target.value) || 0 }))}
-              error={!!errors.estimatedCurrentValue}
-              helperText={errors.estimatedCurrentValue}
-              disabled={isSubmitting}
-              inputProps={{ min: 0, step: 0.01 }}
-            />
-          </Box>
+          <TextField
+            fullWidth
+            label="Estimated Current Value"
+            type="number"
+            value={formData.estimatedCurrentValue || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, estimatedCurrentValue: parseFloat(e.target.value) || 0 }))}
+            error={!!errors.estimatedCurrentValue}
+            helperText={errors.estimatedCurrentValue}
+            disabled={isSubmitting}
+            inputProps={{ min: 0, step: 0.01 }}
+          />
 
           {formData.type === 'rental' && (
             <>

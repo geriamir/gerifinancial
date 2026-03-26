@@ -37,7 +37,6 @@ interface RealEstateEditDialogProps {
   onClose: () => void;
   onSuccess: (investment: RealEstateInvestment) => void;
   investment: RealEstateInvestment;
-  transactionsTotalByCurrency?: Record<string, number>;
 }
 
 interface FundingSourceForm {
@@ -60,8 +59,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
   open,
   onClose,
   onSuccess,
-  investment,
-  transactionsTotalByCurrency
+  investment
 }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -70,7 +68,6 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
     address: '',
     description: '',
     currency: 'USD',
-    totalInvestment: 0,
     estimatedCurrentValue: 0,
     notes: '',
     // Flip-specific
@@ -102,7 +99,6 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
         address: investment.address || '',
         description: investment.description || '',
         currency: investment.currency || 'USD',
-        totalInvestment: investment.totalInvestment || (transactionsTotalByCurrency && transactionsTotalByCurrency[investment.currency || 'USD']) || 0,
         estimatedCurrentValue: investment.estimatedCurrentValue || 0,
         notes: investment.notes || '',
         salePrice: investment.salePrice || 0,
@@ -129,7 +125,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
       setErrors({});
       setSubmitError(null);
     }
-  }, [open, investment, transactionsTotalByCurrency]);
+  }, [open, investment]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -167,7 +163,6 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
         address: formData.address || undefined,
         description: formData.description || undefined,
         currency: formData.currency,
-        totalInvestment: formData.totalInvestment,
         estimatedCurrentValue: formData.estimatedCurrentValue,
         notes: formData.notes || undefined,
         fundingSources: fundingSources.map(fs => ({
@@ -298,19 +293,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
             rows={2}
           />
 
-          <Box display="flex" gap={2}>
-            <TextField
-              fullWidth
-              label="Total Investment"
-              type="number"
-              value={formData.totalInvestment || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, totalInvestment: parseFloat(e.target.value) || 0 }))}
-              helperText={transactionsTotalByCurrency && Object.keys(transactionsTotalByCurrency).length > 0
-                ? `From transactions: ${Object.entries(transactionsTotalByCurrency).map(([cur, total]) => formatCurrency(total, cur)).join(', ')}`
-                : undefined}
-              disabled={isSubmitting}
-              inputProps={{ min: 0, step: 0.01 }}
-            />
+           <Box display="flex" gap={2}>
             <TextField
               fullWidth
               label="Estimated Current Value"
