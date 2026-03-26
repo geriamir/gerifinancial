@@ -29,8 +29,8 @@ export interface RealEstateInvestment {
   leaseStart?: string;
   leaseEnd?: string;
   rentalIncome: RentalIncome[];
-  linkedBankAccountId?: any;
-  investmentTag?: any;
+  linkedBankAccountId?: string | { _id: string; name: string; bankId: string };
+  investmentTag?: string | { _id: string; name: string };
   notes?: string;
   // Virtuals
   totalPendingInstallments?: number;
@@ -54,8 +54,8 @@ export interface FundingSource {
 
 export interface CategoryBudget {
   _id?: string;
-  categoryId: any;
-  subCategoryId: any;
+  categoryId: string | { _id: string; name: string };
+  subCategoryId: string | { _id: string; name: string };
   budgetedAmount: number;
   allocatedTransactions: string[];
   currency: string;

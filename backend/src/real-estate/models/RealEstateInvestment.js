@@ -316,7 +316,7 @@ realEstateInvestmentSchema.index({ userId: 1, type: 1 });
 // Virtuals
 realEstateInvestmentSchema.virtual('totalPendingInstallments').get(function() {
   return this.installments
-    .filter(i => i.status === 'pending')
+    .filter(i => i.status === 'pending' || i.status === 'overdue')
     .reduce((sum, i) => sum + i.amount, 0);
 });
 
@@ -372,7 +372,7 @@ realEstateInvestmentSchema.statics.findActive = async function(userId) {
 
 // Create investment tag
 realEstateInvestmentSchema.methods.createInvestmentTag = async function() {
-  const tagName = `realestate:${this.name.toLowerCase().replace(/\s+/g, '-')}`;
+  const tagName = `realestate:${this.name.toLowerCase().replace(/\s+/g, '-')}`.substring(0, 50);
 
   const tag = await Tag.findOrCreate({
     name: tagName,

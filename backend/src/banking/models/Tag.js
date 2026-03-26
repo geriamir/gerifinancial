@@ -25,7 +25,7 @@ const tagSchema = new mongoose.Schema({
     endDate: Date,
     status: {
       type: String,
-      enum: ['planning', 'active', 'completed', 'cancelled'],
+      enum: ['planning', 'active', 'completed', 'cancelled', 'sold'],
       default: 'planning'
     }
   },

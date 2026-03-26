@@ -111,7 +111,7 @@ const RealEstateList: React.FC<RealEstateListProps> = ({ onNavigateToDetail }) =
       setInvestments(investmentsData);
       setSummary(summaryData);
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to load investments');
+      setError(err?.response?.data?.error || 'Failed to load investments');
     } finally {
       setLoading(false);
     }

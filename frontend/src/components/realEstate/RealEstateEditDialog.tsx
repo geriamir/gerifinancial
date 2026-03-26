@@ -157,7 +157,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
   const handleAddFundingSource = () => {
     setFundingSources(prev => [
       ...prev,
-      { type: 'savings', description: '', expectedAmount: 0, availableAmount: 0, currency: formData.currency }
+      { type: 'savings', description: 'New funding source', expectedAmount: 0, availableAmount: 0, currency: formData.currency }
     ]);
   };
 
@@ -183,7 +183,7 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
         description: formData.description || undefined,
         currency: formData.currency,
         estimatedCurrentValue: formData.estimatedCurrentValue,
-        purchaseTaxRate: formData.purchaseTaxRate || undefined,
+        purchaseTaxRate: formData.purchaseTaxRate ?? undefined,
         taxPresetId: formData.taxPresetId !== 'custom' ? formData.taxPresetId : undefined,
         country: preset && preset.id !== 'custom' ? preset.country : undefined,
         notes: formData.notes || undefined,
@@ -197,26 +197,26 @@ const RealEstateEditDialog: React.FC<RealEstateEditDialogProps> = ({
       };
 
       if (formData.type === 'flip') {
-        updateData.salePrice = formData.salePrice || undefined;
+        updateData.salePrice = formData.salePrice ?? undefined;
         updateData.saleDate = formData.saleDate?.toISOString() || undefined;
-        updateData.saleExpenses = formData.saleExpenses || undefined;
+        updateData.saleExpenses = formData.saleExpenses ?? undefined;
       }
       if (formData.type === 'rental') {
-        updateData.monthlyRent = formData.monthlyRent || undefined;
+        updateData.monthlyRent = formData.monthlyRent ?? undefined;
         updateData.tenantName = formData.tenantName || undefined;
         updateData.leaseStart = formData.leaseStart?.toISOString() || undefined;
         updateData.leaseEnd = formData.leaseEnd?.toISOString() || undefined;
-        updateData.estimatedMonthlyRental = formData.estimatedMonthlyRental || undefined;
-        updateData.mortgagePercentage = formData.mortgagePercentage || undefined;
-        updateData.mortgageInterestRate = formData.mortgageInterestRate || undefined;
-        updateData.mortgageTermYears = formData.mortgageTermYears || undefined;
+        updateData.estimatedMonthlyRental = formData.estimatedMonthlyRental ?? undefined;
+        updateData.mortgagePercentage = formData.mortgagePercentage ?? undefined;
+        updateData.mortgageInterestRate = formData.mortgageInterestRate ?? undefined;
+        updateData.mortgageTermYears = formData.mortgageTermYears ?? undefined;
       }
 
       const updated = await realEstateApi.update(investment._id, updateData);
       onSuccess(updated);
       onClose();
     } catch (error: any) {
-      setSubmitError(error?.response?.data?.message || 'Failed to update investment');
+      setSubmitError(error?.response?.data?.error || 'Failed to update investment');
     } finally {
       setIsSubmitting(false);
     }

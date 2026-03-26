@@ -136,7 +136,7 @@ const RealEstateCreateDialog: React.FC<RealEstateCreateDialogProps> = ({
       onSuccess(investment);
       onClose();
     } catch (error: any) {
-      setSubmitError(error?.response?.data?.message || 'Failed to create investment');
+      setSubmitError(error?.response?.data?.error || 'Failed to create investment');
     } finally {
       setIsSubmitting(false);
     }

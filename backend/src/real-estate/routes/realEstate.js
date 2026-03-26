@@ -165,7 +165,7 @@ router.delete('/:id/installments/:installmentId', validateId('id'), async (req, 
 /**
  * POST /api/real-estate/:id/installments/:installmentId/link-transaction/:transactionId
  */
-router.post('/:id/installments/:installmentId/link-transaction/:transactionId', validateId('id'), async (req, res) => {
+router.post('/:id/installments/:installmentId/link-transaction/:transactionId', validateId('id'), validateId('transactionId'), async (req, res) => {
   try {
     const investment = await realEstateService.linkTransactionToInstallment(
       req.params.id, req.user.id, req.params.installmentId, req.params.transactionId
@@ -183,7 +183,7 @@ router.post('/:id/installments/:installmentId/link-transaction/:transactionId', 
 /**
  * DELETE /api/real-estate/:id/installments/:installmentId/link-transaction/:transactionId
  */
-router.delete('/:id/installments/:installmentId/link-transaction/:transactionId', validateId('id'), async (req, res) => {
+router.delete('/:id/installments/:installmentId/link-transaction/:transactionId', validateId('id'), validateId('transactionId'), async (req, res) => {
   try {
     const investment = await realEstateService.unlinkTransactionFromInstallment(
       req.params.id, req.user.id, req.params.installmentId, req.params.transactionId
@@ -276,7 +276,7 @@ router.get('/:id/transactions', validateId('id'), async (req, res) => {
 /**
  * POST /api/real-estate/:id/transactions/:transactionId/tag
  */
-router.post('/:id/transactions/:transactionId/tag', validateId('id'), async (req, res) => {
+router.post('/:id/transactions/:transactionId/tag', validateId('id'), validateId('transactionId'), async (req, res) => {
   try {
     const transaction = await realEstateTransactionService.tagTransaction(
       req.params.id, req.user.id, req.params.transactionId
@@ -291,7 +291,7 @@ router.post('/:id/transactions/:transactionId/tag', validateId('id'), async (req
 /**
  * DELETE /api/real-estate/:id/transactions/:transactionId/tag
  */
-router.delete('/:id/transactions/:transactionId/tag', validateId('id'), async (req, res) => {
+router.delete('/:id/transactions/:transactionId/tag', validateId('id'), validateId('transactionId'), async (req, res) => {
   try {
     const transaction = await realEstateTransactionService.untagTransaction(
       req.params.id, req.user.id, req.params.transactionId
@@ -330,8 +330,8 @@ router.post('/:id/transactions/bulk-tag', validateId('id'), async (req, res) => 
 router.post('/:id/link-account', validateId('id'), async (req, res) => {
   try {
     const { bankAccountId } = req.body;
-    if (!bankAccountId) {
-      return res.status(400).json({ error: 'bankAccountId is required' });
+    if (!bankAccountId || !mongoose.Types.ObjectId.isValid(bankAccountId)) {
+      return res.status(400).json({ error: 'Valid bankAccountId is required' });
     }
     const investment = await realEstateService.linkBankAccount(req.params.id, req.user.id, bankAccountId);
     if (!investment) {

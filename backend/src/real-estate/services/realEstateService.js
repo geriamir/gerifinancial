@@ -5,9 +5,10 @@ const realEstateTransactionService = require('./realEstateTransactionService');
 
 class RealEstateService {
   async create(userId, data) {
+    // Spread data first, then override userId to prevent privilege escalation
     const investment = await RealEstateInvestment.create({
-      userId,
-      ...data
+      ...data,
+      userId
     });
 
     // Auto-create tag for transaction linking
@@ -120,7 +121,7 @@ class RealEstateService {
     const installment = investment.installments.id(installmentId);
     if (!installment) return null;
 
-    if (!installment.linkedTransactions.includes(transactionId)) {
+    if (!installment.linkedTransactions.some(id => id.toString() === transactionId.toString())) {
       installment.linkedTransactions.push(transactionId);
       if (installment.status !== 'paid') {
         installment.status = 'paid';
@@ -186,6 +187,13 @@ class RealEstateService {
 
   // Link/unlink bank account
   async linkBankAccount(investmentId, userId, bankAccountId) {
+    // Verify bank account belongs to this user
+    const BankAccount = require('../../banking/models/BankAccount');
+    const account = await BankAccount.findOne({ _id: bankAccountId, userId });
+    if (!account) {
+      throw new Error('Bank account not found or does not belong to user');
+    }
+
     const investment = await RealEstateInvestment.findOneAndUpdate(
       { _id: investmentId, userId },
       { $set: { linkedBankAccountId: bankAccountId } },

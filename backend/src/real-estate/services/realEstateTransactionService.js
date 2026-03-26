@@ -1,6 +1,5 @@
 const logger = require('../../shared/utils/logger');
 const Transaction = require('../../banking/models/Transaction');
-const Tag = require('../../banking/models/Tag');
 const RealEstateInvestment = require('../models/RealEstateInvestment');
 
 class RealEstateTransactionService {
@@ -14,7 +13,9 @@ class RealEstateTransactionService {
     return Transaction.find({
       userId,
       tags: investment.investmentTag
-    }).sort({ date: -1 });
+    })
+      .populate('category', 'name')
+      .sort({ date: -1 });
   }
 
   /**
@@ -32,7 +33,8 @@ class RealEstateTransactionService {
     }
 
     if (!transaction.tags) transaction.tags = [];
-    if (!transaction.tags.includes(investment.investmentTag)) {
+    const tagStr = investment.investmentTag.toString();
+    if (!transaction.tags.some(t => t.toString() === tagStr)) {
       transaction.tags.push(investment.investmentTag);
       await transaction.save();
       logger.info(`Tagged transaction ${transactionId} to investment ${investment.name}`);
@@ -104,20 +106,16 @@ class RealEstateTransactionService {
       return { tagged: 0 };
     }
 
-    const untaggedTransactions = await Transaction.find({
-      userId,
-      accountId: investment.linkedBankAccountId,
-      tags: { $nin: [investment.investmentTag] }
-    });
+    const result = await Transaction.updateMany(
+      {
+        userId,
+        accountId: investment.linkedBankAccountId,
+        tags: { $nin: [investment.investmentTag] }
+      },
+      { $addToSet: { tags: investment.investmentTag } }
+    );
 
-    let tagged = 0;
-    for (const tx of untaggedTransactions) {
-      if (!tx.tags) tx.tags = [];
-      tx.tags.push(investment.investmentTag);
-      await tx.save();
-      tagged++;
-    }
-
+    const tagged = result.modifiedCount || 0;
     if (tagged > 0) {
       logger.info(`Auto-tagged ${tagged} transactions from linked account to investment ${investment.name}`);
     }
