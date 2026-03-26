@@ -381,9 +381,10 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
   for (const cur of Object.keys(transactionsTotalByCurrency)) {
     transactionsTotalByCurrency[cur] *= -1;
   }
+  const totalInvestmentFromTxns = transactionsTotalByCurrency[currency] || 0;
   const gainLoss = investment.type === 'flip' && investment.flipGain != null
     ? investment.flipGain
-    : investment.estimatedCurrentValue - investment.totalInvestment;
+    : investment.estimatedCurrentValue - totalInvestmentFromTxns;
 
   return (
     <Box>
@@ -445,20 +446,16 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
           <Card>
             <CardContent>
               <Typography variant="body2" color="text.secondary">Total Investment</Typography>
-              <Typography variant="h5" fontWeight="bold">
-                {formatCurrency(investment.totalInvestment, currency)}
-              </Typography>
-              {transactions.length > 0 && (
-                <Box mt={0.5}>
-                  <Typography variant="body2" color="text.secondary">
-                    From transactions:
+              {Object.keys(transactionsTotalByCurrency).length > 0 ? (
+                Object.entries(transactionsTotalByCurrency).map(([cur, total]) => (
+                  <Typography key={cur} variant="h5" fontWeight="bold">
+                    {formatCurrency(total, cur)}
                   </Typography>
-                  {Object.entries(transactionsTotalByCurrency).map(([cur, total]) => (
-                    <Typography key={cur} variant="body2" color="text.secondary">
-                      {formatCurrency(total, cur)}
-                    </Typography>
-                  ))}
-                </Box>
+                ))
+              ) : (
+                <Typography variant="h5" fontWeight="bold">
+                  {formatCurrency(0, currency)}
+                </Typography>
               )}
             </CardContent>
           </Card>
