@@ -228,6 +228,7 @@ class RealEstateService {
       totalInvested: 0,
       totalEstimatedValue: 0,
       totalInstallments: 0,
+      totalPaidInstallments: 0,
       totalRentalIncome: 0,
       totalFlipGains: 0,
       currency: displayCurrency
@@ -248,6 +249,7 @@ class RealEstateService {
 
       summary.totalEstimatedValue += await this._convertAmount(inv.estimatedCurrentValue || 0, cur, displayCurrency);
       summary.totalInstallments += await this._convertAmount(inv.totalPendingInstallments || 0, cur, displayCurrency);
+      summary.totalPaidInstallments += await this._convertAmount(inv.totalPaidInstallments || 0, cur, displayCurrency);
       summary.totalRentalIncome += await this._convertAmount(inv.totalRentalIncome || 0, cur, displayCurrency);
       if (inv.type === 'flip' && inv.flipGain != null) {
         summary.totalFlipGains += await this._convertAmount(inv.flipGain, cur, displayCurrency);

@@ -95,6 +95,7 @@ export interface RealEstateSummary {
   totalInvested: number;
   totalEstimatedValue: number;
   totalInstallments: number;
+  totalPaidInstallments: number;
   totalRentalIncome: number;
   totalFlipGains: number;
   currency: string;

@@ -126,12 +126,11 @@ const RealEstateList: React.FC<RealEstateListProps> = ({ onNavigateToDetail }) =
   };
 
   const summaryCards = summary ? [
-    { label: 'Total Invested', value: formatCurrency(summary.totalInvested, summary.currency || 'USD') },
-    { label: 'Estimated Value', value: formatCurrency(summary.totalEstimatedValue, summary.currency || 'USD') },
-    { label: 'Active Flips', value: summary.activeFlips.toString() },
-    { label: 'Active Rentals', value: summary.activeRentals.toString() },
-    { label: 'Total Installments', value: formatCurrency(summary.totalInstallments, summary.currency || 'USD') },
-    { label: 'Rental Income', value: formatCurrency(summary.totalRentalIncome, summary.currency || 'USD') }
+    { label: 'Total Invested', value: formatCurrency(summary.totalInvested, summary.currency || 'ILS') },
+    { label: 'Estimated Value', value: formatCurrency(summary.totalEstimatedValue, summary.currency || 'ILS') },
+    { label: 'Remaining Commitments', value: formatCurrency(summary.totalInstallments, summary.currency || 'ILS') },
+    { label: 'Paid Installments', value: formatCurrency(summary.totalPaidInstallments, summary.currency || 'ILS') },
+    { label: 'Rental Income', value: formatCurrency(summary.totalRentalIncome, summary.currency || 'ILS') }
   ] : [];
 
   return (
