@@ -111,6 +111,12 @@ class RealEstateService {
 
     if (!installment.linkedTransactions.includes(transactionId)) {
       installment.linkedTransactions.push(transactionId);
+      if (installment.status !== 'paid') {
+        installment.status = 'paid';
+        if (!installment.paidDate) {
+          installment.paidDate = new Date();
+        }
+      }
       await investment.save();
     }
     return investment;
@@ -126,6 +132,12 @@ class RealEstateService {
     installment.linkedTransactions = installment.linkedTransactions.filter(
       id => id.toString() !== transactionId.toString()
     );
+    // Revert to pending/overdue if no transactions remain
+    if (installment.linkedTransactions.length === 0 && installment.status === 'paid') {
+      const now = new Date();
+      installment.status = installment.dueDate < now ? 'overdue' : 'pending';
+      installment.paidDate = null;
+    }
     await investment.save();
     return investment;
   }
