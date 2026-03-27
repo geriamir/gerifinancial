@@ -14,6 +14,10 @@ class RealEstateService {
     // Auto-create tag for transaction linking
     await investment.createInvestmentTag();
 
+    // Generate auto-installments from mortgage/value/tax settings
+    investment.generateAutoInstallments();
+    await investment.save();
+
     logger.info(`Created real estate investment: ${investment.name} (${investment.type})`);
     return investment;
   }
@@ -61,6 +65,9 @@ class RealEstateService {
     // Prevent changing userId
     delete updates.userId;
 
+    const autoInstallmentFields = ['estimatedCurrentValue', 'mortgagePercentage', 'purchaseTaxRate', 'currency'];
+    const shouldRegenerate = autoInstallmentFields.some(f => updates[f] !== undefined);
+
     const investment = await RealEstateInvestment.findOneAndUpdate(
       { _id: investmentId, userId },
       { $set: updates },
@@ -68,6 +75,11 @@ class RealEstateService {
     )
       .populate('investmentTag', 'name')
       .populate('linkedBankAccountId', 'name bankId');
+
+    if (investment && shouldRegenerate) {
+      investment.generateAutoInstallments();
+      await investment.save();
+    }
 
     return investment;
   }
