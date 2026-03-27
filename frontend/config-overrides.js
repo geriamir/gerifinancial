@@ -7,16 +7,13 @@ module.exports = function override(config, env) {
     path: require.resolve('path-browserify'),
   };
 
-  // Increase memory limit for TypeScript checker to prevent OOM during builds
-  const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
-  const tsCheckerPlugin = config.plugins.find(
-    (plugin) => plugin instanceof ForkTsCheckerWebpackPlugin
-  );
-  if (tsCheckerPlugin && tsCheckerPlugin.options) {
-    tsCheckerPlugin.options.typescript = {
-      ...tsCheckerPlugin.options.typescript,
-      memoryLimit: 2048,
-    };
+  // In CI, remove the forked TS checker to prevent OOM.
+  // Type checking is already handled by the unit test workflow.
+  if (process.env.CI) {
+    const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
+    config.plugins = config.plugins.filter(
+      (plugin) => !(plugin instanceof ForkTsCheckerWebpackPlugin)
+    );
   }
 
   return config;
