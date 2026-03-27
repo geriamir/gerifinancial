@@ -135,7 +135,7 @@ const ProjectOverviewProgressBar: React.FC<ProjectOverviewProgressBarProps> = ({
   if (overviewData.totalValue === 0) {
     return (
       <Box sx={{ py: 2 }}>
-        <Paper sx={{ p: 3, textAlign: 'center', backgroundColor: 'grey.50' }}>
+        <Paper sx={{ p: 3, textAlign: 'center', backgroundColor: 'action.hover' }}>
           <Typography variant="h6" color="text.secondary" gutterBottom>
             No Budget Data
           </Typography>

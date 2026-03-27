@@ -89,7 +89,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   sx={{
                     mt: 2,
                     p: 2,
-                    bgcolor: 'grey.100',
+                    bgcolor: 'action.hover',
                     borderRadius: 1,
                     overflow: 'auto',
                     maxHeight: 200,

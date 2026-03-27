@@ -254,7 +254,7 @@ const BudgetColumn: React.FC<BudgetColumnProps> = ({
           />
 
           {/* Column Headers */}
-          <Box display="flex" justifyContent="space-between" alignItems="center" px={2} py={1} bgcolor="grey.100" borderRadius={1} mb={2}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" px={2} py={1} bgcolor="action.hover" borderRadius={1} mb={2}>
             <Typography variant="body2" fontWeight="bold" color="text.secondary">
               Category
             </Typography>

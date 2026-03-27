@@ -88,10 +88,10 @@ const ProjectExpensesTreeView: React.FC<ProjectExpensesTreeViewProps> = ({
               px: COMPACT_SPACING.small,
               borderRadius: 1,
               '&:hover': {
-                backgroundColor: 'grey.100'
+                backgroundColor: 'action.hover'
               },
               '&.Mui-focused': {
-                backgroundColor: 'grey.200'
+                backgroundColor: 'action.selected'
               }
             },
             '& .MuiTreeItem-label': {
@@ -140,7 +140,7 @@ const ProjectExpensesTreeView: React.FC<ProjectExpensesTreeViewProps> = ({
                           sx={{
                             height: 2,
                             borderRadius: 1,
-                            backgroundColor: 'grey.200',
+                            backgroundColor: 'action.selected',
                             '& .MuiLinearProgress-bar': {
                               backgroundColor: getCompactProgressColor(totalActual, totalBudgeted)
                             }
@@ -174,7 +174,7 @@ const ProjectExpensesTreeView: React.FC<ProjectExpensesTreeViewProps> = ({
                               sx={{
                                 height: 2,
                                 borderRadius: 1,
-                                backgroundColor: 'grey.200',
+                                backgroundColor: 'action.selected',
                                 '& .MuiLinearProgress-bar': {
                                   backgroundColor: getCompactProgressColor(budgetItem.actual, budgetItem.budgeted)
                                 }

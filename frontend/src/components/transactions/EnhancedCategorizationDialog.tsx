@@ -223,7 +223,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                     px: 3,
                     py: 2,
                     border: 1,
-                    borderColor: 'grey.300',
+                    borderColor: 'divider',
                     '&.Mui-selected': {
                       bgcolor: 'primary.main',
                       color: 'primary.contrastText',
@@ -275,7 +275,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                   sx={{
                     bgcolor: 'background.paper',
                     border: 1,
-                    borderColor: 'grey.300',
+                    borderColor: 'divider',
                     '&:hover': {
                       bgcolor: 'primary.50',
                     },
@@ -308,7 +308,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                       key={category._id}
                       sx={{
                         border: 1,
-                        borderColor: 'grey.200',
+                        borderColor: 'divider',
                         transition: 'all 0.2s ease-in-out',
                         backgroundColor: 'transparent',
                         height: '140px', // Fixed height for consistent sizing
@@ -372,7 +372,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                   sx={{
                     bgcolor: 'background.paper',
                     border: 1,
-                    borderColor: 'grey.300',
+                    borderColor: 'divider',
                     '&:hover': {
                       bgcolor: 'primary.50',
                     },

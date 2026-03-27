@@ -172,7 +172,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                         sx={{
                           height: 6,
                           borderRadius: 1,
-                          backgroundColor: 'grey.200',
+                          backgroundColor: 'action.selected',
                           '& .MuiLinearProgress-bar': {
                             backgroundColor: getCompactProgressColor(totalActual, totalBudgeted)
                           }
@@ -217,7 +217,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                                         sx={{
                                           height: 4,
                                           borderRadius: 1,
-                                          backgroundColor: 'grey.200',
+                                          backgroundColor: 'action.selected',
                                           '& .MuiLinearProgress-bar': {
                                             backgroundColor: getCompactProgressColor(budgetItem.actual, budgetItem.budgeted)
                                           }
@@ -385,7 +385,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                         backgroundColor: 'background.paper',
                         borderRadius: 1,
                         border: '1px solid',
-                        borderColor: 'grey.200'
+                        borderColor: 'divider'
                       }}>
                         <Typography variant="caption" color="text.secondary" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>
                           Assign to:

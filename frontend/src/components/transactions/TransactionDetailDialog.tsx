@@ -265,7 +265,7 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {/* Main Transaction Info */}
-            <Paper sx={{ p: 3, bgcolor: 'grey.50' }}>
+            <Paper sx={{ p: 3, bgcolor: 'action.hover' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                 <MoneyIcon color="primary" />
                 <Box>

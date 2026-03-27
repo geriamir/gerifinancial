@@ -266,7 +266,7 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
                               justifyContent: 'space-between',
                               alignItems: 'flex-start',
                               p: 1.5,
-                              backgroundColor: 'grey.50',
+                              backgroundColor: 'action.hover',
                               borderRadius: position.options.length > 0 ? '4px 4px 0 0' : 1,
                             }}
                           >
@@ -363,7 +363,7 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
                           {/* Linked options displayed under the stock */}
                           {position.options.length > 0 && position.stock && (
                             <Box sx={{
-                              backgroundColor: 'grey.100',
+                              backgroundColor: 'action.hover',
                               borderRadius: '0 0 4px 4px',
                               borderTop: '1px dashed',
                               borderColor: 'divider',

@@ -177,10 +177,10 @@ export const ActionItemsList: React.FC<ActionItemsListProps> = ({
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {[1, 2, 3].map((index) => (
               <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Box sx={{ width: 24, height: 24, bgcolor: 'grey.300', borderRadius: '50%' }} />
+                <Box sx={{ width: 24, height: 24, bgcolor: 'action.selected', borderRadius: '50%' }} />
                 <Box sx={{ flex: 1 }}>
-                  <Box sx={{ width: '70%', height: 16, bgcolor: 'grey.300', borderRadius: 1, mb: 0.5 }} />
-                  <Box sx={{ width: '90%', height: 12, bgcolor: 'grey.300', borderRadius: 1 }} />
+                  <Box sx={{ width: '70%', height: 16, bgcolor: 'action.selected', borderRadius: 1, mb: 0.5 }} />
+                  <Box sx={{ width: '90%', height: 12, bgcolor: 'action.selected', borderRadius: 1 }} />
                 </Box>
               </Box>
             ))}

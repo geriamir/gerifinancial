@@ -159,7 +159,7 @@ const TransactionBudgetExclusion: React.FC<TransactionBudgetExclusionProps> = ({
               one-time expenses that shouldn't affect your regular budget planning.
             </DialogContentText>
             
-            <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+            <Box sx={{ mb: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
               <Typography variant="subtitle2" gutterBottom>
                 Transaction Details
               </Typography>
@@ -284,7 +284,7 @@ const TransactionBudgetExclusion: React.FC<TransactionBudgetExclusionProps> = ({
             one-time expenses that shouldn't affect your regular budget planning.
           </DialogContentText>
           
-          <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+          <Box sx={{ mb: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
             <Typography variant="subtitle2" gutterBottom>
               Transaction Details
             </Typography>

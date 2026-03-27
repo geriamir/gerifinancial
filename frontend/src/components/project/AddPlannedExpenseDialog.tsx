@@ -254,7 +254,7 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
 
           {/* Preview */}
           {formData.categoryId && (
-            <Box mt={2} p={2} bgcolor="grey.50" borderRadius={1}>
+            <Box mt={2} p={2} bgcolor="action.hover" borderRadius={1}>
               <Typography variant="body2" color="text.secondary">
                 Preview:
               </Typography>

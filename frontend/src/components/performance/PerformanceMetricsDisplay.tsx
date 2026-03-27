@@ -148,7 +148,7 @@ export const PerformanceMetricsDisplay: React.FC<PerformanceMetricsDisplayProps>
                   </Typography>
                   <Box
                     sx={{
-                      backgroundColor: 'grey.50',
+                      backgroundColor: 'action.hover',
                       p: 1,
                       borderRadius: 1,
                       maxHeight: 200,

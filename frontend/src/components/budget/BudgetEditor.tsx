@@ -267,7 +267,7 @@ const BudgetEditor: React.FC<BudgetEditorProps> = ({
       />
       
       {parseFloat(editedFixedAmount) > 0 && (
-        <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+        <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
           <Typography variant="subtitle2" gutterBottom>
             Preview: Annual Total
           </Typography>
@@ -305,7 +305,7 @@ const BudgetEditor: React.FC<BudgetEditorProps> = ({
       
       <Divider sx={{ my: 3 }} />
       
-      <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+      <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
         <Typography variant="subtitle2" gutterBottom>
           Annual Total
         </Typography>

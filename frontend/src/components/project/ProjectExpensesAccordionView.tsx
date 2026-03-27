@@ -138,7 +138,7 @@ const ProjectExpensesAccordionView: React.FC<ProjectExpensesAccordionViewProps> 
                         sx={{
                           height: 3,
                           borderRadius: 1,
-                          backgroundColor: 'grey.200',
+                          backgroundColor: 'action.selected',
                           '& .MuiLinearProgress-bar': {
                             backgroundColor: getCompactProgressColor(totalActual, totalBudgeted)
                           }
@@ -163,7 +163,7 @@ const ProjectExpensesAccordionView: React.FC<ProjectExpensesAccordionViewProps> 
                           p: COMPACT_SPACING.small,
                           borderRadius: 1,
                           border: '1px solid',
-                          borderColor: 'grey.300'
+                          borderColor: 'divider'
                         }}
                       >
                         <Box display="flex" alignItems="center" justifyContent="space-between">
@@ -188,7 +188,7 @@ const ProjectExpensesAccordionView: React.FC<ProjectExpensesAccordionViewProps> 
                             sx={{
                               height: 2,
                               borderRadius: 1,
-                              backgroundColor: 'grey.200',
+                              backgroundColor: 'action.selected',
                               '& .MuiLinearProgress-bar': {
                                 backgroundColor: getCompactProgressColor(budgetItem.actual, budgetItem.budgeted)
                               }
@@ -210,7 +210,7 @@ const ProjectExpensesAccordionView: React.FC<ProjectExpensesAccordionViewProps> 
                           ml: (budgetItem.description || group.budgetItems.length > 1) ? 2 : 0,
                           borderRadius: 1,
                           border: '1px solid',
-                          borderColor: 'grey.200'
+                          borderColor: 'divider'
                         }}
                       >
                         <Box flex={1}>
@@ -326,10 +326,10 @@ const ProjectExpensesAccordionView: React.FC<ProjectExpensesAccordionViewProps> 
                       justifyContent="space-between"
                       sx={{
                         p: COMPACT_SPACING.small,
-                        backgroundColor: index === 0 ? 'primary.light' : 'grey.50',
+                        backgroundColor: index === 0 ? 'primary.light' : 'action.hover',
                         borderRadius: 1,
                         border: '1px solid',
-                        borderColor: index === 0 ? 'primary.main' : 'grey.200'
+                        borderColor: index === 0 ? 'primary.main' : 'divider'
                       }}
                     >
                       <Box flex={1}>
