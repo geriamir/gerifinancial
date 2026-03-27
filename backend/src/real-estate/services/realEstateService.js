@@ -11,12 +11,11 @@ class RealEstateService {
       userId
     });
 
-    // Auto-create tag for transaction linking
-    await investment.createInvestmentTag();
-
     // Generate auto-installments from mortgage/value/tax settings
     investment.generateAutoInstallments();
-    await investment.save();
+
+    // Auto-create tag for transaction linking (also persists the installments)
+    await investment.createInvestmentTag();
 
     logger.info(`Created real estate investment: ${investment.name} (${investment.type})`);
     return investment;
@@ -98,6 +97,9 @@ class RealEstateService {
     if (!investment) return null;
 
     investment.installments.push(installmentData);
+    if (installmentData.installmentType === 'investment') {
+      investment.generateAutoInstallments();
+    }
     await investment.save();
     return investment;
   }
@@ -109,9 +111,13 @@ class RealEstateService {
     const installment = investment.installments.id(installmentId);
     if (!installment) return null;
 
+    const wasInvestment = installment.installmentType === 'investment';
     Object.assign(installment, updates);
     if (updates.status === 'paid' && !installment.paidDate) {
       installment.paidDate = new Date();
+    }
+    if (wasInvestment || installment.installmentType === 'investment') {
+      investment.generateAutoInstallments();
     }
     await investment.save();
     return investment;
@@ -121,7 +127,11 @@ class RealEstateService {
     const investment = await RealEstateInvestment.findOne({ _id: investmentId, userId });
     if (!investment) return null;
 
+    const deleted = investment.installments.id(installmentId);
     investment.installments.pull(installmentId);
+    if (deleted && deleted.installmentType === 'investment') {
+      investment.generateAutoInstallments();
+    }
     await investment.save();
     return investment;
   }
