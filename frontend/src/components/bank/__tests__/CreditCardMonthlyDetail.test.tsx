@@ -75,34 +75,46 @@ const mockMonthlyStats: CreditCardMonthlyStats = {
   categoryBreakdown: [
     {
       _id: 'cat1',
+      categoryId: 'cat1',
+      categoryName: 'Restaurants',
       category: 'Restaurants',
       subCategory: 'Fine Dining',
       totalAmount: 500.25,
       transactionCount: 8,
-      percentage: 40.0
+      percentage: 40.0,
+      averageAmount: 62.53
     },
     {
       _id: 'cat2',
+      categoryId: 'cat2',
+      categoryName: 'Gas',
       category: 'Gas',
       subCategory: 'Gas Stations',
       totalAmount: 300.50,
       transactionCount: 6,
-      percentage: 24.0
+      percentage: 24.0,
+      averageAmount: 50.08
     },
     {
       _id: 'cat3',
+      categoryId: 'cat3',
+      categoryName: 'Shopping',
       category: 'Shopping',
       subCategory: 'Online Shopping',
       totalAmount: 250.00,
       transactionCount: 5,
-      percentage: 20.0
+      percentage: 20.0,
+      averageAmount: 50.00
     },
     {
       _id: 'cat4',
+      categoryId: 'cat4',
+      categoryName: 'Groceries',
       category: 'Groceries',
       totalAmount: 200.00,
       transactionCount: 6,
-      percentage: 16.0
+      percentage: 16.0,
+      averageAmount: 33.33
     }
   ]
 };
