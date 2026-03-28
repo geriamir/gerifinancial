@@ -105,25 +105,24 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({
 
   return (
     <Card
-      sx={{
-        background: gradient,
-        height: '100%',
-        position: 'relative',
-        overflow: 'hidden',
-        ...(!onClick && {
-          '&:hover': {},
-        }),
-        ...(onClick && {
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: mode === 'dark'
-              ? '0 8px 24px rgba(0,0,0,0.4)'
-              : '0 8px 24px rgba(26,35,126,0.12)',
-          },
-        }),
-        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-        ...sx,
-      }}
+      sx={[
+        {
+          background: gradient,
+          height: '100%',
+          position: 'relative',
+          overflow: 'hidden',
+          ...(onClick && {
+            '&:hover': {
+              transform: 'translateY(-2px)',
+              boxShadow: mode === 'dark'
+                ? '0 8px 24px rgba(0,0,0,0.4)'
+                : '0 8px 24px rgba(26,35,126,0.12)',
+            },
+          }),
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+        },
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}
     >
       {onClick ? (
         <CardActionArea onClick={onClick}>

@@ -8,12 +8,16 @@ module.exports = function override(config, env) {
   };
 
   // In CI, remove the forked TS checker to prevent OOM.
-  // Type checking is already handled by the unit test workflow.
+  // Type checking is handled by a dedicated tsc step in CI.
   if (process.env.CI) {
-    const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
-    config.plugins = config.plugins.filter(
-      (plugin) => !(plugin instanceof ForkTsCheckerWebpackPlugin)
-    );
+    try {
+      const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
+      config.plugins = config.plugins.filter(
+        (plugin) => !(plugin instanceof ForkTsCheckerWebpackPlugin)
+      );
+    } catch (e) {
+      // Plugin not found — nothing to remove
+    }
   }
 
   return config;

@@ -137,7 +137,7 @@ const BudgetCategoryItem: React.FC<BudgetCategoryItemProps> = ({
                 sx={{ 
                   cursor: 'pointer',
                   '&:hover': {
-                    bgcolor: 'action.hover'
+                    bgcolor: 'action.selected'
                   }
                 }}
                 onClick={(e) => handleSubcategoryClick(sub, e)}
