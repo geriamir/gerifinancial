@@ -15,14 +15,18 @@ import {
 } from '@mui/material';
 import {
   AccountCircle as AccountCircleIcon,
-  Menu as MenuIcon
+  Menu as MenuIcon,
+  DarkMode as DarkModeIcon,
+  LightMode as LightModeIcon
 } from '@mui/icons-material';
 import { NavigationMenu } from './NavigationMenu';
 import { useAuth } from '../../contexts/AuthContext';
+import { useThemeMode } from '../../contexts/ThemeContext';
 
 const AuthLayout: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { mode, toggleTheme } = useThemeMode();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
@@ -53,11 +57,22 @@ const AuthLayout: React.FC = () => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 700, letterSpacing: '-0.01em' }}>
             GeriFinancial
           </Typography>
 
-          <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <IconButton
+              color="inherit"
+              onClick={toggleTheme}
+              aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              sx={{
+                transition: 'transform 0.3s ease',
+                '&:hover': { transform: 'rotate(30deg)' },
+              }}
+            >
+              {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+            </IconButton>
             <IconButton
               size="large"
               onClick={handleMenu}
@@ -117,7 +132,7 @@ const AuthLayout: React.FC = () => {
           <Typography
             variant="h6"
             component="div"
-            sx={{ px: 2, py: 1 }}
+            sx={{ px: 2, py: 1, fontWeight: 700, letterSpacing: '-0.01em' }}
           >
             GeriFinancial
           </Typography>
@@ -133,18 +148,17 @@ const AuthLayout: React.FC = () => {
       <Box
         component="footer"
         sx={{
-          py: 3,
+          py: 2,
           px: 2,
           mt: 'auto',
-          backgroundColor: (theme) =>
-            theme.palette.mode === 'light'
-              ? theme.palette.grey[200]
-              : theme.palette.grey[800],
+          borderTop: 1,
+          borderColor: 'divider',
+          backgroundColor: 'background.paper',
         }}
       >
         <Container maxWidth="sm">
-          <Typography variant="body2" color="text.secondary" align="center">
-            © {new Date().getFullYear()} GeriFinancial. All rights reserved.
+          <Typography variant="caption" color="text.secondary" align="center" display="block">
+            © {new Date().getFullYear()} GeriFinancial
           </Typography>
         </Container>
       </Box>

@@ -320,7 +320,7 @@ const SimpleProjectCreationDialog: React.FC<SimpleProjectCreationDialogProps> = 
                     sx={{
                       cursor: 'pointer',
                       border: formData.type === option.value ? 2 : 1,
-                      borderColor: formData.type === option.value ? option.color : 'grey.300',
+                      borderColor: formData.type === option.value ? option.color : 'divider',
                       '&:hover': {
                         borderColor: option.color,
                         boxShadow: 1

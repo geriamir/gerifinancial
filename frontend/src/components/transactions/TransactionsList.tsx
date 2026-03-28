@@ -295,7 +295,7 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
               justifyContent: 'space-between',
               alignItems: 'center',
               p: 2,
-              bgcolor: 'grey.50',
+              bgcolor: 'action.hover',
               borderRadius: 1,
               position: 'relative',
               gap: 3
@@ -319,7 +319,7 @@ function TransactionsList<T extends Transaction>(props: TransactionsListProps<T>
               <Box
                 sx={{
                   borderBottom: '2px dotted',
-                  borderColor: 'grey.400',
+                  borderColor: 'action.disabled',
                   width: '100%',
                   mt: 0.5
                 }}

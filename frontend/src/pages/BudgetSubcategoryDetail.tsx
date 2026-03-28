@@ -851,7 +851,7 @@ const BudgetSubcategoryDetail: React.FC = () => {
               sx={{ 
                 height: 12, 
                 borderRadius: 6,
-                backgroundColor: 'grey.200',
+                backgroundColor: 'action.hover',
                 '& .MuiLinearProgress-bar': {
                   backgroundColor: isIncomeView
                     ? (subcategoryData.progressPercentage > 100 ? 'success.main' : (categoryTheme?.primary || 'primary.main'))

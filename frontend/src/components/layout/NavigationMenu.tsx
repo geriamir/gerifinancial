@@ -16,7 +16,9 @@ import {
   List,
   ListItemButton,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
   Home as HomeIcon,
@@ -54,8 +56,16 @@ const navigationItems: NavigationItem[] = [
 export const NavigationMenu: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+
   const handleNavigation = (path: string) => {
     navigate(path);
+  };
+
+  const isActive = (path: string) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
   };
 
   return (
@@ -73,19 +83,48 @@ export const NavigationMenu: React.FC = () => {
         }
       }}
     >
-      <List sx={{ mt: 8 }}>
-        {navigationItems.map((item) => (
-          <ListItemButton
-            key={item.path}
-            selected={location.pathname === item.path}
-            onClick={() => handleNavigation(item.path)}
-          >
-            <ListItemIcon>
-              {item.icon}
-            </ListItemIcon>
-            <ListItemText primary={item.title} />
-          </ListItemButton>
-        ))}
+      <List sx={{ mt: 8, px: 1 }}>
+        {navigationItems.map((item) => {
+          const active = isActive(item.path);
+          return (
+            <ListItemButton
+              key={item.path}
+              selected={active}
+              onClick={() => handleNavigation(item.path)}
+              sx={{
+                borderRadius: '10px',
+                mb: 0.5,
+                py: 1,
+                ...(active && {
+                  backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.15 : 0.08),
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, isDark ? 0.2 : 0.12),
+                  },
+                  '& .MuiListItemIcon-root': {
+                    color: 'primary.main',
+                  },
+                  '& .MuiListItemText-primary': {
+                    fontWeight: 600,
+                    color: 'primary.main',
+                  },
+                }),
+                ...(!active && {
+                  '&:hover': {
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)',
+                  },
+                }),
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText
+                primary={item.title}
+                primaryTypographyProps={{ fontSize: '0.9rem' }}
+              />
+            </ListItemButton>
+          );
+        })}
       </List>
     </Drawer>
   );

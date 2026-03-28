@@ -49,6 +49,7 @@ jobs:
       run: npm run build
       env:
         CI: true
+        GENERATE_SOURCEMAP: 'false'
 
     - name: Run E2E Tests
       run: npm run test:e2e:ci

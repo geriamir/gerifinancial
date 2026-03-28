@@ -147,7 +147,7 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                           sx={{
                             height: 4,
                             borderRadius: 1,
-                            backgroundColor: 'grey.200',
+                            backgroundColor: 'action.selected',
                             '& .MuiLinearProgress-bar': {
                               backgroundColor: getCompactProgressColor(totalActual, totalBudgeted)
                             }
@@ -199,7 +199,7 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                                 sx={{
                                   height: 3,
                                   borderRadius: 1,
-                                  backgroundColor: 'grey.200',
+                                  backgroundColor: 'action.selected',
                                   '& .MuiLinearProgress-bar': {
                                     backgroundColor: getCompactProgressColor(budgetItem.actual, budgetItem.budgeted)
                                   }
@@ -385,10 +385,10 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                                 key={budgetItemKey}
                                 sx={{
                                   p: COMPACT_SPACING.small,
-                                  backgroundColor: displayIndex === 0 ? 'primary.light' : 'grey.50',
+                                  backgroundColor: displayIndex === 0 ? 'primary.light' : 'action.hover',
                                   borderRadius: 1,
                                   border: '1px solid',
-                                  borderColor: displayIndex === 0 ? 'primary.main' : 'grey.200',
+                                  borderColor: displayIndex === 0 ? 'primary.main' : 'divider',
                                   mb: COMPACT_SPACING.small
                                 }}
                               >

@@ -18,7 +18,8 @@ import {
   Typography,
   LinearProgress,
   Chip,
-  Alert
+  Alert,
+  useTheme
 } from '@mui/material';
 import {
   AccountBalance as BalanceIcon,
@@ -31,6 +32,7 @@ import { transactionsApi } from '../../services/api/transactions';
 import { budgetsApi } from '../../services/api/budgets';
 import { bankAccountsApi } from '../../services/api/bank';
 import type { BalanceSummaryItem } from '../../services/api/types/bankAccount';
+import { getSummaryCardGradient, getSummaryIconBg } from '../../theme';
 
 interface FinancialSummary {
   totalBalance: number;
@@ -249,10 +251,11 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
   }, []);
 
   const handleCreateBudget = () => {
-    // Navigate to budgets page to create a new budget
     navigate('/budgets');
   };
 
+  const theme = useTheme();
+  const mode = theme.palette.mode;
   const isLoading = loading || externalLoading;
 
   if (error) {
@@ -271,7 +274,8 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
         ? `${summary.balanceChange > 0 ? '+' : ''}${formatCurrency(summary.balanceChange, summary.displayCurrency)} today`
         : '',
       changeColor: summary.balanceChange >= 0 ? 'success.main' : 'error.main',
-      icon: <BalanceIcon sx={{ fontSize: 40, color: 'primary.main' }} />,
+      icon: <BalanceIcon sx={{ fontSize: 28 }} />,
+      iconColor: 'primary' as const,
       subtitle: 'across all accounts'
     },
     {
@@ -289,8 +293,9 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
       change: `Net: ${formatCurrency(summary.monthlyIncome - summary.monthlyExpenses)}`,
       changeColor: summary.monthlyIncome > summary.monthlyExpenses ? 'success.main' : 'error.main',
       icon: summary.monthlyIncome > summary.monthlyExpenses 
-        ? <IncomeIcon sx={{ fontSize: 40, color: 'success.main' }} />
-        : <ExpenseIcon sx={{ fontSize: 40, color: 'error.main' }} />,
+        ? <IncomeIcon sx={{ fontSize: 28 }} />
+        : <ExpenseIcon sx={{ fontSize: 28 }} />,
+      iconColor: (summary.monthlyIncome > summary.monthlyExpenses ? 'success' : 'error') as 'success' | 'error',
       subtitle: 'current month'
     },
     {
@@ -303,7 +308,7 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
           <LinearProgress 
             variant="determinate" 
             value={summary.budgetProgress} 
-            sx={{ mb: 1, height: 8, borderRadius: 4 }}
+            sx={{ mb: 1 }}
             color={summary.budgetProgress > 100 ? 'error' : 'primary'}
           />
           <Chip 
@@ -333,7 +338,8 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
         `${formatCurrency(summary.monthlyExpenses)} of ${formatCurrency(summary.totalBudgetedExpenses || 0)}` :
         '',
       changeColor: summary.budgetExists ? 'text.secondary' : 'primary.main',
-      icon: <BudgetIcon sx={{ fontSize: 40, color: 'secondary.main' }} />
+      icon: <BudgetIcon sx={{ fontSize: 28 }} />,
+      iconColor: 'secondary' as const
     }
   ];
 
@@ -349,11 +355,11 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
             <Card sx={{ height: 200 }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Box sx={{ width: 40, height: 40, bgcolor: 'grey.300', borderRadius: 1, mr: 2 }} />
-                  <Box sx={{ width: '60%', height: 20, bgcolor: 'grey.300', borderRadius: 1 }} />
+                  <Box sx={{ width: 40, height: 40, bgcolor: 'action.hover', borderRadius: '12px', mr: 2 }} />
+                  <Box sx={{ width: '60%', height: 20, bgcolor: 'action.hover', borderRadius: 1 }} />
                 </Box>
-                <Box sx={{ width: '80%', height: 32, bgcolor: 'grey.300', borderRadius: 1, mb: 1 }} />
-                <Box sx={{ width: '50%', height: 16, bgcolor: 'grey.300', borderRadius: 1 }} />
+                <Box sx={{ width: '80%', height: 32, bgcolor: 'action.hover', borderRadius: 1, mb: 1 }} />
+                <Box sx={{ width: '50%', height: 16, bgcolor: 'action.hover', borderRadius: 1 }} />
               </CardContent>
             </Card>
           </Box>
@@ -372,10 +378,13 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
         <Box key={index} sx={{ flex: 1 }}>
           <Card sx={{ 
             height: 200, 
+            background: getSummaryCardGradient(card.iconColor, mode),
             transition: 'transform 0.2s, box-shadow 0.2s',
             '&:hover': {
               transform: 'translateY(-2px)',
-              boxShadow: 4
+              boxShadow: mode === 'dark'
+                ? '0 8px 24px rgba(0,0,0,0.4)'
+                : '0 8px 24px rgba(26,35,126,0.12)',
             }
           }}>
             <CardContent sx={{ 
@@ -385,8 +394,20 @@ export const FinancialSummaryCards: React.FC<FinancialSummaryCardsProps> = ({
               p: 3
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                {card.icon}
-                <Typography variant="h6" sx={{ ml: 2, fontWeight: 600 }}>
+                <Box sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: getSummaryIconBg(card.iconColor, mode),
+                  color: `${card.iconColor}.main`,
+                  mr: 2,
+                }}>
+                  {card.icon}
+                </Box>
+                <Typography variant="subtitle2" color="text.secondary">
                   {card.title}
                 </Typography>
               </Box>

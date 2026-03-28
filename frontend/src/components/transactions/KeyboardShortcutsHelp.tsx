@@ -29,9 +29,9 @@ const KeyboardShortcut: React.FC<KeyboardShortcutProps> = ({ shortcut, descripti
             px: 1,
             py: 0.5,
             borderRadius: 1,
-            bgcolor: 'grey.100',
+            bgcolor: 'action.hover',
             border: 1,
-            borderColor: 'grey.300',
+            borderColor: 'divider',
             fontSize: '0.875rem',
             fontFamily: 'monospace'
           }}

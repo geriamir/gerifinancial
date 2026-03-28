@@ -75,7 +75,7 @@ const BudgetCategoryItem: React.FC<BudgetCategoryItemProps> = ({
         onClick={handleToggle} 
         sx={{ 
           border: 1, 
-          borderColor: 'grey.200', 
+          borderColor: 'divider', 
           borderRadius: 1, 
           mb: 1, 
           p: 2 
@@ -131,13 +131,13 @@ const BudgetCategoryItem: React.FC<BudgetCategoryItemProps> = ({
                 p={2} 
                 mb={0.5} 
                 border={1} 
-                borderColor="grey.100" 
+                borderColor="divider" 
                 borderRadius={1} 
-                bgcolor="grey.50"
+                bgcolor="action.hover"
                 sx={{ 
                   cursor: 'pointer',
                   '&:hover': {
-                    bgcolor: 'grey.100'
+                    bgcolor: 'action.selected'
                   }
                 }}
                 onClick={(e) => handleSubcategoryClick(sub, e)}

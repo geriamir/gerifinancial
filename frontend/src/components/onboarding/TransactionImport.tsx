@@ -188,7 +188,7 @@ const TransactionImport: React.FC<TransactionImportProps> = ({
 
               {/* Statistics */}
               {transactionsImported > 0 && (
-                <Paper variant="outlined" sx={{ p: 2, mb: 3, bgcolor: 'grey.50' }}>
+                <Paper variant="outlined" sx={{ p: 2, mb: 3, bgcolor: 'action.hover' }}>
                   <Typography variant="subtitle2" gutterBottom>
                     Import Statistics
                   </Typography>

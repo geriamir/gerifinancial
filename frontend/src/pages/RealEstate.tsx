@@ -40,7 +40,12 @@ import {
   Schedule as PendingIcon,
   Warning as OverdueIcon,
   Home as HomeIcon,
-  LocationOn as LocationIcon
+  LocationOn as LocationIcon,
+  AccountBalanceWallet as InvestedIcon,
+  TrendingUp as ValueIcon,
+  EventNote as CommitmentsIcon,
+  CheckCircleOutline as PaidTotalIcon,
+  HomeWork as RentalIcon
 } from '@mui/icons-material';
 import {
   realEstateApi,
@@ -48,6 +53,8 @@ import {
   RealEstateSummary,
   Installment
 } from '../services/api/realEstate';
+import SummaryCard from '../components/common/SummaryCard';
+import SectionCard from '../components/common/SectionCard';
 import { formatCurrency } from '../types/foreignCurrency';
 import { foreignCurrencyApi } from '../services/api/foreignCurrency';
 import RealEstateCreateDialog from '../components/realEstate/RealEstateCreateDialog';
@@ -126,11 +133,11 @@ const RealEstateList: React.FC<RealEstateListProps> = ({ onNavigateToDetail }) =
   };
 
   const summaryCards = summary ? [
-    { label: 'Total Invested', value: formatCurrency(summary.totalInvested, summary.currency || 'ILS') },
-    { label: 'Estimated Value', value: formatCurrency(summary.totalEstimatedValue, summary.currency || 'ILS') },
-    { label: 'Remaining Commitments', value: formatCurrency(summary.totalInstallments, summary.currency || 'ILS') },
-    { label: 'Paid Installments', value: formatCurrency(summary.totalPaidInstallments, summary.currency || 'ILS') },
-    { label: 'Rental Income', value: formatCurrency(summary.totalRentalIncome, summary.currency || 'ILS') }
+    { label: 'Total Invested', value: formatCurrency(summary.totalInvested, summary.currency || 'ILS'), icon: <InvestedIcon />, color: 'primary' as const },
+    { label: 'Estimated Value', value: formatCurrency(summary.totalEstimatedValue, summary.currency || 'ILS'), icon: <ValueIcon />, color: 'info' as const },
+    { label: 'Remaining Commitments', value: formatCurrency(summary.totalInstallments, summary.currency || 'ILS'), icon: <CommitmentsIcon />, color: 'warning' as const },
+    { label: 'Paid Installments', value: formatCurrency(summary.totalPaidInstallments, summary.currency || 'ILS'), icon: <PaidTotalIcon />, color: 'success' as const },
+    { label: 'Rental Income', value: formatCurrency(summary.totalRentalIncome, summary.currency || 'ILS'), icon: <RentalIcon />, color: 'secondary' as const }
   ] : [];
 
   return (
@@ -158,17 +165,13 @@ const RealEstateList: React.FC<RealEstateListProps> = ({ onNavigateToDetail }) =
           {summary && (
             <Grid container spacing={2} sx={{ mb: 3 }}>
               {summaryCards.map((card) => (
-                <Grid size={{ xs: 6, sm: 4, md: 2 }} key={card.label}>
-                  <Card>
-                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
-                        {card.label}
-                      </Typography>
-                      <Typography variant="h6" fontWeight="bold">
-                        {card.value}
-                      </Typography>
-                    </CardContent>
-                  </Card>
+                <Grid size={{ xs: 6, sm: 4, md: 2.4 }} key={card.label}>
+                  <SummaryCard
+                    label={card.label}
+                    value={card.value}
+                    icon={card.icon}
+                    color={card.color}
+                  />
                 </Grid>
               ))}
             </Grid>
@@ -493,47 +496,35 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
       {/* Financial Overview */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <Card>
-            <CardContent>
-              <Typography variant="body2" color="text.secondary">Total Investment</Typography>
-              <Typography variant="h5" fontWeight="bold">
-                {formatCurrency(totalInvestmentConverted, currency)}
-              </Typography>
-            </CardContent>
-          </Card>
+          <SummaryCard
+            label="Total Investment"
+            value={formatCurrency(totalInvestmentConverted, currency)}
+            icon={<InvestedIcon />}
+            color="primary"
+          />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <Card>
-            <CardContent>
-              <Typography variant="body2" color="text.secondary">Estimated Current Value</Typography>
-              <Typography variant="h5" fontWeight="bold">
-                {formatCurrency(investment.estimatedCurrentValue, currency)}
-              </Typography>
-            </CardContent>
-          </Card>
+          <SummaryCard
+            label="Estimated Current Value"
+            value={formatCurrency(investment.estimatedCurrentValue, currency)}
+            icon={<ValueIcon />}
+            color="info"
+          />
         </Grid>
         <Grid size={{ xs: 12, sm: 4 }}>
-          <Card>
-            <CardContent>
-              <Typography variant="body2" color="text.secondary">
-                {investment.type === 'flip' ? 'Gain/Loss' : 'Unrealized Gain/Loss'}
-              </Typography>
-              <Typography
-                variant="h5"
-                fontWeight="bold"
-                color={gainLoss >= 0 ? 'success.main' : 'error.main'}
-              >
-                {gainLoss >= 0 ? '+' : ''}{formatCurrency(gainLoss, currency)}
-              </Typography>
-            </CardContent>
-          </Card>
+          <SummaryCard
+            label={investment.type === 'flip' ? 'Gain/Loss' : 'Unrealized Gain/Loss'}
+            value={`${gainLoss >= 0 ? '+' : ''}${formatCurrency(gainLoss, currency)}`}
+            icon={gainLoss >= 0 ? <ValueIcon /> : <OverdueIcon />}
+            color={gainLoss >= 0 ? 'success' : 'error'}
+          />
         </Grid>
       </Grid>
 
       {/* Installments Section */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6">Installments</Typography>
+      <SectionCard
+        title="Installments"
+        action={
           <Button
             size="small"
             startIcon={<AddIcon />}
@@ -544,7 +535,9 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
           >
             Add Installment
           </Button>
-        </Box>
+        }
+        sx={{ mb: 3 }}
+      >
         {investment.installments && investment.installments.length > 0 ? (
           <>
             <Table size="small">
@@ -635,12 +628,9 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
         ) : (
           <Typography variant="body2" color="text.secondary">No installments yet.</Typography>
         )}
-      </Paper>
-
-      {/* Rental Income Section (rentals only) */}
+      </SectionCard>      {/* Rental Income Section (rentals only) */}
       {investment.type === 'rental' && (
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" mb={2}>Rental Income</Typography>
+        <SectionCard title="Rental Income" sx={{ mb: 3 }}>
           {investment.monthlyRent != null && investment.monthlyRent > 0 && (
             <Box mb={2}>
               <Typography variant="body2" color="text.secondary">
@@ -731,12 +721,11 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
               </Typography>
             </Box>
           )}
-        </Paper>
+        </SectionCard>
       )}
 
       {/* Transactions Section */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" mb={2}>Transactions</Typography>
+      <SectionCard title="Transactions" sx={{ mb: 3 }}>
         {transactions.length > 0 ? (
           <Table size="small">
             <TableHead>
@@ -765,7 +754,7 @@ const RealEstateDetail: React.FC<RealEstateDetailProps> = ({ investmentId }) => 
             No transactions linked to this investment.
           </Typography>
         )}
-      </Paper>
+      </SectionCard>
 
       {/* Dialogs */}
       <RealEstateEditDialog

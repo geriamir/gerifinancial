@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ThemeProvider, CssBaseline } from '@mui/material';
-import { createTheme } from '@mui/material/styles';
+import { CssBaseline } from '@mui/material';
+import { ThemeContextProvider } from './contexts/ThemeContext';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { he } from 'date-fns/locale';
@@ -32,18 +32,6 @@ import '@fontsource/roboto/400.css';
 import '@fontsource/roboto/500.css';
 import '@fontsource/roboto/700.css';
 
-// Create theme
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-  },
-});
-
 // Profile placeholder component
 const Profile = () => (
   <div>
@@ -54,7 +42,7 @@ const Profile = () => (
 
 const App: React.FC = () => {
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeContextProvider>
       <CssBaseline />
       <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={he}>
       <AuthProvider>
@@ -108,7 +96,7 @@ const App: React.FC = () => {
         </Router>
       </AuthProvider>
       </LocalizationProvider>
-    </ThemeProvider>
+    </ThemeContextProvider>
   );
 };
 

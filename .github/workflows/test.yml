@@ -34,6 +34,11 @@ jobs:
       env:
         CI: true
 
+    - name: TypeScript type check
+      run: cd frontend && npx tsc --noEmit
+      env:
+        CI: true
+
     - name: Run backend unit tests
       run: cd backend && npm test
       env:

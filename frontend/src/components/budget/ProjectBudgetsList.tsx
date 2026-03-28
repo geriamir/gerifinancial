@@ -152,13 +152,13 @@ const ProjectBudgetsList: React.FC<ProjectBudgetsListProps> = ({
                 alignItems="center"
                 p={2}
                 border={1}
-                borderColor="grey.200"
+                borderColor="divider"
                 borderRadius={1}
                 mb={1}
                 sx={{
                   cursor: 'pointer',
                   '&:hover': {
-                    backgroundColor: 'grey.50',
+                    backgroundColor: 'action.hover',
                     borderColor: 'primary.main'
                   }
                 }}

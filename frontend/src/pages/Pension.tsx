@@ -31,6 +31,7 @@ import {
   Sync as SyncIcon,
   AccountBalance as AccountBalanceIcon
 } from '@mui/icons-material';
+import SummaryCard from '../components/common/SummaryCard';
 import { pensionApi } from '../services/api/pension';
 import {
   PensionAccount,
@@ -541,18 +542,13 @@ const Pension: React.FC = () => {
       ) : (
         <>
           {/* Total Balance Card */}
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="subtitle2" color="text.secondary">Total Pension & Savings</Typography>
-              <Typography variant="h3" sx={{ fontWeight: 'bold', my: 1 }}>
-                {formatCurrency(summary!.totalBalance)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {summary!.groups.reduce((sum, g) => sum + g.accountCount, 0)} accounts across{' '}
-                {summary!.groups.length} categories
-              </Typography>
-            </CardContent>
-          </Card>
+          <SummaryCard
+            label="Total Pension & Savings"
+            value={formatCurrency(summary!.totalBalance)}
+            icon={<AccountBalanceIcon />}
+            subtitle={`${summary!.groups.reduce((sum, g) => sum + g.accountCount, 0)} accounts across ${summary!.groups.length} categories`}
+            sx={{ mb: 3 }}
+          />
 
           {/* Category Cards */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>

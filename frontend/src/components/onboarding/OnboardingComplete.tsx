@@ -262,7 +262,7 @@ export const OnboardingComplete: React.FC<OnboardingCompleteProps> = ({
       )}
 
       {/* Final Thank You */}
-      <Box sx={{ mt: 4, textAlign: 'center', p: 3, bgcolor: 'grey.50', borderRadius: 1 }}>
+      <Box sx={{ mt: 4, textAlign: 'center', p: 3, bgcolor: 'action.hover', borderRadius: 1 }}>
         <Typography variant="h6" gutterBottom>
           Thank you for choosing GeriFinancial! 🚀
         </Typography>
