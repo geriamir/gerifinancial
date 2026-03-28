@@ -65,7 +65,7 @@ const AuthLayout: React.FC = () => {
             <IconButton
               color="inherit"
               onClick={toggleTheme}
-              aria-label="toggle dark mode"
+              aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               sx={{
                 transition: 'transform 0.3s ease',
                 '&:hover': { transform: 'rotate(30deg)' },

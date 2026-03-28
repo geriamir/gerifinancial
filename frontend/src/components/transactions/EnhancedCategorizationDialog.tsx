@@ -232,7 +232,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                       },
                     },
                     '&:hover': {
-                      bgcolor: 'primary.50',
+                      bgcolor: 'action.hover',
                     },
                   },
                 }}
@@ -277,7 +277,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                     border: 1,
                     borderColor: 'divider',
                     '&:hover': {
-                      bgcolor: 'primary.50',
+                      bgcolor: 'action.hover',
                     },
                     '&:disabled': {
                       opacity: 0.3,
@@ -374,7 +374,7 @@ export const EnhancedCategorizationDialog: React.FC<EnhancedCategorizationDialog
                     border: 1,
                     borderColor: 'divider',
                     '&:hover': {
-                      bgcolor: 'primary.50',
+                      bgcolor: 'action.hover',
                     },
                     '&:disabled': {
                       opacity: 0.3,
