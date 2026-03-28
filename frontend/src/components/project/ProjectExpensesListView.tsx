@@ -15,12 +15,16 @@ import {
   CircularProgress,
   Avatar,
   Divider,
-  LinearProgress
+  LinearProgress,
+  TextField
 } from '@mui/material';
 import {
   ExpandLess,
   ExpandMore,
   Delete,
+  Edit,
+  Check,
+  Close,
   TrendingFlat,
   CheckCircle,
   Warning,
@@ -47,6 +51,8 @@ interface ProjectExpensesListViewProps {
   projectCurrency: string;
   projectType?: string;
   onRemoveFromProject: (transactionId: string) => void;
+  onEditPlannedExpense: (index: number, updates: Partial<CategoryBreakdownItem>) => void;
+  onDeletePlannedExpense: (index: number) => void;
   moveExpenseToPlanned: (transactionId: string, categoryId: string, subCategoryId: string) => Promise<void>;
   movingExpense: string | null;
 }
@@ -58,11 +64,15 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
   projectCurrency,
   projectType,
   onRemoveFromProject,
+  onEditPlannedExpense,
+  onDeletePlannedExpense,
   moveExpenseToPlanned,
   movingExpense
 }) => {
   const [expandedSubcategories, setExpandedSubcategories] = useState<Set<string>>(new Set());
   const [expandedUnplanned, setExpandedUnplanned] = useState<Set<string>>(new Set());
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
 
   const toggleSubcategory = (subcategoryId: string) => {
     const newExpanded = new Set(expandedSubcategories);
@@ -158,15 +168,110 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                   }
                 />
                 <ListItemSecondaryAction>
-                  <IconButton edge="end" size="small">
-                    {isExpanded ? <ExpandLess /> : <ExpandMore />}
-                  </IconButton>
+                  <Box display="flex" alignItems="center" gap={0.5}>
+                    {group.budgetItems.length === 1 && (
+                      <>
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const item = group.budgetItems[0];
+                            setEditingBudgetId(item.budgetId);
+                            setEditValue(String(item.budgeted));
+                          }}
+                          title="Edit budgeted amount"
+                        >
+                          <Edit sx={{ fontSize: 16 }} />
+                        </IconButton>
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const item = group.budgetItems[0];
+                            const originalIndex = plannedExpenses.findIndex(exp => exp.budgetId === item.budgetId);
+                            if (originalIndex !== -1 && window.confirm(`Delete planned expense "${item.description || item.subCategoryId.name}"?`)) {
+                              onDeletePlannedExpense(originalIndex);
+                            }
+                          }}
+                          title="Delete planned expense"
+                          sx={{ color: 'error.main' }}
+                        >
+                          <Delete sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </>
+                    )}
+                    <IconButton edge="end" size="small">
+                      {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                    </IconButton>
+                  </Box>
                 </ListItemSecondaryAction>
               </ListItemButton>
 
               {/* Budget Items and Transactions */}
               <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                 <List component="div" disablePadding dense>
+                  {/* Inline edit for single-item groups (where header doesn't show a separate budget item row) */}
+                  {group.budgetItems.length === 1 && !group.budgetItems[0].description && editingBudgetId === group.budgetItems[0].budgetId && (
+                    <ListItem sx={{ pl: 4 }}>
+                      <ListItemText
+                        primary={
+                          <Box display="flex" alignItems="center" gap={0.5}>
+                            <Typography variant="caption" color="text.secondary">Edit budgeted amount:</Typography>
+                            <TextField
+                              size="small"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const newAmount = parseFloat(editValue);
+                                  if (!isNaN(newAmount) && newAmount >= 0) {
+                                    const originalIndex = plannedExpenses.findIndex(exp => exp.budgetId === group.budgetItems[0].budgetId);
+                                    if (originalIndex !== -1) {
+                                      onEditPlannedExpense(originalIndex, { budgeted: newAmount });
+                                    }
+                                  }
+                                  setEditingBudgetId(null);
+                                } else if (e.key === 'Escape') {
+                                  setEditingBudgetId(null);
+                                }
+                              }}
+                              onBlur={() => {
+                                const newAmount = parseFloat(editValue);
+                                if (!isNaN(newAmount) && newAmount >= 0) {
+                                  const originalIndex = plannedExpenses.findIndex(exp => exp.budgetId === group.budgetItems[0].budgetId);
+                                  if (originalIndex !== -1) {
+                                    onEditPlannedExpense(originalIndex, { budgeted: newAmount });
+                                  }
+                                }
+                                setEditingBudgetId(null);
+                              }}
+                              autoFocus
+                              type="number"
+                              inputProps={{ min: 0, step: 'any' }}
+                              sx={{ width: 100, '& input': { py: 0.5, px: 1, fontSize: '0.75rem', textAlign: 'right' } }}
+                            />
+                            <IconButton size="small" sx={{ p: 0.25 }} onClick={() => {
+                              const newAmount = parseFloat(editValue);
+                              if (!isNaN(newAmount) && newAmount >= 0) {
+                                const originalIndex = plannedExpenses.findIndex(exp => exp.budgetId === group.budgetItems[0].budgetId);
+                                if (originalIndex !== -1) {
+                                  onEditPlannedExpense(originalIndex, { budgeted: newAmount });
+                                }
+                              }
+                              setEditingBudgetId(null);
+                            }}>
+                              <Check sx={{ fontSize: 16, color: 'success.main' }} />
+                            </IconButton>
+                            <IconButton size="small" sx={{ p: 0.25 }} onClick={() => setEditingBudgetId(null)}>
+                              <Close sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Box>
+                        }
+                      />
+                    </ListItem>
+                  )}
                   {group.budgetItems.map((budgetItem, budgetIndex) => (
                     <React.Fragment key={budgetItem.budgetId}>
                       {/* Budget Item Header (if has description or multiple budget items) */}
@@ -186,25 +291,109 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                               </Typography>
                             }
                             secondary={
-                              <Typography variant="caption" color="text.secondary">
-                                {formatCompactCurrency(budgetItem.actual, budgetItem.currency)} / {formatCompactCurrency(budgetItem.budgeted, budgetItem.currency)}
-                              </Typography>
+                              editingBudgetId === budgetItem.budgetId ? (
+                                <Box display="flex" alignItems="center" gap={0.5} mt={0.5}>
+                                  <TextField
+                                    size="small"
+                                    value={editValue}
+                                    onChange={(e) => setEditValue(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        const newAmount = parseFloat(editValue);
+                                        if (!isNaN(newAmount) && newAmount >= 0) {
+                                          const originalIndex = plannedExpenses.findIndex(exp => exp.budgetId === budgetItem.budgetId);
+                                          if (originalIndex !== -1) {
+                                            onEditPlannedExpense(originalIndex, { budgeted: newAmount });
+                                          }
+                                        }
+                                        setEditingBudgetId(null);
+                                      } else if (e.key === 'Escape') {
+                                        setEditingBudgetId(null);
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      const newAmount = parseFloat(editValue);
+                                      if (!isNaN(newAmount) && newAmount >= 0) {
+                                        const originalIndex = plannedExpenses.findIndex(exp => exp.budgetId === budgetItem.budgetId);
+                                        if (originalIndex !== -1) {
+                                          onEditPlannedExpense(originalIndex, { budgeted: newAmount });
+                                        }
+                                      }
+                                      setEditingBudgetId(null);
+                                    }}
+                                    autoFocus
+                                    type="number"
+                                    inputProps={{ min: 0, step: 'any' }}
+                                    sx={{ width: 100, '& input': { py: 0.5, px: 1, fontSize: '0.75rem', textAlign: 'right' } }}
+                                  />
+                                  <IconButton size="small" sx={{ p: 0.25 }} onClick={() => {
+                                    const newAmount = parseFloat(editValue);
+                                    if (!isNaN(newAmount) && newAmount >= 0) {
+                                      const originalIndex = plannedExpenses.findIndex(exp => exp.budgetId === budgetItem.budgetId);
+                                      if (originalIndex !== -1) {
+                                        onEditPlannedExpense(originalIndex, { budgeted: newAmount });
+                                      }
+                                    }
+                                    setEditingBudgetId(null);
+                                  }}>
+                                    <Check sx={{ fontSize: 16, color: 'success.main' }} />
+                                  </IconButton>
+                                  <IconButton size="small" sx={{ p: 0.25 }} onClick={() => setEditingBudgetId(null)}>
+                                    <Close sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Box>
+                              ) : (
+                                <Typography variant="caption" color="text.secondary">
+                                  {formatCompactCurrency(budgetItem.actual, budgetItem.currency)} / {formatCompactCurrency(budgetItem.budgeted, budgetItem.currency)}
+                                </Typography>
+                              )
                             }
                           />
                           <ListItemSecondaryAction>
-                            <Box sx={{ width: 60 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={getCompactProgressWidth(budgetItem.actual, budgetItem.budgeted)}
-                                sx={{
-                                  height: 3,
-                                  borderRadius: 1,
-                                  backgroundColor: 'action.selected',
-                                  '& .MuiLinearProgress-bar': {
-                                    backgroundColor: getCompactProgressColor(budgetItem.actual, budgetItem.budgeted)
-                                  }
-                                }}
-                              />
+                            <Box display="flex" alignItems="center" gap={0.5}>
+                              {editingBudgetId !== budgetItem.budgetId && (
+                                <>
+                                  <IconButton
+                                    edge="end"
+                                    size="small"
+                                    onClick={() => {
+                                      setEditingBudgetId(budgetItem.budgetId);
+                                      setEditValue(String(budgetItem.budgeted));
+                                    }}
+                                    title="Edit budgeted amount"
+                                  >
+                                    <Edit sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                  <IconButton
+                                    edge="end"
+                                    size="small"
+                                    onClick={() => {
+                                      const originalIndex = plannedExpenses.findIndex(exp => exp.budgetId === budgetItem.budgetId);
+                                      if (originalIndex !== -1 && window.confirm(`Delete planned expense "${budgetItem.description || budgetItem.subCategoryId.name}"?`)) {
+                                        onDeletePlannedExpense(originalIndex);
+                                      }
+                                    }}
+                                    title="Delete planned expense"
+                                    sx={{ color: 'error.main' }}
+                                  >
+                                    <Delete sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </>
+                              )}
+                              <Box sx={{ width: 60 }}>
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={getCompactProgressWidth(budgetItem.actual, budgetItem.budgeted)}
+                                  sx={{
+                                    height: 3,
+                                    borderRadius: 1,
+                                    backgroundColor: 'action.selected',
+                                    '& .MuiLinearProgress-bar': {
+                                      backgroundColor: getCompactProgressColor(budgetItem.actual, budgetItem.budgeted)
+                                    }
+                                  }}
+                                />
+                              </Box>
                             </Box>
                           </ListItemSecondaryAction>
                         </ListItem>

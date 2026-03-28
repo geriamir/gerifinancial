@@ -53,6 +53,8 @@ const ProjectExpensesList: React.FC<ProjectExpensesListProps> = ({
   projectCurrency,
   projectType,
   availableCategories,
+  onEditPlannedExpense,
+  onDeletePlannedExpense,
   onAddPlannedExpense,
   onRemoveFromProject,
   onExpensesMoved}) => {
@@ -112,6 +114,8 @@ const ProjectExpensesList: React.FC<ProjectExpensesListProps> = ({
                     projectCurrency={projectCurrency}
                     projectType={projectType}
                     onRemoveFromProject={onRemoveFromProject}
+                    onEditPlannedExpense={onEditPlannedExpense}
+                    onDeletePlannedExpense={onDeletePlannedExpense}
                     moveExpenseToPlanned={async (transactionId: string, categoryId: string, subCategoryId: string, budgetId?: string) => {
                       if (!projectId) {
                         console.error('Project ID is required to move expense');
@@ -158,6 +162,8 @@ const ProjectExpensesList: React.FC<ProjectExpensesListProps> = ({
                     projectCurrency={projectCurrency}
                     projectType={projectType}
                     onRemoveFromProject={onRemoveFromProject}
+                    onEditPlannedExpense={onEditPlannedExpense}
+                    onDeletePlannedExpense={onDeletePlannedExpense}
                     moveExpenseToPlanned={async (transactionId: string, categoryId: string, subCategoryId: string, budgetId?: string) => {
                       if (!projectId) {
                         console.error('Project ID is required to move expense');
