@@ -147,6 +147,7 @@ describe('CreditCardService', () => {
       const transactions = [];
       for (let i = 0; i < 6; i++) {
         const date = new Date();
+        date.setDate(15); // Use mid-month to avoid month-overflow flakiness
         date.setMonth(date.getMonth() - i);
         transactions.push({
           identifier: `test-txn-${4 + i}`,
