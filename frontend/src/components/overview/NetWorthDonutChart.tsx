@@ -139,6 +139,7 @@ function useNetWorthData(): NetWorthData {
           pensionSummary,
           realEstateSummary,
           rsuSummary,
+          exchangeRatesResult,
         ] = await Promise.allSettled([
           bankAccountsApi.getBalanceSummary(),
           foreignCurrencyApi.getCurrencySummary(),
@@ -146,9 +147,27 @@ function useNetWorthData(): NetWorthData {
           pensionApi.getSummary(),
           realEstateApi.getSummary(),
           rsuApi.portfolio.getSummary(),
+          foreignCurrencyApi.getExchangeRates({ baseCurrency: 'ILS' }),
         ]);
 
         if (cancelled) return;
+
+        // Build exchange rate lookup (currency → ILS multiplier)
+        const rates: Record<string, number> = { ILS: 1 };
+        if (exchangeRatesResult.status === 'fulfilled') {
+          for (const r of exchangeRatesResult.value.rates || []) {
+            // baseCurrency=ILS: fromCurrency=ILS, toCurrency=USD, rate = how many USD per 1 ILS
+            // To convert USD→ILS we need 1/rate
+            if (r.toCurrency && r.rate) {
+              rates[r.toCurrency] = 1 / r.rate;
+            }
+          }
+        }
+        const toILS = (amount: number, currency: string): number => {
+          if (!currency || currency === 'ILS') return amount;
+          const rate = rates[currency];
+          return rate ? amount * rate : amount;
+        };
 
         const assets: AssetSource[] = [];
         let totalLiabilities = 0;
@@ -185,9 +204,9 @@ function useNetWorthData(): NetWorthData {
           }
         }
 
-        // RSU Portfolio — Mid-term
+        // RSU Portfolio — Mid-term (vested post-tax value only, excludes unvested & sold)
         if (rsuSummary.status === 'fulfilled') {
-          const total = rsuSummary.value?.summary?.totalPortfolioValue || 0;
+          const total = rsuSummary.value?.summary?.vestedLiquidValue || 0;
           if (total > 0) {
             assets.push({
               name: 'RSU Portfolio',
@@ -206,12 +225,17 @@ function useNetWorthData(): NetWorthData {
 
           for (const inv of investments) {
             if (inv.status !== 'active') continue;
-            const cashBalance = inv.cashBalance || 0;
+            const invCurrency = inv.currency || 'ILS';
+            const cashBalance = toILS(inv.cashBalance || 0, invCurrency);
             let mmHoldings = 0;
             let otherHoldings = 0;
 
             for (const h of inv.holdings || []) {
-              const val = h.marketValue || (h.quantity * (h.currentPrice || 0));
+              const hCurrency = h.currency || invCurrency;
+              const val = toILS(
+                h.marketValue || (h.quantity * (h.currentPrice || 0)),
+                hCurrency
+              );
               if (h.holdingType === 'money_market') {
                 mmHoldings += val;
               } else {
@@ -247,10 +271,11 @@ function useNetWorthData(): NetWorthData {
           }
         }
 
-        // Real Estate — Long-term (equity = estimatedValue - pending installments)
+        // Real Estate — Long-term
         if (realEstateSummary.status === 'fulfilled') {
           const summary = realEstateSummary.value;
-          const equity = summary.totalEstimatedValue || 0;
+          const reCurrency = summary.currency || 'ILS';
+          const equity = toILS(summary.totalEstimatedValue || 0, reCurrency);
           if (equity > 0) {
             assets.push({
               name: 'Real Estate',
@@ -260,7 +285,7 @@ function useNetWorthData(): NetWorthData {
             });
           }
           // Liabilities: pending installments
-          const pendingInstallments = summary.totalInstallments || 0;
+          const pendingInstallments = toILS(summary.totalInstallments || 0, reCurrency);
           if (pendingInstallments > 0) {
             totalLiabilities += pendingInstallments;
           }
@@ -268,7 +293,8 @@ function useNetWorthData(): NetWorthData {
 
         // Pension — Long-term
         if (pensionSummary.status === 'fulfilled') {
-          const total = pensionSummary.value?.totalBalance || 0;
+          const penCurrency = pensionSummary.value?.currency || 'ILS';
+          const total = toILS(pensionSummary.value?.totalBalance || 0, penCurrency);
           if (total > 0) {
             assets.push({
               name: 'Pension',
