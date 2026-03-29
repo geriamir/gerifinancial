@@ -385,6 +385,8 @@ const NetWorthDonutChart: React.FC = () => {
                     dataKey="value"
                     cx="50%"
                     cy="50%"
+                    startAngle={90}
+                    endAngle={-270}
                     outerRadius={140}
                     innerRadius={115}
                     paddingAngle={1}
@@ -401,6 +403,8 @@ const NetWorthDonutChart: React.FC = () => {
                     dataKey="value"
                     cx="50%"
                     cy="50%"
+                    startAngle={90}
+                    endAngle={-270}
                     outerRadius={112}
                     innerRadius={88}
                     paddingAngle={1}
@@ -418,6 +422,8 @@ const NetWorthDonutChart: React.FC = () => {
                       dataKey="value"
                       cx="50%"
                       cy="50%"
+                      startAngle={90}
+                      endAngle={-270}
                       outerRadius={85}
                       innerRadius={68}
                       paddingAngle={0}
