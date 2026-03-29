@@ -392,7 +392,7 @@ const NetWorthDonutChart: React.FC = () => {
         ) : (
           <>
             {/* Chart */}
-            <Box sx={{ width: '100%', height: 300, position: 'relative' }}>
+            <Box sx={{ width: '100%', height: 320, position: 'relative' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   {/* Outer ring: Asset categories */}
@@ -403,17 +403,18 @@ const NetWorthDonutChart: React.FC = () => {
                     cy="50%"
                     startAngle={90}
                     endAngle={-270}
-                    outerRadius={140}
-                    innerRadius={115}
+                    outerRadius={150}
+                    innerRadius={122}
                     paddingAngle={1}
                     strokeWidth={0}
+                    isAnimationActive={false}
                   >
                     {outerRingData.map((entry, i) => (
                       <Cell key={`outer-${i}`} fill={entry.color} />
                     ))}
                   </Pie>
 
-                  {/* Middle ring: Individual sources */}
+                  {/* Middle ring: Individual sources (clickable) */}
                   <Pie
                     data={middleRingData}
                     dataKey="value"
@@ -421,10 +422,11 @@ const NetWorthDonutChart: React.FC = () => {
                     cy="50%"
                     startAngle={90}
                     endAngle={-270}
-                    outerRadius={112}
-                    innerRadius={88}
+                    outerRadius={118}
+                    innerRadius={86}
                     paddingAngle={1}
                     strokeWidth={0}
+                    isAnimationActive={false}
                   >
                     {middleRingData.map((entry, i) => (
                       <Cell
@@ -445,10 +447,11 @@ const NetWorthDonutChart: React.FC = () => {
                       cy="50%"
                       startAngle={90}
                       endAngle={-270}
-                      outerRadius={85}
-                      innerRadius={68}
+                      outerRadius={82}
+                      innerRadius={58}
                       paddingAngle={0}
                       strokeWidth={0}
+                      isAnimationActive={false}
                     >
                       {innerRingData.map((entry, i) => (
                         <Cell key={`inner-${i}`} fill={entry.color} />
