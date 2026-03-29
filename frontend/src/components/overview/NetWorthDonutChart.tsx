@@ -58,6 +58,7 @@ const CATEGORY_COLORS = {
 const SOURCE_ROUTES: Record<string, string> = {
   'Bank Accounts': '/banks',
   'Foreign Currency': '/foreign-currency',
+  'Money Market': '/investments',
   'RSU Portfolio': '/rsus',
   'Investments': '/investments',
   'Real Estate': '/real-estate',
@@ -67,6 +68,7 @@ const SOURCE_ROUTES: Record<string, string> = {
 const SOURCE_COLORS: Record<string, string> = {
   'Bank Accounts': '#1e88e5',
   'Foreign Currency': '#64b5f6',
+  'Money Market': '#4fc3f7',
   'RSU Portfolio': '#8e24aa',
   'Investments': '#ba68c8',
   'Real Estate': '#00897b',
@@ -133,14 +135,14 @@ function useNetWorthData(): NetWorthData {
         const [
           balanceSummary,
           fxSummary,
-          investmentSummary,
+          investmentsResult,
           pensionSummary,
           realEstateSummary,
           rsuSummary,
         ] = await Promise.allSettled([
           bankAccountsApi.getBalanceSummary(),
           foreignCurrencyApi.getCurrencySummary(),
-          investmentApi.getPortfolioSummary(),
+          investmentApi.getUserInvestments(),
           pensionApi.getSummary(),
           realEstateApi.getSummary(),
           rsuApi.portfolio.getSummary(),
@@ -196,13 +198,49 @@ function useNetWorthData(): NetWorthData {
           }
         }
 
-        // Investment accounts — Mid-term
-        if (investmentSummary.status === 'fulfilled') {
-          const total = investmentSummary.value?.totalValue || 0;
-          if (total > 0) {
+        // Investments — split money market (liquid) from rest (mid-term)
+        if (investmentsResult.status === 'fulfilled') {
+          const investments = investmentsResult.value.investments || [];
+          let moneyMarketTotal = 0;
+          let otherTotal = 0;
+
+          for (const inv of investments) {
+            if (inv.status !== 'active') continue;
+            const cashBalance = inv.cashBalance || 0;
+            let mmHoldings = 0;
+            let otherHoldings = 0;
+
+            for (const h of inv.holdings || []) {
+              const val = h.marketValue || (h.quantity * (h.currentPrice || 0));
+              if (h.holdingType === 'money_market') {
+                mmHoldings += val;
+              } else {
+                otherHoldings += val;
+              }
+            }
+
+            // Distribute cash balance proportionally, or to other if no holdings
+            const totalHoldings = mmHoldings + otherHoldings;
+            if (totalHoldings > 0) {
+              moneyMarketTotal += mmHoldings + cashBalance * (mmHoldings / totalHoldings);
+              otherTotal += otherHoldings + cashBalance * (otherHoldings / totalHoldings);
+            } else {
+              otherTotal += cashBalance;
+            }
+          }
+
+          if (moneyMarketTotal > 0) {
+            assets.push({
+              name: 'Money Market',
+              value: moneyMarketTotal,
+              category: 'liquid',
+              color: SOURCE_COLORS['Money Market'],
+            });
+          }
+          if (otherTotal > 0) {
             assets.push({
               name: 'Investments',
-              value: total,
+              value: otherTotal,
               category: 'mid-term',
               color: SOURCE_COLORS['Investments'],
             });

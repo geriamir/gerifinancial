@@ -34,7 +34,7 @@ const holdingSnapshotSchema = new mongoose.Schema({
   },
   holdingType: {
     type: String,
-    enum: ['stock', 'bond', 'etf', 'mutual_fund', 'other'],
+    enum: ['stock', 'bond', 'etf', 'mutual_fund', 'money_market', 'other'],
     default: 'stock'
   }
 }, { _id: false });

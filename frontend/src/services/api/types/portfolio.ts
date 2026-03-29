@@ -6,7 +6,7 @@ export interface PortfolioInvestment {
   marketValue?: number;
   currency: string;
   sector?: string;
-  investmentType: 'stock' | 'bond' | 'etf' | 'mutual_fund' | 'commodity' | 'cash' | 'other';
+  investmentType: 'stock' | 'bond' | 'etf' | 'mutual_fund' | 'money_market' | 'commodity' | 'cash' | 'other';
   paperId?: string;
   isin?: string;
   exchange?: string;

@@ -8,7 +8,7 @@ export interface Holding {
   costBasis?: number;
   currency: string;
   sector?: string;
-  holdingType: 'stock' | 'bond' | 'etf' | 'mutual_fund' | 'option' | 'future' | 'other';
+  holdingType: 'stock' | 'bond' | 'etf' | 'mutual_fund' | 'money_market' | 'option' | 'future' | 'other';
   // Option-specific fields
   underlyingSymbol?: string;
   strikePrice?: number;
