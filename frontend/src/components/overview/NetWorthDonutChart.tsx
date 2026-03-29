@@ -537,7 +537,9 @@ const NetWorthDonutChart: React.FC = () => {
                 </Box>
               ))}
               {innerRingData.length > 0 &&
-                innerRingData.map((entry) => (
+                innerRingData
+                  .filter((entry) => !entry.isFiller)
+                  .map((entry) => (
                   <Box key={entry.name} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Box
                       sx={{

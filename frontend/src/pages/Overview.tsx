@@ -36,7 +36,7 @@ const Overview: React.FC = () => {
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' },
+            gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
             gap: 3,
             mb: 3,
           }}
