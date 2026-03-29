@@ -13,7 +13,6 @@ import {
   Pie,
   Cell,
   ResponsiveContainer,
-  Tooltip,
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import { bankAccountsApi } from '../../services/api/bank';
@@ -103,32 +102,15 @@ const formatCompact = (amount: number, currency = 'ILS'): string => {
 };
 
 // ---------- Custom tooltip ----------
+// Recharts v3 shared <Tooltip> only works for one Pie at a time,
+// so we manage hover state manually across all rings.
 
-const ChartTooltip: React.FC<any> = ({ active, payload }) => {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
-  if (d.isFiller || d.name === '_filler') return null;
-  return (
-    <Box
-      sx={{
-        bgcolor: 'background.paper',
-        border: 1,
-        borderColor: 'divider',
-        borderRadius: 2,
-        px: 1.5,
-        py: 1,
-        boxShadow: 3,
-      }}
-    >
-      <Typography variant="body2" fontWeight={600}>
-        {d.name}
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        {formatCurrency(d.value)}
-      </Typography>
-    </Box>
-  );
-};
+interface TooltipData {
+  name: string;
+  value: number;
+  x: number;
+  y: number;
+}
 
 // ---------- Data fetching hook ----------
 
@@ -297,11 +279,30 @@ function useNetWorthData(): NetWorthData {
 const NetWorthDonutChart: React.FC = () => {
   const navigate = useNavigate();
   const data = useNetWorthData();
+  const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+  const chartRef = React.useRef<HTMLDivElement>(null);
 
   const handleSliceClick = useCallback((entry: any) => {
     const route = SOURCE_ROUTES[entry.name];
     if (route) navigate(route);
   }, [navigate]);
+
+  const handleCellMouseEnter = useCallback((entry: any, e: React.MouseEvent) => {
+    if (entry.isFiller || entry.name === '_filler') return;
+    const rect = chartRef.current?.getBoundingClientRect();
+    if (rect) {
+      setTooltip({
+        name: entry.name,
+        value: entry.value,
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+    }
+  }, []);
+
+  const handleCellMouseLeave = useCallback(() => {
+    setTooltip(null);
+  }, []);
 
   // Outer ring: asset categories (Liquid / Mid-term / Long-term)
   const outerRingData = useMemo(() => {
@@ -392,7 +393,7 @@ const NetWorthDonutChart: React.FC = () => {
         ) : (
           <>
             {/* Chart */}
-            <Box sx={{ width: '100%', height: 320, position: 'relative' }}>
+            <Box ref={chartRef} sx={{ width: '100%', height: 320, position: 'relative' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   {/* Outer ring: Asset categories */}
@@ -410,7 +411,12 @@ const NetWorthDonutChart: React.FC = () => {
                     isAnimationActive={false}
                   >
                     {outerRingData.map((entry, i) => (
-                      <Cell key={`outer-${i}`} fill={entry.color} />
+                      <Cell
+                        key={`outer-${i}`}
+                        fill={entry.color}
+                        onMouseEnter={(e: any) => handleCellMouseEnter(entry, e)}
+                        onMouseLeave={handleCellMouseLeave}
+                      />
                     ))}
                   </Pie>
 
@@ -434,6 +440,8 @@ const NetWorthDonutChart: React.FC = () => {
                         fill={entry.color}
                         cursor="pointer"
                         onClick={() => handleSliceClick(entry)}
+                        onMouseEnter={(e: any) => handleCellMouseEnter(entry, e)}
+                        onMouseLeave={handleCellMouseLeave}
                       />
                     ))}
                   </Pie>
@@ -454,14 +462,46 @@ const NetWorthDonutChart: React.FC = () => {
                       isAnimationActive={false}
                     >
                       {innerRingData.map((entry, i) => (
-                        <Cell key={`inner-${i}`} fill={entry.color} />
+                        <Cell
+                          key={`inner-${i}`}
+                          fill={entry.color}
+                          onMouseEnter={(e: any) => handleCellMouseEnter(entry, e)}
+                          onMouseLeave={handleCellMouseLeave}
+                        />
                       ))}
                     </Pie>
                   )}
 
-                  <Tooltip content={<ChartTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
+
+              {/* Custom tooltip */}
+              {tooltip && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    left: tooltip.x + 12,
+                    top: tooltip.y - 10,
+                    bgcolor: 'background.paper',
+                    border: 1,
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    px: 1.5,
+                    py: 1,
+                    boxShadow: 3,
+                    pointerEvents: 'none',
+                    zIndex: 10,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Typography variant="body2" fontWeight={600}>
+                    {tooltip.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {formatCurrency(tooltip.value)}
+                  </Typography>
+                </Box>
+              )}
 
               {/* Center label — net worth */}
               <Box
