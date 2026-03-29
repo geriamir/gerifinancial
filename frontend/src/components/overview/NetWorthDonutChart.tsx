@@ -385,13 +385,16 @@ const NetWorthDonutChart: React.FC = () => {
     return result;
   }, [data.assets]);
 
-  // Middle ring: individual asset sources
+  // Middle ring: individual asset sources — sorted by category to align with outer ring
   const middleRingData = useMemo(() => {
-    return data.assets.map((a) => ({
-      name: a.name,
-      value: a.value,
-      color: a.color,
-    }));
+    const categoryOrder: Record<string, number> = { 'liquid': 0, 'mid-term': 1, 'long-term': 2 };
+    return [...data.assets]
+      .sort((a, b) => (categoryOrder[a.category] ?? 9) - (categoryOrder[b.category] ?? 9))
+      .map((a) => ({
+        name: a.name,
+        value: a.value,
+        color: a.color,
+      }));
   }, [data.assets]);
 
   // Inner ring: liabilities with transparent filler to show ratio vs assets
