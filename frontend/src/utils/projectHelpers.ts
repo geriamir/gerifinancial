@@ -4,20 +4,23 @@ import { ProjectBudget, CategoryBudget } from '../types/projects';
  * Helper functions for project operations
  */
 
+/** Extract plain string ID from a populated Mongoose object or raw string */
+const getId = (val: any): string => (typeof val === 'object' && val !== null) ? val._id : val;
+
 /**
  * Update a planned expense in the project's category budgets
  */
 export const updatePlannedExpense = (
   project: ProjectBudget,
   index: number,
-  updates: Record<string, any>
+  updates: Partial<CategoryBudget>
 ): CategoryBudget[] => {
   const categoryBreakdownItem = (project.categoryBreakdown || [])[index];
   if (!categoryBreakdownItem) {
     return project.categoryBudgets || [];
   }
 
-  const newBudgetedAmount = updates.budgetedAmount ?? updates.budgeted ?? categoryBreakdownItem.budgeted;
+  const newBudgetedAmount = updates.budgetedAmount ?? categoryBreakdownItem.budgeted;
   const newCategoryId = (typeof updates.categoryId === 'string') ? updates.categoryId : categoryBreakdownItem.categoryId._id;
   const newSubCategoryId = (typeof updates.subCategoryId === 'string') ? updates.subCategoryId : categoryBreakdownItem.subCategoryId._id;
 
@@ -33,7 +36,6 @@ export const updatePlannedExpense = (
   // Find the corresponding index in categoryBudgets array
   // categoryBudgets entries may have populated objects or raw strings for IDs
   const categoryBudgets = [...(project.categoryBudgets || [])];
-  const getId = (val: any): string => (typeof val === 'object' && val !== null) ? val._id : val;
   const targetCatId = categoryBreakdownItem.categoryId._id;
   const targetSubId = categoryBreakdownItem.subCategoryId._id;
   const budgetIndex = categoryBudgets.findIndex(budget => 
@@ -62,7 +64,6 @@ export const deletePlannedExpense = (
     return project.categoryBudgets || [];
   }
 
-  const getId = (val: any): string => (typeof val === 'object' && val !== null) ? val._id : val;
   const targetCatId = categoryBreakdownItem.categoryId._id;
   const targetSubId = categoryBreakdownItem.subCategoryId._id;
 

@@ -198,6 +198,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                             }
                           }}
                           title="Delete planned expense"
+                          aria-label="Delete planned expense"
                           sx={{ p: 0.25, color: 'error.main' }}
                         >
                           <Delete sx={{ fontSize: 16 }} />
@@ -258,6 +259,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                                           onOpenEditDialog(budgetItem);
                                         }}
                                         title="Edit planned expense"
+                                        aria-label="Edit planned expense"
                                         sx={{ p: 0.25 }}
                                       >
                                         <Edit sx={{ fontSize: 16 }} />
@@ -272,6 +274,7 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                                           }
                                         }}
                                         title="Delete planned expense"
+                                        aria-label="Delete planned expense"
                                         sx={{ p: 0.25, color: 'error.main' }}
                                       >
                                         <Delete sx={{ fontSize: 16 }} />

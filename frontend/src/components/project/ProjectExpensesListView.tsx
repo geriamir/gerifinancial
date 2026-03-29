@@ -178,6 +178,7 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                             }
                           }}
                           title="Delete planned expense"
+                          aria-label="Delete planned expense"
                           sx={{ color: 'error.main' }}
                         >
                           <Delete sx={{ fontSize: 16 }} />
@@ -225,6 +226,7 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                                 size="small"
                                 onClick={() => onOpenEditDialog(budgetItem)}
                                 title="Edit planned expense"
+                                aria-label="Edit planned expense"
                               >
                                 <Edit sx={{ fontSize: 16 }} />
                               </IconButton>
@@ -238,6 +240,7 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                                   }
                                 }}
                                 title="Delete planned expense"
+                                aria-label="Delete planned expense"
                                 sx={{ color: 'error.main' }}
                               >
                                 <Delete sx={{ fontSize: 16 }} />

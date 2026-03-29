@@ -10,12 +10,14 @@ const config = require('../shared/config');
  */
 
 async function removeEmptyBudgetItems() {
+  let ownConnection = false;
   try {
     logger.info('Starting removal of empty categoryBudget items from ProjectBudget documents...');
 
     if (mongoose.connection.readyState !== 1) {
       await mongoose.connect(config.mongodbUri);
-      logger.info(`Connected to MongoDB at ${config.mongodbUri}`);
+      ownConnection = true;
+      logger.info(`Connected to MongoDB at ${mongoose.connection.host}/${mongoose.connection.name}`);
     }
 
     const allProjects = await ProjectBudget.find({
@@ -65,6 +67,10 @@ async function removeEmptyBudgetItems() {
   } catch (error) {
     logger.error('❌ Fatal error during migration:', error);
     throw error;
+  } finally {
+    if (ownConnection) {
+      await mongoose.disconnect();
+    }
   }
 }
 

@@ -511,9 +511,15 @@ class ProjectOverviewService {
     const plannedExpensesGrouped = await this.getPlannedExpensesGrouped(project);
     
     // Create enhanced category breakdown that combines budget info with grouped transactions
-    // Include all explicitly created budgets (e.g. template defaults) even if amount is 0
+    // Filter out truly empty/legacy budgets, then build enhanced breakdown
     const categoryBreakdown = await Promise.all(
       project.categoryBudgets
+        .filter((budget) => {
+          const hasDescription = typeof budget.description === 'string' && budget.description.trim() !== '';
+          const hasBudgetAmount = typeof budget.budgetedAmount === 'number' && budget.budgetedAmount !== 0;
+          const hasAllocatedTransactions = Array.isArray(budget.allocatedTransactions) && budget.allocatedTransactions.length > 0;
+          return hasDescription || hasBudgetAmount || hasAllocatedTransactions;
+        })
         .map(async (budget) => {
         // Calculate actual amount in project currency (for totals/progress)
         const actualAmountInProjectCurrency = await this.calculateActualAmountForBudget(budget, project.currency);

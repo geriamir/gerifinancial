@@ -36,7 +36,7 @@ interface ProjectExpensesListProps {
     }>;
   }>;
   // Editing handlers
-  onEditPlannedExpense: (index: number, updates: Record<string, any>) => void;
+  onEditPlannedExpense: (index: number, updates: Partial<CategoryBudget>) => void;
   onDeletePlannedExpense: (index: number) => void;
   onAddPlannedExpense: (expense: Partial<CategoryBudget>) => void; // Changed to accept expense data
   // Unplanned expense handlers
