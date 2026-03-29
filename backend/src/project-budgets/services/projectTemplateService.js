@@ -96,6 +96,7 @@ class ProjectTemplateService {
         categoryBudgets.push({
           categoryId: category._id,
           subCategoryId: subCategory._id,
+          description: budgetItem.name,
           budgetedAmount: 0,
           actualAmount: 0,
           currency: budgetItem.currency || projectCurrency

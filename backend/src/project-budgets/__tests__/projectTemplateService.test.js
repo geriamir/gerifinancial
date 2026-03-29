@@ -89,6 +89,7 @@ describe('ProjectTemplateService', () => {
         expect(budget.categoryId.toString()).toBe(travelCategory._id.toString());
         expect(budget.budgetedAmount).toBe(0);
         expect(budget.subCategoryId).toBeDefined();
+        expect(budget.description).toBeDefined();
       });
 
       // Verify subcategories were created
