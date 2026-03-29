@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -12,6 +12,8 @@ import { useInvestment } from '../contexts/InvestmentContext';
 import { InvestmentAccountList } from '../components/investment/InvestmentAccountList';
 import { InvestmentTransactionList } from '../components/investments/InvestmentTransactionList';
 import { PortfolioTimelineChart } from '../components/investment/PortfolioTimelineChart';
+import { investmentApi } from '../services/api/investments';
+import type { Holding } from '../services/api/types/investment';
 
 const Investments: React.FC = () => {
   const {
@@ -48,6 +50,15 @@ const Investments: React.FC = () => {
       refreshPortfolioSummary()
     ]);
   };
+
+  const handleHoldingTypeChange = useCallback(async (investmentId: string, symbol: string, holdingType: Holding['holdingType']) => {
+    try {
+      await investmentApi.updateHoldingType(investmentId, symbol, holdingType);
+      await refreshInvestments();
+    } catch (err: any) {
+      console.error('Failed to update holding type:', err);
+    }
+  }, [refreshInvestments]);
 
   if (loading && !portfolioSummary) {
     return (
@@ -105,6 +116,7 @@ const Investments: React.FC = () => {
           holdingsPriceData={holdingsPriceData}
           loading={loading}
           onRefresh={handleRefresh}
+          onHoldingTypeChange={handleHoldingTypeChange}
         />
 
         {/* Investment Transactions */}

@@ -633,6 +633,18 @@ class InvestmentService {
     }
   }
 
+  async updateHoldingType(investmentId, userId, symbol, holdingType) {
+    const investment = await Investment.findOne({ _id: investmentId, userId });
+    if (!investment) throw new Error('Investment not found');
+
+    const holding = investment.holdings.find(h => h.symbol === symbol);
+    if (!holding) throw new Error(`Holding with symbol "${symbol}" not found`);
+
+    holding.holdingType = holdingType;
+    await investment.save();
+    return investment;
+  }
+
   async deleteInvestment(investmentId, userId) {
     try {
       const result = await Investment.findOneAndUpdate(

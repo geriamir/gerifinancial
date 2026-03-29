@@ -279,6 +279,30 @@ router.post('/prices/update', async (req, res) => {
   }
 });
 
+// Update a holding's type (e.g., reclassify mutual_fund → money_market)
+router.put('/:investmentId/holdings/:symbol/type', async (req, res) => {
+  try {
+    const { holdingType } = req.body;
+    const validTypes = Object.values(require('../constants/investmentConstants').HOLDING_TYPES);
+    
+    if (!holdingType || !validTypes.includes(holdingType)) {
+      return res.status(400).json({ error: `Invalid holdingType. Must be one of: ${validTypes.join(', ')}` });
+    }
+
+    const investment = await investmentService.updateHoldingType(
+      req.params.investmentId,
+      req.user.id,
+      decodeURIComponent(req.params.symbol),
+      holdingType
+    );
+
+    res.json({ message: 'Holding type updated', investment });
+  } catch (error) {
+    logger.error('Error updating holding type:', error);
+    res.status(error.message.includes('not found') ? 404 : 500).json({ error: error.message });
+  }
+});
+
 // Delete/close an investment account
 router.delete('/:id', async (req, res) => {
   try {
