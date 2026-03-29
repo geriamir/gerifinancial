@@ -177,11 +177,10 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                               onDeletePlannedExpense(originalIndex);
                             }
                           }}
-                          title="Delete planned expense"
                           aria-label="Delete planned expense"
                           sx={{ color: 'error.main' }}
                         >
-                          <Delete sx={{ fontSize: 16 }} />
+                          <Delete fontSize="small" />
                         </IconButton>
                       </>
                     )}
@@ -225,10 +224,9 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                                 edge="end"
                                 size="small"
                                 onClick={() => onOpenEditDialog(budgetItem)}
-                                title="Edit planned expense"
                                 aria-label="Edit planned expense"
                               >
-                                <Edit sx={{ fontSize: 16 }} />
+                                <Edit fontSize="small" />
                               </IconButton>
                               <IconButton
                                 edge="end"
@@ -239,11 +237,10 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                                     onDeletePlannedExpense(originalIndex);
                                   }
                                 }}
-                                title="Delete planned expense"
                                 aria-label="Delete planned expense"
                                 sx={{ color: 'error.main' }}
                               >
-                                <Delete sx={{ fontSize: 16 }} />
+                                <Delete fontSize="small" />
                               </IconButton>
                               <Box sx={{ width: 60 }}>
                                 <LinearProgress

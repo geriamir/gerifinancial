@@ -197,11 +197,10 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                               onDeletePlannedExpense(originalIndex);
                             }
                           }}
-                          title="Delete planned expense"
                           aria-label="Delete planned expense"
                           sx={{ p: 0.25, color: 'error.main' }}
                         >
-                          <Delete sx={{ fontSize: 16 }} />
+                          <Delete fontSize="small" />
                         </IconButton>
                       </Box>
                     )}
@@ -258,11 +257,10 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                                           e.stopPropagation();
                                           onOpenEditDialog(budgetItem);
                                         }}
-                                        title="Edit planned expense"
                                         aria-label="Edit planned expense"
                                         sx={{ p: 0.25 }}
                                       >
-                                        <Edit sx={{ fontSize: 16 }} />
+                                        <Edit fontSize="small" />
                                       </IconButton>
                                       <IconButton
                                         size="small"
@@ -273,11 +271,10 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                                             onDeletePlannedExpense(originalIndex);
                                           }
                                         }}
-                                        title="Delete planned expense"
                                         aria-label="Delete planned expense"
                                         sx={{ p: 0.25, color: 'error.main' }}
                                       >
-                                        <Delete sx={{ fontSize: 16 }} />
+                                        <Delete fontSize="small" />
                                       </IconButton>
                                     </Box>
                                   </TableCell>
