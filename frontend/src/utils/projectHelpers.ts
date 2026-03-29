@@ -1,4 +1,4 @@
-import { ProjectBudget, CategoryBreakdownItem, CategoryBudget } from '../types/projects';
+import { ProjectBudget, CategoryBudget } from '../types/projects';
 
 /**
  * Helper functions for project operations
@@ -10,19 +10,23 @@ import { ProjectBudget, CategoryBreakdownItem, CategoryBudget } from '../types/p
 export const updatePlannedExpense = (
   project: ProjectBudget,
   index: number,
-  updates: Partial<CategoryBreakdownItem>
+  updates: Record<string, any>
 ): CategoryBudget[] => {
   const categoryBreakdownItem = (project.categoryBreakdown || [])[index];
   if (!categoryBreakdownItem) {
     return project.categoryBudgets || [];
   }
 
+  const newBudgetedAmount = updates.budgetedAmount ?? updates.budgeted ?? categoryBreakdownItem.budgeted;
+  const newCategoryId = (typeof updates.categoryId === 'string') ? updates.categoryId : categoryBreakdownItem.categoryId._id;
+  const newSubCategoryId = (typeof updates.subCategoryId === 'string') ? updates.subCategoryId : categoryBreakdownItem.subCategoryId._id;
+
   const updatedBudgetItem: CategoryBudget = {
-    categoryId: categoryBreakdownItem.categoryId._id,
-    subCategoryId: categoryBreakdownItem.subCategoryId._id,
-    budgetedAmount: updates.budgeted || categoryBreakdownItem.budgeted,
+    categoryId: newCategoryId,
+    subCategoryId: newSubCategoryId,
+    budgetedAmount: newBudgetedAmount,
     actualAmount: categoryBreakdownItem.actual,
-    description: '',
+    description: updates.description ?? categoryBreakdownItem.description ?? '',
     currency: updates.currency || categoryBreakdownItem.currency
   };
   

@@ -36,7 +36,7 @@ interface ProjectExpensesListProps {
     }>;
   }>;
   // Editing handlers
-  onEditPlannedExpense: (index: number, updates: Partial<CategoryBreakdownItem>) => void;
+  onEditPlannedExpense: (index: number, updates: Record<string, any>) => void;
   onDeletePlannedExpense: (index: number) => void;
   onAddPlannedExpense: (expense: Partial<CategoryBudget>) => void; // Changed to accept expense data
   // Unplanned expense handlers
@@ -62,10 +62,36 @@ const ProjectExpensesList: React.FC<ProjectExpensesListProps> = ({
   const [movingExpense, setMovingExpense] = useState<string | null>(null);
   const [currentView, setCurrentView] = useState<ViewType>('table');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<{
+    index: number;
+    categoryId: string;
+    subCategoryId: string;
+    budgetedAmount: number;
+    description?: string;
+    currency?: string;
+  } | null>(null);
 
   const handleAddExpense = (expense: Partial<CategoryBudget>) => {
     onAddPlannedExpense(expense);
     setAddDialogOpen(false);
+  };
+
+  const handleEditExpense = (index: number, updates: Partial<CategoryBudget>) => {
+    onEditPlannedExpense(index, updates);
+    setEditingExpense(null);
+  };
+
+  const handleOpenEditDialog = (budgetItem: CategoryBreakdownItem) => {
+    const originalIndex = plannedExpenses.findIndex(e => e.budgetId === budgetItem.budgetId);
+    if (originalIndex === -1) return;
+    setEditingExpense({
+      index: originalIndex,
+      categoryId: budgetItem.categoryId._id,
+      subCategoryId: budgetItem.subCategoryId._id,
+      budgetedAmount: budgetItem.budgeted,
+      description: budgetItem.description,
+      currency: budgetItem.currency
+    });
   };
 
   return (
@@ -114,7 +140,7 @@ const ProjectExpensesList: React.FC<ProjectExpensesListProps> = ({
                     projectCurrency={projectCurrency}
                     projectType={projectType}
                     onRemoveFromProject={onRemoveFromProject}
-                    onEditPlannedExpense={onEditPlannedExpense}
+                    onOpenEditDialog={handleOpenEditDialog}
                     onDeletePlannedExpense={onDeletePlannedExpense}
                     moveExpenseToPlanned={async (transactionId: string, categoryId: string, subCategoryId: string, budgetId?: string) => {
                       if (!projectId) {
@@ -162,7 +188,7 @@ const ProjectExpensesList: React.FC<ProjectExpensesListProps> = ({
                     projectCurrency={projectCurrency}
                     projectType={projectType}
                     onRemoveFromProject={onRemoveFromProject}
-                    onEditPlannedExpense={onEditPlannedExpense}
+                    onOpenEditDialog={handleOpenEditDialog}
                     onDeletePlannedExpense={onDeletePlannedExpense}
                     moveExpenseToPlanned={async (transactionId: string, categoryId: string, subCategoryId: string, budgetId?: string) => {
                       if (!projectId) {
@@ -194,11 +220,13 @@ const ProjectExpensesList: React.FC<ProjectExpensesListProps> = ({
         </Box>
       </CardContent>
 
-      {/* Add Planned Expense Dialog */}
+      {/* Add/Edit Planned Expense Dialog */}
       <AddPlannedExpenseDialog
-        open={addDialogOpen}
-        onClose={() => setAddDialogOpen(false)}
+        open={addDialogOpen || !!editingExpense}
+        onClose={() => { setAddDialogOpen(false); setEditingExpense(null); }}
         onAdd={handleAddExpense}
+        onEdit={handleEditExpense}
+        editingExpense={editingExpense}
         availableCategories={availableCategories}
         projectCurrency={projectCurrency}
         projectType={projectType}

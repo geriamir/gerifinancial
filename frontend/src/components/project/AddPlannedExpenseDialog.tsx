@@ -32,7 +32,16 @@ interface AddPlannedExpenseDialogProps {
     }>;
   }>;
   projectCurrency: string;
-  projectType?: string; // Add project type to determine UI behavior
+  projectType?: string;
+  editingExpense?: {
+    index: number;
+    categoryId: string;
+    subCategoryId: string;
+    budgetedAmount: number;
+    description?: string;
+    currency?: string;
+  } | null;
+  onEdit?: (index: number, updates: Partial<CategoryBudget>) => void;
 }
 
 const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
@@ -41,8 +50,11 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
   onAdd,
   availableCategories,
   projectCurrency,
-  projectType
+  projectType,
+  editingExpense,
+  onEdit
 }) => {
+  const isEditing = !!editingExpense;
   // For vacation projects, find Travel/Vacation category and pre-select it
   const expenseCategories = availableCategories.filter(cat => cat.type === 'Expense');
   const isVacationProject = projectType === 'vacation';
@@ -54,14 +66,36 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
     cat.name.toLowerCase().includes('trip')
   );
 
-  const [formData, setFormData] = useState<Partial<CategoryBudget>>({
-    categoryId: isVacationProject && travelCategory ? travelCategory._id : '',
-    subCategoryId: undefined,
-    budgetedAmount: 0,
-    actualAmount: 0,
-    description: '',
-    currency: projectCurrency
-  });
+  const getDefaultFormData = (): Partial<CategoryBudget> => {
+    if (editingExpense) {
+      return {
+        categoryId: editingExpense.categoryId,
+        subCategoryId: editingExpense.subCategoryId,
+        budgetedAmount: editingExpense.budgetedAmount,
+        actualAmount: 0,
+        description: editingExpense.description || '',
+        currency: editingExpense.currency || projectCurrency
+      };
+    }
+    return {
+      categoryId: isVacationProject && travelCategory ? travelCategory._id : '',
+      subCategoryId: undefined,
+      budgetedAmount: 0,
+      actualAmount: 0,
+      description: '',
+      currency: projectCurrency
+    };
+  };
+
+  const [formData, setFormData] = useState<Partial<CategoryBudget>>(getDefaultFormData());
+  
+  // Update form when editingExpense changes
+  useEffect(() => {
+    if (open) {
+      setFormData(getDefaultFormData());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editingExpense]);
   
   // Ref for description input to handle focus
   const descriptionInputRef = useRef<HTMLInputElement>(null);
@@ -84,34 +118,28 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
   const selectedCategory = expenseCategories.find(cat => cat._id === formData.categoryId);
 
   const handleSubmit = () => {
-    // Validate required fields
     if (!formData.categoryId) {
-      return; // Could show error message
+      return;
     }
 
-    // Clean up the data before submitting - remove actualAmount and ensure subCategoryId is set
     const cleanedData: Partial<CategoryBudget> = {
       categoryId: formData.categoryId,
-      subCategoryId: formData.subCategoryId || '', // Default to empty string if undefined
+      subCategoryId: formData.subCategoryId || '',
       budgetedAmount: formData.budgetedAmount || 0,
       description: formData.description,
-      currency: formData.currency || projectCurrency // Use selected currency, fallback to project currency
+      currency: formData.currency || projectCurrency
     };
 
-    onAdd(cleanedData);
+    if (isEditing && onEdit && editingExpense) {
+      onEdit(editingExpense.index, cleanedData);
+    } else {
+      onAdd(cleanedData);
+    }
     handleClose();
   };
 
   const handleClose = () => {
-    // Reset form - for vacation projects, keep the travel category selected
-    setFormData({
-      categoryId: isVacationProject && travelCategory ? travelCategory._id : '',
-      subCategoryId: undefined,
-      budgetedAmount: 0,
-      actualAmount: 0,
-      description: '',
-      currency: projectCurrency
-    });
+    setFormData(getDefaultFormData());
     onClose();
   };
 
@@ -122,7 +150,7 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
       maxWidth="sm" 
       fullWidth
     >
-      <DialogTitle>Add Planned Expense</DialogTitle>
+      <DialogTitle>{isEditing ? 'Edit Planned Expense' : 'Add Planned Expense'}</DialogTitle>
       <DialogContent>
         <Box 
           component="form" 
@@ -279,7 +307,7 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
           variant="contained"
           disabled={!formData.categoryId}
         >
-          Add Expense
+          {isEditing ? 'Save' : 'Add Expense'}
         </Button>
       </DialogActions>
     </Dialog>
