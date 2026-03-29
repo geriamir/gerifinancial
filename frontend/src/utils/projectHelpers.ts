@@ -31,10 +31,14 @@ export const updatePlannedExpense = (
   };
   
   // Find the corresponding index in categoryBudgets array
+  // categoryBudgets entries may have populated objects or raw strings for IDs
   const categoryBudgets = [...(project.categoryBudgets || [])];
+  const getId = (val: any): string => (typeof val === 'object' && val !== null) ? val._id : val;
+  const targetCatId = categoryBreakdownItem.categoryId._id;
+  const targetSubId = categoryBreakdownItem.subCategoryId._id;
   const budgetIndex = categoryBudgets.findIndex(budget => 
-    budget.categoryId === categoryBreakdownItem.categoryId._id &&
-    budget.subCategoryId === categoryBreakdownItem.subCategoryId._id
+    getId(budget.categoryId) === targetCatId &&
+    getId(budget.subCategoryId) === targetSubId
   );
   
   if (budgetIndex >= 0) {
@@ -58,9 +62,13 @@ export const deletePlannedExpense = (
     return project.categoryBudgets || [];
   }
 
+  const getId = (val: any): string => (typeof val === 'object' && val !== null) ? val._id : val;
+  const targetCatId = categoryBreakdownItem.categoryId._id;
+  const targetSubId = categoryBreakdownItem.subCategoryId._id;
+
   return (project.categoryBudgets || []).filter(budget => !(
-    budget.categoryId === categoryBreakdownItem.categoryId._id &&
-    budget.subCategoryId === categoryBreakdownItem.subCategoryId._id
+    getId(budget.categoryId) === targetCatId &&
+    getId(budget.subCategoryId) === targetSubId
   ));
 };
 
