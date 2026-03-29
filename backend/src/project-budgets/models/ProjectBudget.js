@@ -175,8 +175,8 @@ projectBudgetSchema.virtual('durationDays').get(function() {
 projectBudgetSchema.set('toJSON', { virtuals: true });
 projectBudgetSchema.set('toObject', { virtuals: true });
 
-// Pre-save middleware
-projectBudgetSchema.pre('save', function(next) {
+// Pre-validate middleware — runs before schema validation so defaults are set in time
+projectBudgetSchema.pre('validate', function(next) {
   // Default funding source description to type label if not provided
   const FUNDING_TYPE_LABELS = {
     ongoing_funds: 'Ongoing Funds',
@@ -191,6 +191,11 @@ projectBudgetSchema.pre('save', function(next) {
     }
   });
 
+  next();
+});
+
+// Pre-save middleware
+projectBudgetSchema.pre('save', function(next) {
   // Update impactsOtherBudgets based on funding sources
   this.impactsOtherBudgets = this.fundingSources.some(source => source.type === 'ongoing_funds');
   
