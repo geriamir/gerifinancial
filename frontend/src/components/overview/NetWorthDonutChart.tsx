@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -15,6 +15,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
+import { useNavigate } from 'react-router-dom';
 import { bankAccountsApi } from '../../services/api/bank';
 import { foreignCurrencyApi } from '../../services/api/foreignCurrency';
 import { investmentApi } from '../../services/api/investments';
@@ -53,6 +54,15 @@ const CATEGORY_COLORS = {
   liquid: { main: '#42a5f5', light: '#90caf9' },
   'mid-term': { main: '#ab47bc', light: '#ce93d8' },
   'long-term': { main: '#26a69a', light: '#80cbc4' },
+};
+
+const SOURCE_ROUTES: Record<string, string> = {
+  'Bank Accounts': '/banks',
+  'Foreign Currency': '/foreign-currency',
+  'RSU Portfolio': '/rsus',
+  'Investments': '/investments',
+  'Real Estate': '/real-estate',
+  'Pension': '/pension',
 };
 
 const SOURCE_COLORS: Record<string, string> = {
@@ -285,7 +295,13 @@ function useNetWorthData(): NetWorthData {
 // ---------- Main component ----------
 
 const NetWorthDonutChart: React.FC = () => {
+  const navigate = useNavigate();
   const data = useNetWorthData();
+
+  const handleSliceClick = useCallback((entry: any) => {
+    const route = SOURCE_ROUTES[entry.name];
+    if (route) navigate(route);
+  }, [navigate]);
 
   // Outer ring: asset categories (Liquid / Mid-term / Long-term)
   const outerRingData = useMemo(() => {
@@ -411,7 +427,12 @@ const NetWorthDonutChart: React.FC = () => {
                     strokeWidth={0}
                   >
                     {middleRingData.map((entry, i) => (
-                      <Cell key={`mid-${i}`} fill={entry.color} />
+                      <Cell
+                        key={`mid-${i}`}
+                        fill={entry.color}
+                        cursor="pointer"
+                        onClick={() => handleSliceClick(entry)}
+                      />
                     ))}
                   </Pie>
 
