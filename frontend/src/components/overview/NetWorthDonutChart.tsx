@@ -97,6 +97,7 @@ const formatCompact = (amount: number, currency = 'ILS'): string => {
 const ChartTooltip: React.FC<any> = ({ active, payload }) => {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
+  if (d.isFiller || d.name === '_filler') return null;
   return (
     <Box
       sx={{
@@ -312,15 +313,22 @@ const NetWorthDonutChart: React.FC = () => {
     }));
   }, [data.assets]);
 
-  // Inner ring: liabilities
+  // Inner ring: liabilities with transparent filler to show ratio vs assets
   const innerRingData = useMemo(() => {
-    if (data.liabilities.length === 0) return [];
-    return data.liabilities.map((l) => ({
-      name: l.name,
-      value: l.value,
-      color: l.color,
-    }));
-  }, [data.liabilities]);
+    if (data.liabilities.length === 0 || data.totalAssets === 0) return [];
+    const fillerValue = data.totalAssets - data.totalLiabilities;
+    return [
+      ...data.liabilities.map((l) => ({
+        name: l.name,
+        value: l.value,
+        color: l.color,
+        isFiller: false,
+      })),
+      ...(fillerValue > 0
+        ? [{ name: '_filler', value: fillerValue, color: 'transparent', isFiller: true }]
+        : []),
+    ];
+  }, [data.liabilities, data.totalAssets, data.totalLiabilities]);
 
   if (data.loading) {
     return (
@@ -379,7 +387,7 @@ const NetWorthDonutChart: React.FC = () => {
                     cy="50%"
                     outerRadius={140}
                     innerRadius={115}
-                    paddingAngle={2}
+                    paddingAngle={1}
                     strokeWidth={0}
                   >
                     {outerRingData.map((entry, i) => (
