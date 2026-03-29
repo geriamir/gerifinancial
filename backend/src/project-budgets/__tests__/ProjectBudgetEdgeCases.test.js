@@ -278,7 +278,7 @@ describe('ProjectBudget Model - Edge Cases and Missing Coverage', () => {
       await expect(project.save()).rejects.toThrow();
     });
 
-    test('should require funding source description', async () => {
+    test('should default funding source description to type label when not provided', async () => {
       const projectData = {
         userId: testUser._id,
         name: 'Funding Description Required',
@@ -289,12 +289,13 @@ describe('ProjectBudget Model - Edge Cases and Missing Coverage', () => {
           type: 'savings',
           expectedAmount: 1000,
           currency: 'ILS'
-          // Missing description
+          // Missing description — should default to 'Savings'
         }]
       };
 
       const project = new ProjectBudget(projectData);
-      await expect(project.save()).rejects.toThrow();
+      const saved = await project.save();
+      expect(saved.fundingSources[0].description).toBe('Savings');
     });
 
     test('should enforce maximum description length for funding sources', async () => {
