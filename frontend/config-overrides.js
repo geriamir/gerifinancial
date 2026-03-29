@@ -7,17 +7,26 @@ module.exports = function override(config, env) {
     path: require.resolve('path-browserify'),
   };
 
-  // In CI, remove the forked TS checker to prevent OOM.
-  // Type checking is handled by a dedicated tsc step in CI.
-  if (process.env.CI) {
-    try {
-      const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
+  // Tune ForkTsCheckerWebpackPlugin to prevent OOM.
+  // In CI, remove it entirely (type checking handled by dedicated tsc step).
+  // In dev, increase its memory limit.
+  try {
+    const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
+    if (process.env.CI) {
       config.plugins = config.plugins.filter(
         (plugin) => !(plugin instanceof ForkTsCheckerWebpackPlugin)
       );
-    } catch (e) {
-      // Plugin not found — nothing to remove
+    } else {
+      config.plugins.forEach((plugin) => {
+        if (plugin instanceof ForkTsCheckerWebpackPlugin) {
+          plugin.options = plugin.options || {};
+          plugin.options.typescript = plugin.options.typescript || {};
+          plugin.options.typescript.memoryLimit = 4096;
+        }
+      });
     }
+  } catch (e) {
+    // Plugin not found — nothing to configure
   }
 
   return config;
