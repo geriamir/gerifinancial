@@ -88,8 +88,8 @@ describe('ProjectTemplateService', () => {
       result.forEach(budget => {
         expect(budget.categoryId.toString()).toBe(travelCategory._id.toString());
         expect(budget.budgetedAmount).toBe(0);
-        expect(budget.currency).toBe('ILS');
         expect(budget.subCategoryId).toBeDefined();
+        expect(budget.description).toBeDefined();
       });
 
       // Verify subcategories were created
@@ -98,6 +98,18 @@ describe('ProjectTemplateService', () => {
         userId: testUser._id
       });
       expect(subCategories.length).toBeGreaterThan(0);
+
+      // Flights should default to USD, others to project currency (ILS)
+      const flightsBudget = result.find(b => {
+        const sub = subCategories.find(s => s._id.toString() === b.subCategoryId.toString());
+        return sub && sub.name === 'Flights';
+      });
+      const nonFlightsBudgets = result.filter(b => {
+        const sub = subCategories.find(s => s._id.toString() === b.subCategoryId.toString());
+        return !sub || sub.name !== 'Flights';
+      });
+      expect(flightsBudget.currency).toBe('USD');
+      nonFlightsBudgets.forEach(b => expect(b.currency).toBe('ILS'));
     });
 
     test('should create Travel category if it does not exist', async () => {
@@ -179,8 +191,9 @@ describe('ProjectTemplateService', () => {
       );
 
       expect(result).toBeInstanceOf(Array);
+      // Flights overrides to USD; others use default project currency (ILS)
       result.forEach(budget => {
-        expect(budget.currency).toBe('ILS'); // Default currency
+        expect(['ILS', 'USD']).toContain(budget.currency);
       });
     });
 
@@ -284,7 +297,7 @@ describe('ProjectTemplateService', () => {
         expect(budget.categoryId).toBeDefined();
         expect(budget.subCategoryId).toBeDefined();
         expect(budget.budgetedAmount).toBe(0);
-        expect(budget.currency).toBe('ILS');
+        expect(['ILS', 'USD']).toContain(budget.currency);
       });
     });
   });

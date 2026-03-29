@@ -9,7 +9,7 @@ const PROJECT_TEMPLATES = {
     categoryName: 'Travel', // Use existing Travel category
     // Default budget line items created for new projects
     defaultBudgetItems: [
-      { name: 'Flights', keywords: ['flights', 'airline', 'טיסות', 'airlines'] },
+      { name: 'Flights', keywords: ['flights', 'airline', 'טיסות', 'airlines'], currency: 'USD' },
       { name: 'Hotels', keywords: ['hotels', 'accommodation', 'בתי מלון'] },
       { name: 'Travel Insurance', keywords: ['travel insurance', 'ביטוח נסיעות'] }
     ],
@@ -96,9 +96,10 @@ class ProjectTemplateService {
         categoryBudgets.push({
           categoryId: category._id,
           subCategoryId: subCategory._id,
+          description: budgetItem.name,
           budgetedAmount: 0,
           actualAmount: 0,
-          currency: projectCurrency
+          currency: budgetItem.currency || projectCurrency
         });
       }
 

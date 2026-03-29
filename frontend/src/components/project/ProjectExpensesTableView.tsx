@@ -19,6 +19,7 @@ import {
   FormControl} from '@mui/material';
 import {
   Delete,
+  Edit,
   TrendingFlat,
   Warning,
   Undo
@@ -41,6 +42,8 @@ interface ProjectExpensesTableViewProps {
   projectCurrency: string;
   projectType?: string;
   onRemoveFromProject: (transactionId: string) => void;
+  onOpenEditDialog: (budgetItem: CategoryBreakdownItem) => void;
+  onDeletePlannedExpense: (index: number) => void;
   moveExpenseToPlanned: (transactionId: string, categoryId: string, subCategoryId: string, budgetId?: string) => Promise<void>;
   onUnassignExpense?: (transactionId: string) => Promise<void>;
   movingExpense: string | null;
@@ -53,6 +56,8 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
   projectCurrency,
   projectType,
   onRemoveFromProject,
+  onOpenEditDialog,
+  onDeletePlannedExpense,
   moveExpenseToPlanned,
   onUnassignExpense,
   movingExpense
@@ -180,7 +185,26 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                       />
                     </Box>
                   </TableCell>
-                  <TableCell></TableCell>
+                  <TableCell>
+                    {group.budgetItems.length === 1 && (
+                      <Box display="flex" gap={0.5} onClick={(e) => e.stopPropagation()}>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            const item = group.budgetItems[0];
+                            const originalIndex = plannedExpenses.findIndex(e => e.budgetId === item.budgetId);
+                            if (originalIndex !== -1 && window.confirm(`Delete planned expense "${item.description || item.subCategoryId.name}"?`)) {
+                              onDeletePlannedExpense(originalIndex);
+                            }
+                          }}
+                          aria-label="Delete planned expense"
+                          sx={{ p: 0.25, color: 'error.main' }}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    )}
+                  </TableCell>
                   <TableCell align="right" sx={{ minWidth: 120 }}>
                     <Typography variant="body2" fontWeight="medium">
                       {formatCompactCurrency(totalActual, projectCurrency, 20)}
@@ -225,7 +249,35 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                                       />
                                     </Box>
                                   </TableCell>
-                                  <TableCell></TableCell>
+                                  <TableCell>
+                                    <Box display="flex" gap={0.5}>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onOpenEditDialog(budgetItem);
+                                        }}
+                                        aria-label="Edit planned expense"
+                                        sx={{ p: 0.25 }}
+                                      >
+                                        <Edit fontSize="small" />
+                                      </IconButton>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const originalIndex = plannedExpenses.findIndex(e => e.budgetId === budgetItem.budgetId);
+                                          if (originalIndex !== -1 && window.confirm(`Delete planned expense "${budgetItem.description || budgetItem.subCategoryId.name}"?`)) {
+                                            onDeletePlannedExpense(originalIndex);
+                                          }
+                                        }}
+                                        aria-label="Delete planned expense"
+                                        sx={{ p: 0.25, color: 'error.main' }}
+                                      >
+                                        <Delete fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </TableCell>
                                   <TableCell align="right" sx={{ minWidth: 120 }}>
                                     <Typography variant="body2" fontWeight="medium">
                                       {formatCompactCurrency(budgetItem.actual, budgetItem.currency, 20)}

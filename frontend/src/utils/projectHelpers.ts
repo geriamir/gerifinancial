@@ -1,8 +1,11 @@
-import { ProjectBudget, CategoryBreakdownItem, CategoryBudget } from '../types/projects';
+import { ProjectBudget, CategoryBudget } from '../types/projects';
 
 /**
  * Helper functions for project operations
  */
+
+/** Extract plain string ID from a populated Mongoose object or raw string */
+const getId = (val: any): string => (typeof val === 'object' && val !== null) ? val._id : val;
 
 /**
  * Update a planned expense in the project's category budgets
@@ -10,27 +13,34 @@ import { ProjectBudget, CategoryBreakdownItem, CategoryBudget } from '../types/p
 export const updatePlannedExpense = (
   project: ProjectBudget,
   index: number,
-  updates: Partial<CategoryBreakdownItem>
+  updates: Partial<CategoryBudget>
 ): CategoryBudget[] => {
   const categoryBreakdownItem = (project.categoryBreakdown || [])[index];
   if (!categoryBreakdownItem) {
     return project.categoryBudgets || [];
   }
 
+  const newBudgetedAmount = updates.budgetedAmount ?? categoryBreakdownItem.budgeted;
+  const newCategoryId = (typeof updates.categoryId === 'string') ? updates.categoryId : categoryBreakdownItem.categoryId._id;
+  const newSubCategoryId = (typeof updates.subCategoryId === 'string') ? updates.subCategoryId : categoryBreakdownItem.subCategoryId._id;
+
   const updatedBudgetItem: CategoryBudget = {
-    categoryId: categoryBreakdownItem.categoryId._id,
-    subCategoryId: categoryBreakdownItem.subCategoryId._id,
-    budgetedAmount: updates.budgeted || categoryBreakdownItem.budgeted,
+    categoryId: newCategoryId,
+    subCategoryId: newSubCategoryId,
+    budgetedAmount: newBudgetedAmount,
     actualAmount: categoryBreakdownItem.actual,
-    description: '',
+    description: updates.description ?? categoryBreakdownItem.description ?? '',
     currency: updates.currency || categoryBreakdownItem.currency
   };
   
   // Find the corresponding index in categoryBudgets array
+  // categoryBudgets entries may have populated objects or raw strings for IDs
   const categoryBudgets = [...(project.categoryBudgets || [])];
+  const targetCatId = categoryBreakdownItem.categoryId._id;
+  const targetSubId = categoryBreakdownItem.subCategoryId._id;
   const budgetIndex = categoryBudgets.findIndex(budget => 
-    budget.categoryId === categoryBreakdownItem.categoryId._id &&
-    budget.subCategoryId === categoryBreakdownItem.subCategoryId._id
+    getId(budget.categoryId) === targetCatId &&
+    getId(budget.subCategoryId) === targetSubId
   );
   
   if (budgetIndex >= 0) {
@@ -54,9 +64,12 @@ export const deletePlannedExpense = (
     return project.categoryBudgets || [];
   }
 
+  const targetCatId = categoryBreakdownItem.categoryId._id;
+  const targetSubId = categoryBreakdownItem.subCategoryId._id;
+
   return (project.categoryBudgets || []).filter(budget => !(
-    budget.categoryId === categoryBreakdownItem.categoryId._id &&
-    budget.subCategoryId === categoryBreakdownItem.subCategoryId._id
+    getId(budget.categoryId) === targetCatId &&
+    getId(budget.subCategoryId) === targetSubId
   ));
 };
 

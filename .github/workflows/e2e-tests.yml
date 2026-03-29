@@ -50,6 +50,7 @@ jobs:
       env:
         CI: true
         GENERATE_SOURCEMAP: 'false'
+        NODE_OPTIONS: '--max-old-space-size=4096'
 
     - name: Run E2E Tests
       run: npm run test:e2e:ci

@@ -45,14 +45,20 @@ class ProjectBudgetService {
       // Create project tag
       await project.createProjectTag();
 
+      // Re-fetch with populated category references for the overview
+      const populatedProject = await ProjectBudget.findById(project._id)
+        .populate('projectTag', 'name')
+        .populate('categoryBudgets.categoryId', 'name type')
+        .populate('categoryBudgets.subCategoryId', 'name');
+
       logger.info(`Created project budget for user ${userId}: ${projectData.name} with ${categoryBudgets.length} category budgets`);
       
       // Get overview with calculated totals before returning
-      const overview = await projectOverviewService.getProjectOverview(project);
+      const overview = await projectOverviewService.getProjectOverview(populatedProject);
       
       // Return enriched project data with calculated totals
       return {
-        ...project.toObject(),
+        ...populatedProject.toObject(),
         ...overview
       };
     } catch (error) {
@@ -113,12 +119,18 @@ class ProjectBudgetService {
       await project.save();
       logger.info(`Updated project budget: ${projectId}`);
       
+      // Re-fetch with populated category references after save
+      const populatedProject = await ProjectBudget.findById(projectId)
+        .populate('projectTag', 'name')
+        .populate('categoryBudgets.categoryId', 'name type')
+        .populate('categoryBudgets.subCategoryId', 'name');
+      
       // Get overview with calculated totals
-      const overview = await projectOverviewService.getProjectOverview(project);
+      const overview = await projectOverviewService.getProjectOverview(populatedProject);
       
       // Return enriched project data with calculated totals
       return {
-        ...project.toObject(),
+        ...populatedProject.toObject(),
         ...overview
       };
     } catch (error) {

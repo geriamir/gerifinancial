@@ -21,6 +21,7 @@ import {
   ExpandLess,
   ExpandMore,
   Delete,
+  Edit,
   TrendingFlat,
   CheckCircle,
   Warning,
@@ -47,6 +48,8 @@ interface ProjectExpensesListViewProps {
   projectCurrency: string;
   projectType?: string;
   onRemoveFromProject: (transactionId: string) => void;
+  onOpenEditDialog: (budgetItem: CategoryBreakdownItem) => void;
+  onDeletePlannedExpense: (index: number) => void;
   moveExpenseToPlanned: (transactionId: string, categoryId: string, subCategoryId: string) => Promise<void>;
   movingExpense: string | null;
 }
@@ -58,6 +61,8 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
   projectCurrency,
   projectType,
   onRemoveFromProject,
+  onOpenEditDialog,
+  onDeletePlannedExpense,
   moveExpenseToPlanned,
   movingExpense
 }) => {
@@ -158,9 +163,31 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                   }
                 />
                 <ListItemSecondaryAction>
-                  <IconButton edge="end" size="small">
-                    {isExpanded ? <ExpandLess /> : <ExpandMore />}
-                  </IconButton>
+                  <Box display="flex" alignItems="center" gap={0.5}>
+                    {group.budgetItems.length === 1 && (
+                      <>
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const item = group.budgetItems[0];
+                            const originalIndex = plannedExpenses.findIndex(exp => exp.budgetId === item.budgetId);
+                            if (originalIndex !== -1 && window.confirm(`Delete planned expense "${item.description || item.subCategoryId.name}"?`)) {
+                              onDeletePlannedExpense(originalIndex);
+                            }
+                          }}
+                          aria-label="Delete planned expense"
+                          sx={{ color: 'error.main' }}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </>
+                    )}
+                    <IconButton edge="end" size="small">
+                      {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                    </IconButton>
+                  </Box>
                 </ListItemSecondaryAction>
               </ListItemButton>
 
@@ -192,19 +219,43 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                             }
                           />
                           <ListItemSecondaryAction>
-                            <Box sx={{ width: 60 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={getCompactProgressWidth(budgetItem.actual, budgetItem.budgeted)}
-                                sx={{
-                                  height: 3,
-                                  borderRadius: 1,
-                                  backgroundColor: 'action.selected',
-                                  '& .MuiLinearProgress-bar': {
-                                    backgroundColor: getCompactProgressColor(budgetItem.actual, budgetItem.budgeted)
+                            <Box display="flex" alignItems="center" gap={0.5}>
+                              <IconButton
+                                edge="end"
+                                size="small"
+                                onClick={() => onOpenEditDialog(budgetItem)}
+                                aria-label="Edit planned expense"
+                              >
+                                <Edit fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                edge="end"
+                                size="small"
+                                onClick={() => {
+                                  const originalIndex = plannedExpenses.findIndex(exp => exp.budgetId === budgetItem.budgetId);
+                                  if (originalIndex !== -1 && window.confirm(`Delete planned expense "${budgetItem.description || budgetItem.subCategoryId.name}"?`)) {
+                                    onDeletePlannedExpense(originalIndex);
                                   }
                                 }}
-                              />
+                                aria-label="Delete planned expense"
+                                sx={{ color: 'error.main' }}
+                              >
+                                <Delete fontSize="small" />
+                              </IconButton>
+                              <Box sx={{ width: 60 }}>
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={getCompactProgressWidth(budgetItem.actual, budgetItem.budgeted)}
+                                  sx={{
+                                    height: 3,
+                                    borderRadius: 1,
+                                    backgroundColor: 'action.selected',
+                                    '& .MuiLinearProgress-bar': {
+                                      backgroundColor: getCompactProgressColor(budgetItem.actual, budgetItem.budgeted)
+                                    }
+                                  }}
+                                />
+                              </Box>
                             </Box>
                           </ListItemSecondaryAction>
                         </ListItem>

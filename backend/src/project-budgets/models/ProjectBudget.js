@@ -175,6 +175,25 @@ projectBudgetSchema.virtual('durationDays').get(function() {
 projectBudgetSchema.set('toJSON', { virtuals: true });
 projectBudgetSchema.set('toObject', { virtuals: true });
 
+// Pre-validate middleware — runs before schema validation so defaults are set in time
+projectBudgetSchema.pre('validate', function(next) {
+  // Default funding source description to type label if not provided
+  const FUNDING_TYPE_LABELS = {
+    ongoing_funds: 'Ongoing Funds',
+    loan: 'Loan',
+    bonus: 'Bonus',
+    savings: 'Savings',
+    other: 'Other'
+  };
+  this.fundingSources.forEach(source => {
+    if (!source.description) {
+      source.description = FUNDING_TYPE_LABELS[source.type] || source.type;
+    }
+  });
+
+  next();
+});
+
 // Pre-save middleware
 projectBudgetSchema.pre('save', function(next) {
   // Update impactsOtherBudgets based on funding sources
@@ -251,7 +270,7 @@ projectBudgetSchema.methods.updateActualAmounts = async function() {
 projectBudgetSchema.methods.addFundingSource = function(sourceData) {
   this.fundingSources.push({
     type: sourceData.type,
-    description: sourceData.description,
+    description: sourceData.description || '',
     expectedAmount: sourceData.expectedAmount,
     availableAmount: sourceData.availableAmount || 0,
     limit: sourceData.limit || null,
