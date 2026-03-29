@@ -171,17 +171,6 @@ const ProjectExpensesListView: React.FC<ProjectExpensesListViewProps> = ({
                           size="small"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onOpenEditDialog(group.budgetItems[0]);
-                          }}
-                          title="Edit planned expense"
-                        >
-                          <Edit sx={{ fontSize: 16 }} />
-                        </IconButton>
-                        <IconButton
-                          edge="end"
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
                             const item = group.budgetItems[0];
                             const originalIndex = plannedExpenses.findIndex(exp => exp.budgetId === item.budgetId);
                             if (originalIndex !== -1 && window.confirm(`Delete planned expense "${item.description || item.subCategoryId.name}"?`)) {

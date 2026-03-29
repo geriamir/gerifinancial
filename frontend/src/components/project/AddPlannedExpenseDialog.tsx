@@ -173,8 +173,8 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
             inputRef={descriptionInputRef}
           />
 
-          {/* Category Selection - Hidden for vacation projects */}
-          {!isVacationProject && (
+          {/* Category Selection - Hidden for vacation projects and when editing */}
+          {!isEditing && !isVacationProject && (
             <FormControl fullWidth required>
               <InputLabel>Category</InputLabel>
               <Select
@@ -201,8 +201,8 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
             </FormControl>
           )}
 
-          {/* Subcategory Selection with Autocomplete */}
-          {selectedCategory && selectedCategory.subCategories && selectedCategory.subCategories.length > 0 && (
+          {/* Subcategory Selection with Autocomplete - Hidden when editing */}
+          {!isEditing && selectedCategory && selectedCategory.subCategories && selectedCategory.subCategories.length > 0 && (
             <Autocomplete
               fullWidth
               options={[
@@ -280,8 +280,8 @@ const AddPlannedExpenseDialog: React.FC<AddPlannedExpenseDialogProps> = ({
             }}
           />
 
-          {/* Preview */}
-          {formData.categoryId && (
+          {/* Preview - only for new expenses */}
+          {!isEditing && formData.categoryId && (
             <Box mt={2} p={2} bgcolor="action.hover" borderRadius={1}>
               <Typography variant="body2" color="text.secondary">
                 Preview:

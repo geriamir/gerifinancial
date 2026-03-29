@@ -190,14 +190,6 @@ const ProjectExpensesTableView: React.FC<ProjectExpensesTableViewProps> = ({
                       <Box display="flex" gap={0.5} onClick={(e) => e.stopPropagation()}>
                         <IconButton
                           size="small"
-                          onClick={() => onOpenEditDialog(group.budgetItems[0])}
-                          title="Edit planned expense"
-                          sx={{ p: 0.25 }}
-                        >
-                          <Edit sx={{ fontSize: 16 }} />
-                        </IconButton>
-                        <IconButton
-                          size="small"
                           onClick={() => {
                             const item = group.budgetItems[0];
                             const originalIndex = plannedExpenses.findIndex(e => e.budgetId === item.budgetId);
