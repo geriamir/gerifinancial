@@ -58,7 +58,7 @@ const CATEGORY_COLORS = {
 const SOURCE_ROUTES: Record<string, string> = {
   'Bank Accounts': '/banks',
   'Foreign Currency': '/foreign-currency',
-  'Money Market': '/investments',
+  'Money Market Fund': '/investments',
   'RSU Portfolio': '/rsus',
   'Investments': '/investments',
   'Real Estate': '/real-estate',
@@ -68,7 +68,7 @@ const SOURCE_ROUTES: Record<string, string> = {
 const SOURCE_COLORS: Record<string, string> = {
   'Bank Accounts': '#1e88e5',
   'Foreign Currency': '#64b5f6',
-  'Money Market': '#4fc3f7',
+  'Money Market Fund': '#4fc3f7',
   'RSU Portfolio': '#8e24aa',
   'Investments': '#ba68c8',
   'Real Estate': '#00897b',
@@ -231,10 +231,10 @@ function useNetWorthData(): NetWorthData {
 
           if (moneyMarketTotal > 0) {
             assets.push({
-              name: 'Money Market',
+              name: 'Money Market Fund',
               value: moneyMarketTotal,
               category: 'liquid',
-              color: SOURCE_COLORS['Money Market'],
+              color: SOURCE_COLORS['Money Market Fund'],
             });
           }
           if (otherTotal > 0) {

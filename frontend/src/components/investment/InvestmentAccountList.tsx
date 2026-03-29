@@ -101,7 +101,7 @@ const HOLDING_TYPE_LABELS: Record<string, string> = {
   bond: 'Bond',
   etf: 'ETF',
   mutual_fund: 'Mutual Fund',
-  money_market: 'Money Market',
+  money_market: 'Money Market Fund',
   option: 'Option',
   future: 'Future',
   other: 'Other',
