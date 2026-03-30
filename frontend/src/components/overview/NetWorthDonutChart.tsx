@@ -39,7 +39,10 @@ interface AssetSource {
 interface LiabilitySource {
   name: string;
   value: number;
+  originalValue?: number;
+  originalCurrency?: string;
   color: string;
+  route?: string;
 }
 
 interface NetWorthData {
@@ -67,10 +70,7 @@ const CATEGORY_PALETTES: Record<string, string[]> = {
   'long-term': ['#004d40', '#00695c', '#00796b', '#00897b', '#009688', '#26a69a', '#4db6ac', '#80cbc4'],
 };
 
-const LIABILITY_COLORS = {
-  main: '#ef5350',
-  light: '#e57373',
-};
+const LIABILITY_PALETTE = ['#b71c1c', '#c62828', '#d32f2f', '#e53935', '#ef5350', '#e57373', '#ef9a9a', '#ffcdd2'];
 
 // ---------- Currency formatting ----------
 
@@ -162,7 +162,7 @@ function useNetWorthData(): NetWorthData {
         };
 
         const assets: AssetSource[] = [];
-        let totalLiabilities = 0;
+        const liabilities: LiabilitySource[] = [];
 
         // ---------- Bank accounts — Liquid (per account) ----------
         if (balanceSummary.status === 'fulfilled') {
@@ -319,10 +319,17 @@ function useNetWorthData(): NetWorthData {
                 route: `/real-estate/${project._id}`,
               });
             }
-            // Liabilities: pending installments
+            // Liabilities: pending installments per project
             const pending = toILS(project.totalPendingInstallments || 0, reCurrency);
             if (pending > 0) {
-              totalLiabilities += pending;
+              liabilities.push({
+                name: project.name || 'RE Project',
+                value: pending,
+                originalValue: project.totalPendingInstallments,
+                originalCurrency: reCurrency,
+                color: '',
+                route: `/real-estate/${project._id}`,
+              });
             }
           }
         }
@@ -372,14 +379,19 @@ function useNetWorthData(): NetWorthData {
         }
 
         const totalAssets = assets.reduce((s, a) => s + a.value, 0);
+
+        // Assign colors to liabilities (red gradient, sorted by value desc)
+        liabilities.sort((a, b) => b.value - a.value);
+        liabilities.forEach((l, idx) => {
+          l.color = LIABILITY_PALETTE[idx % LIABILITY_PALETTE.length];
+        });
+        const totalLiabilities = liabilities.reduce((s, l) => s + l.value, 0);
+
         const netWorth = totalAssets - totalLiabilities;
 
         setData({
           assets,
-          liabilities:
-            totalLiabilities > 0
-              ? [{ name: 'RE Commitments', value: totalLiabilities, color: LIABILITY_COLORS.main }]
-              : [],
+          liabilities,
           totalAssets,
           totalLiabilities,
           netWorth,
@@ -473,6 +485,9 @@ const NetWorthDonutChart: React.FC = () => {
         name: l.name,
         value: l.value,
         color: l.color,
+        originalValue: l.originalValue,
+        originalCurrency: l.originalCurrency,
+        route: l.route,
         isFiller: false,
       })),
       ...(fillerValue > 0
