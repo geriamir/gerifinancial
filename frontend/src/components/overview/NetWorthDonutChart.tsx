@@ -212,68 +212,74 @@ function useNetWorthData(): NetWorthData {
           }
         }
 
-        // ---------- Investments — per account, split money market (liquid) from rest (mid-term) ----------
+        // ---------- Investments — grouped by bank account; pure money-market accounts → liquid, rest → mid-term ----------
         if (investmentsResult.status === 'fulfilled') {
           const investments = investmentsResult.value.investments || [];
 
+          // Group by bankAccountId (same logic as InvestmentAccountList)
+          const acctGroups = new Map<string, {
+            name: string;
+            currency: string;
+            mmILS: number;
+            otherILS: number;
+            cashILS: number;
+            originalTotal: number;
+          }>();
+
           for (const inv of investments) {
             if (inv.status !== 'active') continue;
+            const key = typeof inv.bankAccountId === 'object'
+              ? (inv.bankAccountId as any)?._id
+              : inv.bankAccountId;
             const invCurrency = inv.currency || 'ILS';
-            const cashBalance = toILS(inv.cashBalance || 0, invCurrency);
-            let mmHoldings = 0;
-            let otherHoldings = 0;
-            let mmOriginal = 0;
-            let otherOriginal = 0;
+
+            let group = acctGroups.get(key);
+            if (!group) {
+              const bankName = typeof inv.bankAccountId === 'object'
+                ? (inv.bankAccountId as any)?.name
+                : undefined;
+              group = {
+                name: bankName || inv.accountName || `Account ${inv.accountNumber}`,
+                currency: invCurrency,
+                mmILS: 0,
+                otherILS: 0,
+                cashILS: 0,
+                originalTotal: 0,
+              };
+              acctGroups.set(key, group);
+            }
+
+            group.cashILS += toILS(inv.cashBalance || 0, invCurrency);
+            group.originalTotal += inv.totalMarketValue || inv.totalValue || 0;
 
             for (const h of inv.holdings || []) {
               const hCurrency = h.currency || invCurrency;
-              const rawVal = h.marketValue || (h.quantity * (h.currentPrice || 0));
-              const val = toILS(rawVal, hCurrency);
+              const val = toILS(
+                h.marketValue || (h.quantity * (h.currentPrice || 0)),
+                hCurrency
+              );
               if (h.holdingType === 'money_market') {
-                mmHoldings += val;
-                mmOriginal += rawVal;
+                group.mmILS += val;
               } else {
-                otherHoldings += val;
-                otherOriginal += rawVal;
+                group.otherILS += val;
               }
             }
-
-            // Distribute cash balance proportionally
-            const totalHoldings = mmHoldings + otherHoldings;
-            let mmTotal = mmHoldings;
-            let otherTotal = otherHoldings;
-            if (totalHoldings > 0) {
-              mmTotal += cashBalance * (mmHoldings / totalHoldings);
-              otherTotal += cashBalance * (otherHoldings / totalHoldings);
-            } else {
-              otherTotal += cashBalance;
-            }
-
-            const acctName = inv.accountName || inv.accountNumber || `Investment ${inv._id.slice(-4)}`;
-
-            if (mmTotal > 0) {
-              assets.push({
-                name: acctName,
-                value: mmTotal,
-                originalValue: mmOriginal,
-                originalCurrency: invCurrency,
-                category: 'liquid',
-                color: '',
-                route: '/investments',
-              });
-            }
-            if (otherTotal > 0) {
-              assets.push({
-                name: acctName,
-                value: otherTotal,
-                originalValue: otherOriginal,
-                originalCurrency: invCurrency,
-                category: 'mid-term',
-                color: '',
-                route: '/investments',
-              });
-            }
           }
+
+          acctGroups.forEach((g) => {
+            const total = g.mmILS + g.otherILS + g.cashILS;
+            if (total <= 0) return;
+            const isAllMoneyMarket = g.otherILS === 0 && g.mmILS > 0;
+            assets.push({
+              name: g.name,
+              value: total,
+              originalValue: g.originalTotal,
+              originalCurrency: g.currency,
+              category: isAllMoneyMarket ? 'liquid' : 'mid-term',
+              color: '',
+              route: '/investments',
+            });
+          });
         }
 
         // ---------- Real Estate — Long-term (per project) ----------
@@ -301,25 +307,31 @@ function useNetWorthData(): NetWorthData {
           }
         }
 
-        // ---------- Pension — Long-term (per type+provider+owner) ----------
+        // ---------- Pension — Long-term (grouped by type+provider+owner) ----------
         if (pensionSummary.status === 'fulfilled') {
           const penCurrency = pensionSummary.value?.currency || 'ILS';
+          const pensionGroups: Record<string, { ils: number; original: number }> = {};
           for (const group of pensionSummary.value?.groups || []) {
             for (const acct of group.accounts || []) {
-              const bal = toILS(acct.balance || 0, penCurrency);
-              if (bal <= 0) continue;
+              if ((acct.balance || 0) <= 0) continue;
               const typeLabel = PRODUCT_TYPE_LABELS[group.productType] || group.productType;
-              const parts = [typeLabel, acct.provider, acct.owner].filter(Boolean);
-              assets.push({
-                name: parts.join(' · '),
-                value: bal,
-                originalValue: acct.balance,
-                originalCurrency: penCurrency,
-                category: 'long-term',
-                color: '',
-                route: '/pension',
-              });
+              const key = [typeLabel, acct.provider, acct.owner].filter(Boolean).join(' · ');
+              if (!pensionGroups[key]) pensionGroups[key] = { ils: 0, original: 0 };
+              pensionGroups[key].ils += toILS(acct.balance || 0, penCurrency);
+              pensionGroups[key].original += acct.balance || 0;
             }
+          }
+          for (const [name, totals] of Object.entries(pensionGroups)) {
+            if (totals.ils <= 0) continue;
+            assets.push({
+              name,
+              value: totals.ils,
+              originalValue: totals.original,
+              originalCurrency: penCurrency,
+              category: 'long-term',
+              color: '',
+              route: '/pension',
+            });
           }
         }
 
