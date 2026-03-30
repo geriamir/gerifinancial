@@ -235,11 +235,8 @@ function useNetWorthData(): NetWorthData {
 
             let group = acctGroups.get(key);
             if (!group) {
-              const bankName = typeof inv.bankAccountId === 'object'
-                ? (inv.bankAccountId as any)?.name
-                : undefined;
               group = {
-                name: bankName || inv.accountName || `Account ${inv.accountNumber}`,
+                name: inv.accountName || `Account ${inv.accountNumber}`,
                 currency: invCurrency,
                 mmILS: 0,
                 otherILS: 0,
