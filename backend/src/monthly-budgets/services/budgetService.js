@@ -70,20 +70,34 @@ class BudgetService {
           const actualAmounts = await this.getActualAmountsForMonth(userId, year, month);
           
           // Update actual amounts in expense budgets
-          const updatedExpenseBudgets = oldBudget.expenseBudgets.map(budget => ({
-            ...budget.toObject(),
-            actualAmount: actualAmounts.expensesBySubCategory[`${budget.categoryId._id}_${budget.subCategoryId._id}`] || 0
-          }));
-          
-          // Calculate totals
-          const totalActualExpenses = updatedExpenseBudgets.reduce((sum, budget) => sum + budget.actualAmount, 0);
+          const budgetedKeys = new Set();
+          const updatedExpenseBudgets = oldBudget.expenseBudgets.map(budget => {
+            const key = `${budget.categoryId._id}_${budget.subCategoryId._id}`;
+            budgetedKeys.add(key);
+            return {
+              ...budget.toObject(),
+              actualAmount: actualAmounts.expensesBySubCategory[key] || 0
+            };
+          });
+
+          // Include unbudgeted subcategories
+          for (const [key, amount] of Object.entries(actualAmounts.expensesBySubCategory)) {
+            if (budgetedKeys.has(key)) continue;
+            const [catId, subId] = key.split('_');
+            updatedExpenseBudgets.push({
+              categoryId: actualAmounts.categoryRefs[catId] || catId,
+              subCategoryId: actualAmounts.subCategoryRefs[subId] || subId,
+              budgetedAmount: 0,
+              actualAmount: amount
+            });
+          }
           
           return {
             ...oldBudget.toObject(),
             expenseBudgets: updatedExpenseBudgets,
             totalActualIncome: actualAmounts.totalActualIncome,
-            totalActualExpenses,
-            actualBalance: actualAmounts.totalActualIncome - totalActualExpenses
+            totalActualExpenses: actualAmounts.totalActualExpenses,
+            actualBalance: actualAmounts.totalActualIncome - actualAmounts.totalActualExpenses
           };
         }
         
@@ -101,17 +115,34 @@ class BudgetService {
       }));
       
       // Format expense budgets to match old structure
-      const formattedExpenseBudgets = expenseBudgets.map(budget => ({
-        categoryId: budget.categoryId,
-        subCategoryId: budget.subCategoryId,
-        budgetedAmount: budget.amountForMonth,
-        actualAmount: actualAmounts.expensesBySubCategory[`${budget.categoryId._id}_${budget.subCategoryId._id}`] || 0
-      }));
+      const budgetedKeys = new Set();
+      const formattedExpenseBudgets = expenseBudgets.map(budget => {
+        const key = `${budget.categoryId._id}_${budget.subCategoryId._id}`;
+        budgetedKeys.add(key);
+        return {
+          categoryId: budget.categoryId,
+          subCategoryId: budget.subCategoryId,
+          budgetedAmount: budget.amountForMonth,
+          actualAmount: actualAmounts.expensesBySubCategory[key] || 0
+        };
+      });
+
+      // Include unbudgeted subcategories that have actual expenses
+      for (const [key, amount] of Object.entries(actualAmounts.expensesBySubCategory)) {
+        if (budgetedKeys.has(key)) continue;
+        const [catId, subId] = key.split('_');
+        formattedExpenseBudgets.push({
+          categoryId: actualAmounts.categoryRefs[catId] || catId,
+          subCategoryId: actualAmounts.subCategoryRefs[subId] || subId,
+          budgetedAmount: 0,
+          actualAmount: amount
+        });
+      }
       
-      // Calculate totals
+      // Calculate totals — use actual transaction total which includes unbudgeted subcategories
       const totalBudgetedIncome = allIncomeBudgets.reduce((sum, budget) => sum + budget.amount, 0);
       const totalBudgetedExpenses = expenseBudgets.reduce((sum, budget) => sum + budget.amountForMonth, 0);
-      const totalActualExpenses = formattedExpenseBudgets.reduce((sum, budget) => sum + budget.actualAmount, 0);
+      const totalActualExpenses = actualAmounts.totalActualExpenses;
 
       // Return budget structure compatible with existing frontend
       return {
@@ -362,6 +393,8 @@ class BudgetService {
       let totalActualExpenses = 0;
       const expensesBySubCategory = {};
       const incomeByCategory = {};
+      const categoryRefs = {};
+      const subCategoryRefs = {};
 
       transactions.forEach(transaction => {
         const amount = Math.abs(transaction.amount);
@@ -372,8 +405,13 @@ class BudgetService {
           incomeByCategory[categoryKey] = (incomeByCategory[categoryKey] || 0) + amount;
         } else if (transaction.category && transaction.category.type === 'Expense' && transaction.subCategory) {
           totalActualExpenses += amount;
-          const key = `${transaction.category._id}_${transaction.subCategory._id}`;
+          const catId = transaction.category._id.toString();
+          const subId = transaction.subCategory._id.toString();
+          const key = `${catId}_${subId}`;
           expensesBySubCategory[key] = (expensesBySubCategory[key] || 0) + amount;
+          // Store populated refs for unbudgeted subcategory lookups
+          if (!categoryRefs[catId]) categoryRefs[catId] = transaction.category;
+          if (!subCategoryRefs[subId]) subCategoryRefs[subId] = transaction.subCategory;
         }
       });
 
@@ -381,7 +419,9 @@ class BudgetService {
         totalActualIncome, 
         totalActualExpenses,
         expensesBySubCategory,
-        incomeByCategory
+        incomeByCategory,
+        categoryRefs,
+        subCategoryRefs
       };
     } catch (error) {
       logger.error('Error getting actual amounts for month:', error);
