@@ -401,17 +401,14 @@ const NetWorthDonutChart: React.FC = () => {
 
   const handleCellMouseEnter = useCallback((entry: any, e: React.MouseEvent) => {
     if (entry.isFiller || entry.name === '_filler') return;
-    const rect = chartRef.current?.getBoundingClientRect();
-    if (rect) {
-      setTooltip({
-        name: entry.name,
-        value: entry.value,
-        originalValue: entry.originalValue,
-        originalCurrency: entry.originalCurrency,
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
-      });
-    }
+    setTooltip({
+      name: entry.name,
+      value: entry.value,
+      originalValue: entry.originalValue,
+      originalCurrency: entry.originalCurrency,
+      x: e.clientX,
+      y: e.clientY,
+    });
   }, []);
 
   const handleCellMouseLeave = useCallback(() => {
@@ -496,8 +493,7 @@ const NetWorthDonutChart: React.FC = () => {
 
   return (
     <Card sx={{ height: '100%', minHeight: 420 }}>
-      <CardContent sx={{ p: 3 }}>
-        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+      <CardContent sx={{ p: 3 }}><Typography variant="subtitle2" color="text.secondary" gutterBottom>
           Net Worth
         </Typography>
 
@@ -600,7 +596,7 @@ const NetWorthDonutChart: React.FC = () => {
               {tooltip && (
                 <Box
                   sx={{
-                    position: 'absolute',
+                    position: 'fixed',
                     left: tooltip.x + 12,
                     top: tooltip.y - 10,
                     bgcolor: 'background.paper',
@@ -611,7 +607,7 @@ const NetWorthDonutChart: React.FC = () => {
                     py: 1,
                     boxShadow: 3,
                     pointerEvents: 'none',
-                    zIndex: 10,
+                    zIndex: 1300,
                     whiteSpace: 'nowrap',
                   }}
                 >
