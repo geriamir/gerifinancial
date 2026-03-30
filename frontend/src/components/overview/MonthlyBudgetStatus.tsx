@@ -112,7 +112,7 @@ const MonthlyBudgetStatus: React.FC = () => {
           // Extract top spending categories
           if (budget.expenseBudgets && Array.isArray(budget.expenseBudgets)) {
             topCategories = budget.expenseBudgets
-              .filter((cat: any) => (cat.budgetedAmount || 0) > 0)
+              .filter((cat: any) => (cat.budgetedAmount || 0) > 0 || (cat.actualAmount || 0) > 0)
               .map((cat: any) => ({
                 name: cat.subCategoryId?.name || cat.categoryId?.name || 'Other',
                 categoryId: cat.categoryId?._id || cat.categoryId,
