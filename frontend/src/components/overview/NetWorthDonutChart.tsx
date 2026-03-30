@@ -215,6 +215,7 @@ function useNetWorthData(): NetWorthData {
         // ---------- Investments — grouped by bank account; pure money-market accounts → liquid, rest → mid-term ----------
         if (investmentsResult.status === 'fulfilled') {
           const investments = investmentsResult.value.investments || [];
+          const portfolioCash = investmentsResult.value.portfolioCashBalances || {};
 
           // Group by bankAccountId (same logic as InvestmentAccountList)
           const acctGroups = new Map<string, {
@@ -223,6 +224,8 @@ function useNetWorthData(): NetWorthData {
             mmILS: number;
             otherILS: number;
             cashILS: number;
+            cashOriginal: number;
+            cashCurrency: string;
             originalTotal: number;
           }>();
 
@@ -235,18 +238,25 @@ function useNetWorthData(): NetWorthData {
 
             let group = acctGroups.get(key);
             if (!group) {
+              const bankName = typeof inv.bankAccountId === 'object'
+                ? (inv.bankAccountId as any)?.name
+                : undefined;
+              // Portfolio-level cash from the Portfolio document
+              const pCash = portfolioCash[key];
+              const pCashCurrency = pCash?.currency || invCurrency;
               group = {
-                name: inv.accountName || `Account ${inv.accountNumber}`,
+                name: bankName || inv.accountName || `Account ${inv.accountNumber}`,
                 currency: invCurrency,
                 mmILS: 0,
                 otherILS: 0,
-                cashILS: 0,
+                cashILS: toILS(pCash?.cashBalance || 0, pCashCurrency),
+                cashOriginal: pCash?.cashBalance || 0,
+                cashCurrency: pCashCurrency,
                 originalTotal: 0,
               };
               acctGroups.set(key, group);
             }
 
-            group.cashILS += toILS(inv.cashBalance || 0, invCurrency);
             group.originalTotal += inv.totalMarketValue || inv.totalValue || 0;
 
             for (const h of inv.holdings || []) {
@@ -269,7 +279,8 @@ function useNetWorthData(): NetWorthData {
               assets.push({
                 name: `${g.name} (Cash)`,
                 value: g.cashILS,
-                originalCurrency: g.currency,
+                originalValue: g.cashOriginal,
+                originalCurrency: g.cashCurrency,
                 category: 'liquid',
                 color: '',
                 route: '/investments',
