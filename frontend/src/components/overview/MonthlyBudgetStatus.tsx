@@ -18,6 +18,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { budgetsApi } from '../../services/api/budgets';
+import { formatCurrencyDisplay } from '../../utils/formatters';
 
 // ---------- Types ----------
 
@@ -42,18 +43,6 @@ interface MonthlyData {
   daysPassed: number;
   hasBudget: boolean;
 }
-
-// ---------- Currency formatting ----------
-
-const formatCurrency = (amount: number, currency = 'ILS'): string => {
-  const locale = currency === 'ILS' ? 'he-IL' : 'en-US';
-  return new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
 
 // ---------- Main component ----------
 
@@ -274,12 +263,12 @@ const MonthlyBudgetStatus: React.FC = () => {
                     Income
                   </Typography>
                 </Box>
-                <Typography variant="body1" fontWeight={700} color="success.main" sx={{ direction: 'ltr', unicodeBidi: 'embed' }}>
-                  {formatCurrency(data.income)}
+                <Typography variant="body1" fontWeight={700} color="success.main">
+                  {formatCurrencyDisplay(data.income)}
                 </Typography>
                 {data.budgetedIncome > 0 && (
-                  <Typography variant="caption" color="text.secondary" sx={{ direction: 'ltr', unicodeBidi: 'embed' }}>
-                    of {formatCurrency(data.budgetedIncome)}
+                  <Typography variant="caption" color="text.secondary">
+                    of {formatCurrencyDisplay(data.budgetedIncome)}
                   </Typography>
                 )}
               </Box>
@@ -302,11 +291,11 @@ const MonthlyBudgetStatus: React.FC = () => {
                     Expenses
                   </Typography>
                 </Box>
-                <Typography variant="body1" fontWeight={700} color="error.main" sx={{ direction: 'ltr', unicodeBidi: 'embed' }}>
-                  {formatCurrency(data.expenses)}
+                <Typography variant="body1" fontWeight={700} color="error.main">
+                  {formatCurrencyDisplay(data.expenses)}
                 </Typography>
-                <Typography variant="caption" color="text.secondary" sx={{ direction: 'ltr', unicodeBidi: 'embed' }}>
-                  of {formatCurrency(data.budgetedExpenses)}
+                <Typography variant="caption" color="text.secondary">
+                  of {formatCurrencyDisplay(data.budgetedExpenses)}
                 </Typography>
               </Box>
             </Box>
@@ -373,8 +362,8 @@ const MonthlyBudgetStatus: React.FC = () => {
                       <Typography variant="caption" noWrap sx={{ maxWidth: '50%' }}>
                         {cat.name}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ direction: 'ltr', unicodeBidi: 'embed' }}>
-                        {formatCurrency(cat.actual)} / {formatCurrency(cat.budgeted)}
+                      <Typography variant="caption" color="text.secondary">
+                        {formatCurrencyDisplay(cat.actual)} / {formatCurrencyDisplay(cat.budgeted)}
                       </Typography>
                     </Box>
                     <LinearProgress
