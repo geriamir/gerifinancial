@@ -5,6 +5,7 @@ const yearlyBudgetService = require('./yearlyBudgetService');
 const budgetCalculationService = require('./budgetCalculationService');
 const { projectBudgetService, BUDGET_STATUS } = require('../../project-budgets');
 const { adjustForSalaryEarlyPayment } = require('./salaryAttributionHelper');
+const ProjectBudget = require('../../project-budgets/models/ProjectBudget');
 
 class BudgetService {
   // ============================================
@@ -97,6 +98,7 @@ class BudgetService {
             expenseBudgets: updatedExpenseBudgets,
             totalActualIncome: actualAmounts.totalActualIncome,
             totalActualExpenses: actualAmounts.totalActualExpenses,
+            totalProjectExpenses: actualAmounts.totalProjectExpenses,
             actualBalance: actualAmounts.totalActualIncome - actualAmounts.totalActualExpenses
           };
         }
@@ -159,6 +161,7 @@ class BudgetService {
         totalBudgetedExpenses,
         totalActualIncome: actualAmounts.totalActualIncome,
         totalActualExpenses,
+        totalProjectExpenses: actualAmounts.totalProjectExpenses,
         budgetBalance: totalBudgetedIncome - totalBudgetedExpenses,
         actualBalance: actualAmounts.totalActualIncome - totalActualExpenses,
         status: BUDGET_STATUS.ACTIVE,
@@ -360,6 +363,7 @@ class BudgetService {
           totalBudgetedExpenses: monthlyBudget.totalBudgetedExpenses,
           totalActualIncome: monthlyBudget.totalActualIncome,
           totalActualExpenses: monthlyBudget.totalActualExpenses,
+          totalProjectExpenses: monthlyBudget.totalProjectExpenses || 0,
           budgetBalance: monthlyBudget.budgetBalance,
           actualBalance: monthlyBudget.actualBalance
         } : null,
@@ -384,13 +388,32 @@ class BudgetService {
         userId,
         processedDate: { $gte: startDate, $lte: endDate },
         category: { $ne: null }
-      }).populate('category', 'type').populate('subCategory', 'name');
+      }).populate('category', 'type').populate('subCategory', 'name').populate('tags', 'type');
 
       // Adjust for salary arriving up to 5 days before month start
       transactions = await adjustForSalaryEarlyPayment(transactions, userId, year, month);
 
+      // Build set of project tag IDs for non-ongoing-funded projects
+      // These transactions should be separated from the regular monthly budget
+      const projects = await ProjectBudget.find({
+        userId,
+        projectTag: { $ne: null },
+        impactsOtherBudgets: false
+      }, 'projectTag');
+      const nonOngoingProjectTagIds = new Set(
+        projects.map(p => p.projectTag.toString())
+      );
+
+      const isNonOngoingProjectTxn = (transaction) => {
+        if (!transaction.tags || transaction.tags.length === 0) return false;
+        return transaction.tags.some(tag =>
+          tag.type === 'project' && nonOngoingProjectTagIds.has(tag._id.toString())
+        );
+      };
+
       let totalActualIncome = 0;
       let totalActualExpenses = 0;
+      let totalProjectExpenses = 0;
       const expensesBySubCategory = {};
       const incomeByCategory = {};
       const categoryRefs = {};
@@ -404,20 +427,24 @@ class BudgetService {
           const categoryKey = transaction.category._id.toString();
           incomeByCategory[categoryKey] = (incomeByCategory[categoryKey] || 0) + amount;
         } else if (transaction.category && transaction.category.type === 'Expense' && transaction.subCategory) {
-          totalActualExpenses += amount;
-          const catId = transaction.category._id.toString();
-          const subId = transaction.subCategory._id.toString();
-          const key = `${catId}_${subId}`;
-          expensesBySubCategory[key] = (expensesBySubCategory[key] || 0) + amount;
-          // Store populated refs for unbudgeted subcategory lookups
-          if (!categoryRefs[catId]) categoryRefs[catId] = transaction.category;
-          if (!subCategoryRefs[subId]) subCategoryRefs[subId] = transaction.subCategory;
+          if (isNonOngoingProjectTxn(transaction)) {
+            totalProjectExpenses += amount;
+          } else {
+            totalActualExpenses += amount;
+            const catId = transaction.category._id.toString();
+            const subId = transaction.subCategory._id.toString();
+            const key = `${catId}_${subId}`;
+            expensesBySubCategory[key] = (expensesBySubCategory[key] || 0) + amount;
+            if (!categoryRefs[catId]) categoryRefs[catId] = transaction.category;
+            if (!subCategoryRefs[subId]) subCategoryRefs[subId] = transaction.subCategory;
+          }
         }
       });
 
       return { 
         totalActualIncome, 
         totalActualExpenses,
+        totalProjectExpenses,
         expensesBySubCategory,
         incomeByCategory,
         categoryRefs,

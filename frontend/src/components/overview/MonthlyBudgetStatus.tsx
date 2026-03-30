@@ -15,6 +15,7 @@ import {
   TrendingUp as IncomeIcon,
   TrendingDown as ExpenseIcon,
   CalendarToday as CalendarIcon,
+  AccountTree as ProjectIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { budgetsApi } from '../../services/api/budgets';
@@ -36,6 +37,7 @@ interface MonthlyData {
   budgetedIncome: number;
   expenses: number;
   budgetedExpenses: number;
+  projectExpenses: number;
   budgetProgress: number;
   topCategories: BudgetCategory[];
   daysRemaining: number;
@@ -80,6 +82,7 @@ const MonthlyBudgetStatus: React.FC = () => {
         let budgetedIncome = 0;
         let expenses = 0;
         let budgetedExpenses = 0;
+        let projectExpenses = 0;
         let topCategories: BudgetCategory[] = [];
         let hasBudget = false;
 
@@ -92,6 +95,7 @@ const MonthlyBudgetStatus: React.FC = () => {
             budgetedIncome = d.monthly.totalBudgetedIncome || 0;
             expenses = d.monthly.totalActualExpenses || 0;
             budgetedExpenses = d.monthly.totalBudgetedExpenses || 0;
+            projectExpenses = d.monthly.totalProjectExpenses || 0;
             hasBudget = budgetedExpenses > 0;
           }
         }
@@ -106,7 +110,12 @@ const MonthlyBudgetStatus: React.FC = () => {
             budgetedIncome = budget.totalBudgetedIncome || budgetedIncome;
             expenses = budget.totalActualExpenses || expenses;
             budgetedExpenses = budget.totalBudgetedExpenses || budgetedExpenses;
+            projectExpenses = budget.totalProjectExpenses || projectExpenses;
             hasBudget = true;
+          }
+          // Always pick up project expenses from the budget endpoint if not set
+          if (!projectExpenses && budget.totalProjectExpenses) {
+            projectExpenses = budget.totalProjectExpenses;
           }
 
           // Extract top spending categories
@@ -137,6 +146,7 @@ const MonthlyBudgetStatus: React.FC = () => {
           budgetedIncome,
           expenses,
           budgetedExpenses,
+          projectExpenses,
           budgetProgress,
           topCategories,
           daysRemaining,
@@ -298,6 +308,31 @@ const MonthlyBudgetStatus: React.FC = () => {
                   of {formatCurrencyDisplay(data.budgetedExpenses)}
                 </Typography>
               </Box>
+
+              {/* Project Expenses */}
+              {data.projectExpenses > 0 && (
+                <Box
+                  sx={{
+                    flex: 1,
+                    p: 1.5,
+                    borderRadius: 2,
+                    bgcolor: alpha(theme.palette.info.main, mode === 'dark' ? 0.1 : 0.06),
+                    cursor: 'pointer',
+                    '&:hover': { opacity: 0.85 },
+                  }}
+                  onClick={() => navigate('/projects')}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                    <ProjectIcon sx={{ fontSize: 16, color: 'info.main' }} />
+                    <Typography variant="caption" color="text.secondary">
+                      Projects
+                    </Typography>
+                  </Box>
+                  <Typography variant="body1" fontWeight={700} color="info.main">
+                    {formatCurrencyDisplay(data.projectExpenses)}
+                  </Typography>
+                </Box>
+              )}
             </Box>
 
             {/* Overall budget progress */}
