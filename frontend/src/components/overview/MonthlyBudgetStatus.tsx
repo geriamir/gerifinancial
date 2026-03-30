@@ -197,7 +197,7 @@ const MonthlyBudgetStatus: React.FC = () => {
   const monthName = now.toLocaleString('en-US', { month: 'long' });
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
-  const budgetDetailUrl = `/budgets/detail?year=${year}&month=${month}`;
+  const budgetsUrl = '/budgets';
 
   return (
     <Card sx={{ height: '100%', minHeight: 420 }}>
@@ -207,7 +207,7 @@ const MonthlyBudgetStatus: React.FC = () => {
             variant="subtitle2"
             color="text.secondary"
             sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-            onClick={() => navigate(budgetDetailUrl)}
+            onClick={() => navigate(budgetsUrl)}
           >
             {monthName} Budget
           </Typography>
@@ -255,7 +255,7 @@ const MonthlyBudgetStatus: React.FC = () => {
                   cursor: 'pointer',
                   '&:hover': { opacity: 0.85 },
                 }}
-                onClick={() => navigate(`${budgetDetailUrl}&type=income`)}
+                onClick={() => navigate(budgetsUrl)}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                   <IncomeIcon sx={{ fontSize: 16, color: 'success.main' }} />
@@ -283,7 +283,7 @@ const MonthlyBudgetStatus: React.FC = () => {
                   cursor: 'pointer',
                   '&:hover': { opacity: 0.85 },
                 }}
-                onClick={() => navigate(budgetDetailUrl)}
+                onClick={() => navigate(budgetsUrl)}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                   <ExpenseIcon sx={{ fontSize: 16, color: 'error.main' }} />
@@ -354,7 +354,7 @@ const MonthlyBudgetStatus: React.FC = () => {
                       if (cat.categoryId && cat.subCategoryId) {
                         navigate(`/budgets/subcategory/${year}/${month}/${cat.categoryId}/${cat.subCategoryId}`);
                       } else {
-                        navigate(`${budgetDetailUrl}${cat.categoryId ? `&category=${cat.categoryId}` : ''}`);
+                        navigate(budgetsUrl);
                       }
                     }}
                   >
