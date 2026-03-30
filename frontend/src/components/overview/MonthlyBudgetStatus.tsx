@@ -274,11 +274,11 @@ const MonthlyBudgetStatus: React.FC = () => {
                     Income
                   </Typography>
                 </Box>
-                <Typography variant="body1" fontWeight={700} color="success.main">
+                <Typography variant="body1" fontWeight={700} color="success.main" sx={{ direction: 'ltr', unicodeBidi: 'embed' }}>
                   {formatCurrency(data.income)}
                 </Typography>
                 {data.budgetedIncome > 0 && (
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color="text.secondary" sx={{ direction: 'ltr', unicodeBidi: 'embed' }}>
                     of {formatCurrency(data.budgetedIncome)}
                   </Typography>
                 )}
@@ -302,10 +302,10 @@ const MonthlyBudgetStatus: React.FC = () => {
                     Expenses
                   </Typography>
                 </Box>
-                <Typography variant="body1" fontWeight={700} color="error.main">
+                <Typography variant="body1" fontWeight={700} color="error.main" sx={{ direction: 'ltr', unicodeBidi: 'embed' }}>
                   {formatCurrency(data.expenses)}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{ direction: 'ltr', unicodeBidi: 'embed' }}>
                   of {formatCurrency(data.budgetedExpenses)}
                 </Typography>
               </Box>
@@ -373,7 +373,7 @@ const MonthlyBudgetStatus: React.FC = () => {
                       <Typography variant="caption" noWrap sx={{ maxWidth: '50%' }}>
                         {cat.name}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="text.secondary" sx={{ direction: 'ltr', unicodeBidi: 'embed' }}>
                         {formatCurrency(cat.actual)} / {formatCurrency(cat.budgeted)}
                       </Typography>
                     </Box>
