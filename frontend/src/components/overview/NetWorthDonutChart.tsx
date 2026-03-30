@@ -267,12 +267,24 @@ function useNetWorthData(): NetWorthData {
           }
 
           acctGroups.forEach((g) => {
-            const total = g.mmILS + g.otherILS + g.cashILS;
-            if (total <= 0) return;
-            const isAllMoneyMarket = g.otherILS === 0 && g.mmILS > 0;
+            // Cash balance is always liquid
+            if (g.cashILS > 0) {
+              assets.push({
+                name: `${g.name} (Cash)`,
+                value: g.cashILS,
+                originalCurrency: g.currency,
+                category: 'liquid',
+                color: '',
+                route: '/investments',
+              });
+            }
+            // Money-market-only accounts → liquid, otherwise → mid-term
+            const holdingsTotal = g.mmILS + g.otherILS;
+            if (holdingsTotal <= 0) return;
+            const isAllMoneyMarket = g.otherILS === 0;
             assets.push({
               name: g.name,
-              value: total,
+              value: holdingsTotal,
               originalValue: g.originalTotal,
               originalCurrency: g.currency,
               category: isAllMoneyMarket ? 'liquid' : 'mid-term',
