@@ -16,12 +16,15 @@ import {
   TrendingDown as ExpenseIcon,
   CalendarToday as CalendarIcon,
 } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { budgetsApi } from '../../services/api/budgets';
 
 // ---------- Types ----------
 
 interface BudgetCategory {
   name: string;
+  categoryId?: string;
+  subCategoryId?: string;
   budgeted: number;
   actual: number;
   percentage: number;
@@ -57,6 +60,7 @@ const formatCurrency = (amount: number, currency = 'ILS'): string => {
 const MonthlyBudgetStatus: React.FC = () => {
   const theme = useTheme();
   const mode = theme.palette.mode;
+  const navigate = useNavigate();
   const [data, setData] = useState<MonthlyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -122,6 +126,8 @@ const MonthlyBudgetStatus: React.FC = () => {
               .filter((cat: any) => (cat.budgetedAmount || 0) > 0)
               .map((cat: any) => ({
                 name: cat.categoryId?.name || cat.categoryName || cat.category?.name || 'Other',
+                categoryId: cat.categoryId?._id || cat.categoryId,
+                subCategoryId: cat.subCategoryId?._id || cat.subCategoryId,
                 budgeted: cat.budgetedAmount || 0,
                 actual: cat.actualAmount || 0,
                 percentage: cat.budgetedAmount
@@ -198,13 +204,22 @@ const MonthlyBudgetStatus: React.FC = () => {
   const timeProgress = Math.round((data.daysPassed / data.daysTotal) * 100);
   const isOverBudget = data.budgetProgress > 100;
   const isAheadOfTime = data.budgetProgress < timeProgress;
-  const monthName = new Date().toLocaleString('en-US', { month: 'long' });
+  const now = new Date();
+  const monthName = now.toLocaleString('en-US', { month: 'long' });
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const budgetDetailUrl = `/budgets/detail?year=${year}&month=${month}`;
 
   return (
     <Card sx={{ height: '100%', minHeight: 420 }}>
       <CardContent sx={{ p: 3, display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Typography variant="subtitle2" color="text.secondary">
+          <Typography
+            variant="subtitle2"
+            color="text.secondary"
+            sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+            onClick={() => navigate(budgetDetailUrl)}
+          >
             {monthName} Budget
           </Typography>
           <Chip
@@ -225,6 +240,7 @@ const MonthlyBudgetStatus: React.FC = () => {
                 variant="body2"
                 color="primary"
                 sx={{ cursor: 'pointer', textDecoration: 'underline' }}
+                onClick={() => navigate('/budgets')}
               >
                 Create one →
               </Typography>
@@ -247,7 +263,10 @@ const MonthlyBudgetStatus: React.FC = () => {
                   p: 1.5,
                   borderRadius: 2,
                   bgcolor: alpha(theme.palette.success.main, mode === 'dark' ? 0.1 : 0.06),
+                  cursor: 'pointer',
+                  '&:hover': { opacity: 0.85 },
                 }}
+                onClick={() => navigate(`${budgetDetailUrl}&type=income`)}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                   <IncomeIcon sx={{ fontSize: 16, color: 'success.main' }} />
@@ -272,7 +291,10 @@ const MonthlyBudgetStatus: React.FC = () => {
                   p: 1.5,
                   borderRadius: 2,
                   bgcolor: alpha(theme.palette.error.main, mode === 'dark' ? 0.1 : 0.06),
+                  cursor: 'pointer',
+                  '&:hover': { opacity: 0.85 },
                 }}
+                onClick={() => navigate(budgetDetailUrl)}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                   <ExpenseIcon sx={{ fontSize: 16, color: 'error.main' }} />
@@ -336,7 +358,17 @@ const MonthlyBudgetStatus: React.FC = () => {
                   Top Categories
                 </Typography>
                 {data.topCategories.map((cat) => (
-                  <Box key={cat.name} sx={{ mb: 1.5 }}>
+                  <Box
+                    key={cat.name}
+                    sx={{ mb: 1.5, cursor: 'pointer', '&:hover': { opacity: 0.8 } }}
+                    onClick={() => {
+                      if (cat.categoryId && cat.subCategoryId) {
+                        navigate(`/budgets/subcategory/${year}/${month}/${cat.categoryId}/${cat.subCategoryId}`);
+                      } else {
+                        navigate(`${budgetDetailUrl}${cat.categoryId ? `&category=${cat.categoryId}` : ''}`);
+                      }
+                    }}
+                  >
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.3 }}>
                       <Typography variant="caption" noWrap sx={{ maxWidth: '50%' }}>
                         {cat.name}
