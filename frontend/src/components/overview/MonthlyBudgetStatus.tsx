@@ -121,7 +121,7 @@ const MonthlyBudgetStatus: React.FC = () => {
             topCategories = budget.expenseBudgets
               .filter((cat: any) => (cat.budgetedAmount || 0) > 0)
               .map((cat: any) => ({
-                name: cat.categoryName || cat.category?.name || 'Other',
+                name: cat.categoryId?.name || cat.categoryName || cat.category?.name || 'Other',
                 budgeted: cat.budgetedAmount || 0,
                 actual: cat.actualAmount || 0,
                 percentage: cat.budgetedAmount
