@@ -282,7 +282,7 @@ function useNetWorthData(): NetWorthData {
           });
         }
 
-        // ---------- Real Estate — Long-term (per project) ----------
+        // ---------- Real Estate — flips are mid-term, rentals are long-term ----------
         if (realEstateList.status === 'fulfilled') {
           for (const project of realEstateList.value) {
             if (project.status === 'cancelled') continue;
@@ -294,7 +294,7 @@ function useNetWorthData(): NetWorthData {
                 value: equity,
                 originalValue: project.estimatedCurrentValue,
                 originalCurrency: reCurrency,
-                category: 'long-term',
+                category: project.type === 'flip' ? 'mid-term' : 'long-term',
                 color: '',
                 route: `/real-estate/${project._id}`,
               });
