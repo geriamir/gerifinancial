@@ -7,6 +7,7 @@ import {
   Skeleton,
   Alert,
   Tooltip as MuiTooltip,
+  useTheme,
 } from '@mui/material';
 import {
   PieChart,
@@ -21,14 +22,18 @@ import { investmentApi } from '../../services/api/investments';
 import { pensionApi } from '../../services/api/pension';
 import { realEstateApi } from '../../services/api/realEstate';
 import { rsuApi } from '../../services/api/rsus';
+import { PRODUCT_TYPE_LABELS } from '../../services/api/types/pension';
 
 // ---------- Types ----------
 
 interface AssetSource {
   name: string;
   value: number;
+  originalValue?: number;
+  originalCurrency?: string;
   category: 'liquid' | 'mid-term' | 'long-term';
   color: string;
+  route?: string;
 }
 
 interface LiabilitySource {
@@ -55,24 +60,11 @@ const CATEGORY_COLORS = {
   'long-term': { main: '#26a69a', light: '#80cbc4' },
 };
 
-const SOURCE_ROUTES: Record<string, string> = {
-  'Bank Accounts': '/banks',
-  'Foreign Currency': '/foreign-currency',
-  'Money Market Fund': '/investments',
-  'RSU Portfolio': '/rsus',
-  'Investments': '/investments',
-  'Real Estate': '/real-estate',
-  'Pension': '/pension',
-};
-
-const SOURCE_COLORS: Record<string, string> = {
-  'Bank Accounts': '#1e88e5',
-  'Foreign Currency': '#64b5f6',
-  'Money Market Fund': '#4fc3f7',
-  'RSU Portfolio': '#8e24aa',
-  'Investments': '#ba68c8',
-  'Real Estate': '#00897b',
-  'Pension': '#4db6ac',
+// Per-category color palettes for individual items (darkest → lightest)
+const CATEGORY_PALETTES: Record<string, string[]> = {
+  liquid: ['#0d47a1', '#1565c0', '#1976d2', '#1e88e5', '#2196f3', '#42a5f5', '#64b5f6', '#90caf9'],
+  'mid-term': ['#4a148c', '#6a1b9a', '#7b1fa2', '#8e24aa', '#9c27b0', '#ab47bc', '#ba68c8', '#ce93d8'],
+  'long-term': ['#004d40', '#00695c', '#00796b', '#00897b', '#009688', '#26a69a', '#4db6ac', '#80cbc4'],
 };
 
 const LIABILITY_COLORS = {
@@ -110,6 +102,8 @@ const formatCompact = (amount: number, currency = 'ILS'): string => {
 interface TooltipData {
   name: string;
   value: number;
+  originalValue?: number;
+  originalCurrency?: string;
   x: number;
   y: number;
 }
@@ -137,7 +131,7 @@ function useNetWorthData(): NetWorthData {
           fxSummary,
           investmentsResult,
           pensionSummary,
-          realEstateSummary,
+          realEstateList,
           rsuSummary,
           exchangeRatesResult,
         ] = await Promise.allSettled([
@@ -145,7 +139,7 @@ function useNetWorthData(): NetWorthData {
           foreignCurrencyApi.getCurrencySummary(),
           investmentApi.getUserInvestments(),
           pensionApi.getSummary(),
-          realEstateApi.getSummary(),
+          realEstateApi.getAll(),
           rsuApi.portfolio.getSummary(),
           foreignCurrencyApi.getExchangeRates({ baseCurrency: 'ILS' }),
         ]);
@@ -156,8 +150,6 @@ function useNetWorthData(): NetWorthData {
         const rates: Record<string, number> = { ILS: 1 };
         if (exchangeRatesResult.status === 'fulfilled') {
           for (const r of exchangeRatesResult.value.rates || []) {
-            // baseCurrency=ILS: fromCurrency=ILS, toCurrency=USD, rate = how many USD per 1 ILS
-            // To convert USD→ILS we need 1/rate
             if (r.toCurrency && r.rate) {
               rates[r.toCurrency] = 1 / r.rate;
             }
@@ -172,23 +164,24 @@ function useNetWorthData(): NetWorthData {
         const assets: AssetSource[] = [];
         let totalLiabilities = 0;
 
-        // Bank accounts — Liquid
+        // ---------- Bank accounts — Liquid (per account) ----------
         if (balanceSummary.status === 'fulfilled') {
-          const total = balanceSummary.value.reduce(
-            (sum, item) => sum + item.convertedBalance,
-            0
-          );
-          if (total !== 0) {
+          for (const acct of balanceSummary.value) {
+            const converted = acct.convertedBalance || 0;
+            if (converted <= 0) continue;
             assets.push({
-              name: 'Bank Accounts',
-              value: Math.max(total, 0),
+              name: acct.accountName || `Account ${acct.bankAccountId}`,
+              value: converted,
+              originalValue: acct.balance,
+              originalCurrency: acct.currency,
               category: 'liquid',
-              color: SOURCE_COLORS['Bank Accounts'],
+              color: '', // assigned later
+              route: '/banks',
             });
           }
         }
 
-        // Foreign Currency — Liquid
+        // ---------- Foreign Currency — Liquid ----------
         if (fxSummary.status === 'fulfilled') {
           const total = fxSummary.value.reduce(
             (sum, item) => sum + (item.totalBalanceILS || 0),
@@ -199,12 +192,13 @@ function useNetWorthData(): NetWorthData {
               name: 'Foreign Currency',
               value: total,
               category: 'liquid',
-              color: SOURCE_COLORS['Foreign Currency'],
+              color: '',
+              route: '/foreign-currency',
             });
           }
         }
 
-        // RSU Portfolio — Mid-term (vested post-tax value only, excludes unvested & sold)
+        // ---------- RSU Portfolio — Mid-term ----------
         if (rsuSummary.status === 'fulfilled') {
           const total = rsuSummary.value?.summary?.vestedLiquidValue || 0;
           if (total > 0) {
@@ -212,16 +206,15 @@ function useNetWorthData(): NetWorthData {
               name: 'RSU Portfolio',
               value: total,
               category: 'mid-term',
-              color: SOURCE_COLORS['RSU Portfolio'],
+              color: '',
+              route: '/rsus',
             });
           }
         }
 
-        // Investments — split money market (liquid) from rest (mid-term)
+        // ---------- Investments — per account, split money market (liquid) from rest (mid-term) ----------
         if (investmentsResult.status === 'fulfilled') {
           const investments = investmentsResult.value.investments || [];
-          let moneyMarketTotal = 0;
-          let otherTotal = 0;
 
           for (const inv of investments) {
             if (inv.status !== 'active') continue;
@@ -229,80 +222,121 @@ function useNetWorthData(): NetWorthData {
             const cashBalance = toILS(inv.cashBalance || 0, invCurrency);
             let mmHoldings = 0;
             let otherHoldings = 0;
+            let mmOriginal = 0;
+            let otherOriginal = 0;
 
             for (const h of inv.holdings || []) {
               const hCurrency = h.currency || invCurrency;
-              const val = toILS(
-                h.marketValue || (h.quantity * (h.currentPrice || 0)),
-                hCurrency
-              );
+              const rawVal = h.marketValue || (h.quantity * (h.currentPrice || 0));
+              const val = toILS(rawVal, hCurrency);
               if (h.holdingType === 'money_market') {
                 mmHoldings += val;
+                mmOriginal += rawVal;
               } else {
                 otherHoldings += val;
+                otherOriginal += rawVal;
               }
             }
 
-            // Distribute cash balance proportionally, or to other if no holdings
+            // Distribute cash balance proportionally
             const totalHoldings = mmHoldings + otherHoldings;
+            let mmTotal = mmHoldings;
+            let otherTotal = otherHoldings;
             if (totalHoldings > 0) {
-              moneyMarketTotal += mmHoldings + cashBalance * (mmHoldings / totalHoldings);
-              otherTotal += otherHoldings + cashBalance * (otherHoldings / totalHoldings);
+              mmTotal += cashBalance * (mmHoldings / totalHoldings);
+              otherTotal += cashBalance * (otherHoldings / totalHoldings);
             } else {
               otherTotal += cashBalance;
             }
-          }
 
-          if (moneyMarketTotal > 0) {
-            assets.push({
-              name: 'Money Market Fund',
-              value: moneyMarketTotal,
-              category: 'liquid',
-              color: SOURCE_COLORS['Money Market Fund'],
-            });
-          }
-          if (otherTotal > 0) {
-            assets.push({
-              name: 'Investments',
-              value: otherTotal,
-              category: 'mid-term',
-              color: SOURCE_COLORS['Investments'],
-            });
+            const acctName = inv.accountName || inv.accountNumber || `Investment ${inv._id.slice(-4)}`;
+
+            if (mmTotal > 0) {
+              assets.push({
+                name: acctName,
+                value: mmTotal,
+                originalValue: mmOriginal,
+                originalCurrency: invCurrency,
+                category: 'liquid',
+                color: '',
+                route: '/investments',
+              });
+            }
+            if (otherTotal > 0) {
+              assets.push({
+                name: acctName,
+                value: otherTotal,
+                originalValue: otherOriginal,
+                originalCurrency: invCurrency,
+                category: 'mid-term',
+                color: '',
+                route: '/investments',
+              });
+            }
           }
         }
 
-        // Real Estate — Long-term
-        if (realEstateSummary.status === 'fulfilled') {
-          const summary = realEstateSummary.value;
-          const reCurrency = summary.currency || 'ILS';
-          const equity = toILS(summary.totalEstimatedValue || 0, reCurrency);
-          if (equity > 0) {
-            assets.push({
-              name: 'Real Estate',
-              value: equity,
-              category: 'long-term',
-              color: SOURCE_COLORS['Real Estate'],
-            });
-          }
-          // Liabilities: pending installments
-          const pendingInstallments = toILS(summary.totalInstallments || 0, reCurrency);
-          if (pendingInstallments > 0) {
-            totalLiabilities += pendingInstallments;
+        // ---------- Real Estate — Long-term (per project) ----------
+        if (realEstateList.status === 'fulfilled') {
+          for (const project of realEstateList.value) {
+            if (project.status === 'cancelled') continue;
+            const reCurrency = project.currency || 'ILS';
+            const equity = toILS(project.estimatedCurrentValue || 0, reCurrency);
+            if (equity > 0) {
+              assets.push({
+                name: project.name || 'RE Project',
+                value: equity,
+                originalValue: project.estimatedCurrentValue,
+                originalCurrency: reCurrency,
+                category: 'long-term',
+                color: '',
+                route: `/real-estate/${project._id}`,
+              });
+            }
+            // Liabilities: pending installments
+            const pending = toILS(project.totalPendingInstallments || 0, reCurrency);
+            if (pending > 0) {
+              totalLiabilities += pending;
+            }
           }
         }
 
-        // Pension — Long-term
+        // ---------- Pension — Long-term (per type+provider+owner) ----------
         if (pensionSummary.status === 'fulfilled') {
           const penCurrency = pensionSummary.value?.currency || 'ILS';
-          const total = toILS(pensionSummary.value?.totalBalance || 0, penCurrency);
-          if (total > 0) {
-            assets.push({
-              name: 'Pension',
-              value: total,
-              category: 'long-term',
-              color: SOURCE_COLORS['Pension'],
-            });
+          for (const group of pensionSummary.value?.groups || []) {
+            for (const acct of group.accounts || []) {
+              const bal = toILS(acct.balance || 0, penCurrency);
+              if (bal <= 0) continue;
+              const typeLabel = PRODUCT_TYPE_LABELS[group.productType] || group.productType;
+              const parts = [typeLabel, acct.provider, acct.owner].filter(Boolean);
+              assets.push({
+                name: parts.join(' · '),
+                value: bal,
+                originalValue: acct.balance,
+                originalCurrency: penCurrency,
+                category: 'long-term',
+                color: '',
+                route: '/pension',
+              });
+            }
           }
+        }
+
+        // ---------- Assign colors per category ----------
+        const categoryIndices: Record<string, number> = {};
+        // Sort by category order then by value desc within category
+        const catOrder: Record<string, number> = { liquid: 0, 'mid-term': 1, 'long-term': 2 };
+        assets.sort((a, b) => {
+          const catDiff = (catOrder[a.category] ?? 9) - (catOrder[b.category] ?? 9);
+          if (catDiff !== 0) return catDiff;
+          return b.value - a.value; // larger first within category
+        });
+        for (const asset of assets) {
+          const idx = categoryIndices[asset.category] || 0;
+          const palette = CATEGORY_PALETTES[asset.category] || CATEGORY_PALETTES.liquid;
+          asset.color = palette[idx % palette.length];
+          categoryIndices[asset.category] = idx + 1;
         }
 
         const totalAssets = assets.reduce((s, a) => s + a.value, 0);
@@ -342,12 +376,14 @@ function useNetWorthData(): NetWorthData {
 
 const NetWorthDonutChart: React.FC = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const data = useNetWorthData();
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const chartRef = React.useRef<HTMLDivElement>(null);
+  const strokeColor = theme.palette.background.paper;
 
   const handleSliceClick = useCallback((entry: any) => {
-    const route = SOURCE_ROUTES[entry.name];
+    const route = entry.route;
     if (route) navigate(route);
   }, [navigate]);
 
@@ -358,6 +394,8 @@ const NetWorthDonutChart: React.FC = () => {
       setTooltip({
         name: entry.name,
         value: entry.value,
+        originalValue: entry.originalValue,
+        originalCurrency: entry.originalCurrency,
         x: e.clientX - rect.left,
         y: e.clientY - rect.top,
       });
@@ -385,16 +423,16 @@ const NetWorthDonutChart: React.FC = () => {
     return result;
   }, [data.assets]);
 
-  // Middle ring: individual asset sources — sorted by category to align with outer ring
+  // Middle ring: individual asset sources (already sorted by category in hook)
   const middleRingData = useMemo(() => {
-    const categoryOrder: Record<string, number> = { 'liquid': 0, 'mid-term': 1, 'long-term': 2 };
-    return [...data.assets]
-      .sort((a, b) => (categoryOrder[a.category] ?? 9) - (categoryOrder[b.category] ?? 9))
-      .map((a) => ({
-        name: a.name,
-        value: a.value,
-        color: a.color,
-      }));
+    return data.assets.map((a) => ({
+      name: a.name,
+      value: a.value,
+      color: a.color,
+      originalValue: a.originalValue,
+      originalCurrency: a.originalCurrency,
+      route: a.route,
+    }));
   }, [data.assets]);
 
   // Inner ring: liabilities with transparent filler to show ratio vs assets
@@ -473,7 +511,7 @@ const NetWorthDonutChart: React.FC = () => {
                     endAngle={-270}
                     outerRadius={150}
                     innerRadius={122}
-                    paddingAngle={1}
+                    paddingAngle={0}
                     strokeWidth={0}
                     isAnimationActive={false}
                   >
@@ -481,6 +519,8 @@ const NetWorthDonutChart: React.FC = () => {
                       <Cell
                         key={`outer-${i}`}
                         fill={entry.color}
+                        stroke={strokeColor}
+                        strokeWidth={2}
                         onMouseEnter={(e: any) => handleCellMouseEnter(entry, e)}
                         onMouseLeave={handleCellMouseLeave}
                       />
@@ -497,7 +537,7 @@ const NetWorthDonutChart: React.FC = () => {
                     endAngle={-270}
                     outerRadius={118}
                     innerRadius={86}
-                    paddingAngle={1}
+                    paddingAngle={0}
                     strokeWidth={0}
                     isAnimationActive={false}
                   >
@@ -505,6 +545,8 @@ const NetWorthDonutChart: React.FC = () => {
                       <Cell
                         key={`mid-${i}`}
                         fill={entry.color}
+                        stroke={strokeColor}
+                        strokeWidth={2}
                         cursor="pointer"
                         onClick={() => handleSliceClick(entry)}
                         onMouseEnter={(e: any) => handleCellMouseEnter(entry, e)}
@@ -564,9 +606,20 @@ const NetWorthDonutChart: React.FC = () => {
                   <Typography variant="body2" fontWeight={600}>
                     {tooltip.name}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {formatCurrency(tooltip.value)}
-                  </Typography>
+                  {tooltip.originalCurrency && tooltip.originalCurrency !== 'ILS' && tooltip.originalValue != null ? (
+                    <>
+                      <Typography variant="body2" color="text.secondary">
+                        {formatCurrency(tooltip.originalValue, tooltip.originalCurrency)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        ≈ {formatCurrency(tooltip.value)}
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      {formatCurrency(tooltip.value)}
+                    </Typography>
+                  )}
                 </Box>
               )}
 
