@@ -1,6 +1,7 @@
 import api from './base';
 import {
   Investment,
+  Holding,
   PortfolioSummary,
   PortfolioTrend,
   PerformanceMetrics,
@@ -107,5 +108,14 @@ export const investmentApi = {
   getHoldingTimeline: async (symbol: string, days: number = 365): Promise<HoldingTimeline> => {
     const response = await api.get<HoldingTimeline>(`/investments/holdings/${encodeURIComponent(symbol)}/timeline?days=${days}`);
     return response.data;
-  }
+  },
+
+  // Update holding type
+  updateHoldingType: async (investmentId: string, symbol: string, holdingType: Holding['holdingType']): Promise<Investment> => {
+    const response = await api.put<{ investment: Investment }>(
+      `/investments/${investmentId}/holdings/${encodeURIComponent(symbol)}/type`,
+      { holdingType }
+    );
+    return response.data.investment;
+  },
 };

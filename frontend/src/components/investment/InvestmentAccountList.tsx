@@ -10,7 +10,9 @@ import {
   IconButton,
   Tooltip,
   Collapse,
-  Divider
+  Divider,
+  Menu,
+  MenuItem,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -29,6 +31,11 @@ interface InvestmentAccountListProps {
   holdingsPriceData: HoldingsPriceData;
   loading: boolean;
   onRefresh: () => void;
+  onHoldingTypeChange?: (investmentId: string, symbol: string, holdingType: Holding['holdingType']) => void;
+}
+
+interface HoldingWithInvestmentId extends Holding {
+  _investmentId?: string;
 }
 
 interface GroupedAccount {
@@ -40,7 +47,7 @@ interface GroupedAccount {
   totalMarketValue: number;
   cashBalance: number;
   lastUpdated: Date;
-  holdings: Holding[];
+  holdings: HoldingWithInvestmentId[];
 }
 
 function groupByBankAccount(investments: Investment[], portfolioCashBalances: PortfolioCashBalances): GroupedAccount[] {
@@ -56,7 +63,7 @@ function groupByBankAccount(investments: Investment[], portfolioCashBalances: Po
     if (existing) {
       existing.totalValue += inv.totalValue || 0;
       existing.totalMarketValue += inv.totalMarketValue || 0;
-      existing.holdings.push(...inv.holdings);
+      existing.holdings.push(...inv.holdings.map(h => ({ ...h, _investmentId: inv._id })));
       if (new Date(inv.lastUpdated) > new Date(existing.lastUpdated)) {
         existing.lastUpdated = inv.lastUpdated;
       }
@@ -75,7 +82,7 @@ function groupByBankAccount(investments: Investment[], portfolioCashBalances: Po
         totalMarketValue: inv.totalMarketValue || 0,
         cashBalance: portfolioCash,
         lastUpdated: inv.lastUpdated,
-        holdings: [...inv.holdings]
+        holdings: inv.holdings.map(h => ({ ...h, _investmentId: inv._id }))
       });
     }
   }
@@ -86,10 +93,28 @@ function groupByBankAccount(investments: Investment[], portfolioCashBalances: Po
 interface GroupedAccountItemProps {
   account: GroupedAccount;
   holdingsPriceData: HoldingsPriceData;
+  onHoldingTypeChange?: (investmentId: string, symbol: string, holdingType: Holding['holdingType']) => void;
 }
 
-const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdingsPriceData }) => {
+const HOLDING_TYPE_LABELS: Record<string, string> = {
+  stock: 'Stock',
+  bond: 'Bond',
+  etf: 'ETF',
+  mutual_fund: 'Mutual Fund',
+  money_market: 'Money Market Fund',
+  option: 'Option',
+  future: 'Future',
+  other: 'Other',
+};
+
+const HOLDING_TYPE_OPTIONS: Holding['holdingType'][] = [
+  'stock', 'bond', 'etf', 'mutual_fund', 'money_market', 'option', 'future', 'other',
+];
+
+const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdingsPriceData, onHoldingTypeChange }) => {
   const [expanded, setExpanded] = React.useState(false);
+  const [typeMenuAnchor, setTypeMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [typeMenuHolding, setTypeMenuHolding] = React.useState<{ investmentId: string; symbol: string; current: string } | null>(null);
   
 
   const formatLastUpdated = (date: Date) => {
@@ -230,7 +255,6 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
                   <Box sx={{ display: 'grid', gap: 1 }}>
                     {positionEntries.map(([posSymbol, position]) => {
                       const holding = position.stock || position.options[0];
-                      const isStandaloneOption = !position.stock && position.options.length > 0;
                       const lookupSymbol = posSymbol;
                       const displaySymbol = posSymbol;
 
@@ -277,10 +301,18 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
                                   {displaySymbol}
                                 </Typography>
                                 <Chip
-                                  label={isStandaloneOption ? 'option' : 'stock'}
+                                  label={HOLDING_TYPE_LABELS[holding.holdingType] || holding.holdingType}
                                   size="small"
                                   variant="outlined"
-                                  sx={{ height: 20, fontSize: '0.7rem' }}
+                                  sx={{ height: 20, fontSize: '0.7rem', cursor: onHoldingTypeChange ? 'pointer' : 'default' }}
+                                  onClick={onHoldingTypeChange ? (e) => {
+                                    e.stopPropagation();
+                                    const invId = (holding as HoldingWithInvestmentId)._investmentId;
+                                    if (invId) {
+                                      setTypeMenuAnchor(e.currentTarget);
+                                      setTypeMenuHolding({ investmentId: invId, symbol: holding.symbol, current: holding.holdingType });
+                                    }
+                                  } : undefined}
                                 />
                               </Box>
                               {holding.name && (
@@ -410,6 +442,30 @@ const GroupedAccountItem: React.FC<GroupedAccountItemProps> = ({ account, holdin
           </Box>
         </Collapse>
       )}
+
+      {/* Holding type menu */}
+      <Menu
+        anchorEl={typeMenuAnchor}
+        open={Boolean(typeMenuAnchor)}
+        onClose={() => { setTypeMenuAnchor(null); setTypeMenuHolding(null); }}
+      >
+        {HOLDING_TYPE_OPTIONS.map((type) => (
+          <MenuItem
+            key={type}
+            selected={type === typeMenuHolding?.current}
+            onClick={() => {
+              if (typeMenuHolding && onHoldingTypeChange && type !== typeMenuHolding.current) {
+                onHoldingTypeChange(typeMenuHolding.investmentId, typeMenuHolding.symbol, type);
+              }
+              setTypeMenuAnchor(null);
+              setTypeMenuHolding(null);
+            }}
+            sx={{ fontSize: '0.85rem' }}
+          >
+            {HOLDING_TYPE_LABELS[type]}
+          </MenuItem>
+        ))}
+      </Menu>
     </ListItem>
   );
 };
@@ -419,7 +475,8 @@ export const InvestmentAccountList: React.FC<InvestmentAccountListProps> = ({
   portfolioCashBalances,
   holdingsPriceData,
   loading,
-  onRefresh
+  onRefresh,
+  onHoldingTypeChange,
 }) => {
   const activeInvestments = investments.filter(inv => inv.status === 'active');
   const grouped = groupByBankAccount(activeInvestments, portfolioCashBalances);
@@ -463,6 +520,7 @@ export const InvestmentAccountList: React.FC<InvestmentAccountListProps> = ({
                 key={account.bankAccountId}
                 account={account}
                 holdingsPriceData={holdingsPriceData}
+                onHoldingTypeChange={onHoldingTypeChange}
               />
             ))}
           </List>

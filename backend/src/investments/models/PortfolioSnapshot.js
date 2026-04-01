@@ -32,7 +32,7 @@ const portfolioSnapshotInvestmentSchema = new mongoose.Schema({
   },
   investmentType: {
     type: String,
-    enum: ['stock', 'bond', 'etf', 'mutual_fund', 'commodity', 'cash', 'option', 'future', 'other'],
+    enum: ['stock', 'bond', 'etf', 'mutual_fund', 'money_market', 'commodity', 'cash', 'option', 'future', 'other'],
     default: 'stock'
   }
 }, { _id: false });

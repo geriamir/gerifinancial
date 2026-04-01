@@ -1,6 +1,6 @@
 const { Transaction, TransactionType, Category, SubCategory, BankAccount } = require('../banking');
 const { User } = require('../auth');
-const { TransactionPattern, recurrenceDetectionService, budgetService } = require('../monthly-budgets');
+const { TransactionPattern, recurrenceDetectionService, budgetService, CategoryBudget } = require('../monthly-budgets');
 
 describe('Pattern Detection Integration Tests', () => {
   let testUser;
@@ -95,6 +95,7 @@ describe('Pattern Detection Integration Tests', () => {
     // Clear transactions and patterns before each test (use user-specific cleanup)
     await Transaction.deleteMany({ userId: testUser._id });
     await TransactionPattern.deleteMany({ userId: testUser._id });
+    await CategoryBudget.deleteMany({ userId: testUser._id });
   });
 
   describe('Bi-Monthly Pattern Detection', () => {

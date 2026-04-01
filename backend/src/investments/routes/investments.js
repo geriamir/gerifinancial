@@ -247,17 +247,6 @@ router.get('/:id', async (req, res) => {
 
 
 
-// Get sync status for a bank account
-router.get('/sync/status/:bankAccountId', async (req, res) => {
-  try {
-    const status = await dataSyncService.getSyncStatus(req.params.bankAccountId, req.user.id);
-    res.json({ status });
-  } catch (error) {
-    logger.error('Error fetching sync status:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Update investment prices (for manual price updates)
 router.post('/prices/update', async (req, res) => {
   try {
@@ -279,6 +268,30 @@ router.post('/prices/update', async (req, res) => {
   }
 });
 
+// Update a holding's type (e.g., reclassify mutual_fund → money_market)
+router.put('/:investmentId/holdings/:symbol/type', async (req, res) => {
+  try {
+    const { holdingType } = req.body;
+    const validTypes = Object.values(require('../constants/investmentConstants').HOLDING_TYPES);
+    
+    if (!holdingType || !validTypes.includes(holdingType)) {
+      return res.status(400).json({ error: `Invalid holdingType. Must be one of: ${validTypes.join(', ')}` });
+    }
+
+    const investment = await investmentService.updateHoldingType(
+      req.params.investmentId,
+      req.user.id,
+      decodeURIComponent(req.params.symbol),
+      holdingType
+    );
+
+    res.json({ message: 'Holding type updated', investment });
+  } catch (error) {
+    logger.error('Error updating holding type:', error);
+    res.status(error.message.includes('not found') ? 404 : 500).json({ error: error.message });
+  }
+});
+
 // Delete/close an investment account
 router.delete('/:id', async (req, res) => {
   try {
@@ -289,20 +302,6 @@ router.delete('/:id', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error closing investment:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get investments by bank account
-router.get('/by-bank/:bankAccountId', async (req, res) => {
-  try {
-    const investments = await investmentService.getInvestmentsByBankAccount(
-      req.user.id, 
-      req.params.bankAccountId
-    );
-    res.json({ investments });
-  } catch (error) {
-    logger.error('Error fetching investments by bank account:', error);
     res.status(500).json({ error: error.message });
   }
 });

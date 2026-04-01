@@ -59,6 +59,14 @@ class InvestmentService {
         };
 
         if (existingInvestment) {
+          // Preserve manually-set holdingType when sync doesn't provide a specific type
+          const existingHolding = existingInvestment.holdings.find(
+            h => h.symbol === holdingData.symbol
+          );
+          if (existingHolding && !investmentData.holdingType && existingHolding.holdingType !== INVESTMENT_CONSTANTS.HOLDING_TYPES.STOCK) {
+            holdingData.holdingType = existingHolding.holdingType;
+          }
+
           // Update existing investment
           existingInvestment.holdings = [holdingData];
           existingInvestment.calculateMarketValue();
@@ -130,10 +138,22 @@ class InvestmentService {
         });
 
         if (existingInvestment) {
+          // Preserve manually-set holdingTypes during sync
+          const existingTypes = new Map(
+            existingInvestment.holdings.map(h => [h.symbol, h.holdingType])
+          );
+          const newHoldings = (investmentData.holdings || []).map(h => {
+            const prevType = existingTypes.get(h.symbol);
+            if (prevType && prevType !== INVESTMENT_CONSTANTS.HOLDING_TYPES.STOCK && !h.holdingType) {
+              return { ...h, holdingType: prevType };
+            }
+            return h;
+          });
+
           // Update existing investment
           existingInvestment.balance = investmentData.balance;
           existingInvestment.currency = investmentData.currency;
-          existingInvestment.holdings = investmentData.holdings || [];
+          existingInvestment.holdings = newHoldings;
           existingInvestment.cashBalance = investmentData.cashBalance || 0;
           existingInvestment.accountName = investmentData.accountName || existingInvestment.accountName;
           existingInvestment.accountType = investmentData.accountType || existingInvestment.accountType;
@@ -631,6 +651,18 @@ class InvestmentService {
       logger.error(`Error updating investment prices: ${error.message}`);
       throw error;
     }
+  }
+
+  async updateHoldingType(investmentId, userId, symbol, holdingType) {
+    const investment = await Investment.findOne({ _id: investmentId, userId });
+    if (!investment) throw new Error('Investment not found');
+
+    const holding = investment.holdings.find(h => h.symbol === symbol);
+    if (!holding) throw new Error(`Holding with symbol "${symbol}" not found`);
+
+    holding.holdingType = holdingType;
+    await investment.save();
+    return investment;
   }
 
   async deleteInvestment(investmentId, userId) {

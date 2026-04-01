@@ -117,6 +117,28 @@ subCategorySchema.pre('remove', async function(next) {
   next();
 });
 
+// Auto-create a zero-amount CategoryBudget for new expense subcategories
+subCategorySchema.post('save', async function(doc) {
+  if (!doc.wasNew) return;
+  try {
+    const Category = mongoose.model('Category');
+    const category = await Category.findById(doc.parentCategory);
+    if (!category || category.type !== 'Expense') return;
+
+    const CategoryBudget = require('../../monthly-budgets/models/CategoryBudget');
+    await CategoryBudget.findOrCreate(doc.userId, doc.parentCategory, doc._id);
+  } catch (err) {
+    // Non-critical — budget can be created later via the budget UI
+    console.warn('Auto-create CategoryBudget for new subcategory failed:', err.message);
+  }
+});
+
+// Track if this is a new document
+subCategorySchema.pre('save', function(next) {
+  this.wasNew = this.isNew;
+  next();
+});
+
 const SubCategory = mongoose.model('SubCategory', subCategorySchema);
 
 module.exports = SubCategory;
