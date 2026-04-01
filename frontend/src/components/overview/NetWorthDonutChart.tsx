@@ -150,8 +150,12 @@ function useNetWorthData(): NetWorthData {
         const rates: Record<string, number> = { ILS: 1 };
         if (exchangeRatesResult.status === 'fulfilled') {
           for (const r of exchangeRatesResult.value.rates || []) {
-            if (r.toCurrency && r.rate) {
+            if (r.fromCurrency === 'ILS' && r.toCurrency && r.rate) {
+              // ILS → X at rate R means 1 ILS = R units of X, so X → ILS = 1/R
               rates[r.toCurrency] = 1 / r.rate;
+            } else if (r.toCurrency === 'ILS' && r.fromCurrency && r.rate) {
+              // X → ILS at rate R means 1 X = R ILS
+              rates[r.fromCurrency] = r.rate;
             }
           }
         }

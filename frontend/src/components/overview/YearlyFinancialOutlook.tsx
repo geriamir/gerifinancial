@@ -42,11 +42,12 @@ const formatCurrency = (amount: number, currency = 'ILS'): string => {
   }).format(amount);
 };
 
-const formatCompact = (amount: number): string => {
+const formatCompact = (amount: number, currency = 'ILS'): string => {
   const abs = Math.abs(amount);
-  if (abs >= 1_000_000) return `₪${(amount / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `₪${(amount / 1_000).toFixed(0)}K`;
-  return formatCurrency(amount);
+  const symbol = currency === 'ILS' ? '₪' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : `${currency} `;
+  if (abs >= 1_000_000) return `${symbol}${(amount / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${symbol}${(amount / 1_000).toFixed(0)}K`;
+  return formatCurrency(amount, currency);
 };
 
 // ---------- Stat row component ----------
@@ -286,7 +287,7 @@ const YearlyFinancialOutlook: React.FC = () => {
             <StatRow
               icon={<VestingIcon sx={{ fontSize: 18 }} />}
               label="Upcoming RSU Vesting"
-              value={formatCompact(data.totalVestingValue)}
+              value={formatCompact(data.totalVestingValue, 'USD')}
               sub={`${data.upcomingVesting.length} event${data.upcomingVesting.length > 1 ? 's' : ''} this year`}
               color={theme.palette.secondary.main}
             />

@@ -130,7 +130,7 @@ const MonthlyBudgetStatus: React.FC = () => {
                 actual: cat.actualAmount || 0,
                 percentage: cat.budgetedAmount
                   ? Math.round(((cat.actualAmount || 0) / cat.budgetedAmount) * 100)
-                  : 0,
+                  : (cat.actualAmount ? 100 : 0),
               }))
               .sort((a: BudgetCategory, b: BudgetCategory) => b.actual - a.actual)
               .slice(0, 4);

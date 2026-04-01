@@ -6,9 +6,8 @@
  * │  Net Worth Donut (2x)   │  Monthly Budget   │
  * │  3-ring + summary       │  Status           │
  * ├────────────┬────────────┼──────────────────┤
- * │  Yearly    │  Action    │                   │
- * │  Outlook   │  Items     │  Recent Activity  │
- * │            │            │  (spans rows 2-3) │
+ * │  Yearly    │  Action    │  Recent Activity  │
+ * │  Outlook   │  Items     │                   │
  * └────────────┴────────────┴──────────────────┘
  */
 

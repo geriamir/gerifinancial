@@ -247,17 +247,6 @@ router.get('/:id', async (req, res) => {
 
 
 
-// Get sync status for a bank account
-router.get('/sync/status/:bankAccountId', async (req, res) => {
-  try {
-    const status = await dataSyncService.getSyncStatus(req.params.bankAccountId, req.user.id);
-    res.json({ status });
-  } catch (error) {
-    logger.error('Error fetching sync status:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Update investment prices (for manual price updates)
 router.post('/prices/update', async (req, res) => {
   try {
@@ -313,20 +302,6 @@ router.delete('/:id', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error closing investment:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get investments by bank account
-router.get('/by-bank/:bankAccountId', async (req, res) => {
-  try {
-    const investments = await investmentService.getInvestmentsByBankAccount(
-      req.user.id, 
-      req.params.bankAccountId
-    );
-    res.json({ investments });
-  } catch (error) {
-    logger.error('Error fetching investments by bank account:', error);
     res.status(500).json({ error: error.message });
   }
 });
