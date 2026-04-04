@@ -202,13 +202,15 @@ function useNetWorthData(): NetWorthData {
           }
         }
 
-        // ---------- RSU Portfolio — Mid-term ----------
+        // ---------- RSU Portfolio — Mid-term (values are in USD, post-tax, 2yr cliff) ----------
         if (rsuSummary.status === 'fulfilled') {
-          const total = rsuSummary.value?.summary?.vestedLiquidValue || 0;
-          if (total > 0) {
+          const totalUSD = rsuSummary.value?.summary?.vestedLiquidValue || 0;
+          if (totalUSD > 0) {
             assets.push({
               name: 'RSU Portfolio',
-              value: total,
+              value: toILS(totalUSD, 'USD'),
+              originalValue: totalUSD,
+              originalCurrency: 'USD',
               category: 'mid-term',
               color: '',
               route: '/rsus',
