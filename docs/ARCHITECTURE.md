@@ -43,9 +43,24 @@ upstream is [`eshaham/israeli-bank-scrapers`](https://github.com/eshaham/israeli
 The package is TypeScript and must be built (`npm run build` → `lib/`) before
 real scrapes will work. See the README for setup steps.
 
+**The required checkout is the fork's `feature/add-foreign-currency` branch**,
+not `master`. That branch is 33 commits ahead of the fork's `master` and is the
+only place the extended scraping API this backend depends on exists:
+
+| API | Consumed by |
+|---|---|
+| `scrapePortfolios()` / `doesSupportPortfolios()` | `PortfoliosSyncStrategy` |
+| `scrapeForeignCurrencyAccounts()` / `doesSupportForeignCurrencyAccounts()` | `ForeignCurrencySyncStrategy` |
+| `generateTransactionUniqueId()` | transaction deduplication |
+
+Neither the fork's `master` nor upstream's `master` defines any of them, so the
+`investment-portfolios` and `foreign-currency` sync strategies cannot work
+against those branches.
+
 Because the dependency is a path, **updating the scrapers is a manual `git pull`
 plus rebuild** in that sibling directory — it will never change via
-`npm update` here.
+`npm update` here. npm links it as a junction/symlink, so a rebuild in the
+sibling checkout takes effect immediately without reinstalling.
 
 ---
 
@@ -326,6 +341,36 @@ npm run test:e2e                                 # Cypress
 Current suite: 47 backend test files, 15 frontend test files, 5 Cypress specs.
 Backend tests run serially (`--runInBand`) because they share a test database.
 
+#### Test gotchas
+
+**Never hard-code absolute dates in fixtures.** Several behaviours key off
+"is this date in the future?" — notably `RSUGrant.unvestedShares` (a virtual
+derived from `vestDate > now`, *not* from the `vested` flag) and the
+`mostRecentTransactionDate` / `lastScraped` logic that deliberately ignores
+future-dated instalments. Fixtures written with literal dates pass until real
+time overtakes them, then fail for reasons unrelated to the code under test.
+Express test dates relative to `Date.now()` instead.
+
+**`frontend/package.json` defines `jest.moduleNameMapper` — do not remove it.**
+`react-scripts` 5 ships a Jest resolver that predates the `exports` field, so it
+falls back to `main`. Two dependencies break under that resolver:
+
+| Package | Problem | Mapped to |
+|---|---|---|
+| `react-router-dom` | Declares `main: ./dist/main.js`, a file it does not ship | `react-router-dom/dist/index.js` |
+| `react-router` | Subpath `react-router/dom` is `exports`-only | `react-router/dist/development/dom-export.js` |
+| `axios` | Resolves to its ESM entry under the jsdom `browser` condition | `axios/dist/node/axios.cjs` |
+
+Webpack understands `exports`, so `npm run build` succeeds even when these
+suites cannot load — a green build is not evidence that tests run.
+
+**Globals in `src/setupTests.ts` must be plain functions, not `jest.fn()`.**
+`react-scripts` sets `resetMocks: true`, which clears mock implementations
+before every test. `window.matchMedia` and `window.ResizeObserver` are stubbed
+there; as `jest.fn().mockImplementation(...)` they would be reset to return
+`undefined`, and MUI's `useMediaQuery` then throws
+`Cannot read properties of undefined (reading 'matches')`.
+
 ### Required pre-commit checks
 
 Per `.github/copilot-instructions.md`, all of the following must pass before
@@ -337,7 +382,8 @@ committing:
 4. `cd frontend && npx tsc --noEmit`
 5. `cd frontend && npm run build`
 
-CI enforces these via `.github/workflows/test.yml` and `e2e-tests.yml`.
+> There is **no CI**: the repository has no `.github/workflows/`. These checks
+> are enforced by convention only, so run them locally before every commit.
 
 ### Branching
 

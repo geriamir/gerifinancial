@@ -98,7 +98,8 @@ models.
 - **Node.js ≥ 22.12** and npm
 - **MongoDB** running on port 27777 (or set `MONGODB_URI`)
 - **Redis** — required for the BullMQ scraping queue and distributed locks
-- **`israeli-bank-scrapers`** cloned as a **sibling of this repository** — see below
+- **`israeli-bank-scrapers`** cloned as a **sibling of this repository**, on the
+  `feature/add-foreign-currency` branch — see below
 
 ### Setting up `israeli-bank-scrapers`
 
@@ -123,9 +124,24 @@ cd ..                                   # into the parent of gerifinancial/
 git clone https://github.com/geriamir/israeli-bank-scrapers.git
 cd israeli-bank-scrapers
 git remote add upstream https://github.com/eshaham/israeli-bank-scrapers.git
+git checkout feature/add-foreign-currency   # REQUIRED — see below
 npm install
 npm run build                           # emits lib/
 ```
+
+> ⚠️ **Check out `feature/add-foreign-currency`, not the default branch.**
+> Three APIs this backend calls exist *only* on that branch — they are absent
+> from both the fork's `master` and upstream's `master`:
+>
+> | API | Used by |
+> |---|---|
+> | `scrapePortfolios()` / `doesSupportPortfolios()` | `investments/services/sync/PortfoliosSyncStrategy.js` |
+> | `scrapeForeignCurrencyAccounts()` / `doesSupportForeignCurrencyAccounts()` | `foreign-currency/services/sync/ForeignCurrencySyncStrategy.js` |
+> | `generateTransactionUniqueId()` | transaction deduplication (PRs #51, #53) |
+>
+> On `master` the backend installs and boots fine, but the investment and
+> foreign-currency sync strategies fail at runtime, and transaction dedup falls
+> back to the non-unique bank `identifier`.
 
 Backend *tests* do not need the built library: `bankScraperService.js`
 substitutes `src/test/mocks/bankScraper` whenever `NODE_ENV` is `test` or `e2e`.
@@ -234,7 +250,8 @@ cd frontend && npx tsc --noEmit
 cd frontend && npm run build
 ```
 
-CI runs these via `.github/workflows/test.yml` and `e2e-tests.yml`.
+> **There is no CI** — this repository has no `.github/workflows/`. These checks
+> are enforced by convention only, so run them locally before every commit.
 
 ---
 

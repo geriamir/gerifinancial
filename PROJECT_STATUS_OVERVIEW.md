@@ -130,13 +130,32 @@ timeline source) rather than four separate patches.
   (`file:../../israeli-bank-scrapers`), so a sibling checkout of the
   [`geriamir` fork](https://github.com/geriamir/israeli-bank-scrapers) is
   required to install the backend, and it must be built before real scrapes
-  work. As of July 2026 that fork is **32 commits behind upstream** and carries
-  **no unique changes** — its only original commit (`safeCleanup`) has since
-  been merged upstream. Syncing the fork to upstream, or switching to upstream
-  directly, would remove a maintenance burden; note that upstream has moved to
-  Puppeteer 24 and Node ≥ 22.22.2, so it warrants a scrape smoke-test.
+  work. The required branch is **`feature/add-foreign-currency`** — the fork's
+  `master` is missing `scrapePortfolios`, `scrapeForeignCurrencyAccounts` and
+  `generateTransactionUniqueId`, which the investments, foreign-currency and
+  dedup code all call. This is an easy setup trap and is now called out in the
+  README.
+- **Scraper fork divergence** — `feature/add-foreign-currency` is 33 commits
+  ahead of the fork's `master`, which is itself 32 behind upstream, so the
+  working branch has never been rebased onto current upstream. It also **misses
+  the mizrahi transaction-identifier fix** (upstream #1052, present on the
+  fork's `feature/add-investments-for-leumi` as `927e1db`) — a candidate
+  cherry-pick. Rebasing onto upstream would pick up Puppeteer 24 and
+  Node ≥ 22.22.2, so it warrants a scrape smoke-test.
 - **Documentation drift** — this refresh (July 2026) corrected roughly eight
   months of drift. Keep architecture docs updated alongside structural changes.
+- **No CI** — there is no `.github/workflows/`, so the pre-commit checks in
+  `.github/copilot-instructions.md` are enforced by convention only. That is how
+  the test suites below silently rotted.
+- **Test suites rot without CI** — as of this refresh both suites are green
+  (backend 873 passing / 47 suites, frontend 205 passing / 15 suites), but
+  getting there required fixing bugs that had accumulated unnoticed:
+  - Fixtures using hard-coded absolute "future" dates that had since become
+    past dates, breaking `unvestedShares` (derived from `vestDate > now`) and
+    the `mostRecentTransactionDate` / `lastScraped` future-exclusion logic.
+    **Always express test dates relative to `Date.now()`.**
+  - 8 of 15 frontend suites could not even load. See the note in
+    `frontend/package.json` `jest.moduleNameMapper` — do not remove it.
 
 ---
 
