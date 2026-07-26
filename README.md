@@ -95,12 +95,41 @@ models.
 
 ## Prerequisites
 
-- **Node.js** and npm
+- **Node.js ≥ 22.12** and npm
 - **MongoDB** running on port 27777 (or set `MONGODB_URI`)
 - **Redis** — required for the BullMQ scraping queue and distributed locks
-- **`israeli-bank-scrapers`** checked out as a sibling directory: the backend
-  depends on it via `file:../../israeli-bank-scrapers`, so the repo will not
-  install without it
+- **`israeli-bank-scrapers`** cloned as a **sibling of this repository** — see below
+
+### Setting up `israeli-bank-scrapers`
+
+The backend depends on the scraper library through a local path
+(`"israeli-bank-scrapers": "file:../../israeli-bank-scrapers"`), so
+`npm install` fails unless the directory exists next to this repo:
+
+```
+repos/
+├── gerifinancial/
+└── israeli-bank-scrapers/     <-- must be here
+```
+
+The project uses the fork at
+[`geriamir/israeli-bank-scrapers`](https://github.com/geriamir/israeli-bank-scrapers)
+(the upstream package is marked `private`, so it is consumed from source rather
+than npm). It is a TypeScript package whose `main` is `lib/index.js`, and `lib/`
+is **not** committed — you must build it before the backend can run:
+
+```bash
+cd ..                                   # into the parent of gerifinancial/
+git clone https://github.com/geriamir/israeli-bank-scrapers.git
+cd israeli-bank-scrapers
+git remote add upstream https://github.com/eshaham/israeli-bank-scrapers.git
+npm install
+npm run build                           # emits lib/
+```
+
+Backend *tests* do not need the built library: `bankScraperService.js`
+substitutes `src/test/mocks/bankScraper` whenever `NODE_ENV` is `test` or `e2e`.
+The build is only required to run real scrapes.
 
 ---
 

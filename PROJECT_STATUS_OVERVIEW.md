@@ -126,9 +126,15 @@ timeline source) rather than four separate patches.
   moved to `docs/archive/`, but new work should not add more root-level
   markdown.
 - **No user profile/settings page** — the route renders a placeholder.
-- **`israeli-bank-scrapers` is a local file dependency**
-  (`file:../../israeli-bank-scrapers`), so a sibling checkout is required to
-  install the backend.
+- **`israeli-bank-scrapers` is a local path dependency**
+  (`file:../../israeli-bank-scrapers`), so a sibling checkout of the
+  [`geriamir` fork](https://github.com/geriamir/israeli-bank-scrapers) is
+  required to install the backend, and it must be built before real scrapes
+  work. As of July 2026 that fork is **32 commits behind upstream** and carries
+  **no unique changes** — its only original commit (`safeCleanup`) has since
+  been merged upstream. Syncing the fork to upstream, or switching to upstream
+  directly, would remove a maintenance burden; note that upstream has moved to
+  Puppeteer 24 and Node ≥ 22.22.2, so it warrants a scrape smoke-test.
 - **Documentation drift** — this refresh (July 2026) corrected roughly eight
   months of drift. Keep architecture docs updated alongside structural changes.
 

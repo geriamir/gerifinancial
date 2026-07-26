@@ -29,6 +29,24 @@ Server-Sent Events stream for push updates.
 | Redis | BullMQ job queue + distributed locks | Yes for scraping/sync |
 | Puppeteer | Headless browser for `israeli-bank-scrapers` | Yes for bank sync |
 
+### The `israeli-bank-scrapers` dependency
+
+The backend consumes the scraper library from a **local path**, not npm:
+
+```json
+"israeli-bank-scrapers": "file:../../israeli-bank-scrapers"
+```
+
+That resolves to a sibling of the repository root. The project tracks the fork
+[`geriamir/israeli-bank-scrapers`](https://github.com/geriamir/israeli-bank-scrapers);
+upstream is [`eshaham/israeli-bank-scrapers`](https://github.com/eshaham/israeli-bank-scrapers).
+The package is TypeScript and must be built (`npm run build` → `lib/`) before
+real scrapes will work. See the README for setup steps.
+
+Because the dependency is a path, **updating the scrapers is a manual `git pull`
+plus rebuild** in that sibling directory — it will never change via
+`npm update` here.
+
 ---
 
 ## 2. Backend: Domain-Module Architecture
