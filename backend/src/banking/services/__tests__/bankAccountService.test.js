@@ -267,9 +267,10 @@ describe('BankAccountService', () => {
     });
 
     it('should set lastScraped to latest non-future transaction date', async () => {
-      const pastDate = new Date('2026-02-20');
-      const recentDate = new Date('2026-03-05');
-      const futureDate = new Date('2026-04-15');
+      const DAY_MS = 24 * 60 * 60 * 1000;
+      const pastDate = new Date(Date.now() - 60 * DAY_MS);
+      const recentDate = new Date(Date.now() - 10 * DAY_MS);
+      const futureDate = new Date(Date.now() + 30 * DAY_MS);
 
       await Transaction.create([
         { identifier: 'tx-past', userId, accountId: account._id, amount: -100, currency: 'ILS', date: pastDate, type: 'Expense', description: 'Past', rawData: {} },

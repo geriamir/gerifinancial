@@ -12,25 +12,31 @@ global.TextDecoder = TextDecoder;
 //   testIdAttribute: 'data-testid',
 // });
 
-// Mock window.matchMedia for Material-UI
+// Mock window.matchMedia for Material-UI.
+// NOTE: react-scripts sets `resetMocks: true`, which clears implementations of
+// `jest.fn()` before every test. These globals must therefore be plain
+// functions, not jest mocks, or they return `undefined` inside tests and MUI's
+// useMediaQuery throws "Cannot read properties of undefined (reading 'matches')".
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: jest.fn().mockImplementation(query => ({
+  value: (query: string) => ({
     matches: false,
     media: query,
     onchange: null,
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
-  })),
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }),
 });
 
-// Mock window.ResizeObserver for Material-UI
-window.ResizeObserver = jest.fn().mockImplementation(() => ({
-  observe: jest.fn(),
-  unobserve: jest.fn(),
-  disconnect: jest.fn(),
-}));
+// Mock window.ResizeObserver for Material-UI (plain class for the same reason)
+window.ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver;
 
 // Mock useSSE hook for testing
 jest.mock('./hooks/useSSE', () => ({
