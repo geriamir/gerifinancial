@@ -1,4 +1,5 @@
 const credentialEncryption = require('../credentialEncryption');
+const crypto = require('crypto');
 const { getKekProvider, setKekProvider, LocalKekProvider } = require('../kek');
 
 describe('credentialEncryption', () => {
@@ -172,6 +173,33 @@ describe('credentialEncryption', () => {
       expect(credentialEncryption.isEncrypted(null)).toBe(false);
       // Legacy unauthenticated aes-256-cbc format: hex IV + ':' + hex body
       expect(credentialEncryption.isEncrypted('a'.repeat(32) + ':deadbeef')).toBe(false);
+    });
+
+    it('rejects plaintext that merely looks like the ciphertext format', () => {
+      // A credential misread as ciphertext would skip encryption and be stored
+      // in the clear, so shape alone must not be enough to pass.
+      expect(credentialEncryption.isEncrypted('v2:abc:def:ghi')).toBe(false);
+      expect(credentialEncryption.isEncrypted('v2:aaaa:bbbb:cccc')).toBe(false);
+      // Right shape, wrong nonce length (8 bytes rather than 12).
+      const shortIv = Buffer.alloc(8).toString('base64');
+      const tag = Buffer.alloc(16).toString('base64');
+      const body = Buffer.from('body').toString('base64');
+      expect(credentialEncryption.isEncrypted(`v2:${shortIv}:${tag}:${body}`)).toBe(false);
+      // Right nonce, wrong tag length (12 bytes rather than 16).
+      const iv = Buffer.alloc(12).toString('base64');
+      const shortTag = Buffer.alloc(12).toString('base64');
+      expect(credentialEncryption.isEncrypted(`v2:${iv}:${shortTag}:${body}`)).toBe(false);
+      // Correct sizes but non-canonical base64 (padding stripped from the tag).
+      expect(credentialEncryption.isEncrypted(`v2:${iv}:${tag.replace(/=+$/, '')}:${body}`)).toBe(false);
+      // An empty ciphertext body is never produced: empty values are not encrypted.
+      expect(credentialEncryption.isEncrypted(`v2:${iv}:${tag}:`)).toBe(false);
+    });
+
+    it('accepts a correctly sized synthetic ciphertext', () => {
+      const iv = crypto.randomBytes(12).toString('base64');
+      const tag = crypto.randomBytes(16).toString('base64');
+      const body = crypto.randomBytes(24).toString('base64');
+      expect(credentialEncryption.isEncrypted(`v2:${iv}:${tag}:${body}`)).toBe(true);
     });
   });
 });

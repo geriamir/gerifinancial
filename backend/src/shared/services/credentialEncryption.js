@@ -14,6 +14,22 @@ const CIPHERTEXT_VERSION = 'v2';
 const MAX_CACHED_DEKS = 500;
 
 /**
+ * Decodes one component of a ciphertext string, returning null unless it is
+ * canonical base64 of the expected size.
+ *
+ * Buffer.from(..., 'base64') silently skips characters it does not recognise,
+ * so decoding alone proves nothing about the input. Re-encoding and comparing
+ * is what makes this strict: only canonical base64 survives the round trip.
+ */
+function decodeStrictBase64(part, expectedBytes) {
+  if (typeof part !== 'string' || part.length === 0) return null;
+  const buf = Buffer.from(part, 'base64');
+  if (buf.length === 0 || buf.toString('base64') !== part) return null;
+  if (expectedBytes !== undefined && buf.length !== expectedBytes) return null;
+  return buf;
+}
+
+/**
  * Per-user envelope encryption for bank credentials.
  *
  * Every user gets their own randomly generated data encryption key (DEK). The
@@ -185,12 +201,22 @@ class CredentialEncryptionService {
   /**
    * Detects whether a value has already been encrypted by this service, so a
    * re-save does not encrypt the ciphertext a second time.
+   *
+   * This has to be strict. A plaintext credential misread as ciphertext would
+   * skip encryption and be stored in the clear, so the check validates the
+   * decoded size of the nonce and authentication tag rather than just the
+   * shape of the string.
    */
   static isEncrypted(value) {
     if (!value || typeof value !== 'string') return false;
     const parts = value.split(':');
     if (parts.length !== 4 || parts[0] !== CIPHERTEXT_VERSION) return false;
-    return parts.slice(1).every((part) => /^[A-Za-z0-9+/]+={0,2}$/.test(part));
+    const [, ivB64, tagB64, ciphertextB64] = parts;
+    return (
+      decodeStrictBase64(ivB64, IV_LENGTH) !== null &&
+      decodeStrictBase64(tagB64, TAG_LENGTH) !== null &&
+      decodeStrictBase64(ciphertextB64) !== null
+    );
   }
 }
 

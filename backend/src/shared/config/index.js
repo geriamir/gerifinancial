@@ -32,11 +32,10 @@ const config = {
   encryptionKey: process.env.ENCRYPTION_KEY || undefined
 };
 
-// Outside production a locally derived key keeps development and tests running
-// without an Azure Key Vault. In production the key must be supplied.
-if (!config.encryptionKey && config.env !== 'production') {
-  config.encryptionKey = 'development-only-encryption-key-do-not-use-in-production';
-}
+// No development fallback: a committed, well-known key would silently become
+// the KEK for anyone running without configuration. ENCRYPTION_KEY (or a Key
+// Vault URL) is required in every environment, and LocalKekProvider reports
+// clearly when neither is set. Tests set ENCRYPTION_KEY in src/test/setup.js.
 
 // Override configuration for test/e2e environments
 if (process.env.NODE_ENV === 'test') {
