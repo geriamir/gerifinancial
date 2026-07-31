@@ -25,6 +25,7 @@ jest.mock('../bankAccountEvents', () => ({
 }));
 jest.mock('../../../shared/utils/logger', () => ({
   info: jest.fn(),
+  warn: jest.fn(),
   error: jest.fn(),
   debug: jest.fn()
 }));
@@ -43,16 +44,16 @@ const logger = require('../../../shared/utils/logger');
 
 let testUser;
 
-beforeAll(async () => {
-  testUser = await User.create({
-    name: 'Test User',
-    email: 'test@example.com',
-    password: 'password123'
-  });
-});
-
 describe('ScrapingSchedulerService', () => {
   beforeEach(async () => {
+    // Recreated per test because the shared setup wipes the users collection
+    // between tests, and bank account credentials are encrypted with a key
+    // that must belong to a user that actually exists.
+    testUser = await User.create({
+      name: 'Test User',
+      email: 'test@example.com',
+      password: 'password123'
+    });
     jest.clearAllMocks();
     // Reset mocks
     logger.info.mockReset();

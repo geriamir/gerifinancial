@@ -21,7 +21,10 @@ describe('BankAccountService', () => {
   let eventListeners;
 
   beforeEach(async () => {
-    userId = new mongoose.Types.ObjectId();
+    // Credentials are encrypted with a key that belongs to a specific user, so
+    // the owning user has to actually exist.
+    const user = await global.createTestUser();
+    userId = user._id;
     mockAccountData = {
       bankId: 'hapoalim',
       name: 'Test Account',

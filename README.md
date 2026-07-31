@@ -179,7 +179,11 @@ services first. On other platforms, start those services yourself and run
 | `MONGODB_URI` | yes | MongoDB connection string |
 | `JWT_SECRET` | yes | Token signing secret |
 | `JWT_EXPIRATION` | no | Token lifetime (default 24h) |
-| `ENCRYPTION_KEY` | yes | Encrypts stored bank credentials |
+| `ENCRYPTION_KEY` | yes, unless `AZURE_KEY_VAULT_URL` is set | Wraps each user's bank-credential key when running without Key Vault |
+| `AZURE_KEY_VAULT_URL` | no | Key Vault holding the key encryption key. Takes precedence over `ENCRYPTION_KEY` |
+| `AZURE_KEY_VAULT_KEY_NAME` | no | Key name within the vault (default `credential-kek`) |
+| `AZURE_CLIENT_ID` | no | User-assigned managed identity to authenticate to Key Vault with |
+| `DEK_CACHE_TTL_MS` | no | How long an unwrapped user key is cached in memory (default 15 min) |
 | `NODE_ENV` | no | `development` / `test` / `production` |
 | `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` / `REDIS_DB` | no | Redis connection (defaults to localhost:6379) |
 | `ALPHA_VANTAGE_API_KEY`, `FINNHUB_API_KEY` | no | Stock price providers |

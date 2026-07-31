@@ -60,7 +60,9 @@ The landing page answers "how am I doing?" at a glance.
 ### Connecting accounts
 - Connect Israeli bank accounts via the `israeli-bank-scrapers` integration.
 - Connect **Mercury Bank** accounts through its direct API.
-- Credentials are encrypted at rest and never returned in API responses.
+- Credentials are encrypted at rest with a **per-user key** and never returned in
+  API responses. Each user's key is itself wrapped by a key held in Azure Key
+  Vault, so one user's credentials cannot be read with another user's key.
 - Test a connection before saving it.
 
 ### Syncing

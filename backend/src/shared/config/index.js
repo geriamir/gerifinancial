@@ -17,8 +17,25 @@ const config = {
     password: process.env.REDIS_PASSWORD || undefined,
     db: Number(process.env.REDIS_DB) || 0,
     ...(redisTls ? { tls: { servername: redisHost } } : {})
-  }
+  },
+  // Envelope encryption for bank credentials. Each user gets their own data
+  // encryption key (DEK), wrapped by a key encryption key (KEK). When a vault
+  // URL is configured the KEK lives in Azure Key Vault and never leaves it;
+  // otherwise the KEK is derived locally from ENCRYPTION_KEY.
+  keyVault: {
+    url: process.env.AZURE_KEY_VAULT_URL || undefined,
+    keyName: process.env.AZURE_KEY_VAULT_KEY_NAME || 'credential-kek',
+    // Unwrapping a DEK costs a Key Vault round trip, so unwrapped DEKs are
+    // cached in memory for this long.
+    dekCacheTtlMs: Number(process.env.DEK_CACHE_TTL_MS) || 15 * 60 * 1000
+  },
+  encryptionKey: process.env.ENCRYPTION_KEY || undefined
 };
+
+// No development fallback: a committed, well-known key would silently become
+// the KEK for anyone running without configuration. ENCRYPTION_KEY (or a Key
+// Vault URL) is required in every environment, and LocalKekProvider reports
+// clearly when neither is set. Tests set ENCRYPTION_KEY in src/test/setup.js.
 
 // Override configuration for test/e2e environments
 if (process.env.NODE_ENV === 'test') {

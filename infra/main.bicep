@@ -29,12 +29,6 @@ param mongoAdminPassword string
 @secure()
 param jwtSecret string
 
-@description('Key used to encrypt stored bank credentials. AES-256 needs exactly 32 bytes and the app passes this straight to Buffer.from(), so the length is fixed. Changing it makes existing credentials unreadable.')
-@minLength(32)
-@maxLength(32)
-@secure()
-param encryptionKey string
-
 @description('Password for the Redis container.')
 @secure()
 param redisPassword string
@@ -46,6 +40,10 @@ var suffix = uniqueString(resourceGroup().id)
 var mongoClusterName = '${namePrefix}-mongo-${suffix}'
 var containerAppName = '${namePrefix}-api'
 var redisAppName = '${namePrefix}-redis'
+// Vault names are globally unique and capped at 24 characters, so the full
+// prefix does not fit.
+var keyVaultName = 'gfkv${suffix}'
+var credentialKekName = 'credential-kek'
 
 resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: registryName
@@ -66,6 +64,63 @@ resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(registry.id, identity.id, acrPullRoleId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Holds the key encryption key for user bank credentials. Each user has their
+// own data encryption key, stored on their user document in wrapped form only;
+// this vault holds the key that unwraps it, and that key never leaves the vault.
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+  name: keyVaultName
+  location: location
+  properties: {
+    sku: {
+      family: 'A'
+      // Software-protected keys. A Premium SKU would allow HSM-backed keys at
+      // $1/key/month, which is not worth it at this scale.
+      name: 'standard'
+    }
+    tenantId: subscription().tenantId
+    // Access is granted through Azure RBAC rather than legacy access policies.
+    enableRbacAuthorization: true
+    // Soft delete is mandatory. Keep the window short so a redeploy after a
+    // teardown is not blocked by a name still held in the deleted state.
+    enableSoftDelete: true
+    softDeleteRetentionInDays: 7
+    publicNetworkAccess: 'Enabled'
+    networkAcls: {
+      bypass: 'AzureServices'
+      defaultAction: 'Allow'
+    }
+  }
+}
+
+// Key Vault outside a Managed HSM cannot hold AES keys, so the KEK is RSA and
+// data keys are wrapped with RSA-OAEP-256.
+resource credentialKek 'Microsoft.KeyVault/vaults/keys@2023-07-01' = {
+  parent: keyVault
+  name: credentialKekName
+  properties: {
+    kty: 'RSA'
+    keySize: 2048
+    keyOps: [
+      'wrapKey'
+      'unwrapKey'
+    ]
+  }
+}
+
+// Key Vault Crypto User: wrap and unwrap only. The app cannot read, export,
+// modify or delete the key itself.
+var keyVaultCryptoUserRoleId = '12338af0-0e69-4776-bea7-57ae8d297424'
+
+resource keyVaultCryptoUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: keyVault
+  name: guid(keyVault.id, identity.id, keyVaultCryptoUserRoleId)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultCryptoUserRoleId)
     principalId: identity.properties.principalId
     principalType: 'ServicePrincipal'
   }
@@ -234,6 +289,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   dependsOn: [
     acrPull
     redisApp
+    // The app resolves the key on first use, but the role assignment and the
+    // key itself must exist before it starts serving traffic.
+    keyVaultCryptoUser
+    credentialKek
   ]
   properties: {
     managedEnvironmentId: containerEnv.id
@@ -265,10 +324,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'jwt-secret'
           value: jwtSecret
         }
-        {
-          name: 'encryption-key'
-          value: encryptionKey
-        }
       ]
     }
     template: {
@@ -299,8 +354,18 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               secretRef: 'jwt-secret'
             }
             {
-              name: 'ENCRYPTION_KEY'
-              secretRef: 'encryption-key'
+              name: 'AZURE_KEY_VAULT_URL'
+              value: keyVault.properties.vaultUri
+            }
+            {
+              name: 'AZURE_KEY_VAULT_KEY_NAME'
+              value: credentialKekName
+            }
+            {
+              // DefaultAzureCredential needs to be told which user-assigned
+              // identity to request a token for.
+              name: 'AZURE_CLIENT_ID'
+              value: identity.properties.clientId
             }
             {
               name: 'REDIS_HOST'
@@ -361,3 +426,5 @@ output staticWebAppName string = staticWebApp.name
 output staticWebAppUrl string = 'https://${staticWebApp.properties.defaultHostname}'
 output mongoClusterName string = mongoCluster.name
 output redisHostName string = redisAppName
+output keyVaultName string = keyVault.name
+output keyVaultUrl string = keyVault.properties.vaultUri

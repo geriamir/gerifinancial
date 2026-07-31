@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-const { encrypt, decrypt } = require('../../shared/utils/encryption');
+const credentialEncryption = require('../../shared/services/credentialEncryption');
+const { resolveStartDate } = require('../utils/scraperDates');
 const logger = require('../../shared/utils/logger');
 const { OTP_BANKS } = require('../constants/enums');
 
@@ -214,35 +215,18 @@ bankAccountSchema.set('toJSON', {
 // Index for efficient queries
 bankAccountSchema.index({ userId: 1, bankId: 1 });
 
-// Check if a value looks like it was encrypted by our encrypt() function.
-// Encrypted format is: 32-hex-char IV + ':' + hex-encoded ciphertext
-function isEncrypted(text) {
-  if (!text || !text.includes(':')) return false;
-  const ivPart = text.split(':')[0];
-  return /^[0-9a-f]{32}$/i.test(ivPart);
-}
+// Check if a value has already been encrypted, so re-saving an account does not
+// encrypt the stored ciphertext a second time.
+const isEncrypted = credentialEncryption.isEncrypted;
 
-// Pre-save middleware to encrypt credentials
-bankAccountSchema.pre('save', function(next) {
+// Pre-save middleware to encrypt credentials with this user's own key
+bankAccountSchema.pre('save', async function(next) {
   try {
-    if (this.isModified('credentials.password') && this.credentials.password) {
-      if (!isEncrypted(this.credentials.password)) {
-        this.credentials.password = encrypt(this.credentials.password);
-      }
-    }
-    if (this.isModified('credentials.apiToken') && this.credentials.apiToken) {
-      if (!isEncrypted(this.credentials.apiToken)) {
-        this.credentials.apiToken = encrypt(this.credentials.apiToken);
-      }
-    }
-    if (this.isModified('credentials.flexToken') && this.credentials.flexToken) {
-      if (!isEncrypted(this.credentials.flexToken)) {
-        this.credentials.flexToken = encrypt(this.credentials.flexToken);
-      }
-    }
-    if (this.isModified('credentials.phoneOrEmail') && this.credentials.phoneOrEmail) {
-      if (!isEncrypted(this.credentials.phoneOrEmail)) {
-        this.credentials.phoneOrEmail = encrypt(this.credentials.phoneOrEmail);
+    const fields = ['password', 'apiToken', 'flexToken', 'phoneOrEmail'];
+    for (const field of fields) {
+      const value = this.credentials?.[field];
+      if (this.isModified(`credentials.${field}`) && value && !isEncrypted(value)) {
+        this.credentials[field] = await credentialEncryption.encryptForUser(this.userId, value);
       }
     }
     next();
@@ -251,28 +235,25 @@ bankAccountSchema.pre('save', function(next) {
   }
 });
 
-// Method to get scraper options for a specific strategy
-bankAccountSchema.methods.getScraperOptionsForStrategy = function(strategyName) {
-  // Strategy-specific start date logic
-  let startDate;
-  const strategyData = this.strategySync?.[strategyName];
-  
-  if (strategyData?.lastScraped) {
-    // Use strategy-specific last scraped date for incremental scraping
-    startDate = strategyData.lastScraped;
-  } else {
-    // First scrape for this strategy: go back 6 months
-    startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - 6);
-  }
+// Start dates need no decryption, so they stay synchronous and can be used by
+// callers that only build scraper options.
+bankAccountSchema.methods.getStartDateForStrategy = function(strategyName) {
+  return resolveStartDate(this.strategySync?.[strategyName]?.lastScraped);
+};
 
+bankAccountSchema.methods.getDefaultStartDate = function() {
+  return resolveStartDate(this.lastScraped);
+};
+
+// Method to get scraper options for a specific strategy
+bankAccountSchema.methods.getScraperOptionsForStrategy = async function(strategyName) {
   const options = {
     companyId: this.bankId,
     credentials: {
       username: this.credentials.username,
-      password: decrypt(this.credentials.password)
+      password: await credentialEncryption.decryptForUser(this.userId, this.credentials.password)
     },
-    startDate: startDate,
+    startDate: this.getStartDateForStrategy(strategyName),
     showBrowser: false,
     verbose: false
   };
@@ -281,23 +262,14 @@ bankAccountSchema.methods.getScraperOptionsForStrategy = function(strategyName) 
 };
 
 // Legacy method for backward compatibility
-bankAccountSchema.methods.getScraperOptions = function() {
-  // Use the most recent strategy sync date or fallback to 6 months
-  let startDate;
-  if (this.lastScraped) {
-    startDate = this.lastScraped;
-  } else {
-    startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - 6);
-  }
-
+bankAccountSchema.methods.getScraperOptions = async function() {
   const options = {
     companyId: this.bankId,
     credentials: {
       username: this.credentials.username,
-      password: decrypt(this.credentials.password)
+      password: await credentialEncryption.decryptForUser(this.userId, this.credentials.password)
     },
-    startDate: startDate,
+    startDate: this.getDefaultStartDate(),
     showBrowser: false,
     verbose: false
   };

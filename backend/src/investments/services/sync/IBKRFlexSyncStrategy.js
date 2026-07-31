@@ -39,7 +39,8 @@ class IBKRFlexSyncStrategy extends BaseSyncStrategy {
         });
       }
 
-      const client = new IBKRFlexClient(
+      const client = await IBKRFlexClient.fromEncryptedToken(
+        bankAccount.userId,
         bankAccount.credentials.flexToken,
         bankAccount.credentials.queryId
       );

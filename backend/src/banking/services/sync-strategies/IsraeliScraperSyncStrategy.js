@@ -41,7 +41,7 @@ class IsraeliScraperSyncStrategy extends BaseSyncStrategy {
       const bankScraperService = require('../bankScraperService');
 
       // Use strategy-specific start date instead of the global lastScraped
-      const strategyOptions = bankAccount.getScraperOptionsForStrategy(this.name);
+      const strategyOptions = await bankAccount.getScraperOptionsForStrategy(this.name);
       const mergedOptions = { ...options, startDate: strategyOptions.startDate };
 
       const scraper = bankScraperService.createScraper(bankAccount, mergedOptions);

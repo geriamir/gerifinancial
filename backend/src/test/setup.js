@@ -71,6 +71,9 @@ beforeEach(async () => {
     if (mongoose.connection.collections['users']) {
       await mongoose.connection.collections['users'].deleteMany({});
     }
+    // Users are wiped between tests, so their cached encryption keys must go
+    // too or a later test could reuse a key belonging to a deleted user.
+    require('../shared/services/credentialEncryption').clearCache();
   } catch (error) {
     // Ignore cleanup errors - tests will handle duplicates
     console.warn('Cleanup warning (ignored):', error.message);
