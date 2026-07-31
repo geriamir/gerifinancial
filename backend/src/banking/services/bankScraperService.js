@@ -5,6 +5,7 @@ const scraperModule = ['test', 'e2e'].includes(process.env.NODE_ENV)
 const { createScraper } = scraperModule;
 const logger = require('../../shared/utils/logger');
 const { BankAccount } = require('../models');
+const { resolveStartDate } = require('../utils/scraperDates');
 
 
 class BankScraperService {
@@ -53,10 +54,8 @@ class BankScraperService {
 
   createScraper(bankAccount, options = {}) {
     // Get smart start date from bank account (uses lastScraped if available, otherwise 6 months back)
-    const scraperOptions = bankAccount.getScraperOptions();
-    
     const {
-      startDate = scraperOptions.startDate, // Use smart start date from bank account
+      startDate = resolveStartDate(bankAccount.lastScraped),
       showBrowser = false,
       verbose = false,
       timeout = this.DEFAULT_TIMEOUT
@@ -88,12 +87,13 @@ class BankScraperService {
 
   async login(bankAccount, options = {}) {
     const scraper = this.createScraper(bankAccount, options);
+    const { credentials } = await bankAccount.getScraperOptions();
     let attempts = 0;
     let error = null;
 
     while (attempts < this.MAX_RETRIES) {
       try {
-        const loginResult = await scraper.login(bankAccount.getScraperOptions().credentials);
+        const loginResult = await scraper.login(credentials);
 
         if (!loginResult) {
           throw new Error('Login failed - invalid credentials');

@@ -23,6 +23,22 @@ const userSchema = new mongoose.Schema({
     default: 'ILS',
     trim: true
   },
+  // Envelope encryption material for this user's bank credentials. Holds only
+  // the wrapped form of the data encryption key; the key that unwraps it lives
+  // in Azure Key Vault. Never selected by default so it cannot leak through a
+  // query that forgets to exclude it.
+  credentialKey: {
+    type: {
+      wrappedDek: { type: String, required: true },
+      // Fully versioned key identifier, so DEKs stay unwrappable after the
+      // key encryption key is rotated.
+      kekId: { type: String, required: true },
+      wrappedAt: { type: Date, default: Date.now }
+    },
+    select: false,
+    default: undefined,
+    _id: false
+  },
   // Enhanced onboarding tracking with complete state persistence
   onboarding: {
     // Overall status
@@ -339,7 +355,15 @@ const userSchema = new mongoose.Schema({
     }
   }]
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: {
+    // Belt and braces alongside select:false, so key material can never reach
+    // a response even if a query explicitly selects it.
+    transform: (doc, ret) => {
+      delete ret.credentialKey;
+      return ret;
+    }
+  }
 });
 
 // Hash password before saving

@@ -1,4 +1,4 @@
-const { decrypt } = require('../../shared/utils/encryption');
+const credentialEncryption = require('../../shared/services/credentialEncryption');
 const { parseStringPromise } = require('xml2js');
 const logger = require('../../shared/utils/logger');
 
@@ -11,9 +11,20 @@ const POLL_INTERVAL_MS = 2000;
  * Requests and retrieves Flex Query reports via token-based authentication.
  */
 class IBKRFlexClient {
-  constructor(encryptedFlexToken, queryId) {
-    this.flexToken = decrypt(encryptedFlexToken);
+  constructor(flexToken, queryId) {
+    this.flexToken = flexToken;
     this.queryId = queryId;
+  }
+
+  /**
+   * Builds a client from a stored, encrypted token. Decryption needs the
+   * owning user's key and is asynchronous, which a constructor cannot be.
+   */
+  static async fromEncryptedToken(userId, encryptedFlexToken, queryId) {
+    return new IBKRFlexClient(
+      await credentialEncryption.decryptForUser(userId, encryptedFlexToken),
+      queryId
+    );
   }
 
   /**

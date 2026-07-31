@@ -318,9 +318,13 @@ describe('RealEstateService', () => {
     });
 
     it('should reject linking another user\'s bank account', async () => {
-      const otherUserId = new mongoose.Types.ObjectId();
+      // A real user, because bank account credentials are encrypted with a key
+      // that belongs to the owning user.
+      const otherUser = await global.createTestUser({
+        email: `other-${Date.now()}@example.com`
+      });
       const otherAccount = await BankAccount.create({
-        userId: otherUserId,
+        userId: otherUser._id,
         bankId: 'leumi',
         name: 'Other Account',
         credentials: { username: 'other', password: 'other' },

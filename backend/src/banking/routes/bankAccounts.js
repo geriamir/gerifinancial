@@ -2,7 +2,6 @@ const express = require('express');
 const BankAccount = require('../models/BankAccount');
 const auth = require('../../shared/middleware/auth');
 const bankAccountService = require('../services/bankAccountService.js');
-const { encrypt } = require('../../shared/utils/encryption');
 const { OTP_BANKS } = require('../constants/enums');
 
 const router = express.Router();

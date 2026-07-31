@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { BankAccount } = require('../models');
-const encryption = require('../../shared/utils/encryption');
+const credentialEncryption = require('../../shared/services/credentialEncryption');
 
 // Mock dependencies
 jest.mock('../services/bankAccountService');
@@ -12,8 +12,11 @@ describe('BankAccount Model', () => {
   let mockAccount;
 
   beforeEach(async () => {
+    // Credentials are encrypted with a key that belongs to a specific user, so
+    // the owning user has to actually exist.
+    const user = await global.createTestUser();
     mockAccount = {
-      userId: new mongoose.Types.ObjectId(),
+      userId: user._id,
       bankId: 'hapoalim',
       name: 'Test Account',
       credentials: {
@@ -33,12 +36,17 @@ describe('BankAccount Model', () => {
   describe('Account Management', () => {
     it('should save bank account with encrypted credentials', async () => {
       const account = new BankAccount(mockAccount);
-      const encryptedPassword = encryption.encrypt(validCredentials.password);
-      account.credentials.password = encryptedPassword;
       await account.save();
-      
+
       const savedAccount = await BankAccount.findById(account._id);
-      expect(savedAccount.credentials.password).toBe(encryptedPassword);
+      expect(savedAccount.credentials.password).not.toBe(validCredentials.password);
+      expect(credentialEncryption.isEncrypted(savedAccount.credentials.password)).toBe(true);
+      expect(
+        await credentialEncryption.decryptForUser(
+          savedAccount.userId,
+          savedAccount.credentials.password
+        )
+      ).toBe(validCredentials.password);
       expect(savedAccount.status).toBe('active');
     });
 
@@ -117,7 +125,7 @@ describe('BankAccount Model', () => {
     it('should generate correct scraper options', async () => {
       const account = await BankAccount.create(mockAccount);
       
-      const options = account.getScraperOptions();
+      const options = await account.getScraperOptions();
       expect(options).toEqual({
         companyId: 'hapoalim',
         credentials: {

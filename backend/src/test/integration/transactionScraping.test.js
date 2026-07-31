@@ -5,8 +5,11 @@ describe('Transaction Scraping Integration', () => {
   let testBankAccount;
 
   beforeEach(async () => {
+    // Credentials are encrypted with a key that belongs to a specific user, so
+    // the owning user has to actually exist.
+    const user = await global.createTestUser();
     testBankAccount = await BankAccount.create({
-      userId: new mongoose.Types.ObjectId(),
+      userId: user._id,
       name: 'Test Account',
       bankId: 'leumi',
       accountNumber: '123456',

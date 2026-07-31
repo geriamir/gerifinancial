@@ -44,6 +44,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@azure/identity": "^4.13.1",
+    "@azure/keyvault-keys": "^4.10.2",
     "@vitalets/google-translate-api": "^9.2.1",
     "bcryptjs": "^3.0.2",
     "bullmq": "^5.12.0",

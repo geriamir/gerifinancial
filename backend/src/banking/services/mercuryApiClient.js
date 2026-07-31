@@ -1,4 +1,4 @@
-const { decrypt } = require('../../shared/utils/encryption');
+const credentialEncryption = require('../../shared/services/credentialEncryption');
 
 const MERCURY_BASE_URL = 'https://api.mercury.com/api/v1';
 
@@ -7,8 +7,18 @@ const MERCURY_BASE_URL = 'https://api.mercury.com/api/v1';
  * Handles authentication, pagination, and response mapping.
  */
 class MercuryApiClient {
-  constructor(encryptedApiToken) {
-    this.apiToken = decrypt(encryptedApiToken);
+  constructor(apiToken) {
+    this.apiToken = apiToken;
+  }
+
+  /**
+   * Builds a client from a stored, encrypted token. Decryption needs the
+   * owning user's key and is asynchronous, which a constructor cannot be.
+   */
+  static async fromEncryptedToken(userId, encryptedApiToken) {
+    return new MercuryApiClient(
+      await credentialEncryption.decryptForUser(userId, encryptedApiToken)
+    );
   }
 
   /**

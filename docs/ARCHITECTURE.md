@@ -140,8 +140,28 @@ shared/
 ├── middleware/    auth (JWT verification), ensureLogsDir
 ├── routes/        Cross-domain budget aggregation, SSE events, test-only helpers
 ├── services/      Infrastructure services (below)
-└── utils/         encryption, logger (Winston), promises, rateLimiter
+└── utils/         logger (Winston), promises, rateLimiter
 ```
+
+### Credential encryption
+
+Bank credentials are protected with **envelope encryption**. Every user gets
+their own randomly generated 32-byte data encryption key (DEK), used with
+AES-256-GCM. The DEK is stored on the user document in wrapped form only; the
+key encryption key (KEK) that unwraps it is an RSA-2048 key in Azure Key Vault
+and never leaves the vault. The container authenticates to the vault with a
+user-assigned managed identity holding the **Key Vault Crypto User** role, which
+permits wrap and unwrap but not reading, exporting or deleting the key.
+
+This means a database dump alone yields neither credentials nor the keys to
+them, a compromise is scoped to a single user rather than every user at once,
+and deleting a user destroys their key along with them.
+
+`shared/services/credentialEncryption.js` owns the DEK lifecycle and caches
+unwrapped keys in memory for a bounded time so the vault is not called on every
+operation. `shared/services/kek/` selects the KEK provider: Azure Key Vault when
+`AZURE_KEY_VAULT_URL` is set, otherwise a key derived locally from
+`ENCRYPTION_KEY` so development and the test suite run with no cloud dependency.
 
 ### `strategyRegistry` — the sync abstraction
 

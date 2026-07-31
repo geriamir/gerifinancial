@@ -39,7 +39,10 @@ class MercurySyncStrategy extends BaseSyncStrategy {
         });
       }
 
-      const client = new MercuryApiClient(bankAccount.credentials.apiToken);
+      const client = await MercuryApiClient.fromEncryptedToken(
+        bankAccount.userId,
+        bankAccount.credentials.apiToken
+      );
 
       // Determine start date from strategy sync or default 6 months back
       const strategyData = bankAccount.strategySync?.['mercury-checking'];
