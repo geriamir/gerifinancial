@@ -203,6 +203,31 @@ describe('Auth Routes', () => {
     });
   });
 
+  describe('session cookie attributes', () => {
+    // A browser silently discards a SameSite=None cookie that is not also
+    // Secure. Getting this wrong drops the session on every plain-http
+    // deployment, and the symptom is an app that simply never logs in.
+    it('never pairs SameSite=None with an insecure cookie', () => {
+      if (config.session.crossSite) {
+        expect(config.session.secure).toBe(true);
+      }
+    });
+
+    it('issues a cookie the browser will keep', async () => {
+      const state = signOAuthState({ returnTo: 'http://localhost:3000/' }, config.jwtSecret);
+      const response = await request(app)
+        .get('/api/auth/github/callback')
+        .query({ code: 'good-code', state });
+
+      const cookie = sessionCookieFrom(response);
+      expect(cookie).toBeDefined();
+      expect(cookie).toContain('HttpOnly');
+      if (cookie.includes('SameSite=None')) {
+        expect(cookie).toContain('Secure');
+      }
+    });
+  });
+
   describe('GET /api/auth/profile', () => {
     let user;
     let token;

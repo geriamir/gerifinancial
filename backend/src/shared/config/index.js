@@ -45,23 +45,31 @@ const config = {
   }
 };
 
-// The session cookie has to survive the cross-site redirect back from GitHub,
-// and the frontend is served from a different origin to the API in every
-// deployed environment. SameSite=None is what allows that, and browsers only
-// honour it on a Secure cookie, so the two settings move together.
+// The session cookie has to reach the API from the frontend, which is served
+// from a different origin in every deployed environment. SameSite=None is what
+// allows that, and browsers *drop* a SameSite=None cookie that is not also
+// Secure - so the two genuinely move together and cross-site is gated on it.
+//
+// Over plain http (local dev and e2e) the frontend and API differ only by
+// port, which does not make them cross-site, so SameSite=Lax works there.
+const cookieSecure =
+  process.env.COOKIE_SECURE === 'true' || config.github.publicApiUrl.startsWith('https://');
+
+const wantsCrossSite = (() => {
+  const explicit = (process.env.COOKIE_CROSS_SITE || '').trim().toLowerCase();
+  if (explicit === 'true') return true;
+  if (explicit === 'false') return false;
+  try {
+    return new URL(config.github.publicApiUrl).origin !== new URL(config.github.defaultReturnTo).origin;
+  } catch (error) {
+    return false;
+  }
+})();
+
 config.session = {
   cookieName: 'gerifinancial_session',
-  secure: process.env.COOKIE_SECURE === 'true' || config.github.publicApiUrl.startsWith('https://'),
-  crossSite: (() => {
-    const explicit = (process.env.COOKIE_CROSS_SITE || '').trim().toLowerCase();
-    if (explicit === 'true') return true;
-    if (explicit === 'false') return false;
-    try {
-      return new URL(config.github.publicApiUrl).origin !== new URL(config.github.defaultReturnTo).origin;
-    } catch (error) {
-      return false;
-    }
-  })()
+  secure: cookieSecure,
+  crossSite: cookieSecure && wantsCrossSite
 };
 
 // No development fallback: a committed, well-known key would silently become
