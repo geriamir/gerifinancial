@@ -12,14 +12,21 @@
 FROM node:22-bookworm AS scraper-build
 
 ARG SCRAPER_REPO=https://github.com/geriamir/israeli-bank-scrapers.git
-ARG SCRAPER_REF=feature/add-foreign-currency
+# Pinned to a commit so an image rebuild is reproducible; a branch name would let
+# the dependency change underneath an otherwise identical build. Bump deliberately
+# after verifying the new scraper commit: git rev-parse origin/feature/add-foreign-currency
+ARG SCRAPER_REF=5351a5020745d411d701f1dba66e0092fcccfc80
 
 WORKDIR /scraper
 
 # Chrome is not needed to compile the package.
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 
-RUN git clone --depth 1 --branch "${SCRAPER_REF}" "${SCRAPER_REPO}" . \
+# --depth 1 cannot take a raw SHA, so fetch just that commit into an empty repo.
+RUN git init -q . \
+    && git remote add origin "${SCRAPER_REPO}" \
+    && git fetch -q --depth 1 origin "${SCRAPER_REF}" \
+    && git checkout -q FETCH_HEAD \
     && npm ci --ignore-scripts --no-audit --no-fund \
     && npm run build:types \
     && npm run build:js \

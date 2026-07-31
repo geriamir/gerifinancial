@@ -3,6 +3,7 @@ require('dotenv').config();
 // Managed Redis services (Azure Cache for Redis, Elasticache in-transit encryption, ...)
 // disable the plaintext port, so TLS has to be opt-in-able via configuration.
 const redisTls = process.env.REDIS_TLS === 'true';
+const redisHost = process.env.REDIS_HOST || 'localhost';
 
 const config = {
   port: process.env.PORT || 3001,
@@ -11,11 +12,11 @@ const config = {
   jwtExpiration: process.env.JWT_EXPIRATION || '24h',
   env: process.env.NODE_ENV || 'development',
   redis: {
-    host: process.env.REDIS_HOST || 'localhost',
+    host: redisHost,
     port: Number(process.env.REDIS_PORT) || 6379,
     password: process.env.REDIS_PASSWORD || undefined,
     db: Number(process.env.REDIS_DB) || 0,
-    ...(redisTls ? { tls: { servername: process.env.REDIS_HOST } } : {})
+    ...(redisTls ? { tls: { servername: redisHost } } : {})
   }
 };
 

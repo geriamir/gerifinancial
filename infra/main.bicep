@@ -1,5 +1,6 @@
 // gerifinancial runtime stack: Container App backend, Cosmos DB for MongoDB (vCore),
-// Azure Cache for Redis and a Static Web App for the React frontend.
+// Redis as an internal Container App (rationale at the redisApp resource below) and a
+// Static Web App for the React frontend.
 targetScope = 'resourceGroup'
 
 @description('Location for all resources except the Static Web App.')
@@ -117,13 +118,23 @@ resource mongoFirewall 'Microsoft.DocumentDB/mongoClusters/firewallRules@2024-07
   }
 }
 
-// Azure Cache for Redis is retired for new instances and Azure Managed Redis is a
-// Marketplace-backed offering that this subscription type cannot purchase, so Redis
-// runs as a container inside the same Container Apps environment. Ingress is internal,
-// so it is never reachable from the internet.
+// Redis runs as a container inside the Container Apps environment rather than as a
+// managed service, for two reasons:
+//
+//  1. Azure Cache for Redis is retired for new instances, and Azure Managed Redis
+//     (Microsoft.Cache/redisEnterprise) cannot be created on this Visual Studio
+//     Enterprise subscription - a Balanced_B0 create is accepted and then fails
+//     asynchronously with an opaque CreateFailed and no error detail. Retested
+//     2026-07-31 in North Europe; previously also reproduced in Sweden Central.
+//  2. Cost. Measured actuals: this container is ~$2.70/month, against ~$14.60/month
+//     for a Balanced_B0 - roughly two thirds of the entire stack's ~$18/month bill.
+//
+// Ingress is internal, so it is never reachable from the internet.
 //
 // There is no persistence: BullMQ jobs and distributed locks are both recoverable
 // (a lost scrape can simply be retriggered), so an empty cache after a restart is safe.
+// Switching to a managed Redis later is a contained change: swap this resource and
+// repoint REDIS_HOST/REDIS_PORT/REDIS_PASSWORD plus REDIS_TLS on the backend.
 resource redisApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: redisAppName
   location: location

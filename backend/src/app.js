@@ -129,6 +129,12 @@ const corsOrigins = (process.env.CORS_ORIGIN || '')
   .map(origin => origin.trim())
   .filter(Boolean);
 
+if (config.env === 'production' && corsOrigins.length === 0) {
+  // Refuse to start rather than silently serving every origin. A deployment
+  // that forgot the variable is a configuration error, not a default.
+  throw new Error('CORS_ORIGIN must list at least one allowed origin in production');
+}
+
 app.use(cors(corsOrigins.length > 0 ? { origin: corsOrigins, credentials: true } : {}));
 app.use(express.json());
 
