@@ -1,5 +1,6 @@
 const Redis = require('ioredis');
 const logger = require('../utils/logger');
+const config = require('../config');
 
 /**
  * Distributed Lock Service using Redis
@@ -20,10 +21,7 @@ class DistributedLockService {
 
     try {
       this.redis = new Redis({
-        host: process.env.REDIS_HOST || 'localhost',
-        port: process.env.REDIS_PORT || 6379,
-        password: process.env.REDIS_PASSWORD || undefined,
-        db: process.env.REDIS_DB || 0,
+        ...config.redis,
         maxRetriesPerRequest: 3,
         retryDelayOnFailover: 100,
         enableReadyCheck: false,

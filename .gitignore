@@ -40,3 +40,7 @@ yarn-error.log*
 PR_DESCRIPTION.md
 
 frontend/cypress/screenshots/
+
+# Azure deployment secrets (generated locally, never commit)
+infra/.secrets.json
+infra/*.parameters.local.json

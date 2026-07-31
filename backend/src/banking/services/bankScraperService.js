@@ -14,6 +14,22 @@ class BankScraperService {
     this.DEFAULT_TIMEOUT = 210000; // 3 minutes
   }
 
+  // Chrome cannot use its sandbox inside a container, and /dev/shm is too small there
+  // by default, which crashes the renderer on heavy pages.
+  getBrowserArgs() {
+    if (process.env.PUPPETEER_ARGS) {
+      return process.env.PUPPETEER_ARGS.split(',')
+        .map(arg => arg.trim())
+        .filter(Boolean);
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      return ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
+    }
+
+    return [];
+  }
+
   // Helper method to normalize currency symbols to ISO codes
   normalizeCurrency(currency) {
     if (!currency) return 'ILS'; // Default to ILS if no currency provided
@@ -63,7 +79,8 @@ class BankScraperService {
       defaultTimeout: timeout,
       startDate: startDateCopy,
       combineInstallments: false,
-      excludePendingTransactions: true
+      excludePendingTransactions: true,
+      args: this.getBrowserArgs()
     });
     
     return scraper;

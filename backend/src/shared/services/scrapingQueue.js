@@ -1,5 +1,6 @@
 const { Queue, Worker } = require('bullmq');
 const logger = require('../utils/logger');
+const config = require('../config');
 
 /**
  * Scraping Queue Service using BullMQ for producer-consumer pattern
@@ -14,10 +15,7 @@ class ScrapingQueueService {
     
     // Redis connection config (will use default Redis connection)
     this.redisConfig = {
-      host: process.env.REDIS_HOST || 'localhost',
-      port: process.env.REDIS_PORT || 6379,
-      password: process.env.REDIS_PASSWORD || undefined,
-      db: process.env.REDIS_DB || 0,
+      ...config.redis,
       maxRetriesPerRequest: 3,
       retryDelayOnFailover: 100,
       enableReadyCheck: false,

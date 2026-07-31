@@ -6,6 +6,7 @@ const logger = require('./shared/utils/logger');
 const ensureLogsDir = require('./shared/middleware/ensureLogsDir');
 
 const strategyRegistry = require('./shared/services/strategyRegistry');
+const { checkRedis } = require('./shared/services/redisHealth');
 
 // Ensure logs directory exists in production
 ensureLogsDir();
@@ -121,23 +122,41 @@ if (config.env === 'test') {
 }
 
 // Middleware
-app.use(cors());
+// CORS_ORIGIN takes a comma-separated allowlist. Left unset (local dev) any origin is
+// accepted, which must not happen in production since this API fronts bank credentials.
+const corsOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+if (config.env === 'production' && corsOrigins.length === 0) {
+  // Refuse to start rather than silently serving every origin. A deployment
+  // that forgot the variable is a configuration error, not a default.
+  throw new Error('CORS_ORIGIN must list at least one allowed origin in production');
+}
+
+app.use(cors(corsOrigins.length > 0 ? { origin: corsOrigins, credentials: true } : {}));
 app.use(express.json());
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
   // Check MongoDB connection state
   const mongoStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
-  
+  const redisStatus = await checkRedis();
+
+  // Only MongoDB gates the status code. Redis outages break queued scraping but leave
+  // the rest of the API usable, so they are reported without failing the container probe.
   if (mongoStatus === 'connected') {
     res.status(200).json({ 
       status: 'ok',
-      mongo: mongoStatus
+      mongo: mongoStatus,
+      redis: redisStatus
     });
   } else {
     res.status(503).json({ 
       status: 'error',
-      mongo: mongoStatus
+      mongo: mongoStatus,
+      redis: redisStatus
     });
   }
 });
