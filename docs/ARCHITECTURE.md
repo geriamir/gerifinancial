@@ -382,8 +382,10 @@ committing:
 4. `cd frontend && npx tsc --noEmit`
 5. `cd frontend && npm run build`
 
-> There is **no CI**: the repository has no `.github/workflows/`. These checks
-> are enforced by convention only, so run them locally before every commit.
+> CI covers only part of this list: `.github/workflows/test.yml` runs the
+> frontend and backend unit tests plus `tsc --noEmit`, and `e2e-tests.yml` runs
+> the Cypress suite, both on pull requests to `main`/`develop`. Neither runs
+> ESLint or the production build, so run the full list locally before committing.
 
 ### Branching
 

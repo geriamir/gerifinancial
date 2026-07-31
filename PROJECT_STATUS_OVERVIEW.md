@@ -144,10 +144,13 @@ timeline source) rather than four separate patches.
   Node ≥ 22.22.2, so it warrants a scrape smoke-test.
 - **Documentation drift** — this refresh (July 2026) corrected roughly eight
   months of drift. Keep architecture docs updated alongside structural changes.
-- **No CI** — there is no `.github/workflows/`, so the pre-commit checks in
-  `.github/copilot-instructions.md` are enforced by convention only. That is how
-  the test suites below silently rotted.
-- **Test suites rot without CI** — as of this refresh both suites are green
+- **CI is event-triggered, not scheduled** — `.github/workflows/test.yml` and
+  `e2e-tests.yml` only run on pushes to `main` and pull requests to
+  `main`/`develop`. Between April and July 2026 no PR was opened, so nothing ran
+  and the time-dependent fixtures below rotted undetected. CI also skips ESLint
+  and the production build, which the pre-commit checks in
+  `.github/copilot-instructions.md` do cover.
+- **Test suites rot between pull requests** — as of this refresh both suites are green
   (backend 873 passing / 47 suites, frontend 205 passing / 15 suites), but
   getting there required fixing bugs that had accumulated unnoticed:
   - Fixtures using hard-coded absolute "future" dates that had since become
