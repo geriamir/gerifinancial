@@ -163,9 +163,10 @@ describe('TransactionService', () => {
     });
 
     it('should pick the latest non-future date for mostRecentTransactionDate', async () => {
-      const pastDate = new Date('2026-02-15');
-      const recentDate = new Date('2026-03-05');
-      const futureDate = new Date('2026-04-20');
+      const DAY_MS = 24 * 60 * 60 * 1000;
+      const pastDate = new Date(Date.now() - 60 * DAY_MS);
+      const recentDate = new Date(Date.now() - 10 * DAY_MS);
+      const futureDate = new Date(Date.now() + 30 * DAY_MS);
 
       const accounts = [{
         txns: [

@@ -801,9 +801,14 @@ describe('Vesting Service', () => {
     let testGrant;
 
     beforeEach(async () => {
+      const DAY_MS = 24 * 60 * 60 * 1000;
       const pastDate = new Date('2023-01-01');
-      const futureDate1 = new Date('2026-01-01'); // Far future
-      const futureDate2 = new Date('2026-04-01'); // Far future
+      // Relative to now so the fixture cannot rot into the past over time.
+      // `unvestedShares` is derived from `vestDate > now`, not the `vested`
+      // flag, so absolute dates here silently break the suite once they pass.
+      const futureDate1 = new Date(Date.now() + 180 * DAY_MS);
+      const futureDate2 = new Date(Date.now() + 270 * DAY_MS);
+      const futureDate3 = new Date(Date.now() + 365 * DAY_MS);
       
       testGrant = await RSUGrant.create({
         userId: testUserId,
@@ -823,7 +828,7 @@ describe('Vesting Service', () => {
           { vestDate: futureDate1, shares: 50, vested: false, vestedValue: 0 },
           { vestDate: futureDate2, shares: 50, vested: false, vestedValue: 0 },
           // More unvested shares
-          { vestDate: new Date('2026-07-01'), shares: 800, vested: false, vestedValue: 0 }
+          { vestDate: futureDate3, shares: 800, vested: false, vestedValue: 0 }
         ]
       });
     });

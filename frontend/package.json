@@ -48,6 +48,14 @@
     "test:e2e:headless": "start-server-and-test start http://localhost:3000 cypress:run",
     "test:e2e:auth": "node scripts/test-e2e.js"
   },
+  "jest": {
+    "moduleNameMapper": {
+      "^axios$": "axios/dist/node/axios.cjs",
+      "^react-router-dom$": "react-router-dom/dist/index.js",
+      "^react-router/dom$": "react-router/dist/development/dom-export.js",
+      "^react-router$": "react-router/dist/development/index.js"
+    }
+  },
   "eslintConfig": {
     "extends": [
       "react-app",

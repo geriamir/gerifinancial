@@ -1,536 +1,281 @@
 # GeriFinancial
 
-**Production-Ready Financial Management Platform** with Israeli bank integration, sophisticated RSU portfolio management, advanced budgeting, and intelligent transaction processing.
+A personal financial management platform for the Israeli market. It aggregates
+bank accounts, credit cards, brokerage portfolios, RSU grants, pension savings,
+real-estate investments and foreign-currency holdings into a single net-worth
+view, with budgeting and automated transaction categorisation on top.
 
-🎯 **Current Status**: Advanced Production Features (~85% Core Features Complete)  
-📊 **See**: [PROJECT_STATUS_OVERVIEW.md](PROJECT_STATUS_OVERVIEW.md) for comprehensive progress details  
-👤 **User Guide**: [CURRENT_CAPABILITIES.md](CURRENT_CAPABILITIES.md) for what you can do today
+**Docs**
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the code is organised
+- [`CURRENT_CAPABILITIES.md`](CURRENT_CAPABILITIES.md) — what the app can do today
+- [`PROJECT_STATUS_OVERVIEW.md`](PROJECT_STATUS_OVERVIEW.md) — status, known issues, priorities
+
+---
+
+## Features
+
+| Area | Summary |
+|---|---|
+| **Banking** | Israeli bank scrapers + Mercury API, queued background sync, live progress via SSE, incremental scraping with stable transaction IDs |
+| **Credit cards** | Automatic detection, per-card stats and trends, payment matching, foreign-currency charges |
+| **Transactions** | Automatic categorisation with confidence scoring, manual overrides that train the matcher, tagging, exclusions, installment grouping |
+| **Budgets** | Monthly/yearly budgets at subcategory precision, smart calculation from history, recurring-pattern detection, unbudgeted-spend tracking |
+| **Projects** | Project budgets with multi-source funding, templates, transaction discovery, planned vs unplanned expenses |
+| **RSUs** | Multi-grant tracking, vesting plans, Israeli tax calculation, event-driven historical timeline |
+| **Investments** | Brokerage portfolio sync, Interactive Brokers Flex integration, cost basis, holdings history, performance |
+| **Pension** | Phoenix and Clal provider integrations with snapshot history |
+| **Real estate** | Properties with installment schedules, rental income, sale handling, transaction linking |
+| **Foreign currency** | FX accounts, live rates, conversion tooling |
+
+---
+
+## Tech Stack
+
+**Backend** — Node.js, Express 5, MongoDB (Mongoose 8), BullMQ + Redis for job
+queuing, Puppeteer via `israeli-bank-scrapers`, JWT auth with bcrypt, Winston
+logging, `natural` + `string-similarity` for categorisation, node-cron for
+scheduling.
+
+**Frontend** — React 19, TypeScript, Material-UI 7, React Router 7, Recharts 3,
+Axios, Formik + Yup, date-fns, `@dnd-kit`, Sentry.
+
+**Testing** — Jest (backend), React Testing Library (frontend), Cypress (E2E).
+
+---
 
 ## Project Structure
 
 ```
 gerifinancial/
-├── backend/               # Node.js backend
-│   ├── src/
-│   │   ├── config/       # Configuration setup
-│   │   ├── middleware/   # Express middleware
-│   │   ├── models/       # MongoDB models
-│   │   │   └── __tests__/  # Model tests
-│   │   ├── routes/       # API routes
-│   │   │   └── __tests__/  # Route tests
-│   │   ├── services/     # Business logic services
-│   │   │   └── __tests__/  # Service tests
-│   │   ├── test/         # Test utilities and setup
-│   │   │   ├── mocks/      # Test mocks
-│   │   │   └── setup.js    # Test configuration
-│   │   └── utils/        # Utility functions
-│   ├── .env             # Local environment variables (git-ignored)
-│   └── .env.example     # Environment template
-├── frontend/            # React frontend
-│   ├── cypress/         # E2E test suite
-│   │   ├── e2e/          # E2E test files
-│   │   └── support/      # Test helpers and commands
+├── backend/
 │   └── src/
-│       ├── components/  # React components
-│       │   ├── auth/      # Authentication components
-│       │   ├── bank/      # Bank management & scraping components
-│       │   └── layout/    # Layout components
-│       ├── contexts/    # React contexts
-│       ├── services/    # Services layer
-│       │   └── api/       # API services and types
-│       │       ├── types/   # TypeScript type definitions
-│       │       └── base.ts  # Base API configuration
-│       ├── test/        # Frontend test utilities
-│       │   └── __mocks__/ # Component mocks
-│       ├── utils/       # Utility functions
-│       └── constants/   # Shared constants
-├── package.json        # Root package with scripts
-└── .gitignore         # Root git ignore rules
+│       ├── app.js               Express app, route mounting, startup wiring
+│       ├── server.js            Process entrypoint
+│       │
+│       ├── auth/                Users, JWT login, onboarding status
+│       ├── banking/             Accounts, transactions, categories, cards, scraping
+│       ├── foreign-currency/    FX accounts, exchange rates
+│       ├── investments/         Portfolios, holdings, stock prices
+│       ├── monthly-budgets/     Monthly/yearly budgets, pattern detection
+│       ├── onboarding/          First-run setup flow
+│       ├── pension/             Pension accounts and providers
+│       ├── project-budgets/     Project budgets and expenses
+│       ├── real-estate/         Property investments
+│       ├── rsu/                 Grants, vesting, tax, timeline
+│       ├── translation/         Merchant description translation
+│       │
+│       ├── shared/              Config, middleware, queue, events, SSE, utils
+│       ├── scripts/             Migrations and maintenance
+│       └── test/                Jest setup, mocks, helpers
+│
+├── frontend/
+│   ├── cypress/                 E2E specs
+│   └── src/
+│       ├── pages/               One component per top-level route
+│       ├── components/          Feature-grouped component library
+│       ├── contexts/            Auth, Budget, RSU, Investment, Project, Theme
+│       ├── hooks/               Reusable hooks
+│       ├── services/api/        Typed API clients per backend domain
+│       ├── types/               Shared TypeScript interfaces
+│       └── utils/               Formatting and helpers
+│
+├── docs/                        Architecture, design decisions, archive
+└── scripts/                     Repo-level dev/test tooling
 ```
 
-## 🚀 **Current Production Features**
+The backend is organised **by business domain**, not by technical layer — each
+module owns its own models, routes, services and tests. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full picture, including
+the sync-strategy registry, job queue and event pipeline.
 
-### ✅ **Transaction Management System** (Complete)
-**AI-Powered Processing with Smart Automation**
-- **Smart Bank Scraping**: Israeli bank integration with 80% bandwidth reduction through incremental updates
-- **AI Categorization**: Intelligent transaction categorization with confidence scoring and manual override
-- **Enhanced Keyword Matching**: 80% reduction in false positives with word boundary detection
-- **Advanced Filtering**: Comprehensive search, filtering, and bulk operations
-- **Mobile-First UX**: Touch-optimized categorization workflow with step-by-step guidance
+The API exposes **214 endpoints** across 20 route files, backed by 30 Mongoose
+models.
 
-### ✅ **RSU Portfolio Management** (Production Ready)
-**Comprehensive Stock Equity Management**
-- **Multi-Grant Tracking**: Unlimited RSU grants with quarterly vesting (20 periods over 5 years)
-- **Israeli Tax Compliance**: Complex tax calculations (65% wage income + 25%/65% capital gains)
-- **Event-Driven Timeline**: Accurate portfolio evolution with historical price integration
-- **Professional CRUD Operations**: Grant creation, sale recording, tax preview with Material-UI
-- **Stock Price Integration**: Multi-API fallback system with historical data accuracy
+---
 
-### ✅ **Budget Management System** (Advanced)
-**Multi-Layered Budget Architecture**
-- **CategoryBudget Foundation**: Fixed/variable budget types with template-based management
-- **Monthly & Project Budgets**: Subcategory-level precision with multi-source funding
-- **Pattern Detection**: 95%+ accuracy in recurring expense identification
-- **Transaction Tagging**: ObjectId-based system with project allocation
-- **Budget Analytics**: Real-time variance analysis with drill-down transaction views
+## Prerequisites
 
-### ✅ **Modern Navigation & UX** (Phase 1 Complete)
-**Professional User Experience**
-- **4-Item Structure**: Overview, Transactions, Budgets, RSUs with integrated bank management
-- **Enhanced Overview**: Financial summary, action items, recent activity timeline
-- **Mobile-Responsive Design**: Touch-friendly interfaces across all features
-- **Material-UI Components**: Consistent professional design system
+- **Node.js ≥ 22.12** and npm
+- **MongoDB** running on port 27777 (or set `MONGODB_URI`)
+- **Redis** — required for the BullMQ scraping queue and distributed locks
+- **`israeli-bank-scrapers`** cloned as a **sibling of this repository**, on the
+  `feature/add-foreign-currency` branch — see below
 
-## 🏗️ **System Architecture**
+### Setting up `israeli-bank-scrapers`
 
-### **Production Infrastructure**
+The backend depends on the scraper library through a local path
+(`"israeli-bank-scrapers": "file:../../israeli-bank-scrapers"`), so
+`npm install` fails unless the directory exists next to this repo:
+
 ```
-39 API Endpoints | 15+ Database Models | Service-Oriented Architecture
-
-Backend: Node.js + Express + MongoDB
-├── RSU Service (21 endpoints) - Portfolio, tax calculations, timeline
-├── Budget Service (15 endpoints) - Monthly, projects, pattern detection  
-├── Transaction Service - AI categorization, smart scraping
-├── Stock Price Service - Multi-API integration with historical data
-└── Pattern Detection - 95%+ accuracy recurring expense identification
-
-Frontend: React + TypeScript + Material-UI
-├── Professional Component Library (RSU, Budget, Transaction)
-├── Context-Based State Management with optimistic updates
-├── Mobile-First Responsive Design with touch optimization
-└── Comprehensive TypeScript interfaces and error handling
+repos/
+├── gerifinancial/
+└── israeli-bank-scrapers/     <-- must be here
 ```
 
-### **Key Technical Achievements**
-- **Zero Concurrency Issues**: Per-date stock price records eliminated MongoDB version conflicts
-- **Timeline Accuracy**: Event-driven calculations with proper historical price usage
-- **Test Performance**: 70x improvement in test execution (230+ seconds → 3.3 seconds)
-- **Pattern Recognition**: Machine learning-based detection with 95%+ accuracy
-- **Mobile Optimization**: 60fps interactions with professional loading states
+The project uses the fork at
+[`geriamir/israeli-bank-scrapers`](https://github.com/geriamir/israeli-bank-scrapers)
+(the upstream package is marked `private`, so it is consumed from source rather
+than npm). It is a TypeScript package whose `main` is `lib/index.js`, and `lib/`
+is **not** committed — you must build it before the backend can run:
 
-## 🎯 **What Users Can Do Today**
-
-### **RSU Portfolio Management**
-- Track unlimited RSU grants from multiple companies
-- View real-time portfolio value with gain/loss analysis
-- Record sales with automatic Israeli tax calculations
-- Visualize vesting timeline with event-driven accuracy
-- Preview tax implications before sales (2-year threshold handling)
-
-### **Advanced Budget Management**  
-- Create monthly budgets with subcategory-level precision
-- Set up project budgets with multiple funding sources
-- Auto-calculate budgets from historical transaction patterns
-- Track budget vs actual with real-time progress indicators
-- Detect recurring expense patterns automatically
-
-### **Smart Transaction Processing**
-- Scrape Israeli bank accounts with intelligent scheduling
-- AI-powered categorization with manual override capability
-- Tag transactions for project allocation and organization
-- Advanced filtering and bulk operations
-- Mobile-optimized categorization workflow
-
-### **Integrated Financial Overview**
-- Unified dashboard with financial summary and RSU portfolio
-- Recent activity timeline with quick categorization
-- Uncategorized transaction alerts with direct navigation
-- Budget progress tracking with variance analysis
-- Professional Material-UI design across all components
-
-## Legacy Documentation
-
-The sections below contain historical implementation details and are maintained for reference:
-
-### Phase 2: Bank Integration (Completed)
-
-#### Bank Account Management
-1. Implemented bank account connection UI:
-   - Add bank accounts with custom names
-   - View and manage connected accounts
-   - Test bank connections
-   - Delete accounts
-   - Clean form state management
-
-2. Security Enhancements:
-   - Secure credential handling
-   - No sensitive data in responses
-   - Automatic credential stripping
-   - Form data clearing on close
-   - Protected routes and API endpoints
-
-3. User Interface Improvements:
-   - Intuitive bank account form
-   - Clear status indicators
-   - Error handling and display
-   - Responsive design
-   - User-friendly account names
-
-4. Analytics Integration:
-   - Comprehensive event tracking
-   - User action monitoring
-   - Error tracking
-   - Success metrics
-   - Development mode logging
-
-5. Code Organization:
-   - Centralized constants
-   - Shared type definitions
-   - Clean component structure
-   - Reusable utilities
-   - Analytics abstraction
-
-#### Transaction Scraping
-1. Unified Bank Account Management:
-   - Centralized scraping in bank accounts context
-   - Individual account scraping controls
-   - Batch scraping for all accounts
-   - Last scrape status tracking
-   - Improved error handling and feedback
-
-2. API Improvements:
-   - Moved scraping endpoints to bank accounts router
-   - Added batch scraping endpoint
-   - Consistent response formats
-   - Better error reporting
-   - Real-time progress tracking
-
-3. Frontend Architecture:
-   - Moved bank components to core structure
-   - Added comprehensive TypeScript types
-   - Enhanced loading states
-   - Clear error messaging
-   - Analytics event tracking
-   - Reorganized services directory:
-     * Centralized API services under api/
-     * Moved shared types to api/types/
-     * Added clean interface exports
-     * Improved code maintainability
-   - Transaction System Improvements:
-     * Flexible transaction querying
-     * Optional account filtering
-     * Infinite scroll pagination
-     * Comprehensive filtering capabilities
-   - Date Picker Integration:
-     * Integrated MUI Date Pickers
-     * Added Hebrew locale support
-     * Configured ESM/CJS compatibility
-     * Optimized webpack configuration
-
-## Environment Setup
-
-1. Copy the environment template:
 ```bash
-cp backend/.env.example backend/.env
+cd ..                                   # into the parent of gerifinancial/
+git clone https://github.com/geriamir/israeli-bank-scrapers.git
+cd israeli-bank-scrapers
+git remote add upstream https://github.com/eshaham/israeli-bank-scrapers.git
+git checkout feature/add-foreign-currency   # REQUIRED — see below
+npm install
+npm run build                           # emits lib/
 ```
 
-2. Configure backend/.env with your settings:
-```
-PORT=3001
-MONGODB_URI=mongodb://localhost:27777/gerifinancial
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-JWT_EXPIRATION=24h
-NODE_ENV=development
-```
+> ⚠️ **Check out `feature/add-foreign-currency`, not the default branch.**
+> Three APIs this backend calls exist *only* on that branch — they are absent
+> from both the fork's `master` and upstream's `master`:
+>
+> | API | Used by |
+> |---|---|
+> | `scrapePortfolios()` / `doesSupportPortfolios()` | `investments/services/sync/PortfoliosSyncStrategy.js` |
+> | `scrapeForeignCurrencyAccounts()` / `doesSupportForeignCurrencyAccounts()` | `foreign-currency/services/sync/ForeignCurrencySyncStrategy.js` |
+> | `generateTransactionUniqueId()` | transaction deduplication (PRs #51, #53) |
+>
+> On `master` the backend installs and boots fine, but the investment and
+> foreign-currency sync strategies fail at runtime, and transaction dedup falls
+> back to the non-unique bank `identifier`.
 
-## Installation
+Backend *tests* do not need the built library: `bankScraperService.js`
+substitutes `src/test/mocks/bankScraper` whenever `NODE_ENV` is `test` or `e2e`.
+The build is only required to run real scrapes.
 
-1. Install all dependencies (frontend and backend):
+---
+
+## Setup
+
 ```bash
+# 1. Install dependencies for both apps
 npm run install-all
-```
 
-2. Start development servers:
-```bash
+# 2. Configure the backend environment
+cp backend/.env.example backend/.env
+# then edit backend/.env — at minimum set JWT_SECRET and ENCRYPTION_KEY
+
+# 3. Start MongoDB + Redis and both dev servers
 npm run dev
 ```
 
-This will start:
-- Frontend on http://localhost:3000
-- Backend on http://localhost:3001
-- Connects to MongoDB on port 27777
+- Frontend: http://localhost:3000
+- Backend: http://localhost:3001
+- MongoDB: localhost:27777
 
-## Available Scripts
+`npm run dev` attempts to start local MongoDB and Memurai (Redis) Windows
+services first. On other platforms, start those services yourself and run
+`npm run backend` and `npm run frontend` separately.
 
-In the root directory:
-- `npm run install-all`: Install dependencies for both frontend and backend
-- `npm run dev`: Start both servers concurrently
-- `npm run backend`: Start only the backend server
-- `npm run frontend`: Start only the frontend server
+### Environment variables
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `PORT` | no | Backend port (default 3001) |
+| `MONGODB_URI` | yes | MongoDB connection string |
+| `JWT_SECRET` | yes | Token signing secret |
+| `JWT_EXPIRATION` | no | Token lifetime (default 24h) |
+| `ENCRYPTION_KEY` | yes | Encrypts stored bank credentials |
+| `NODE_ENV` | no | `development` / `test` / `production` |
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` / `REDIS_DB` | no | Redis connection (defaults to localhost:6379) |
+| `ALPHA_VANTAGE_API_KEY`, `FINNHUB_API_KEY` | no | Stock price providers |
+| `CURRENCY_API_KEY`, `FIXER_API_KEY` | no | Exchange rate providers |
+
+---
+
+## Scripts
+
+### Root
+
+```bash
+npm run install-all     # Install backend + frontend dependencies
+npm run dev             # Start local services + both dev servers
+npm run backend         # Backend only
+npm run frontend        # Frontend only
+npm run kill-ports      # Free ports 3000 and 3001
+npm run test            # Backend + frontend unit tests
+npm run test:e2e        # Cypress E2E suite (CI runner)
+npm run test:all        # Unit tests followed by E2E
+npm run cypress:open    # Open the Cypress UI
+npm run debugscrape     # Run dev servers with scraper debug logging
+```
+
+### Backend
+
+```bash
+cd backend
+npm run dev             # nodemon
+npm start               # production start
+npm test                # Jest, serial (--runInBand)
+npm run test:watch
+```
+
+Migration scripts live in `backend/src/scripts/` and are exposed as
+`npm run migrate:*` targets; the destructive ones support `--dry-run` and
+`--rollback`.
+
+### Frontend
+
+```bash
+cd frontend
+npm start                       # dev server
+npm run build                   # production build
+npm test                        # Jest + React Testing Library
+npm run cypress:open            # interactive E2E
+npm run cypress:run             # headless E2E
+npm run test:e2e:headless       # start server + headless E2E
+```
+
+---
 
 ## Testing
 
-The project includes comprehensive testing setup for both backend and frontend:
+Current suite: **47 backend test files, 15 frontend test files, 5 Cypress
+specs**. Backend tests run serially because they share a test database.
 
-### Backend Tests
+### Required pre-commit checks
 
-- Unit and integration tests using Jest
-- MongoDB Memory Server for database testing
-- API endpoint testing with Supertest
-- Test utilities for auth token generation and user creation
-- Clean test data management
+All of the following must pass before committing (see
+[`.github/copilot-instructions.md`](.github/copilot-instructions.md)):
 
-Run backend tests:
 ```bash
-cd backend && npm test
+cd backend  && npm run test
+cd frontend && npm run test -- --watchAll=false
+cd frontend && npx eslint src/ --max-warnings 0
+cd frontend && npx tsc --noEmit
+cd frontend && npm run build
 ```
 
-### Frontend Tests
+> **CI covers only part of this list.** `.github/workflows/test.yml` runs the
+> frontend and backend unit tests plus `tsc --noEmit`, and `e2e-tests.yml` runs
+> the Cypress suite — both on pull requests to `main`/`develop`. Neither runs
+> ESLint or the production build, so run the full list locally before committing.
 
-- Component tests using React Testing Library
-- End-to-end tests using Cypress
-- Custom Cypress commands for common operations
-- Integration with MUI components
-- Isolated test database for E2E tests
-- Improved test stability and reliability
-
-Run frontend tests:
-```bash
-# Unit tests
-cd frontend && npm test
-
-# E2E tests (interactive)
-cd frontend && npm run cypress:open
-
-# E2E tests (headless)
-cd frontend && npm run cypress:run
-
-# Run specific test suites
-npm run test:e2e:auth    # Run auth-related E2E tests
-npm run test:e2e:bank    # Run bank-related E2E tests
-```
-
-### Running All Tests
-
-From the root directory:
-```bash
-# Run all tests (unit + E2E)
-npm run test:all
-
-# Run only E2E tests
-npm run test:e2e
-
-# Run E2E tests headless
-npm run test:e2e:headless
-
-# Run new improved E2E tests
-npm run test:e2e:new    # Uses in-memory DB and improved stability
-```
-
-For detailed information about test improvements and roadmap, see TESTING_ROADMAP.md
-
-### Historical Implementation Details
-
-#### Phase 3: Transaction Productization ✅ (Completed)
-*Comprehensive transaction management system with AI categorization and mobile-first UX*
-
-#### Phase 4: Budget Management System ✅ (Completed)
-
-#### CategoryBudget Foundation System
-The budget system is built on a sophisticated **CategoryBudget** foundation that provides flexible, template-based budget management across years:
-
-1. **Core Budget Types**:
-   - **Fixed Budgets**: Single amount that repeats every month (e.g., rent, salary)
-   - **Variable Budgets**: Different amounts per month (e.g., utilities, seasonal expenses)
-   - **Income Budgets**: Category-level budgets for income sources
-   - **Expense Budgets**: Subcategory-level budgets for precise expense tracking
-
-2. **Budget Architecture**:
-   - **CategoryBudget Model**: Core budget storage with `backend/src/models/CategoryBudget.js`
-   - **MonthlyBudget Compatibility**: Legacy compatibility layer for existing frontend
-   - **Service Integration**: Primary budget system used by `budgetService.js`
-   - **Database Efficiency**: Unique constraints and optimized indexes for performance
-
-#### Comprehensive Budget Management System
-1. **Monthly Budget Management**:
-   - Auto-calculation from 1-24 months of historical transaction data
-   - Sub-category level expense budgeting with real-time actual tracking
-   - Salary and income budget management with flexible configuration
-   - Budget vs actual variance analysis with color-coded progress indicators
-   - Month-by-month navigation with period-based filtering
-
-2. **Project Budget System**:
-   - Multi-source funding support (salary, bonus, loan, savings, other)
-   - Automatic project tag creation and transaction association
-   - Timeline tracking with days remaining calculation
-   - Progress percentage based on actual spending vs budget
-   - Category-based budget allocation with detailed breakdowns
-
-3. **Transaction Tagging System**:
-   - Multi-tag support for flexible transaction organization
-   - Project-based tag creation with automatic management
-   - Tag usage analytics and insights for spending patterns
-   - Bulk tagging operations for efficient transaction management
-   - Advanced filtering by tags with real-time search
-
-4. **Smart Budget Features**:
-   - Historical transaction analysis for intelligent budget suggestions
-   - Budget variance analysis with over/under spending indicators
-   - Project timeline management with completion status tracking
-   - Budget status management (draft/active/completed)
-   - Multi-currency support with flexible configuration
-
-#### Technical Implementation
-1. **Backend Architecture**:
-   - **15 REST API Endpoints**: Complete CRUD operations for all budget types
-   - **6 Database Models**: CategoryBudget, MonthlyBudget, ProjectBudget, Tag, and more
-   - **Budget Service Layer**: Comprehensive business logic with analytics
-   - **Advanced Indexes**: Optimized database queries for performance
-
-2. **Frontend Architecture**:
-   - **React-based Dashboard**: Responsive UI with Material-UI components
-   - **BudgetContext**: Centralized state management with optimistic updates
-   - **Two-column Layout**: Separate income and expense visualization
-   - **Progress Tracking**: Real-time budget vs actual with linear progress bars
-   - **Mobile-responsive**: Touch-friendly interface for all screen sizes
-
-3. **Key Components**:
-   - **Budget Dashboard** (`/budgets`): Main budget overview with month navigation
-   - **Monthly Budget Editor**: Sub-category budget allocation interface
-   - **Project Budget Manager**: Multi-source funding and timeline management
-   - **Transaction Tagging**: Enhanced transaction detail with tag management
-
-#### Budget System Features
-1. **Monthly Budgets**:
-   - CategoryBudget-based flexible budget allocation
-   - Real-time actual amount calculation from transactions
-   - Budget vs actual progress monitoring with color indicators
-   - Auto-calculation from historical transaction patterns
-   - Income and expense budget separation with visual distinction
-
-2. **Project Budgets**:
-   - Multi-source funding with detailed funding source tracking
-   - Automatic project tag creation for transaction association
-   - Timeline tracking with start/end dates and days remaining
-   - Progress percentage calculation based on actual spending
-   - Category-based budget allocation with subcategory precision
-
-3. **Budget Dashboard**:
-   - Month-by-month navigation with previous/next controls
-   - Real-time budget vs actual visualization with progress bars
-   - Quick action buttons for budget creation and auto-calculation
-   - Project overview cards with status indicators and progress
-   - Budget balance summary with surplus/deficit tracking
-
-4. **Enhanced Transaction Integration**:
-   - Tag-based transaction organization with ObjectId references
-   - Project allocation through transaction tagging system
-   - Automatic budget allocation tracking with real-time updates
-   - Enhanced transaction service with budget integration methods
-
-See `BUDGET_FEATURE_ROADMAP.md` for complete implementation details and technical specifications.
-
-#### Phase 5: Pattern Detection System ✅ (Completed)
-*95%+ accuracy pattern recognition for recurring expenses with budget integration*
-
-#### Phase 6: Enhanced Keyword Matching ✅ (Completed) 
-*80% reduction in false positives with word boundary detection and stemming support*
-
-#### Phase 7: RSU Management System ✅ (Production Ready)
-*Complete portfolio management with Israeli tax compliance and event-driven timeline*
-
-#### Phase 8: Navigation Modernization 🚧 (Phase 1 Complete)
-*4-item structure with enhanced Overview page and mobile optimization*
-
-## 📋 **Current Development Priorities**
-
-### **Navigation Simplification** (Phases 2-4)
-- Mobile bottom tab navigation  
-- Breadcrumb system implementation
-- URL structure optimization and legacy redirect handling
-
-### **Pattern Detection UI Integration**
-- Budget component pattern indicators
-- Transaction pattern awareness displays
-- Pattern approval workflows and management
-
-### **Advanced Analytics & Reporting** (Next Quarter)
-- Data visualization and insights dashboard
-- Export functionality for tax reporting
-- Performance benchmarking and trend analysis
-
-### **Category System Enhancements** (Planned)
-- Professional PNG icons with color theming
-- Category structure optimization (flatten Income/Transfer)
-- Enhanced visual design system
-
-## 📚 **Documentation & Resources**
-
-### **Primary Documentation**
-- **[PROJECT_STATUS_OVERVIEW.md](PROJECT_STATUS_OVERVIEW.md)** - Comprehensive feature status and achievements
-- **[CURRENT_CAPABILITIES.md](CURRENT_CAPABILITIES.md)** - User-focused guide to current system capabilities
-- **[RSU_FEATURE_ROADMAP.md](RSU_FEATURE_ROADMAP.md)** - Complete RSU implementation details
-- **[BUDGET_FEATURE_ROADMAP.md](BUDGET_FEATURE_ROADMAP.md)** - Budget system architecture and features
-- **[NAVIGATION_SIMPLIFICATION_ROADMAP.md](NAVIGATION_SIMPLIFICATION_ROADMAP.md)** - Navigation modernization plan
-- **[TESTING_ROADMAP.md](TESTING_ROADMAP.md)** - Testing strategy and coverage goals
-
-### **Implementation Summaries**
-- **[RSU_TIMEOUT_FIXES_SUMMARY.md](RSU_TIMEOUT_FIXES_SUMMARY.md)** - Test performance improvements
-- **[TIMELINE_REWORK_SUMMARY.md](TIMELINE_REWORK_SUMMARY.md)** - Event-driven timeline accuracy
-- **[STOCK_PRICE_RESTRUCTURE_SUMMARY.md](STOCK_PRICE_RESTRUCTURE_SUMMARY.md)** - Concurrency issue resolution
-
-## ⚡ **Quick Start**
-
-### Installation & Setup
-```bash
-# Install all dependencies
-npm run install-all
-
-# Configure environment
-cp backend/.env.example backend/.env
-# Edit backend/.env with your MongoDB URI and JWT secret
-
-# Start development servers
-npm run dev
-```
-
-### Access Points
-- **Frontend**: http://localhost:3000 (React + TypeScript + Material-UI)
-- **Backend**: http://localhost:3001 (Node.js + Express + MongoDB)
-- **MongoDB**: localhost:27777 (Local development database)
-
-### Available Scripts
-```bash
-npm run dev              # Start both frontend and backend
-npm run backend         # Backend only
-npm run frontend        # Frontend only
-npm run install-all     # Install all dependencies
-npm run test:all        # Run all tests (unit + E2E)
-npm run test:e2e        # Cypress E2E tests only
-```
-
-## 🔧 **Technical Stack**
-
-### **Backend Architecture**
-- **Runtime**: Node.js with Express framework
-- **Database**: MongoDB with Mongoose ODM
-- **Authentication**: JWT with bcrypt password hashing
-- **External APIs**: israeli-bank-scrapers, stock price APIs (Yahoo Finance, Alpha Vantage)
-- **Services**: 7 major service layers with comprehensive business logic
-- **Testing**: Jest with MongoDB Memory Server and Supertest
-
-### **Frontend Architecture**  
-- **Framework**: React 18 with TypeScript
-- **UI Library**: Material-UI (MUI) v5 with custom theming
-- **State Management**: Context API with optimistic updates
-- **Routing**: React Router v6 with query parameter management
-- **API Layer**: Axios with TypeScript interfaces and error handling
-- **Testing**: React Testing Library + Cypress E2E
-
-### **Security & Performance**
-- **Authentication**: JWT-based with automatic token refresh
-- **Data Protection**: Encrypted bank credentials, sanitized API responses
-- **Performance**: Code splitting, lazy loading, optimized bundle size
-- **Mobile**: Touch-optimized interfaces with 60fps interactions
-- **Error Handling**: Comprehensive error boundaries and user feedback
+---
 
 ## Contributing
 
-1. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-2. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-3. Push to the branch (`git push origin feature/AmazingFeature`)
-4. Open a Pull Request
+Branch from an up-to-date `main`:
+
+```bash
+git checkout main
+git pull origin main
+git checkout -b feature/<name>
+```
+
+Run the pre-commit checks above, then open a pull request.
+
+**Documentation convention**: keep the root directory clean. Architecture and
+design docs belong in `docs/`; point-in-time implementation summaries belong in
+`docs/archive/`. Update [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) in the
+same PR as any structural change.
+
+---
 
 ## License
 
-ISC License
+ISC
