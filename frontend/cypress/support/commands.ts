@@ -1,26 +1,26 @@
-// Login command
-Cypress.Commands.add('login', (email: string, password: string) => {
-  cy.request('POST', `${Cypress.env('apiUrl')}/api/auth/login`, {
-    email,
-    password
-  }).then((response) => {
-    localStorage.setItem('token', response.body.token);
-  });
+// Sign in for tests.
+//
+// The real flow redirects through github.com, which end-to-end tests cannot
+// drive, so they seed a session through the test-only endpoint instead. The
+// backend restricts it to the test and e2e environments.
+Cypress.Commands.add('login', (email: string) => {
+  return cy.request('POST', `${Cypress.env('apiUrl')}/api/test/create-test-user`, {
+    email
+  }).then((response) => response.body.token);
 });
 
 // Create test user command
 Cypress.Commands.add('createTestUser', (options = {}) => {
   const defaultOptions = {
     email: 'test@example.com',
-    password: 'password123',
     name: 'Test User',
     ...options
   };
 
-  return cy.request('POST', `${Cypress.env('apiUrl')}/api/auth/register`, defaultOptions)
+  return cy.request('POST', `${Cypress.env('apiUrl')}/api/test/create-test-user`, defaultOptions)
     .then((response) => {
       const token = response.body.token;
-      Cypress.env('testUserId', response.body.userId);
+      Cypress.env('testUserId', response.body.user?.id);
       
       // Set onboarding as complete for test users to skip onboarding flow
       // Update both legacy (onboardingStatus) and new (onboarding) fields
@@ -48,15 +48,14 @@ Cypress.Commands.add('createTestUser', (options = {}) => {
 Cypress.Commands.add('createOnboardingUser', (options = {}) => {
   const defaultOptions = {
     email: 'onboarding@example.com',
-    password: 'password123',
     name: 'Onboarding User',
     ...options
   };
 
-  return cy.request('POST', `${Cypress.env('apiUrl')}/api/auth/register`, defaultOptions)
+  return cy.request('POST', `${Cypress.env('apiUrl')}/api/test/create-test-user`, defaultOptions)
     .then((response) => {
       const token = response.body.token;
-      const userId = response.body.user?.id || response.body.userId;
+      const userId = response.body.user?.id;
       Cypress.env('testUserId', userId);
       
       cy.log('Created onboarding user:', userId);
@@ -70,7 +69,6 @@ Cypress.Commands.add('createOnboardingUser', (options = {}) => {
 
 export interface TestUserOptions {
   email: string;
-  password: string;
   name: string;
 }
 
@@ -114,30 +112,37 @@ Cypress.Commands.add('createBankAccount', (token: string, options: Partial<BankA
 // Clear test data command - now uses MongoDB task
 Cypress.Commands.add('clearTestData', () => {
   cy.task('db:clearTestData', null, { timeout: 30000 }).then(() => {
+    cy.clearCookies();
     localStorage.clear();
+  });
+});
+
+// Re-apply a session cookie yielded by createTestUser.
+//
+// Cypress clears cookies between tests, so specs that seed a user once in
+// before() need to restore the session at the start of each test.
+Cypress.Commands.add('setSession', (token: string) => {
+  cy.setCookie('gerifinancial_session', token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/'
   });
 });
 
 // Add support for more specific bank account actions
 Cypress.Commands.add('deleteAccount', (accountId: string) => {
-  const token = localStorage.getItem('token');
-  if (!token) throw new Error('No token found');
-
+  // cy.request replays the session cookie from the browser's jar, so these
+  // helpers need no token of their own.
   return cy.request({
     method: 'DELETE',
-    url: `${Cypress.env('apiUrl')}/api/bank-accounts/${accountId}`,
-    headers: { Authorization: `Bearer ${token}` }
+    url: `${Cypress.env('apiUrl')}/api/bank-accounts/${accountId}`
   });
 });
 
 Cypress.Commands.add('testConnection', (accountId: string) => {
-  const token = localStorage.getItem('token');
-  if (!token) throw new Error('No token found');
-
   return cy.request({
     method: 'POST',
-    url: `${Cypress.env('apiUrl')}/api/bank-accounts/${accountId}/test`,
-    headers: { Authorization: `Bearer ${token}` }
+    url: `${Cypress.env('apiUrl')}/api/bank-accounts/${accountId}/test`
   });
 });
 

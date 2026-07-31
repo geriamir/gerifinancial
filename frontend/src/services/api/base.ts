@@ -8,21 +8,10 @@ const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json'
-  }
-});
-
-// Add auth token to requests if it exists
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  } else {
-    console.warn('No auth token found for request:', config.url);
-  }
-  return config;
-}, (error) => {
-  console.error('Request interceptor error:', error);
-  return Promise.reject(error);
+  },
+  // The session is an httpOnly cookie on the API's origin, so it only travels
+  // if credentials are sent explicitly on these cross-origin requests.
+  withCredentials: true
 });
 
 // Log response errors

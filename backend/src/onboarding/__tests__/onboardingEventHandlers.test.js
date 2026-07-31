@@ -36,7 +36,8 @@ describe('Onboarding Event Handlers', () => {
     // Create test user
     testUser = await User.create({
       email: 'test@example.com',
-      password: 'password123',
+      githubId: 90501,
+      githubLogin: 'test-user',
       name: 'Test User'
     });
 

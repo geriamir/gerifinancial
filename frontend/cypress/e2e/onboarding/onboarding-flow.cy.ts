@@ -49,13 +49,10 @@ describe('Onboarding Flow', () => {
         req.reply({ statusCode: 200, body: { success: true, data: { message: 'Credit cards skipped' } } });
       }).as('skipCreditCards');
 
-      // Register through UI
-      cy.visit('/register');
-      cy.get('input[name="name"]').type('Onboarding User');
-      cy.get('input[name="email"]').type('onboarding@example.com');
-      cy.get('input[name="password"]').type('password123');
-      cy.get('input[name="confirmPassword"]').type('password123');
-      cy.get('button[type="submit"]').click();
+      // A brand-new user lands in onboarding on first sign-in. Sign-in itself
+      // goes through GitHub, so seed the session rather than driving github.com.
+      cy.createOnboardingUser({ name: 'Onboarding User', email: 'onboarding@example.com' });
+      cy.visit('/onboarding');
       
       cy.url({ timeout: 10000 }).should('include', '/onboarding');
       cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
@@ -126,13 +123,10 @@ describe('Onboarding Flow', () => {
         req.reply({ statusCode: 200, body: { success: true, data: { message: 'Credit cards skipped' } } });
       }).as('skipCreditCards');
 
-      // Register through UI
-      cy.visit('/register');
-      cy.get('input[name="name"]').type('Skip Cards User');
-      cy.get('input[name="email"]').type('skip-cards@example.com');
-      cy.get('input[name="password"]').type('password123');
-      cy.get('input[name="confirmPassword"]').type('password123');
-      cy.get('button[type="submit"]').click();
+      // A brand-new user lands in onboarding on first sign-in. Sign-in itself
+      // goes through GitHub, so seed the session rather than driving github.com.
+      cy.createOnboardingUser({ name: 'Skip Cards User', email: 'skip-cards@example.com' });
+      cy.visit('/onboarding');
       
       cy.url({ timeout: 10000 }).should('include', '/onboarding');
       cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
@@ -202,13 +196,10 @@ describe('Onboarding Flow', () => {
         req.reply({ statusCode: 200, body: { success: true, data: { message: 'Credit cards skipped' } } });
       }).as('skipCreditCards');
 
-      // Register through UI
-      cy.visit('/register');
-      cy.get('input[name="name"]').type('Multi Cards User');
-      cy.get('input[name="email"]').type('multi-cards@example.com');
-      cy.get('input[name="password"]').type('password123');
-      cy.get('input[name="confirmPassword"]').type('password123');
-      cy.get('button[type="submit"]').click();
+      // A brand-new user lands in onboarding on first sign-in. Sign-in itself
+      // goes through GitHub, so seed the session rather than driving github.com.
+      cy.createOnboardingUser({ name: 'Multi Cards User', email: 'multi-cards@example.com' });
+      cy.visit('/onboarding');
       
       cy.url({ timeout: 10000 }).should('include', '/onboarding');
       cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
@@ -261,13 +252,10 @@ describe('Onboarding Flow', () => {
         req.reply({ statusCode: 200, body: { success: true, data: { accountId: 'mock-account-id', message: 'Account connected' } } });
       }).as('addCheckingAccount');
 
-      // Register through UI
-      cy.visit('/register');
-      cy.get('input[name="name"]').type('Progress User');
-      cy.get('input[name="email"]').type('progress@example.com');
-      cy.get('input[name="password"]').type('password123');
-      cy.get('input[name="confirmPassword"]').type('password123');
-      cy.get('button[type="submit"]').click();
+      // A brand-new user lands in onboarding on first sign-in. Sign-in itself
+      // goes through GitHub, so seed the session rather than driving github.com.
+      cy.createOnboardingUser({ name: 'Progress User', email: 'progress@example.com' });
+      cy.visit('/onboarding');
       
       cy.url({ timeout: 10000 }).should('include', '/onboarding');
       cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
@@ -321,13 +309,10 @@ describe('Onboarding Flow', () => {
         req.reply({ statusCode: 200, body: { success: true, data: { accountId: 'mock-account-id', message: 'Account connected' } } });
       }).as('addCheckingAccount');
 
-      // Register through UI
-      cy.visit('/register');
-      cy.get('input[name="name"]').type('Resume User');
-      cy.get('input[name="email"]').type('resume@example.com');
-      cy.get('input[name="password"]').type('password123');
-      cy.get('input[name="confirmPassword"]').type('password123');
-      cy.get('button[type="submit"]').click();
+      // A brand-new user lands in onboarding on first sign-in. Sign-in itself
+      // goes through GitHub, so seed the session rather than driving github.com.
+      cy.createOnboardingUser({ name: 'Resume User', email: 'resume@example.com' });
+      cy.visit('/onboarding');
       
       cy.url({ timeout: 10000 }).should('include', '/onboarding');
       cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
@@ -382,13 +367,7 @@ describe('Onboarding Flow', () => {
         }
       }).as('addCheckingAccount');
       
-      cy.request('POST', `${apiUrl}/api/auth/register`, {
-        email: 'error@example.com',
-        password: 'password123',
-        name: 'Error User'
-      }).then((response) => {
-        const token = response.body.token;
-        localStorage.setItem('token', token);
+      cy.createOnboardingUser({ email: 'error@example.com', name: 'Error User' }).then((token) => {
         
         cy.visit('/onboarding');
         cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
@@ -430,13 +409,7 @@ describe('Onboarding Flow', () => {
         forceNetworkError: true
       }).as('addCheckingAccount');
       
-      cy.request('POST', `${apiUrl}/api/auth/register`, {
-        email: 'network-error@example.com',
-        password: 'password123',
-        name: 'Network Error User'
-      }).then((response) => {
-        const token = response.body.token;
-        localStorage.setItem('token', token);
+      cy.createOnboardingUser({ email: 'network-error@example.com', name: 'Network Error User' }).then((token) => {
         
         cy.visit('/onboarding');
         cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
@@ -475,13 +448,7 @@ describe('Onboarding Flow', () => {
         }
       }).as('getStatus');
       
-      cy.request('POST', `${apiUrl}/api/auth/register`, {
-        email: 'nav@example.com',
-        password: 'password123',
-        name: 'Nav User'
-      }).then((response) => {
-        const token = response.body.token;
-        localStorage.setItem('token', token);
+      cy.createOnboardingUser({ email: 'nav@example.com', name: 'Nav User' }).then((token) => {
         
         cy.visit('/onboarding?step=credit-card-setup');
         cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
@@ -512,7 +479,6 @@ describe('Onboarding Flow', () => {
         email: 'completed@example.com',
         name: 'Completed User'
       }).then(token => {
-        localStorage.setItem('token', token);
         
         cy.visit('/onboarding');
         cy.url({ timeout: 10000 }).should('include', '/');

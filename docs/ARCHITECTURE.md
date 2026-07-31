@@ -216,7 +216,7 @@ across processes or restarts.
 
 | Mount point | Router | Endpoints |
 |---|---|---|
-| `/api/auth` | `auth/routes/auth.js` | 3 |
+| `/api/auth` | `auth/routes/auth.js` | 4 |
 | `/api/users` | `auth/routes/users.js` | 2 |
 | `/api/bank-accounts` | `banking/routes/bankAccounts.js` | 15 |
 | `/api/credit-cards` | `banking/routes/creditCards.js` | 6 |
@@ -240,8 +240,26 @@ Note that `/api/budgets` is served by **three** routers — the shared aggregati
 router, the monthly-budget router and the project-budget router. Ordering in
 `app.js` matters when adding paths there.
 
-All routes except `/api/auth/register`, `/api/auth/login` and `/api/test/*`
-require a JWT via the `shared/middleware/auth.js` middleware.
+All routes except `/api/auth/github/*` and `/api/test/*` require a session via
+the `shared/middleware/auth.js` middleware. The middleware accepts either the
+`gerifinancial_session` httpOnly cookie or an `Authorization: Bearer` header.
+
+### Sign-in
+
+There is no registration endpoint and no password anywhere in the system.
+Sign-in is delegated to a GitHub OAuth App:
+
+1. `GET /api/auth/github/login` redirects to GitHub, carrying a signed,
+   time-limited `state` that also encodes where to return the user to.
+2. `GET /api/auth/github/callback` verifies `state` *before* looking at `code`,
+   exchanges the code for an access token, reads the GitHub profile, and
+   upserts the local user by **numeric GitHub id** — logins and emails can be
+   changed and later claimed by someone else, the id cannot.
+3. A session JWT is signed locally and set as an httpOnly cookie, so an XSS
+   payload cannot read it.
+
+`safeReturnTo` restricts the post-sign-in redirect to the `CORS_ORIGIN`
+allowlist, so the callback cannot be turned into an open redirect.
 
 ---
 
@@ -279,7 +297,7 @@ frontend/src/
 | `/banks` | `Banks.tsx` |
 | `/profile` | Inline placeholder in `App.tsx` — **not yet implemented** |
 | `/onboarding` | `Onboarding.tsx` (outside the main layout) |
-| `/login`, `/register` | Auth forms (public) |
+| `/login` | `LoginForm.tsx` — a single "Continue with GitHub" link (public) |
 
 Everything except the auth and onboarding routes renders inside a protected
 layout shell that provides navigation. `OnboardingGuard` redirects users who

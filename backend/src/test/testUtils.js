@@ -1,12 +1,29 @@
 const jwt = require('jsonwebtoken');
 const config = require('../shared/config');
 
+// GitHub ids are unique per account, so tests that create several users need a
+// distinct one each time rather than a shared literal.
+let githubIdSequence = 1000;
+
+/**
+ * Builds the external-identity fields every user now requires. Exported so
+ * suites constructing a User directly stay consistent with createTestUser.
+ */
+const githubIdentity = (overrides = {}) => {
+  githubIdSequence += 1;
+  return {
+    githubId: githubIdSequence,
+    githubLogin: `testuser${githubIdSequence}`,
+    ...overrides
+  };
+};
+
 const createTestUser = async (User, userData = {}) => {
   try {
     const user = new User({
       name: 'Test User',
       email: 'test@example.com',
-      password: 'testpassword',
+      ...githubIdentity(),
       ...userData
     });
     
@@ -45,5 +62,6 @@ const clearDatabase = async (mongoose) => {
 
 module.exports = {
   createTestUser,
+  githubIdentity,
   clearDatabase
 };

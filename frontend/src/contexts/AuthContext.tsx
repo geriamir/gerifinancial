@@ -1,61 +1,50 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authApi, AuthResponse } from '../services/api';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { authApi, AuthUser } from '../services/api';
 
 interface AuthContextType {
-  user: AuthResponse['user'] | null;
+  user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AuthResponse['user'] | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // There is no token to inspect: the session lives in an httpOnly cookie the
+    // page cannot read, so the only way to know whether one exists is to ask.
     const initializeAuth = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const response = await authApi.getProfile();
-          setUser(response.user);
-        } catch (error) {
-          localStorage.removeItem('token');
-        }
+      try {
+        const response = await authApi.getProfile();
+        setUser(response.user);
+      } catch (error) {
+        setUser(null);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     initializeAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const response = await authApi.login({ email, password });
-    localStorage.setItem('token', response.token);
-    setUser(response.user);
-  };
-
-  const register = async (name: string, email: string, password: string) => {
-    const response = await authApi.register({ name, email, password });
-    localStorage.setItem('token', response.token);
-    setUser(response.user);
-  };
-
-  const logout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
-  };
+  const logout = useCallback(async () => {
+    try {
+      await authApi.logout();
+    } finally {
+      // Clear locally even if the request failed, so the user is not left
+      // looking at a signed-in page they can no longer use.
+      setUser(null);
+    }
+  }, []);
 
   const value = {
     user,
     isLoading,
     isAuthenticated: !!user,
-    login,
-    register,
     logout
   };
 

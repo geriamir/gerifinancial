@@ -613,7 +613,8 @@ describe('Budget API Endpoints', () => {
       const otherUser = new User({
         email: 'other@example.com',
         name: 'Other User',
-        password: 'password123'
+        githubId: 90301,
+        githubLogin: 'other-user'
       });
       await otherUser.save();
 

@@ -1,6 +1,8 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 const app = require('../../app');
+const config = require('../../shared/config');
 const { User } = require('../../auth');
 const { BankAccount } = require('../../banking');
 const scrapingEvents = require('../../banking/services/scrapingEvents');
@@ -39,19 +41,16 @@ describe('Onboarding Accounts API', () => {
     // Create test user
     testUser = await User.create({
       email: 'test@example.com',
-      password: 'password123',
+      githubId: 90401,
+      githubLogin: 'test-user',
       name: 'Test User'
     });
 
-    // Get auth token
-    const loginResponse = await request(app)
-      .post('/api/auth/login')
-      .send({
-        email: 'test@example.com',
-        password: 'password123'
-      });
-
-    authToken = loginResponse.body.token;
+    // Sign the session directly: login goes through GitHub now, which this
+    // suite has no reason to exercise.
+    authToken = jwt.sign({ userId: testUser._id }, config.jwtSecret, {
+      expiresIn: config.jwtExpiration
+    });
   });
 
   afterAll(async () => {

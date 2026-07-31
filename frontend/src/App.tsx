@@ -11,7 +11,6 @@ import { RSUProvider } from './contexts/RSUContext';
 import { InvestmentProvider } from './contexts/InvestmentContext';
 import { ProjectProvider } from './contexts/ProjectContext';
 import LoginForm from './components/auth/LoginForm';
-import RegisterForm from './components/auth/RegisterForm';
 import AuthLayout from './components/layout/AuthLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { OnboardingGuard } from './components/auth/OnboardingGuard';
@@ -50,7 +49,6 @@ const App: React.FC = () => {
           <OnboardingGuard>
             <Routes>
             <Route path="/login" element={<LoginForm />} />
-            <Route path="/register" element={<RegisterForm />} />
             <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
             
             <Route

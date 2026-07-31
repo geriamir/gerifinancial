@@ -5,12 +5,13 @@ jest.mock('../banking/services/scrapingSchedulerService', () => require('./mocks
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const { User } = require('../auth');
+const { githubIdentity } = require('./testUtils');
 
 // Global test helpers
 global.createTestUser = async (userData = {}) => {
   const defaultData = {
     email: `test-${Date.now()}@example.com`,
-    password: 'testpassword123',
+    ...githubIdentity(),
     name: 'Test User'
   };
   

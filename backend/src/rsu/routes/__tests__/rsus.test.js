@@ -440,7 +440,8 @@ describe('RSU API Endpoints', () => {
         const otherUser = await User.create({
           email: 'other@example.com',
           name: 'Other User',
-          password: 'password123'
+          githubId: 90601,
+          githubLogin: 'other-user'
         });
 
         const otherGrant = await RSUGrant.create({
@@ -672,7 +673,8 @@ describe('RSU API Endpoints', () => {
         const otherUser = await User.create({
           email: 'other2@example.com',
           name: 'Other User 2',
-          password: 'password123'
+          githubId: 90602,
+          githubLogin: 'other-user-2'
         });
 
         const otherGrant = await RSUGrant.create({
@@ -777,7 +779,8 @@ describe('RSU API Endpoints', () => {
       const otherUser = await User.create({
         email: 'other3@example.com',
         name: 'Other User 3',
-        password: 'password123'
+        githubId: 90603,
+        githubLogin: 'other-user-3'
       });
 
       // Create grant for other user

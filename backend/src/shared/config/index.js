@@ -29,7 +29,39 @@ const config = {
     // cached in memory for this long.
     dekCacheTtlMs: Number(process.env.DEK_CACHE_TTL_MS) || 15 * 60 * 1000
   },
-  encryptionKey: process.env.ENCRYPTION_KEY || undefined
+  encryptionKey: process.env.ENCRYPTION_KEY || undefined,
+  // Sign-in is delegated to GitHub; this app issues its own session JWT once
+  // GitHub has confirmed who the user is. Left unset, the OAuth routes report
+  // that login is unconfigured rather than failing obscurely at the redirect.
+  github: {
+    clientId: process.env.GITHUB_OAUTH_CLIENT_ID || undefined,
+    clientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET || undefined,
+    // Where the browser reaches this API. GitHub redirects back here, so it
+    // must match the callback URL registered on the OAuth app exactly.
+    publicApiUrl: (process.env.PUBLIC_API_URL || `http://localhost:${process.env.PORT || 3001}`).replace(/\/$/, ''),
+    // Where to land after a successful login when no return_to was supplied.
+    defaultReturnTo: (process.env.DEFAULT_RETURN_TO || 'http://localhost:3000').replace(/\/$/, ''),
+    sessionTtlSeconds: Number(process.env.SESSION_TTL_SEC) || 7 * 24 * 60 * 60
+  }
+};
+
+// The session cookie has to survive the cross-site redirect back from GitHub,
+// and the frontend is served from a different origin to the API in every
+// deployed environment. SameSite=None is what allows that, and browsers only
+// honour it on a Secure cookie, so the two settings move together.
+config.session = {
+  cookieName: 'gerifinancial_session',
+  secure: process.env.COOKIE_SECURE === 'true' || config.github.publicApiUrl.startsWith('https://'),
+  crossSite: (() => {
+    const explicit = (process.env.COOKIE_CROSS_SITE || '').trim().toLowerCase();
+    if (explicit === 'true') return true;
+    if (explicit === 'false') return false;
+    try {
+      return new URL(config.github.publicApiUrl).origin !== new URL(config.github.defaultReturnTo).origin;
+    } catch (error) {
+      return false;
+    }
+  })()
 };
 
 // No development fallback: a committed, well-known key would silently become

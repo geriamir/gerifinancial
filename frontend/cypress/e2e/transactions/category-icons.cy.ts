@@ -74,7 +74,6 @@ describe('Transaction Category Icons', () => {
     // Create and authenticate test user
     cy.task('db:clearTestData');
     cy.createTestUser().then((token) => {
-      localStorage.setItem('token', token);
       // Visit transactions page after setting token
       cy.visit('/transactions');
       cy.wait('@getTransactions');

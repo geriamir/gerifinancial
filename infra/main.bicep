@@ -33,6 +33,13 @@ param jwtSecret string
 @secure()
 param redisPassword string
 
+@description('Client ID of the GitHub OAuth App used for sign-in. Leave empty to deploy with sign-in disabled.')
+param githubOAuthClientId string = ''
+
+@description('Client secret of the GitHub OAuth App used for sign-in.')
+@secure()
+param githubOAuthClientSecret string = ''
+
 @description('Mongo database name.')
 param mongoDatabaseName string = 'gerifinancial'
 
@@ -44,6 +51,11 @@ var redisAppName = '${namePrefix}-redis'
 // prefix does not fit.
 var keyVaultName = 'gfkv${suffix}'
 var credentialKekName = 'credential-kek'
+
+// The OAuth callback URL has to be registered with GitHub ahead of time, so it
+// cannot be read back off the container app - that would be circular. The
+// environment's domain is enough to derive it.
+var apiPublicUrl = 'https://${containerAppName}.${containerEnv.properties.defaultDomain}'
 
 resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: registryName
@@ -324,6 +336,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'jwt-secret'
           value: jwtSecret
         }
+        {
+          name: 'github-oauth-client-secret'
+          value: githubOAuthClientSecret
+        }
       ]
     }
     template: {
@@ -385,6 +401,24 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'CORS_ORIGIN'
               value: 'https://${staticWebApp.properties.defaultHostname}'
             }
+            {
+              name: 'GITHUB_OAUTH_CLIENT_ID'
+              value: githubOAuthClientId
+            }
+            {
+              name: 'GITHUB_OAUTH_CLIENT_SECRET'
+              secretRef: 'github-oauth-client-secret'
+            }
+            {
+              // Used to build the OAuth callback URL, which must match the one
+              // registered on the GitHub OAuth App exactly.
+              name: 'PUBLIC_API_URL'
+              value: apiPublicUrl
+            }
+            {
+              name: 'DEFAULT_RETURN_TO'
+              value: 'https://${staticWebApp.properties.defaultHostname}'
+            }
           ]
           probes: [
             {
@@ -428,3 +462,6 @@ output mongoClusterName string = mongoCluster.name
 output redisHostName string = redisAppName
 output keyVaultName string = keyVault.name
 output keyVaultUrl string = keyVault.properties.vaultUri
+
+@description('Register this exact URL as the Authorization callback URL on the GitHub OAuth App.')
+output githubOAuthCallbackUrl string = '${apiPublicUrl}/api/auth/github/callback'

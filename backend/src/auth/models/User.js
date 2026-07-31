@@ -1,17 +1,31 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
-  email: {
-    type: String,
+  // Identity is owned by GitHub; this app stores no password of its own.
+  githubId: {
+    type: Number,
     required: true,
     unique: true,
-    trim: true,
-    lowercase: true
+    index: true
   },
-  password: {
+  githubLogin: {
     type: String,
-    required: true
+    required: true,
+    trim: true
+  },
+  avatarUrl: {
+    type: String,
+    default: null
+  },
+  // Optional because GitHub withholds the address for accounts that keep it
+  // private, and sparse so those accounts do not all collide on null.
+  email: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+    lowercase: true,
+    default: null
   },
   name: {
     type: String,
@@ -365,19 +379,6 @@ const userSchema = new mongoose.Schema({
     }
   }
 });
-
-// Hash password before saving
-userSchema.pre('save', async function(next) {
-  if (this.isModified('password')) {
-    this.password = await bcrypt.hash(this.password, 10);
-  }
-  next();
-});
-
-// Method to validate password
-userSchema.methods.validatePassword = async function(password) {
-  return bcrypt.compare(password, this.password);
-};
 
 const User = mongoose.model('User', userSchema);
 

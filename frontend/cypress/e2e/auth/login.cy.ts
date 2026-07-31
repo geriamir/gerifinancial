@@ -1,84 +1,50 @@
 describe('Login Flow', () => {
   beforeEach(() => {
     cy.clearTestData(); // Clear any previous test data
-    cy.visit('/');
   });
 
-  it('should successfully log in with valid credentials', () => {
-    // Create test user and get token
-    cy.createTestUser();
-    
-    // Visit login page
+  it('should offer GitHub as the only sign-in method', () => {
     cy.visit('/login');
 
-    // Fill in login form
-    cy.get('input[name="email"]').type('test@example.com');
-    cy.get('input[name="password"]').type('password123');
-    cy.get('button[type="submit"]').click();
-
-    // Assert successful login
-    cy.url().should('eq', 'http://localhost:3000/');
-    
-    // Wait for the avatar to appear in the AppBar and verify user is logged in
-    cy.get('[data-testid="user-avatar"]', { timeout: 10000 })
+    cy.get('[data-testid="github-login-button"]')
       .should('be.visible')
-      .and('contain.text', 'T');  // First letter of Test User
+      .and('contain.text', 'Continue with GitHub')
+      .and('have.attr', 'href')
+      .and('include', '/api/auth/github/login');
+
+    // Password auth is gone: nothing to type, and nothing to register.
+    cy.get('input[name="password"]').should('not.exist');
+    cy.get('input[name="email"]').should('not.exist');
+    cy.contains('Register').should('not.exist');
   });
 
-  it('should show error with invalid credentials', () => {
-    cy.visit('/login');
+  it('should explain a cancelled sign-in', () => {
+    cy.visit('/login?auth_error=access_denied');
 
-    // Fill in login form with incorrect password
-    cy.get('input[name="email"]').type('test@example.com');
-    cy.get('input[name="password"]').type('wrongpassword');
-    cy.get('button[type="submit"]').click();
+    cy.contains('Sign-in was cancelled').should('be.visible');
+  });
 
-    // Assert error message
-    cy.contains('Invalid email or password').should('be.visible');
+  it('should redirect unauthenticated visitors to login', () => {
+    cy.visit('/');
+
     cy.url().should('include', '/login');
   });
 
-  it('should validate required fields', () => {
-    cy.visit('/login');
-
-    // Try to submit empty form
-    cy.get('button[type="submit"]').click();
-
-    // Assert validation messages
-    cy.contains('Email is required').should('be.visible');
-    cy.contains('Password is required').should('be.visible');
-  });
-
-  it('should navigate to registration page', () => {
-    cy.visit('/login');
-    
-    // Click register link
-    cy.contains('Register').click();
-    
-    // Assert navigation to register page
-    cy.url().should('include', '/register');
-  });
-
   it('should maintain authentication state after refresh', () => {
-    // Create test user and login
+    // The session cookie is set by the test-only seeding endpoint, standing in
+    // for the GitHub callback that end-to-end tests cannot drive.
     cy.createTestUser({
       email: 'persist@example.com',
       name: 'Persist User'
-    }).then(token => {
-      localStorage.setItem('token', token);
-      
-      // Visit protected route
+    }).then(() => {
       cy.visit('/');
-      
-      // Assert we're logged in
+
       cy.get('[data-testid="user-avatar"]', { timeout: 10000 })
         .should('be.visible')
         .and('contain.text', 'P');  // First letter of Persist User
-      
-      // Refresh page
+
       cy.reload();
-      
-      // Assert we're still logged in
+
       cy.get('[data-testid="user-avatar"]', { timeout: 10000 })
         .should('be.visible')
         .and('contain.text', 'P');
@@ -87,25 +53,19 @@ describe('Login Flow', () => {
   });
 
   it('should logout successfully', () => {
-    // Create test user and login
     cy.createTestUser({
       email: 'logout@example.com',
       name: 'Logout User'
-    }).then(token => {
-      localStorage.setItem('token', token);
+    }).then(() => {
       cy.visit('/');
-      
-      // Open user menu and click logout
+
       cy.get('[data-testid="user-avatar"]', { timeout: 10000 }).should('be.visible').click();
       cy.get('.MuiMenu-paper').contains('Logout').click();
-      
-      // Assert we're logged out and redirected
+
       cy.url().should('include', '/login');
-      
-      // Try to visit protected route
+
+      // The session cookie is cleared server-side, so protected routes bounce.
       cy.visit('/');
-      
-      // Assert we're redirected to login
       cy.url().should('include', '/login');
     });
   });

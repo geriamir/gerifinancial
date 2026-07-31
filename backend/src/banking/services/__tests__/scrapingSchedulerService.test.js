@@ -52,7 +52,8 @@ describe('ScrapingSchedulerService', () => {
     testUser = await User.create({
       name: 'Test User',
       email: 'test@example.com',
-      password: 'password123'
+      githubId: 90201,
+      githubLogin: 'test-user'
     });
     jest.clearAllMocks();
     // Reset mocks
