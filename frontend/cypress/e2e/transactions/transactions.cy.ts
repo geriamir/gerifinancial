@@ -217,7 +217,9 @@ describe('Transactions Page', () => {
           }
         });
         
-        expect(req.headers).to.have.property('authorization');
+        // The session travels as an httpOnly cookie now, not a header.
+        expect(req.headers).to.have.property('cookie');
+        expect(req.headers.cookie).to.include('gerifinancial_session');
         expect([200, 304]).to.include(res?.statusCode, 'Response status should be 200 or 304');
         
         const transactions = res?.body?.transactions || [];

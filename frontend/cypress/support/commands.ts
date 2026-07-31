@@ -54,16 +54,14 @@ Cypress.Commands.add('createOnboardingUser', (options = {}) => {
 
   return cy.request('POST', `${Cypress.env('apiUrl')}/api/test/create-test-user`, defaultOptions)
     .then((response) => {
-      const token = response.body.token;
-      const userId = response.body.user?.id;
-      Cypress.env('testUserId', userId);
-      
-      cy.log('Created onboarding user:', userId);
-      
+      // No cy commands in here: a .then() that both queues a command and
+      // returns a plain value makes Cypress throw about mixing async and sync.
+      Cypress.env('testUserId', response.body.user?.id);
+
       // New users automatically get onboarding structure with defaults:
       // isComplete: false, currentStep: 'checking-account'
       // This matches what happens in the real app
-      return token;
+      return response.body.token;
     });
 });
 
