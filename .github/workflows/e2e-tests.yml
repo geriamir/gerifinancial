@@ -27,10 +27,10 @@ jobs:
         node-version: [22.x]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -61,7 +61,7 @@ jobs:
         CI: true
 
     - name: Upload Cypress screenshots
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: failure()
       with:
         name: cypress-screenshots
@@ -69,7 +69,7 @@ jobs:
         retention-days: 5
 
     - name: Upload Cypress videos
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: cypress-videos
