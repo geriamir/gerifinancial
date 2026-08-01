@@ -5,6 +5,8 @@ interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  /** Resolves once the session has been cleared. Never rejects: a failed
+   *  request is reported and the local state is cleared regardless. */
   logout: () => Promise<void>;
 }
 
@@ -34,6 +36,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
+    } catch (error) {
+      // Deliberately not rethrown. The session cookie is httpOnly, so if the
+      // request fails there is nothing the page can do to end the session
+      // itself, and callers have no meaningful way to recover. Rejecting here
+      // would only strand them mid-sign-out.
+      console.error('Failed to clear the session on the server:', error);
     } finally {
       // Clear locally even if the request failed, so the user is not left
       // looking at a signed-in page they can no longer use.

@@ -38,9 +38,13 @@ const AuthLayout: React.FC = () => {
     setAnchorEl(null);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     handleClose();
-    logout();
+    // The session lives in an httpOnly cookie that only the server can clear,
+    // so the request has to finish before navigating. Navigating first can
+    // abort it, leaving the user looking signed out while the cookie is still
+    // valid.
+    await logout();
     navigate('/login');
   };
 
