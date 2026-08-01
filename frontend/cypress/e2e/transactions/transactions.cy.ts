@@ -90,7 +90,7 @@ describe('Transactions Page', () => {
       console.log('Created test user:', storedUserId);
 
     // Login to set up auth state properly
-      return cy.login('test@example.com', 'password123').then(() => {
+      return cy.login('test@example.com').then(() => {
         // Add test transactions for the user
         // Create test transactions relative to current date
         const baseDate = new Date(); // Use current date
@@ -102,7 +102,6 @@ describe('Transactions Page', () => {
         });
       });
     }).then(result => {
-      console.log('Login completed, token:', localStorage.getItem('token'));
       console.log('Added transactions:', result);
       
       console.log('Transaction creation result:', result);
@@ -188,14 +187,8 @@ describe('Transactions Page', () => {
     }).as('getTransactions');
     cy.intercept('GET', '**/api/transactions/categories').as('getCategories');
 
-    // Visit page after ensuring token is set
-    cy.visit('/transactions', {
-      onBeforeLoad(win) {
-        console.log('Verifying token before page load:', {
-          token: win.localStorage.getItem('token')
-        });
-      },
-    });
+    // Visit page after ensuring the session cookie is set
+    cy.visit('/transactions');
     cy.contains('Transactions', { timeout: 10000 }).should('be.visible');
 
     // Wait for initial data load and verify response
@@ -224,7 +217,9 @@ describe('Transactions Page', () => {
           }
         });
         
-        expect(req.headers).to.have.property('authorization');
+        // The session travels as an httpOnly cookie now, not a header.
+        expect(req.headers).to.have.property('cookie');
+        expect(req.headers.cookie).to.include('gerifinancial_session');
         expect([200, 304]).to.include(res?.statusCode, 'Response status should be 200 or 304');
         
         const transactions = res?.body?.transactions || [];
@@ -555,7 +550,7 @@ describe('Transactions Page', () => {
       const decodedToken = JSON.parse(atob(token.split('.')[1]));
       Cypress.env('testUserId', decodedToken.userId);
       
-      return cy.login('test@example.com', 'password123');
+      return cy.login('test@example.com');
     });
 
     // Intercept with error BEFORE visiting the page

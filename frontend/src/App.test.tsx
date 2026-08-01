@@ -6,8 +6,9 @@ import App from './App';
 jest.mock('./contexts/AuthContext');
 
 describe('App', () => {
-  test('renders login form when not authenticated', () => {
+  test('renders the sign-in screen when not authenticated', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { name: /login/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /sign in/i })).toBeInTheDocument();
+    expect(screen.getByTestId('github-login-button')).toBeInTheDocument();
   });
 });

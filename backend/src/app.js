@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const config = require('./shared/config');
 const logger = require('./shared/utils/logger');
 const ensureLogsDir = require('./shared/middleware/ensureLogsDir');
@@ -135,8 +136,18 @@ if (config.env === 'production' && corsOrigins.length === 0) {
   throw new Error('CORS_ORIGIN must list at least one allowed origin in production');
 }
 
-app.use(cors(corsOrigins.length > 0 ? { origin: corsOrigins, credentials: true } : {}));
+// The session cookie only travels on credentialed requests, and a browser
+// refuses those against a wildcard origin, so reflect the caller's origin when
+// there is no allowlist. Production never reaches that branch: it throws above.
+app.use(cors(
+  corsOrigins.length > 0
+    ? { origin: corsOrigins, credentials: true }
+    : { origin: true, credentials: true }
+));
 app.use(express.json());
+// The session travels as an httpOnly cookie, so it has to be parsed before any
+// route or middleware tries to read it.
+app.use(cookieParser());
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

@@ -4,23 +4,24 @@ declare global {
   namespace Cypress {
     interface Chainable {
       /**
-       * Login as a user
+       * Sign in as an existing test user and yield the session token.
+       *
+       * The real flow redirects through github.com, so tests seed a session
+       * through the test-only endpoint instead.
        * @param email - User email
-       * @param password - User password
        * @example
-       * cy.login('test@example.com', 'password123')
+       * cy.login('test@example.com')
        */
-      login(email: string, password: string): Chainable<void>;
+      login(email: string): Chainable<string>;
 
       /**
        * Create a new test user and return the token
        * @param options - User creation options
        * @example
-       * cy.createTestUser({ email: 'test@example.com', password: 'password123', name: 'Test User' })
+       * cy.createTestUser({ email: 'test@example.com', name: 'Test User' })
        */
       createTestUser(options?: {
         email?: string;
-        password?: string;
         name?: string;
       }): Chainable<string>;
 
@@ -48,6 +49,13 @@ declare global {
        * cy.clearTestData()
        */
       clearTestData(): Chainable<void>;
+
+      /**
+       * Restore a session cookie yielded by createTestUser
+       * @example
+       * cy.setSession(token)
+       */
+      setSession(token: string): Chainable<void>;
 
       /**
        * Delete a bank account

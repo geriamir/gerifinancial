@@ -32,9 +32,9 @@ view, with budgeting and automated transaction categorisation on top.
 ## Tech Stack
 
 **Backend** — Node.js, Express 5, MongoDB (Mongoose 8), BullMQ + Redis for job
-queuing, Puppeteer via `israeli-bank-scrapers`, JWT auth with bcrypt, Winston
-logging, `natural` + `string-similarity` for categorisation, node-cron for
-scheduling.
+queuing, Puppeteer via `israeli-bank-scrapers`, GitHub OAuth sign-in with a
+locally-signed session JWT, Winston logging, `natural` + `string-similarity` for
+categorisation, node-cron for scheduling.
 
 **Frontend** — React 19, TypeScript, Material-UI 7, React Router 7, Recharts 3,
 Axios, Formik + Yup, date-fns, `@dnd-kit`, Sentry.
@@ -52,7 +52,7 @@ gerifinancial/
 │       ├── app.js               Express app, route mounting, startup wiring
 │       ├── server.js            Process entrypoint
 │       │
-│       ├── auth/                Users, JWT login, onboarding status
+│       ├── auth/                Users, GitHub OAuth sign-in, onboarding status
 │       ├── banking/             Accounts, transactions, categories, cards, scraping
 │       ├── foreign-currency/    FX accounts, exchange rates
 │       ├── investments/         Portfolios, holdings, stock prices
@@ -157,7 +157,8 @@ npm run install-all
 
 # 2. Configure the backend environment
 cp backend/.env.example backend/.env
-# then edit backend/.env — at minimum set JWT_SECRET and ENCRYPTION_KEY
+# then edit backend/.env — at minimum set JWT_SECRET, ENCRYPTION_KEY and the
+# GitHub OAuth credentials (see "Sign-in" below)
 
 # 3. Start MongoDB + Redis and both dev servers
 npm run dev
@@ -171,14 +172,36 @@ npm run dev
 services first. On other platforms, start those services yourself and run
 `npm run backend` and `npm run frontend` separately.
 
+### Sign-in
+
+There is no registration form and no password to manage — accounts are created
+on first sign-in through GitHub. To run this locally you need your own OAuth
+App:
+
+1. Go to https://github.com/settings/developers → **New OAuth App**.
+2. Homepage URL `http://localhost:3000`, Authorization callback URL
+   `http://localhost:3001/api/auth/github/callback`.
+3. Put the client ID and a generated client secret into `backend/.env` as
+   `GITHUB_OAUTH_CLIENT_ID` and `GITHUB_OAUTH_CLIENT_SECRET`.
+
+For a deployed environment the callback URL is the `githubOAuthCallbackUrl`
+output of `infra/main.bicep`. Deploying with the credentials left empty is
+fine — every route works except sign-in, which reports that it is unconfigured.
+
 ### Environment variables
 
 | Variable | Required | Purpose |
 |---|---|---|
 | `PORT` | no | Backend port (default 3001) |
 | `MONGODB_URI` | yes | MongoDB connection string |
-| `JWT_SECRET` | yes | Token signing secret |
+| `JWT_SECRET` | yes | Session token signing secret |
 | `JWT_EXPIRATION` | no | Token lifetime (default 24h) |
+| `GITHUB_OAUTH_CLIENT_ID` | yes, for sign-in | GitHub OAuth App client ID |
+| `GITHUB_OAUTH_CLIENT_SECRET` | yes, for sign-in | GitHub OAuth App client secret |
+| `PUBLIC_API_URL` | no | Origin this API is reachable at; used to build the OAuth callback URL (default `http://localhost:3001`) |
+| `DEFAULT_RETURN_TO` | no | Where users land after signing in (default `http://localhost:3000`) |
+| `CORS_ORIGIN` | no | Comma-separated origins allowed as post-sign-in redirect targets |
+| `SESSION_TTL_SEC` | no | Session cookie lifetime (default 7 days) |
 | `ENCRYPTION_KEY` | yes, unless `AZURE_KEY_VAULT_URL` is set | Wraps each user's bank-credential key when running without Key Vault |
 | `AZURE_KEY_VAULT_URL` | no | Key Vault holding the key encryption key. Takes precedence over `ENCRYPTION_KEY` |
 | `AZURE_KEY_VAULT_KEY_NAME` | no | Key name within the vault (default `credential-kek`) |

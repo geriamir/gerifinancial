@@ -2,7 +2,6 @@
 
 interface TestUserOptions {
   email: string;
-  password: string;
   name: string;
 }
 
@@ -17,11 +16,11 @@ declare global {
   namespace Cypress {
     interface Chainable<Subject = any> {
       /**
-       * Login with email and password
+       * Sign in as an existing test user and yield the session token
        * @example
-       * cy.login('test@example.com', 'password123')
+       * cy.login('test@example.com')
        */
-      login(email: string, password: string): Chainable<void>;
+      login(email: string): Chainable<string>;
 
       /**
        * Create a test user with optional parameters
@@ -40,11 +39,18 @@ declare global {
       createOnboardingUser(options?: Partial<TestUserOptions>): Chainable<string>;
 
       /**
-       * Clear test data from MongoDB and localStorage
+       * Clear test data from MongoDB, cookies and localStorage
        * @example
        * cy.clearTestData()
        */
       clearTestData(): Chainable<void>;
+
+      /**
+       * Restore a session cookie yielded by createTestUser
+       * @example
+       * cy.setSession(token)
+       */
+      setSession(token: string): Chainable<void>;
 
       /**
        * Create a new bank account

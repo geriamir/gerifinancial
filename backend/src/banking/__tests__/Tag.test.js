@@ -8,7 +8,8 @@ beforeAll(async () => {
   testUser = new User({
     email: 'test-tag@example.com',
     name: 'Test Tag User',
-    password: 'password123'
+    githubId: 90001,
+    githubLogin: 'test-tag-user'
   });
   await testUser.save();
 });
@@ -106,7 +107,8 @@ describe('Tag Model', () => {
       const user2 = new User({
         email: 'test2@example.com',
         name: 'Test User 2',
-        password: 'password123'
+        githubId: 90002,
+        githubLogin: 'test-user-2'
       });
       await user2.save();
 

@@ -20,7 +20,8 @@ describe('Credit Cards Routes', () => {
     // Create test user
     user = await User.create({
       email: 'test@example.com',
-      password: 'hashedpassword',
+      githubId: 90101,
+      githubLogin: 'test-user',
       name: 'Test User'
     });
 
@@ -324,7 +325,8 @@ describe('Credit Cards Routes', () => {
       // Create another user
       const otherUser = await User.create({
         email: 'other@example.com',
-        password: 'hashedpassword',
+        githubId: 90102,
+        githubLogin: 'other-user',
         name: 'Other User'
       });
 

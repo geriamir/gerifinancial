@@ -22,7 +22,7 @@ import {
   Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { patternsApi, DetectedPattern } from '../../../services/api/patterns';
-import { useAuth } from '../../../hooks/useAuth';
+import { useAuth } from '../../../contexts/AuthContext';
 
 interface PatternDetectionDashboardProps {
   className?: string;

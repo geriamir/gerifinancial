@@ -9,7 +9,6 @@ describe('Bank Accounts Management', () => {
       name: 'Bank Test User'
     }).then(token => {
       authToken = token;
-      localStorage.setItem('token', token);
     });
   });
 
