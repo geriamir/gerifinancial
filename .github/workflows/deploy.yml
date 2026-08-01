@@ -17,9 +17,12 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+# id-token is granted per job rather than here. The token can be exchanged for
+# Azure access, and the test and build jobs run the projects' whole npm
+# dependency trees - a compromised package in one of them has no business being
+# able to mint one.
 permissions:
   contents: read
-  id-token: write
 
 env:
   AZURE_RESOURCE_GROUP: rg-gerifinancial
@@ -86,7 +89,9 @@ jobs:
           backend=false
           frontend=false
           infra=false
-          if contains '^(backend/|\.github/workflows/deploy\.yml$)'; then backend=true; fi
+          # .dockerignore counts as backend: the image is built from the
+          # repository root, so it changes what lands in the image.
+          if contains '^(backend/|\.dockerignore$|\.github/workflows/deploy\.yml$)'; then backend=true; fi
           if contains '^(frontend/|\.github/workflows/deploy\.yml$)'; then frontend=true; fi
           if contains '^infra/'; then infra=true; fi
 
@@ -98,6 +103,9 @@ jobs:
     needs: [ test, changes ]
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -137,6 +145,10 @@ jobs:
       - name: Verify the API is serving
         run: |
           set -uo pipefail
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "::error title=jq missing::The health check parses /health with jq."
+            exit 1
+          fi
           # The image reference only proves the revision was accepted. This
           # proves the container actually came up and reached its dependencies.
           for attempt in $(seq 1 30); do
@@ -151,11 +163,17 @@ jobs:
           echo "::error title=API unhealthy::/health did not report ok after the rollout."
           exit 1
 
-  deploy-frontend:
-    name: Deploy frontend
+  build-frontend:
+    name: Build frontend
     needs: [ test, changes ]
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
+    # Deliberately no id-token. This job runs the frontend's entire dependency
+    # tree through npm ci and the build, and the deploy identity can replace
+    # the running API container - which can unwrap stored bank credentials. A
+    # compromised build-time package must not be able to reach that.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -177,6 +195,26 @@ jobs:
           # nothing.
           REACT_APP_API_URL: ${{ env.API_URL }}
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+          retention-days: 7
+          if-no-files-found: error
+
+  deploy-frontend:
+    name: Deploy frontend
+    needs: build-frontend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: build
+
       - uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -192,7 +230,9 @@ jobs:
           token="$(az staticwebapp secrets list -n "$STATIC_WEB_APP" -g "$AZURE_RESOURCE_GROUP" \
             --query properties.apiKey -o tsv)"
           echo "::add-mask::$token"
-          npx --yes @azure/static-web-apps-cli deploy frontend/build \
+          # Pinned rather than floating: this is the one npm package that runs
+          # in a job holding an Azure token.
+          npx --yes @azure/static-web-apps-cli@2.0.10 deploy build \
             --env production --deployment-token "$token"
 
       - name: Verify the new bundle is being served
@@ -200,7 +240,13 @@ jobs:
           set -uo pipefail
           # Guards against the failure this workflow exists to prevent: a deploy
           # that reports success while the CDN keeps serving the previous build.
-          built="$(basename "$(ls frontend/build/static/js/main.*.js | head -1)")"
+          shopt -s nullglob
+          bundles=(build/static/js/main.*.js)
+          if [ ${#bundles[@]} -eq 0 ]; then
+            echo "::error title=No bundle built::Expected build/static/js/main.*.js in the artifact."
+            exit 1
+          fi
+          built="$(basename "${bundles[0]}")"
           host="$(az staticwebapp show -n "$STATIC_WEB_APP" -g "$AZURE_RESOURCE_GROUP" \
             --query defaultHostname -o tsv)"
           echo "expecting $built on https://$host"

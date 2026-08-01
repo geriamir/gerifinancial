@@ -145,6 +145,13 @@ in GitHub. The identity is deliberately narrow - `AcrPush` on the registry and
 Contributor on the two app resources only. It has no access to either vault, so
 it cannot read application secrets.
 
+Permission to mint that token is granted per job, not workflow-wide, and the
+frontend is built in a separate job from the one that deploys it. The jobs that
+run `npm ci` therefore cannot obtain Azure access: the deploy identity can
+replace the running API container, and that container's own identity can unwrap
+stored bank credentials, so a compromised build-time package would otherwise
+have a path to them.
+
 `infra/` is **not** deployed by CI. Bicep carries locks, role assignments and
 vault wiring that should not roll out unreviewed, so a push touching `infra/`
 only raises a warning in the run summary; deploy it by hand as below.
