@@ -13,6 +13,7 @@
 
 | Document | Purpose |
 |---|---|
+| [`DEPLOYMENT.md`](DEPLOYMENT.md) | Deploying to Azure, key vaults and secret rotation |
 | [`DOCKER_MONGODB_SETUP.md`](DOCKER_MONGODB_SETUP.md) | Running MongoDB via Docker |
 | [`QUEUE_SYSTEM_SETUP.md`](QUEUE_SYSTEM_SETUP.md) | BullMQ + Redis scraping queue setup |
 | [`BACKUP_PROCEDURES.md`](BACKUP_PROCEDURES.md) | Database backup and restore |
