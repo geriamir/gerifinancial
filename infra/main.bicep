@@ -21,24 +21,12 @@ param containerImage string
 @description('Administrator user for the Mongo cluster.')
 param mongoAdminUser string = 'gerifinancial'
 
-@description('Administrator password for the Mongo cluster.')
+@description('Administrator password for the Mongo cluster. Needed at deploy time to provision the cluster, so it stays a parameter rather than a vault reference; keep the master copy in the app secrets vault and pass it in from there.')
 @secure()
 param mongoAdminPassword string
 
-@description('Secret used to sign JWTs.')
-@secure()
-param jwtSecret string
-
-@description('Password for the Redis container.')
-@secure()
-param redisPassword string
-
-@description('Client ID of the GitHub OAuth App used for sign-in. Leave empty to deploy with sign-in disabled.')
+@description('Client ID of the GitHub OAuth App used for sign-in. Not a secret, unlike the client secret, which is read from the app secrets vault. Leave empty to deploy with sign-in disabled.')
 param githubOAuthClientId string = ''
-
-@description('Client secret of the GitHub OAuth App used for sign-in.')
-@secure()
-param githubOAuthClientSecret string = ''
 
 @description('Mongo database name.')
 param mongoDatabaseName string = 'gerifinancial'
@@ -47,10 +35,14 @@ var suffix = uniqueString(resourceGroup().id)
 var mongoClusterName = '${namePrefix}-mongo-${suffix}'
 var containerAppName = '${namePrefix}-api'
 var redisAppName = '${namePrefix}-redis'
-// Vault names are globally unique and capped at 24 characters, so the full
-// prefix does not fit.
+// Must match the names vaults.bicep derives from the same resource group.
 var keyVaultName = 'gfkv${suffix}'
+var kekVaultName = 'gfkek${suffix}'
 var credentialKekName = 'credential-kek'
+
+var jwtSecretName = 'jwt-secret'
+var redisPasswordSecretName = 'redis-password'
+var githubOAuthSecretName = 'github-oauth-client-secret'
 
 // The OAuth callback URL has to be registered with GitHub ahead of time, so it
 // cannot be read back off the container app - that would be circular. The
@@ -81,58 +73,46 @@ resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
-// Holds the key encryption key for user bank credentials. Each user has their
-// own data encryption key, stored on their user document in wrapped form only;
-// this vault holds the key that unwraps it, and that key never leaves the vault.
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+// Both vaults are created by vaults.bicep, which must be deployed - and the app
+// secrets vault seeded - before this template runs. See that file for why they
+// are separate and why they cannot be created here.
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
-  location: location
-  properties: {
-    sku: {
-      family: 'A'
-      // Software-protected keys. A Premium SKU would allow HSM-backed keys at
-      // $1/key/month, which is not worth it at this scale.
-      name: 'standard'
-    }
-    tenantId: subscription().tenantId
-    // Access is granted through Azure RBAC rather than legacy access policies.
-    enableRbacAuthorization: true
-    // Soft delete is mandatory. Keep the window short so a redeploy after a
-    // teardown is not blocked by a name still held in the deleted state.
-    enableSoftDelete: true
-    softDeleteRetentionInDays: 7
-    publicNetworkAccess: 'Enabled'
-    networkAcls: {
-      bypass: 'AzureServices'
-      defaultAction: 'Allow'
-    }
-  }
 }
 
-// Key Vault outside a Managed HSM cannot hold AES keys, so the KEK is RSA and
-// data keys are wrapped with RSA-OAEP-256.
-resource credentialKek 'Microsoft.KeyVault/vaults/keys@2023-07-01' = {
-  parent: keyVault
+resource kekVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: kekVaultName
+}
+
+resource credentialKek 'Microsoft.KeyVault/vaults/keys@2023-07-01' existing = {
+  parent: kekVault
   name: credentialKekName
-  properties: {
-    kty: 'RSA'
-    keySize: 2048
-    keyOps: [
-      'wrapKey'
-      'unwrapKey'
-    ]
-  }
 }
 
 // Key Vault Crypto User: wrap and unwrap only. The app cannot read, export,
-// modify or delete the key itself.
+// modify or delete the key itself. Scoped to the KEK vault alone, so it conveys
+// nothing about the configuration secrets next door.
 var keyVaultCryptoUserRoleId = '12338af0-0e69-4776-bea7-57ae8d297424'
 
 resource keyVaultCryptoUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: keyVault
-  name: guid(keyVault.id, identity.id, keyVaultCryptoUserRoleId)
+  scope: kekVault
+  name: guid(kekVault.id, identity.id, keyVaultCryptoUserRoleId)
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultCryptoUserRoleId)
+    principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Key Vault Secrets User: read secret values, nothing else. Scoped to the app
+// secrets vault, so it grants no access to the KEK.
+var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
+
+resource keyVaultSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: keyVault
+  name: guid(keyVault.id, identity.id, keyVaultSecretsUserRoleId)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
     principalId: identity.properties.principalId
     principalType: 'ServicePrincipal'
   }
@@ -205,6 +185,16 @@ resource mongoFirewall 'Microsoft.DocumentDB/mongoClusters/firewallRules@2024-07
 resource redisApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: redisAppName
   location: location
+  // Needed only so the platform can resolve the password out of the vault.
+  identity: {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${identity.id}': {}
+    }
+  }
+  dependsOn: [
+    keyVaultSecretsUser
+  ]
   properties: {
     managedEnvironmentId: containerEnv.id
     configuration: {
@@ -216,8 +206,9 @@ resource redisApp 'Microsoft.App/containerApps@2024-03-01' = {
       }
       secrets: [
         {
-          name: 'redis-password'
-          value: redisPassword
+          name: redisPasswordSecretName
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/${redisPasswordSecretName}'
+          identity: identity.id
         }
       ]
     }
@@ -302,8 +293,11 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     acrPull
     redisApp
     // The app resolves the key on first use, but the role assignment and the
-    // key itself must exist before it starts serving traffic.
+    // key itself must exist before it starts serving traffic. The secrets role
+    // is stricter still: the platform resolves the vault references while the
+    // revision is being created, so it has to be in place first.
     keyVaultCryptoUser
+    keyVaultSecretsUser
     credentialKek
   ]
   properties: {
@@ -323,22 +317,27 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
       ]
       secrets: [
         {
+          // Derived rather than stored: the administrator password is already in
+          // the vault, and composing the URI here stops the two from drifting.
           name: 'mongodb-uri'
           // Built from the @secure() mongoAdminPassword; the linter cannot see through the interpolation.
           #disable-next-line use-secure-value-for-secure-inputs
           value: mongoConnectionString
         }
         {
-          name: 'redis-password'
-          value: redisPassword
+          name: redisPasswordSecretName
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/${redisPasswordSecretName}'
+          identity: identity.id
         }
         {
-          name: 'jwt-secret'
-          value: jwtSecret
+          name: jwtSecretName
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/${jwtSecretName}'
+          identity: identity.id
         }
         {
-          name: 'github-oauth-client-secret'
-          value: githubOAuthClientSecret
+          name: githubOAuthSecretName
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/${githubOAuthSecretName}'
+          identity: identity.id
         }
       ]
     }
@@ -371,7 +370,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'AZURE_KEY_VAULT_URL'
-              value: keyVault.properties.vaultUri
+              value: kekVault.properties.vaultUri
             }
             {
               name: 'AZURE_KEY_VAULT_KEY_NAME'
@@ -460,8 +459,13 @@ output staticWebAppName string = staticWebApp.name
 output staticWebAppUrl string = 'https://${staticWebApp.properties.defaultHostname}'
 output mongoClusterName string = mongoCluster.name
 output redisHostName string = redisAppName
-output keyVaultName string = keyVault.name
-output keyVaultUrl string = keyVault.properties.vaultUri
+@description('Vault holding regenerable configuration secrets. Seed this before deploying: the platform resolves the references while the revision is created.')
+output appSecretsVaultName string = keyVault.name
+output appSecretsVaultUrl string = keyVault.properties.vaultUri
+
+@description('Vault holding the credential key-encryption key. Purge protected and delete locked; never tear this down while any user has stored bank credentials.')
+output kekVaultName string = kekVault.name
+output kekVaultUrl string = kekVault.properties.vaultUri
 
 @description('Register this exact URL as the Authorization callback URL on the GitHub OAuth App.')
 output githubOAuthCallbackUrl string = '${apiPublicUrl}/api/auth/github/callback'
