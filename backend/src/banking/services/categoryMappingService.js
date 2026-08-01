@@ -154,10 +154,14 @@ class CategoryMappingService {
       }
 
       // Try enhanced keyword matching for subcategories (for Expenses)
-      const allSubCategories = await SubCategory.find({}).populate('parentCategory');
+      // Scoped to the transaction's owner. Categories and subcategories are
+      // per-user rows, so an unscoped query lets one user's keywords categorise
+      // another user's transaction into a category that user does not own.
+      const allSubCategories = await SubCategory.find({ userId: transaction.userId }).populate('parentCategory');
       
       // Filter subcategories to match valid category types
       const eligibleSubCategories = allSubCategories.filter(subCat => 
+        subCat.parentCategory &&
         categoryTypes.includes(subCat.parentCategory.type) && 
         subCat.keywords && 
         subCat.keywords.length > 0

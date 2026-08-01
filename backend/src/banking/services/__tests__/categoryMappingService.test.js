@@ -85,6 +85,44 @@ describe('CategoryMappingService', () => {
   });
 
   describe('attemptAutoCategorization', () => {
+    it('should not categorize into another user\'s subcategory', async () => {
+      // Keyword matching used to query every subcategory in the collection, so
+      // one user's keywords could pull another user's transaction into a
+      // category that user does not own - and the foreign id was then persisted
+      // on the transaction.
+      const otherUserId = new mongoose.Types.ObjectId();
+      const otherCategory = await Category.create({
+        name: 'Other User Category',
+        type: TransactionType.EXPENSE,
+        userId: otherUserId
+      });
+      const otherSubCategory = await SubCategory.create({
+        name: 'Other User SubCategory',
+        parentCategory: otherCategory._id,
+        keywords: ['tzatziki'],
+        userId: otherUserId
+      });
+
+      const transaction = await Transaction.create({
+        identifier: 'test-tx-cross-user',
+        description: 'tzatziki',
+        userId: testUserId,
+        accountId: new mongoose.Types.ObjectId(),
+        amount: -20,
+        currency: 'ILS',
+        date: new Date(),
+        type: TransactionType.EXPENSE,
+        rawData: { description: 'tzatziki' }
+      });
+
+      const updated = await categoryMappingService.attemptAutoCategorization(transaction);
+
+      const assignedCategory = updated?.category?._id?.toString() ?? null;
+      const assignedSubCategory = updated?.subCategory?._id?.toString() ?? null;
+      expect(assignedCategory).not.toBe(otherCategory._id.toString());
+      expect(assignedSubCategory).not.toBe(otherSubCategory._id.toString());
+    });
+
     it('should only use expense categories for negative amounts using manual categorization', async () => {
       // Create manual categorization entries for both income and expense
       // Create manual categorization entry with a slightly different description

@@ -14,7 +14,8 @@
     "migrate:add-internal-transfers": "node src/scripts/addInternalTransfersCategory.js",
     "migrate:add-internal-transfers:dry-run": "node src/scripts/addInternalTransfersCategory.js --dry-run",
     "migrate:add-internal-transfers:rollback": "node src/scripts/addInternalTransfersCategory.js --rollback",
-    "migrate:remove-empty-budget-items": "node src/scripts/removeEmptyBudgetItems.js"
+    "migrate:remove-empty-budget-items": "node src/scripts/removeEmptyBudgetItems.js",
+    "eval:categorization": "node src/scripts/evalCategorization.js"
   },
   "jest": {
     "testEnvironment": "node",
@@ -60,6 +61,7 @@
     "mongoose": "^8.16.0",
     "natural": "^6.12.0",
     "node-cron": "^3.0.3",
+    "openai": "^6.49.0",
     "puppeteer": "^24.40.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
