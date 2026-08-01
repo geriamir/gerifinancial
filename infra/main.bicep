@@ -40,6 +40,7 @@ var keyVaultName = 'gfkv${suffix}'
 var kekVaultName = 'gfkek${suffix}'
 var credentialKekName = 'credential-kek'
 
+var mongoUriSecretName = 'mongodb-uri'
 var jwtSecretName = 'jwt-secret'
 var redisPasswordSecretName = 'redis-password'
 var githubOAuthSecretName = 'github-oauth-client-secret'
@@ -58,6 +59,15 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing =
 // Container App is created, which is impossible if the identity is created with it.
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${namePrefix}-identity'
+  location: location
+}
+
+// Redis gets its own identity rather than borrowing the API's. Sharing it would
+// hand the Redis container a token that can wrap and unwrap the credential KEK,
+// which it has no reason to touch, and would undo the role separation the two
+// vaults exist to enforce.
+resource redisIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: '${namePrefix}-redis-identity'
   location: location
 }
 
@@ -114,6 +124,24 @@ resource keyVaultSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
     principalId: identity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Redis needs exactly one secret, so its grant is scoped to that secret rather
+// than to the vault. The API is left at vault scope because it legitimately
+// reads almost everything in there.
+resource redisPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' existing = {
+  parent: keyVault
+  name: redisPasswordSecretName
+}
+
+resource redisSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: redisPasswordSecret
+  name: guid(redisPasswordSecret.id, redisIdentity.id, keyVaultSecretsUserRoleId)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
+    principalId: redisIdentity.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
@@ -189,11 +217,11 @@ resource redisApp 'Microsoft.App/containerApps@2024-03-01' = {
   identity: {
     type: 'UserAssigned'
     userAssignedIdentities: {
-      '${identity.id}': {}
+      '${redisIdentity.id}': {}
     }
   }
   dependsOn: [
-    keyVaultSecretsUser
+    redisSecretsUser
   ]
   properties: {
     managedEnvironmentId: containerEnv.id
@@ -208,7 +236,7 @@ resource redisApp 'Microsoft.App/containerApps@2024-03-01' = {
         {
           name: redisPasswordSecretName
           keyVaultUrl: '${keyVault.properties.vaultUri}secrets/${redisPasswordSecretName}'
-          identity: identity.id
+          identity: redisIdentity.id
         }
       ]
     }
@@ -224,7 +252,7 @@ resource redisApp 'Microsoft.App/containerApps@2024-03-01' = {
           env: [
             {
               name: 'REDIS_PASSWORD'
-              secretRef: 'redis-password'
+              secretRef: redisPasswordSecretName
             }
           ]
           // Run through a shell so the password comes from the environment rather than
@@ -319,7 +347,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         {
           // Derived rather than stored: the administrator password is already in
           // the vault, and composing the URI here stops the two from drifting.
-          name: 'mongodb-uri'
+          name: mongoUriSecretName
           // Built from the @secure() mongoAdminPassword; the linter cannot see through the interpolation.
           #disable-next-line use-secure-value-for-secure-inputs
           value: mongoConnectionString
@@ -362,11 +390,11 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'MONGODB_URI'
-              secretRef: 'mongodb-uri'
+              secretRef: mongoUriSecretName
             }
             {
               name: 'JWT_SECRET'
-              secretRef: 'jwt-secret'
+              secretRef: jwtSecretName
             }
             {
               name: 'AZURE_KEY_VAULT_URL'
@@ -394,7 +422,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'REDIS_PASSWORD'
-              secretRef: 'redis-password'
+              secretRef: redisPasswordSecretName
             }
             {
               name: 'CORS_ORIGIN'
@@ -406,7 +434,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'GITHUB_OAUTH_CLIENT_SECRET'
-              secretRef: 'github-oauth-client-secret'
+              secretRef: githubOAuthSecretName
             }
             {
               // Used to build the OAuth callback URL, which must match the one
