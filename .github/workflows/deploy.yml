@@ -1,0 +1,231 @@
+name: Deploy
+
+# The frontend and the backend are deployed from the same place because they
+# have to move together: the OAuth migration shipped an API that no longer
+# accepted passwords while the Static Web App kept serving a build whose only
+# login form asked for one, and nothing noticed until someone tried to sign in.
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Deploys mutate shared infrastructure, so let an in-flight one finish rather
+# than racing it. Cancelling midway could leave the image pushed but the app
+# still on the old revision.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AZURE_RESOURCE_GROUP: rg-gerifinancial
+  REGISTRY: gerifinanciall2sld6nmx2xxq
+  CONTAINER_APP: gerifinancial-api
+  STATIC_WEB_APP: gerifinancial-web
+  API_URL: https://gerifinancial-api.livelymushroom-c563c2a6.northeurope.azurecontainerapps.io
+
+jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      infra: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Work out what changed
+        id: filter
+        run: |
+          set -euo pipefail
+
+          emit() {
+            echo "backend=$1" >> "$GITHUB_OUTPUT"
+            echo "frontend=$2" >> "$GITHUB_OUTPUT"
+            echo "infra=$3" >> "$GITHUB_OUTPUT"
+          }
+
+          # A manual run is a deliberate "redeploy everything", usually because
+          # someone is recovering from a failed or skipped deploy.
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "Manual run: deploying both."
+            emit true true false
+            exit 0
+          fi
+
+          before="${{ github.event.before }}"
+          # A new branch or a force push leaves no usable base commit. Deploying
+          # everything is the safe answer: the alternative is skipping a deploy
+          # that was needed.
+          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "${before}^{commit}" 2>/dev/null; then
+            echo "No usable base commit: deploying both."
+            emit true true false
+            exit 0
+          fi
+
+          changed="$(git diff --name-only "$before" "${{ github.sha }}")"
+          echo "Changed files:"
+          echo "$changed"
+
+          # A here-string rather than a pipe into `grep -q`: grep exits on its
+          # first match, which can leave the writing end of a pipe with SIGPIPE
+          # and make pipefail report a failure for a successful match.
+          contains() { grep -qE "$1" <<< "$changed"; }
+
+          backend=false
+          frontend=false
+          infra=false
+          if contains '^(backend/|\.github/workflows/deploy\.yml$)'; then backend=true; fi
+          if contains '^(frontend/|\.github/workflows/deploy\.yml$)'; then frontend=true; fi
+          if contains '^infra/'; then infra=true; fi
+
+          echo "backend=$backend frontend=$frontend infra=$infra"
+          emit "$backend" "$frontend" "$infra"
+
+  deploy-api:
+    name: Deploy API
+    needs: [ test, changes ]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push image
+        id: image
+        run: |
+          set -euo pipefail
+          tag="$(date -u +%Y%m%d-%H%M%S)-${GITHUB_SHA::7}"
+          image="${REGISTRY}.azurecr.io/gerifinancial-api:${tag}"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+          # Built on the runner rather than with `az acr build`: a server-side
+          # build needs registry Contributor, while pushing needs only AcrPush.
+          az acr login -n "$REGISTRY"
+          docker build -f backend/Dockerfile -t "$image" .
+          docker push "$image"
+
+      - name: Roll out new revision
+        run: |
+          set -euo pipefail
+          az config set extension.use_dynamic_install=yes_without_prompt --only-show-errors
+          az extension add --name containerapp --upgrade --only-show-errors
+          az containerapp update \
+            -n "$CONTAINER_APP" -g "$AZURE_RESOURCE_GROUP" \
+            --image "${{ steps.image.outputs.image }}" \
+            --only-show-errors --output none
+          az containerapp revision list -n "$CONTAINER_APP" -g "$AZURE_RESOURCE_GROUP" \
+            --query "[?properties.active].{revision:name,healthy:properties.healthState,created:properties.createdTime}" \
+            -o table
+
+      - name: Verify the API is serving
+        run: |
+          set -uo pipefail
+          # The image reference only proves the revision was accepted. This
+          # proves the container actually came up and reached its dependencies.
+          for attempt in $(seq 1 30); do
+            body="$(curl -fsS --max-time 10 "$API_URL/health" || true)"
+            echo "attempt $attempt: ${body:-<no response>}"
+            if [ -n "$body" ] && jq -e '.status == "ok"' >/dev/null 2>&1 <<< "$body"; then
+              echo "API healthy."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error title=API unhealthy::/health did not report ok after the rollout."
+          exit 1
+
+  deploy-frontend:
+    name: Deploy frontend
+    needs: [ test, changes ]
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: cd frontend && npm ci
+
+      - name: Build
+        run: cd frontend && npm run build
+        env:
+          CI: true
+          # Baked in at build time: a React build has no server side to read it
+          # from later, so a wrong value here ships a frontend that talks to
+          # nothing.
+          REACT_APP_API_URL: ${{ env.API_URL }}
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Static Web Apps
+        run: |
+          set -euo pipefail
+          # Fetched per run rather than stored as a repository secret: the
+          # deployment token is long lived and rotating it would otherwise mean
+          # remembering to update GitHub too.
+          token="$(az staticwebapp secrets list -n "$STATIC_WEB_APP" -g "$AZURE_RESOURCE_GROUP" \
+            --query properties.apiKey -o tsv)"
+          echo "::add-mask::$token"
+          npx --yes @azure/static-web-apps-cli deploy frontend/build \
+            --env production --deployment-token "$token"
+
+      - name: Verify the new bundle is being served
+        run: |
+          set -uo pipefail
+          # Guards against the failure this workflow exists to prevent: a deploy
+          # that reports success while the CDN keeps serving the previous build.
+          built="$(basename "$(ls frontend/build/static/js/main.*.js | head -1)")"
+          host="$(az staticwebapp show -n "$STATIC_WEB_APP" -g "$AZURE_RESOURCE_GROUP" \
+            --query defaultHostname -o tsv)"
+          echo "expecting $built on https://$host"
+
+          for attempt in $(seq 1 20); do
+            served="$(curl -fsS --max-time 10 "https://$host" \
+              | grep -oE 'main\.[a-f0-9]+\.js' | head -1 || true)"
+            echo "attempt $attempt: serving ${served:-<none>}"
+            if [ "$served" = "$built" ]; then
+              echo "Frontend is serving the build from this commit."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error title=Stale frontend::The site is not serving $built."
+          exit 1
+
+  infra-notice:
+    name: Infrastructure changed
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Warn that Bicep is not deployed automatically
+        run: |
+          echo "::warning title=Infrastructure not deployed::infra/ changed in this push. \
+          Bicep is deployed by hand on purpose - it holds secrets, locks and role assignments \
+          that should not roll out unreviewed. Follow docs/DEPLOYMENT.md."

@@ -132,7 +132,24 @@ az keyvault secret set --vault-name gfkvl2sld6nmx2xxq \
 Sign-in stays disabled if either value is missing, so deploying without them is
 safe.
 
-## Deploying the backend
+## Deploying
+
+Pushes to `main` deploy themselves. `.github/workflows/deploy.yml` runs the unit
+test suite, then rebuilds and releases whichever of the two apps changed, and
+fails if the result is not actually being served. The sections below are the
+manual fallback, for a first-time environment or a broken pipeline.
+
+The workflow authenticates with a federated credential on the
+`gerifinancial-deploy` user-assigned identity, so no Azure credential is stored
+in GitHub. The identity is deliberately narrow - `AcrPush` on the registry and
+Contributor on the two app resources only. It has no access to either vault, so
+it cannot read application secrets.
+
+`infra/` is **not** deployed by CI. Bicep carries locks, role assignments and
+vault wiring that should not roll out unreviewed, so a push touching `infra/`
+only raises a warning in the run summary; deploy it by hand as below.
+
+### Deploying the backend by hand
 
 ```bash
 TAG="api-$(date +%Y%m%d-%H%M%S)"
@@ -156,10 +173,19 @@ az deployment group create -g rg-gerifinancial -n main -f infra/main.bicep \
 
 The build runs in ACR, so Docker is not needed locally.
 
-## Deploying the frontend
+`containerImage` has no default, and CI moves the image on without touching the
+template. When running Bicep for an unrelated infrastructure change, pass the
+tag that is **currently live** or the deploy will quietly roll the API back:
 
-The Static Web App is deployed with the SWA CLI, not from a GitHub workflow.
-The API URL is baked in at build time:
+```bash
+az containerapp show -n gerifinancial-api -g rg-gerifinancial \
+  --query "properties.template.containers[0].image" -o tsv
+```
+
+### Deploying the frontend by hand
+
+The Static Web App is deployed with the SWA CLI. The API URL is baked in at
+build time - a React build has no server side to read it from later:
 
 ```bash
 cd frontend
@@ -169,6 +195,17 @@ REACT_APP_API_URL=https://gerifinancial-api.livelymushroom-c563c2a6.northeurope.
 npx swa deploy build --env production \
   --deployment-token "$(az staticwebapp secrets list -n gerifinancial-web \
     -g rg-gerifinancial --query properties.apiKey -o tsv)"
+```
+
+Confirm the site is serving the build you just made rather than a cached one -
+deploying the API without the frontend once left production unable to sign in
+at all, because the served bundle still asked for a password the API had
+stopped accepting:
+
+```bash
+ls build/static/js/main.*.js                      # what you built
+curl -s https://witty-glacier-04eac040f.7.azurestaticapps.net \
+  | grep -o 'main\.[a-f0-9]*\.js'                 # what is served
 ```
 
 ## Verifying a deployment
