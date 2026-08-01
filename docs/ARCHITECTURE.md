@@ -203,6 +203,11 @@ without knowing about HTTP.
 The browser connects once to `GET /api/events` and receives scraping progress,
 completion and error notifications live.
 
+`EventSource` cannot set an `Authorization` header, so the stream authenticates
+with the same httpOnly session cookie as every other route — the client opts in
+with `withCredentials`, which is why the API must return an explicit
+`Access-Control-Allow-Origin` rather than a wildcard.
+
 ### `distributedLock`
 
 Redis-backed mutual exclusion, so a scheduled job cannot run twice concurrently

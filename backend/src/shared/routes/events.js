@@ -5,30 +5,19 @@ const sseService = require('../services/sseService');
 const logger = require('../utils/logger');
 
 /**
- * Custom middleware to handle auth for SSE (supports query param token)
- * SSE connections can't set custom headers, so we allow token in query string
- */
-const sseAuth = (req, res, next) => {
-  // Try to get token from query parameter first (for SSE EventSource)
-  const queryToken = req.query.token;
-  
-  if (queryToken) {
-    // Set it in the header so the auth middleware can pick it up
-    req.headers.authorization = `Bearer ${queryToken}`;
-  }
-  
-  // Now call the regular auth middleware
-  auth(req, res, next);
-};
-
-/**
  * SSE endpoint for real-time event streaming
  * GET /api/events
  * 
  * Establishes a Server-Sent Events connection for the authenticated user
  * Events are pushed from the server as they occur
+ *
+ * EventSource cannot set an Authorization header, which previously forced the
+ * token into the query string where it leaks into access logs and Referer
+ * headers. The session is now an httpOnly cookie that the browser attaches by
+ * itself once the client opts in with withCredentials, so the ordinary auth
+ * middleware is sufficient.
  */
-router.get('/', sseAuth, (req, res) => {
+router.get('/', auth, (req, res) => {
   try {
     // Auth middleware sets req.user to the full User document
     const userId = req.user._id || req.user.userId;

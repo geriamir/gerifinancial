@@ -68,13 +68,6 @@ export const useSSE = (
    * Connect to SSE endpoint
    */
   const connect = useCallback(() => {
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      console.warn('[SSE] No auth token, skipping connection');
-      return;
-    }
-
     if (eventSourceRef.current) {
       console.log('[SSE] Already connected');
       return;
@@ -84,9 +77,12 @@ export const useSSE = (
       console.log('[SSE] Connecting to event stream...');
       
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-      const url = `${apiUrl}/api/events?token=${token}`;
+      const url = `${apiUrl}/api/events`;
       
-      const eventSource = new EventSource(url);
+      // The session lives in an httpOnly cookie that JavaScript cannot read, so
+      // the token cannot be put in the query string. withCredentials makes the
+      // browser attach the cookie to this cross-origin stream instead.
+      const eventSource = new EventSource(url, { withCredentials: true });
       eventSourceRef.current = eventSource;
 
       // Connection opened

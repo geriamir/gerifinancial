@@ -48,15 +48,20 @@ function setOAuthClient(client) {
 }
 
 function issueSession(res, user) {
+  // The token and the cookie carrying it must expire together. Deriving maxAge
+  // from the signed exp claim rather than from a second config value means the
+  // two cannot drift apart: a cookie that outlives its token would leave the
+  // browser looking signed in while every request came back 401.
   const token = jwt.sign({ userId: user._id }, config.jwtSecret, {
-    expiresIn: config.jwtExpiration
+    expiresIn: config.github.sessionTtlSeconds
   });
+  const { exp } = jwt.decode(token);
 
   res.cookie(config.session.cookieName, token, {
     httpOnly: true,
     secure: config.session.secure,
     sameSite: config.session.crossSite ? 'none' : 'lax',
-    maxAge: config.github.sessionTtlSeconds * 1000,
+    maxAge: exp * 1000 - Date.now(),
     path: '/'
   });
 
@@ -146,7 +151,12 @@ router.get('/github/callback', async (req, res) => {
     // The user declined authorisation. That is a normal outcome, so send them
     // back to the app rather than showing them a JSON error.
     logger.info(`GitHub callback returned an error: ${req.query.error}`);
-    return res.redirect(`${returnTo}${returnTo.includes('?') ? '&' : '?'}auth_error=access_denied`);
+    // Built through URL rather than concatenated: returnTo may already carry a
+    // query string or a fragment, and appending after a fragment would produce
+    // a parameter the browser never parses.
+    const target = new URL(returnTo);
+    target.searchParams.set('auth_error', 'access_denied');
+    return res.redirect(target.toString());
   }
 
   if (!req.query.code) {

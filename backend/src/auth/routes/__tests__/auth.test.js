@@ -1,4 +1,5 @@
 const request = require('supertest');
+const jwt = require('jsonwebtoken');
 const { createTestUser } = require('../../../test/testUtils');
 const app = require('../../../app');
 const { User } = require('../../models');
@@ -225,6 +226,24 @@ describe('Auth Routes', () => {
       if (cookie.includes('SameSite=None')) {
         expect(cookie).toContain('Secure');
       }
+    });
+
+    // A cookie that outlives the token it carries leaves the browser looking
+    // signed in while every request comes back 401, so the two lifetimes are
+    // pinned to each other rather than to two independent config values.
+    it('expires the cookie at the same moment as the token it carries', async () => {
+      const state = signOAuthState({ returnTo: 'http://localhost:3000/' }, config.jwtSecret);
+      const response = await request(app)
+        .get('/api/auth/github/callback')
+        .query({ code: 'good-code', state });
+
+      const cookie = sessionCookieFrom(response);
+      const token = cookie.split(';')[0].split('=')[1];
+      const maxAge = Number(/Max-Age=(\d+)/i.exec(cookie)[1]);
+      const { exp, iat } = jwt.decode(token);
+
+      expect(exp - iat).toBe(config.github.sessionTtlSeconds);
+      expect(Math.abs(maxAge - (exp - iat))).toBeLessThanOrEqual(1);
     });
   });
 
