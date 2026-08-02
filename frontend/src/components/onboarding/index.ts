@@ -1,11 +1,5 @@
-// Export all onboarding components for easy importing
-export { OnboardingWizard } from './OnboardingWizard';
-export { CheckingAccountSetup } from './CheckingAccountSetup';
-export { default as TransactionImport } from './TransactionImport';
-export { CreditCardDetection } from './CreditCardDetection';
-export { CreditCardSetup } from './CreditCardSetup';
-export { CreditCardVerification } from './CreditCardVerification';
-export { OnboardingComplete } from './OnboardingComplete';
-
-// Export types
-export type { OnboardingStepProps } from './OnboardingWizard';
+// Onboarding is a scripted conversation. There is no wizard behind it any more:
+// the server owns the state machine, and this renders it as chat.
+export { OnboardingChat } from './chat';
+export { buildScript } from './chat';
+export type { ChatMessage, CardId, Script, ChatHandlers, CardProps } from './chat';
