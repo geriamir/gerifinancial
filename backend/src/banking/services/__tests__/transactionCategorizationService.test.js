@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const transactionCategorizationService = require('../transactionCategorizationService');
 const categoryMappingService = require('../categoryMappingService');
 const transactionClassifier = require('../transactionClassifier');
+const llmCategorizer = require('../llmCategorizer');
 const scrapingQueue = require('../../../shared/services/scrapingQueue');
 const sseService = require('../../../shared/services/sseService');
 const { Transaction, Category } = require('../../models');
@@ -78,6 +79,94 @@ describe('transactionCategorizationService', () => {
       });
 
       expect(forUser).toHaveBeenCalledTimes(1);
+    });
+
+    // The point of the two passes: the category list is nearly the whole prompt
+    // and is the same for every transaction, so it is sent once rather than once
+    // per transaction that the cheap tiers could not place.
+    describe('asking the model about the whole batch at once', () => {
+      const seedCatalogue = async () => {
+        const catalogue = await llmCategorizer.forUser(user._id);
+        jest.spyOn(llmCategorizer, 'forUser').mockResolvedValue(catalogue);
+        return catalogue;
+      };
+
+      beforeEach(() => {
+        jest.spyOn(transactionClassifier, 'forUser').mockResolvedValue(null);
+      });
+
+      it('collects everything the cheap tiers declined into one prefetch', async () => {
+        const catalogue = await seedCatalogue();
+        const prefetch = jest.spyOn(llmCategorizer, 'prefetch').mockResolvedValue(undefined);
+        const transactions = await Promise.all([
+          makeTransaction('שופרסל'), makeTransaction('ארומה'), makeTransaction('דלק')
+        ]);
+
+        await transactionCategorizationService.processBatch({
+          userId: user._id,
+          transactionIds: transactions.map((t) => t._id)
+        });
+
+        expect(prefetch).toHaveBeenCalledTimes(1);
+        expect(prefetch).toHaveBeenCalledWith(catalogue, expect.arrayContaining([
+          expect.objectContaining({ description: 'שופרסל' }),
+          expect.objectContaining({ description: 'ארומה' }),
+          expect.objectContaining({ description: 'דלק' })
+        ]));
+      });
+
+      it('does not prefetch when every transaction was already placed', async () => {
+        await seedCatalogue();
+        const prefetch = jest.spyOn(llmCategorizer, 'prefetch').mockResolvedValue(undefined);
+        jest.spyOn(categoryMappingService, 'attemptAutoCategorization')
+          .mockResolvedValue({ category: category._id });
+        const transaction = await makeTransaction();
+
+        await transactionCategorizationService.processBatch({
+          userId: user._id,
+          transactionIds: [transaction._id]
+        });
+
+        expect(prefetch).not.toHaveBeenCalled();
+      });
+
+      it('still counts every transaction once across both passes', async () => {
+        await seedCatalogue();
+        jest.spyOn(llmCategorizer, 'prefetch').mockResolvedValue(undefined);
+        const [placed, deferred] = await Promise.all([makeTransaction(), makeTransaction()]);
+        jest.spyOn(categoryMappingService, 'attemptAutoCategorization')
+          .mockResolvedValueOnce({ category: category._id })
+          .mockResolvedValueOnce(categoryMappingService.DEFERRED);
+        jest.spyOn(categoryMappingService, 'finishDeferred').mockResolvedValue(undefined);
+
+        const results = await transactionCategorizationService.processBatch({
+          userId: user._id,
+          transactionIds: [placed._id, deferred._id]
+        });
+
+        expect(results).toEqual({ categorized: 1, uncategorized: 1, failed: 0 });
+      });
+
+      // A deferred transaction is not finished, and reporting it as processed
+      // would mean a progress total that later has to move backwards.
+      it('reports a batch as complete only once the deferred pass has run', async () => {
+        await seedCatalogue();
+        jest.spyOn(llmCategorizer, 'prefetch').mockResolvedValue(undefined);
+        jest.spyOn(categoryMappingService, 'finishDeferred').mockResolvedValue(undefined);
+        const emit = jest.spyOn(sseService, 'emit').mockImplementation(() => {});
+        const transactions = await Promise.all([makeTransaction(), makeTransaction()]);
+
+        await transactionCategorizationService.processBatch({
+          userId: user._id,
+          transactionIds: transactions.map((t) => t._id)
+        });
+
+        const progress = emit.mock.calls.filter(([, event]) => event === 'categorization:progress');
+        expect(progress.at(-1)[2]).toMatchObject({ processed: 2, total: 2 });
+        // Monotonic: nothing is ever counted and then uncounted.
+        const counts = progress.map(([, , payload]) => payload.processed);
+        expect(counts).toEqual([...counts].sort((a, b) => a - b));
+      });
     });
 
     it('counts what it categorized and what it left alone', async () => {

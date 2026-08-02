@@ -235,7 +235,7 @@ async function seedCorpus({ userId, cases }) {
   return seeded;
 }
 
-async function scoreCase({ testCase, userId, accountId, index, corpus, catalogue }) {
+async function runCase({ testCase, userId, accountId, index, corpus, catalogue }) {
   const { Transaction } = require('../banking/models');
   const categoryMappingService = require('../banking/services/categoryMappingService');
 
@@ -253,8 +253,19 @@ async function scoreCase({ testCase, userId, accountId, index, corpus, catalogue
   await transaction.save();
 
   const startedAt = Date.now();
-  await categoryMappingService.attemptAutoCategorization(transaction, { corpus, catalogue });
-  const elapsedMs = Date.now() - startedAt;
+  const outcome = await categoryMappingService.attemptAutoCategorization(
+    transaction, { corpus, catalogue, deferModel: true }
+  );
+  return {
+    testCase,
+    transaction,
+    elapsedMs: Date.now() - startedAt,
+    deferred: outcome === categoryMappingService.DEFERRED
+  };
+}
+
+async function judgeCase({ testCase, transaction, elapsedMs }) {
+  const { Transaction } = require('../banking/models');
 
   const populated = await Transaction.findById(transaction._id)
     .populate('category', 'name')
@@ -325,6 +336,10 @@ function report(summary, results) {
   say(`category-only accuracy  ${summary.categoryAccuracyPct}%`);
   say(`precision when answered ${summary.precisionWhenAnsweredPct}%`);
   say(`mean latency            ${summary.meanMs} ms/transaction`);
+  say(`wall clock              ${summary.wallMs} ms for the whole run`);
+  if (summary.deferredCount > 0) {
+    say(`model batch             ${summary.deferredCount} transactions in ${summary.prefetchMs} ms`);
+  }
   say('');
   say('by tier that answered');
   for (const [method, stats] of Object.entries(summary.byMethod)) {
@@ -379,12 +394,42 @@ async function main() {
     const llmCategorizer = require('../banking/services/llmCategorizer');
     const catalogue = await llmCategorizer.forUser(userId);
     if (catalogue) say(`Model fallback is on, choosing from ${catalogue.size} categories`);
-    const results = [];
+    const categoryMappingService = require('../banking/services/categoryMappingService');
+
+    // Two passes, exactly as the batch worker runs them: everything the cheap
+    // tiers decline is collected and asked in as few model calls as possible,
+    // so the timings here reflect what a real backfill costs.
+    const wallStartedAt = Date.now();
+    const running = [];
     for (let i = 0; i < cases.length; i += 1) {
-      results.push(await scoreCase({ testCase: cases[i], userId, accountId, index: i, corpus, catalogue }));
+      running.push(await runCase({ testCase: cases[i], userId, accountId, index: i, corpus, catalogue }));
     }
 
-    const summary = summarise(results);
+    const deferred = running.filter((entry) => entry.deferred);
+    let prefetchMs = 0;
+    if (catalogue && deferred.length > 0) {
+      const prefetchStartedAt = Date.now();
+      await llmCategorizer.prefetch(catalogue, deferred.map((entry) => ({
+        description: entry.transaction.description,
+        memo: entry.transaction.memo,
+        amount: entry.transaction.amount,
+        categoryTypes: categoryMappingService.deriveCategoryTypes(entry.transaction)
+      })));
+      prefetchMs = Date.now() - prefetchStartedAt;
+      say(`Asked the model about ${deferred.length} transactions in ${prefetchMs} ms`);
+    }
+
+    for (const entry of deferred) {
+      const startedAt = Date.now();
+      await categoryMappingService.finishDeferred(entry.transaction, catalogue);
+      entry.elapsedMs += Date.now() - startedAt;
+    }
+    const wallMs = Date.now() - wallStartedAt;
+
+    const results = [];
+    for (const entry of running) results.push(await judgeCase(entry));
+
+    const summary = { ...summarise(results), wallMs, prefetchMs, deferredCount: deferred.length };
 
     if (args.json) {
       process.stdout.write(`${JSON.stringify({ summary, results }, null, 2)}\n`);

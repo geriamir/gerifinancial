@@ -112,8 +112,16 @@ const config = {
       // itself is hedging.
       minConfidence: numberFromEnv(process.env.AI_LLM_MIN_CONFIDENCE, 0.7),
       // The reply is a single small JSON object. Capping it keeps a model that
-      // decides to explain itself from being charged for the essay.
-      maxTokens: Number(process.env.AI_LLM_MAX_COMPLETION_TOKENS) || 300
+      // decides to explain itself from being charged for the essay. This is the
+      // allowance per transaction; a batched call is given it once per item,
+      // because a truncated reply loses the whole batch rather than one answer.
+      maxTokens: Number(process.env.AI_LLM_MAX_COMPLETION_TOKENS) || 300,
+      // How many fall-through transactions to put in one request. The category
+      // list is by far the largest part of the prompt and is identical for every
+      // transaction in a group, so asking about ten at once sends it once
+      // instead of ten times. Measured at ~730 input tokens per single call
+      // against ~940 for a batch of ten. Set to 1 to go back to one call each.
+      batchSize: Number(process.env.AI_LLM_BATCH_SIZE) || 10
     }
   }
 };

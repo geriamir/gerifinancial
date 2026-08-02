@@ -5,7 +5,86 @@ const { enhancedKeywordMatcher } = require('./enhanced-keyword-matching');
 const { CategorizationMethod, TransactionType } = require('../constants/enums');
 const logger = require('../../shared/utils/logger');
 
+/**
+ * Returned instead of a result when a caller asked for the model tier to be
+ * deferred and every cheaper tier declined. It means "not finished yet", which
+ * is deliberately distinct from the undefined that means "finished, uncategorised" -
+ * a deferred transaction must not have a default type written to it, because the
+ * model tier may still choose a category whose type disagrees.
+ */
+const DEFERRED = Object.freeze({ deferred: true });
+
 class CategoryMappingService {
+  /**
+   * The category types a transaction may be given.
+   *
+   * Transfer is offered whatever the amount, because the sign of a transaction
+   * tells you its direction and not its kind: money leaving an account is a
+   * transfer out as readily as an expense. Every tier resolves against this same
+   * list, so none of them can reach a category the others could not.
+   */
+  deriveCategoryTypes(transaction) {
+    if (transaction.type) return [transaction.type];
+    return [
+      TransactionType.TRANSFER,
+      transaction.amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME
+    ];
+  }
+
+  /**
+   * Writes a suggestion onto a transaction, whichever tier produced it.
+   */
+  async applySuggestion(transaction, suggestion, method = CategorizationMethod.AI) {
+    await transaction.categorize(
+      suggestion.categoryId,
+      suggestion.subCategoryId,
+      method,
+      suggestion.reasoning
+    );
+
+    if (!transaction.type) {
+      transaction.type = suggestion.categoryType;
+      await transaction.save();
+    }
+
+    return await Transaction.findById(transaction._id)
+      .populate('category')
+      .populate('subCategory');
+  }
+
+  /**
+   * Nothing placed it, so record what its amount implies and leave it for the user.
+   */
+  async applyDefaultType(transaction) {
+    if (!transaction.type) {
+      transaction.type = transaction.amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME;
+      await transaction.save();
+    }
+  }
+
+  /**
+   * Runs the model tier for a transaction that was deferred, and settles it
+   * either way. After a prefetch the answer is already cached, so this makes no
+   * request at all.
+   */
+  async finishDeferred(transaction, catalogue) {
+    try {
+      const categoryTypes = this.deriveCategoryTypes(transaction);
+      const suggestion = await llmCategorizer.suggestFrom(catalogue, {
+        description: transaction.description,
+        memo: transaction.memo || transaction.rawData?.memo || null,
+        amount: transaction.amount,
+        categoryTypes
+      });
+
+      if (suggestion) return await this.applySuggestion(transaction, suggestion);
+
+      await this.applyDefaultType(transaction);
+    } catch (error) {
+      logger.error('Deferred auto-categorization failed:', error);
+    }
+    return undefined;
+  }
   /**
    * Attempt to automatically categorize a transaction, in descending order of
    * how much the evidence is worth:
@@ -21,8 +100,12 @@ class CategoryMappingService {
    * `corpus` and `catalogue` let a caller working through many transactions load
    * the user's corrections and categories once instead of once per transaction.
    * Omit either and it is loaded on demand.
+   *
+   * `deferModel` stops before tier 4 and returns DEFERRED instead, so a caller
+   * driving many transactions can collect everything the cheap tiers could not
+   * place and ask the model about them together.
    */
-  async attemptAutoCategorization(transaction, { corpus, catalogue } = {}) {
+  async attemptAutoCategorization(transaction, { corpus, catalogue, deferModel = false } = {}) {
     // Skip if already categorized
     // For Expenses: need both category and subcategory
     // For Income/Transfer: only need category (no subcategory)
@@ -36,17 +119,7 @@ class CategoryMappingService {
     }
 
     try {
-      // Determine valid category types
-      let categoryTypes = [];
-      if (transaction.type) {
-        // If transaction already has a type, use it
-        categoryTypes.push(transaction.type);
-      } else {
-        // For transactions without type, consider all types but prefer amount-based logic
-        // Transfer type is allowed regardless of amount
-        categoryTypes.push(TransactionType.TRANSFER);
-        categoryTypes.push(transaction.amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME);
-      }
+      const categoryTypes = this.deriveCategoryTypes(transaction);
 
       // Try to match by manual categorization
       const manualMatches = await ManualCategorized.findMatches(
@@ -279,6 +352,11 @@ class CategoryMappingService {
       // who has never corrected a transaction, which is everyone on their first
       // scrape. It declines far more readily than the tiers above, and costs
       // money when it does not, so it goes last.
+      //
+      // A caller working through a batch stops here instead, so every
+      // transaction that got this far can be asked about in one request.
+      if (deferModel) return DEFERRED;
+
       const activeCatalogue = catalogue !== undefined
         ? catalogue
         : await llmCategorizer.forUser(transaction.userId);
@@ -291,28 +369,10 @@ class CategoryMappingService {
       });
 
       if (llmSuggestion) {
-        await transaction.categorize(
-          llmSuggestion.categoryId,
-          llmSuggestion.subCategoryId,
-          CategorizationMethod.AI,
-          llmSuggestion.reasoning
-        );
-
-        if (!transaction.type) {
-          transaction.type = llmSuggestion.categoryType;
-          await transaction.save();
-        }
-
-        return await Transaction.findById(transaction._id)
-          .populate('category')
-          .populate('subCategory');
+        return await this.applySuggestion(transaction, llmSuggestion);
       }
 
-      // If no categorization was successful and transaction has no type, set default type based on amount
-      if (!transaction.type) {
-        transaction.type = transaction.amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME;
-        await transaction.save();
-      }
+      await this.applyDefaultType(transaction);
     } catch (error) {
       logger.error('Auto-categorization failed:', error);
       return undefined;
@@ -322,3 +382,4 @@ class CategoryMappingService {
 }
 
 module.exports = new CategoryMappingService();
+module.exports.DEFERRED = DEFERRED;
