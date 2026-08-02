@@ -10,6 +10,7 @@ import { BudgetProvider } from './contexts/BudgetContext';
 import { RSUProvider } from './contexts/RSUContext';
 import { InvestmentProvider } from './contexts/InvestmentContext';
 import { ProjectProvider } from './contexts/ProjectContext';
+import { CategorizationProvider } from './contexts/CategorizationContext';
 import LoginForm from './components/auth/LoginForm';
 import AuthLayout from './components/layout/AuthLayout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -55,15 +56,17 @@ const App: React.FC = () => {
               path="/"
               element={
                 <ProtectedRoute>
-                  <BudgetProvider>
-                    <RSUProvider>
-                      <InvestmentProvider>
-                        <ProjectProvider>
-                          <AuthLayout />
-                        </ProjectProvider>
-                      </InvestmentProvider>
-                    </RSUProvider>
-                  </BudgetProvider>
+                  <CategorizationProvider>
+                    <BudgetProvider>
+                      <RSUProvider>
+                        <InvestmentProvider>
+                          <ProjectProvider>
+                            <AuthLayout />
+                          </ProjectProvider>
+                        </InvestmentProvider>
+                      </RSUProvider>
+                    </BudgetProvider>
+                  </CategorizationProvider>
                 </ProtectedRoute>
               }
             >

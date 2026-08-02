@@ -1,6 +1,31 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
+/**
+ * The named events this client subscribes to.
+ *
+ * Not a catalogue of everything the server emits - `connection:established` and
+ * `account:sync-completed` go out on the stream without appearing here, because
+ * nothing in the UI acts on them. What it does mean is that an event outside
+ * this list is discarded by the browser without a trace on either end, since
+ * EventSource only invokes listeners registered for an exact event name and
+ * named events do not fall through to `onmessage`. So a feature that needs to
+ * react to a server event has to add its name here as well as write the handler;
+ * the handler alone will simply never run.
+ */
+export const SSE_EVENT_TYPES = [
+  'connected',
+  'heartbeat',
+  'scraping:started',
+  'scraping:progress',
+  'scraping:completed',
+  'scraping:failed',
+  'onboarding:credit-card-detection',
+  'onboarding:credit-card-matching',
+  'categorization:progress',
+  'categorization:completed'
+] as const;
+
 export interface SSEEvent {
   type: string;
   data: any;
@@ -24,8 +49,19 @@ export interface UseSSEResult {
 /**
  * Generic hook for Server-Sent Events (SSE) connections
  * Provides real-time event streaming from the server
- * 
- * @param onEvent - Callback function called when events are received
+ *
+ * Each call opens its own `EventSource`, so two callers mounted at the same time
+ * mean two connections per tab and the server fanning every event out twice.
+ * That does not happen today - the only two callers are `useOnboarding`, reached
+ * solely from the `/onboarding` route, and `CategorizationProvider`, which wraps
+ * the `/` route; they are sibling routes, so only one is ever mounted. Anything
+ * new that wants events app-wide should subscribe through a provider that
+ * already holds a connection rather than calling this a second time, until the
+ * hook is reworked into a shared multiplexer.
+ *
+ * @param onEvent - Callback function called when events are received. It must be
+ *   referentially stable (`useCallback` with stable deps), because a new
+ *   identity tears the stream down and reopens it.
  * @param options - Configuration options
  * @returns Connection state and control functions
  * 
@@ -136,16 +172,7 @@ export const useSSE = (
 
       // Listen for specific event types
       // The EventSource will automatically call these when events with matching names are received
-      const eventTypes = [
-        'connected',
-        'heartbeat',
-        'scraping:started',
-        'scraping:progress',
-        'scraping:completed',
-        'scraping:failed',
-        'onboarding:credit-card-detection',
-        'onboarding:credit-card-matching'
-      ];
+      const eventTypes = SSE_EVENT_TYPES;
 
       eventTypes.forEach((eventType) => {
         eventSource.addEventListener(eventType, (e: MessageEvent) => {

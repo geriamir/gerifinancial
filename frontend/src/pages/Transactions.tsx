@@ -19,6 +19,7 @@ import FilterPanel from '../components/transactions/FilterPanel';
 import TransactionDetailDialog from '../components/transactions/TransactionDetailDialog';
 import { TransactionFilters } from '../services/api/types';
 import type { Transaction } from '../services/api/types/transactions';
+import { useCategorization } from '../contexts/CategorizationContext';
 
 const defaultFilters: Partial<TransactionFilters> = {
   startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
@@ -44,6 +45,9 @@ const TransactionsPage: React.FC = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  // This view is the list of transactions still waiting for a category, so it
+  // is the one that should visibly shrink while the queue works through them.
+  const { revision } = useCategorization();
 
   // Check if we're showing uncategorized transactions (legacy URL support)
   const isShowingUncategorized = filters.category === 'uncategorized';
@@ -123,7 +127,7 @@ const TransactionsPage: React.FC = () => {
         <TransactionsList 
           filters={filters} 
           onRowClick={handleTransactionClick}
-          refreshTrigger={refreshTrigger}
+          refreshTrigger={refreshTrigger + revision}
         />
 
         {/* Transaction Detail Dialog */}

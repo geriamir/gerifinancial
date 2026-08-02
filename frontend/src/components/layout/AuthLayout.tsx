@@ -20,6 +20,7 @@ import {
   LightMode as LightModeIcon
 } from '@mui/icons-material';
 import { NavigationMenu } from './NavigationMenu';
+import CategorizationStatus from '../transactions/CategorizationStatus';
 import { useAuth } from '../../contexts/AuthContext';
 import { useThemeMode } from '../../contexts/ThemeContext';
 
@@ -146,6 +147,7 @@ const AuthLayout: React.FC = () => {
       </Drawer>
 
       <Container component="main" sx={{ flex: 1, py: 4 }}>
+        <CategorizationStatus />
         <Outlet />
       </Container>
 
