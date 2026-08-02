@@ -3,7 +3,8 @@ const router = express.Router();
 const auth = require('../../shared/middleware/auth');
 const { Category, SubCategory, Transaction, Tag } = require('../models');
 const transactionService = require('../services/transactionService');
-const categoryAIService = require('../services/categoryAIService');
+const transactionClassifier = require('../services/transactionClassifier');
+const logger = require('../../shared/utils/logger');
 const tagService = require('../services/tagService');
 const { findSalaryCategory, adjustForSalaryEarlyPayment } = require('../../monthly-budgets/services/salaryAttributionHelper');
 
@@ -320,7 +321,8 @@ router.delete('/categories/:categoryId', auth, async (req, res) => {
 });
 
 
-// Request AI suggestion for transaction categorization
+// Suggest a category for one transaction, on demand, from the user's own past
+// corrections.
 router.post('/:transactionId/suggest-category', auth, async (req, res) => {
   try {
     const transaction = await Transaction.findOne({
@@ -332,37 +334,11 @@ router.post('/:transactionId/suggest-category', auth, async (req, res) => {
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
-    // Get all categories for the user
-    const availableCategories = await Category.find({ userId: req.user._id })
-      .populate('subCategories')
-      .lean();
-
-    // Get AI suggestion
-    const availableCategoriesMapped = availableCategories.map(cat => ({
-      id: cat._id.toString(),
-      name: cat.name,
-      type: cat.type,
-      subCategories: cat.subCategories.map(sub => ({
-        id: sub._id.toString(),
-        name: sub.name,
-        keywords: sub.keywords || []
-      }))
-    }));
-    
-    console.log('Requesting AI suggestion for:', {
+    const suggestion = await transactionClassifier.suggest({
+      userId: req.user._id,
       description: transaction.description,
-      amount: transaction.amount,
-      categoriesCount: availableCategoriesMapped.length
+      memo: transaction.memo || transaction.rawData?.memo || null
     });
-
-    const suggestion = await categoryAIService.suggestCategory(
-      transaction.description,
-      transaction.amount,
-      availableCategoriesMapped,
-      req.user._id
-    );
-
-    console.log('Received AI suggestion:', suggestion);
 
     res.json({
       suggestion,
@@ -373,7 +349,7 @@ router.post('/:transactionId/suggest-category', auth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error getting AI category suggestion:', error);
+    logger.error('Error getting category suggestion:', error);
     res.status(500).json({ error: 'Failed to get category suggestion' });
   }
 });

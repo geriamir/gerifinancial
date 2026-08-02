@@ -3,7 +3,8 @@ const BankClassificationService = require('./bankClassificationService');
 const { ObjectId } = require('mongodb');
 const bankScraperService = require('./bankScraperService');
 const categoryMappingService = require('./categoryMappingService');
-const { CategorizationMethod, TransactionStatus } = require('../constants/enums');
+const transactionCategorizationService = require('./transactionCategorizationService');
+const { CategorizationMethod, TransactionStatus, TransactionType } = require('../constants/enums');
 const logger = require('../../shared/utils/logger');
 
 const convertToObjectId = (id) => {
@@ -98,6 +99,7 @@ class TransactionService {
     // Check once if this is a credit card provider
     const isCreditCardProvider = BankClassificationService.isCreditCardProvider(bankAccount.bankId);
     const now = new Date();
+    const pendingCategorization = [];
 
     for (const account of scrapedAccounts) {
       let creditCard = null;
@@ -189,9 +191,17 @@ class TransactionService {
           
           results.newTransactions++;
           logger.debug(`Created new transaction: ${savedTx.description}, date: ${savedTx.date}, amount: ${savedTx.amount}, ID: ${savedTx._id}`);
-          
-          // Attempt auto-categorization which will also set the transaction type
-          await categoryMappingService.attemptAutoCategorization(savedTx);
+
+          // Categorisation is queued once the whole batch is in, rather than
+          // done here: it is not needed for the transaction to be saved or
+          // shown, and running it inline made every scrape wait for it.
+          // The type is still set now, because the amount alone decides it and
+          // the UI groups on it immediately.
+          if (!savedTx.type) {
+            savedTx.type = savedTx.amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME;
+            await savedTx.save();
+          }
+          pendingCategorization.push(savedTx._id);
         } catch (error) {
           // Still catch MongoDB unique constraint errors as a fallback
           if (error.code === 11000) {
@@ -219,6 +229,16 @@ class TransactionService {
     }
     
     console.log(`Scraping completed for account ${bankAccount._id}:`, results);
+
+    // Queued after the loop rather than per transaction, so the batch shares one
+    // load of the user's past corrections.
+    if (pendingCategorization.length) {
+      results.categorizationJobId = await transactionCategorizationService.enqueue(
+        bankAccount.userId,
+        pendingCategorization
+      );
+    }
+
     return results;
   }
 

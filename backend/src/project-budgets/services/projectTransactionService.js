@@ -1,7 +1,7 @@
 const { ProjectBudget } = require('../models');
 const { Tag, Transaction, Category, SubCategory } = require('../../banking');
 const { CategorizationMethod } = require('../../banking/constants/enums');
-const categoryAIService = require('../../banking/services/categoryAIService');
+const transactionClassifier = require('../../banking/services/transactionClassifier');
 const { ObjectId } = require('mongodb');
 const logger = require('../../shared/utils/logger');
 
@@ -473,6 +473,14 @@ class ProjectTransactionService {
     const fallback = subCatByName['Travel - Miscellaneous'] || travelSubCategories[0];
     const suggestions = {};
 
+    // Loaded once for the whole batch rather than per transaction, and lazily
+    // so a run resolved entirely by steps 1 and 2 never touches it.
+    let corpusPromise;
+    const loadCorpus = () => {
+      corpusPromise = corpusPromise || transactionClassifier.forUser(convertToObjectId(userId));
+      return corpusPromise;
+    };
+
     for (const txn of transactions) {
       const currentCategoryName = txn.category?.name || '';
       const description = (txn.description || '').toLowerCase();
@@ -511,37 +519,27 @@ class ProjectTransactionService {
       }
       if (matched) continue;
 
-      // 3) Try AI categorization scoped to Travel subcategories
-      const aiCategories = [{
-        id: travelCategory._id.toString(),
-        name: travelCategory.name,
-        type: 'Expense',
-        keywords: [],
-        subCategories: travelSubCategories.map(sc => ({
-          id: sc._id.toString(),
-          name: sc.name,
-          keywords: sc.keywords || []
-        }))
-      }];
-
+      // 3) Work out what the transaction would have been categorised as
+      // day-to-day, from the user's own past corrections, and put that through
+      // the same mapping step 1 uses. Better than asking for a Travel
+      // subcategory directly: the user has corrected everyday categories many
+      // times and Travel ones rarely, so that is where the evidence is.
       try {
-        const aiSuggestion = await categoryAIService.suggestCategory(
-          txn.description,
-          Math.abs(txn.amount),
-          aiCategories,
-          userId.toString(),
-          txn.rawData?.category || '',
-          txn.memo || txn.rawData?.memo || ''
-        );
+        const corpus = await loadCorpus();
+        const suggestion = await transactionClassifier.suggestFrom(corpus, {
+          description: txn.description,
+          memo: txn.memo || txn.rawData?.memo || null
+        });
 
-        if (aiSuggestion.subCategoryId) {
-          const aiSub = travelSubCategories.find(sc => sc._id.toString() === aiSuggestion.subCategoryId);
-          if (aiSub && aiSub.name !== 'Travel - Miscellaneous') {
+        if (suggestion) {
+          const inferred = await Category.findById(suggestion.categoryId).lean();
+          const inferredSubName = VACATION_CATEGORY_MAP[inferred?.name];
+          if (inferredSubName && subCatByName[inferredSubName]) {
             suggestions[txn._id.toString()] = {
               categoryId: travelCategory._id,
               categoryName: travelCategory.name,
-              subCategoryId: aiSub._id,
-              subCategoryName: aiSub.name
+              subCategoryId: subCatByName[inferredSubName]._id,
+              subCategoryName: subCatByName[inferredSubName].name
             };
             continue;
           }

@@ -25,14 +25,23 @@ const MOCK_DIMENSIONS = 8;
  * logic repeatably, without pretending to carry any semantics.
  */
 const fakeEmbedding = (text) => {
-  const digest = crypto.createHash('sha256').update(String(text)).digest();
+  const key = String(text);
+  if (overrides.has(key)) return overrides.get(key);
+  const digest = crypto.createHash('sha256').update(key).digest();
   const raw = Array.from({ length: MOCK_DIMENSIONS }, (_, i) => (digest[i] / 255) * 2 - 1);
   const norm = Math.sqrt(raw.reduce((sum, v) => sum + v * v, 0)) || 1;
   return raw.map((v) => v / norm);
 };
 
+// Hashed vectors are deterministic but carry no meaning, so two descriptions a
+// human would call the same are no closer than two unrelated ones. Tests that
+// need "near" and "far" to mean something register their own vectors here.
+const overrides = new Map();
+
 module.exports = {
   isEnabled: jest.fn(() => enabled),
+
+  isEmbeddingEnabled: jest.fn(() => enabled),
 
   assertEnabled: jest.fn(() => {
     if (!enabled) throw new AiNotConfiguredError();
@@ -74,9 +83,11 @@ module.exports = {
   __setChatResponse: (response) => { chatResponse = response; chatError = null; },
   __setChatError: (error) => { chatError = error; },
   __embeddingFor: fakeEmbedding,
+  __setEmbedding: (text, vector) => { overrides.set(String(text), vector); },
   __reset: () => {
     enabled = false;
     chatResponse = { content: '', finishReason: 'stop' };
     chatError = null;
+    overrides.clear();
   }
 };

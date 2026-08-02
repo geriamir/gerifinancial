@@ -61,14 +61,43 @@ const config = {
     // exceeding this one costs real money, and the paths that will call the
     // model - categorising a scrape, answering questions about transactions -
     // are all loops that a bug could run away with. The cap is per user so one
-    // account cannot spend everyone else's allowance.
-    dailyTokenBudget: Number(process.env.AI_DAILY_TOKEN_BUDGET) || 200000
+    // account cannot spend everyone else's allowance. Read with `??` rather than
+    // `||` so that 0, which switches the ceiling off, is not mistaken for unset
+    // and replaced by the default.
+    dailyTokenBudget: Number(process.env.AI_DAILY_TOKEN_BUDGET ?? 200000),
+    // How a transaction is matched against the user's own past corrections.
+    // Exposed as settings rather than constants so the evaluation script can
+    // sweep them without a code change.
+    knn: {
+      // Cosine similarity below which two descriptions are not considered
+      // related at all.
+      //
+      // Measured against text-embedding-3-small on the fixture set rather than
+      // guessed: the same Israeli merchant written two different ways scores
+      // 0.42-0.53, while merchants belonging to different categories score
+      // 0.17-0.28. This sits in the gap. It is deliberately nearer the noise
+      // than the signal, because the vote below is what rejects a bad match -
+      // this only decides what is allowed to vote at all.
+      minSimilarity: Number(process.env.AI_KNN_MIN_SIMILARITY) || 0.35,
+      // How many neighbours vote.
+      neighbours: Number(process.env.AI_KNN_NEIGHBOURS) || 5,
+      // Share of the vote the winner needs. Below this the neighbours disagree
+      // too much to act on, and staying silent beats being confidently wrong -
+      // a wrong category is worse than none, because the user has to notice it
+      // before they can fix it.
+      minConfidence: Number(process.env.AI_KNN_MIN_CONFIDENCE) || 0.6
+    }
   }
 };
 
 // Every AI feature checks this rather than testing the individual settings, so
 // a half-configured environment behaves the same as an unconfigured one.
 config.ai.enabled = Boolean(config.ai.endpoint && config.ai.chatDeployment);
+
+// Tracked separately because matching transactions needs only embeddings. A
+// deployment serving chat is a different, more expensive thing to provision, and
+// categorisation should not be switched off just because it is absent.
+config.ai.embeddingsEnabled = Boolean(config.ai.endpoint && config.ai.embeddingDeployment);
 
 // The session cookie has to reach the API from the frontend, which is served
 // from a different origin in every deployed environment. SameSite=None is what

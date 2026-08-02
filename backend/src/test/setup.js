@@ -1,6 +1,8 @@
 // Mock services
-jest.mock('../banking/services/categoryAIService', () => require('./mocks/categoryAIService'));
 jest.mock('../banking/services/scrapingSchedulerService', () => require('./mocks/scrapingSchedulerService'));
+// No test should reach Redis, and none should have to wait on work the real
+// system does out of band.
+jest.mock('../shared/services/scrapingQueue', () => require('./mocks/scrapingQueue'));
 // The one seam to a language model, and the budget that meters it. Mocked
 // globally so no test can reach the network, spend money, or depend on an
 // Azure OpenAI deployment existing.

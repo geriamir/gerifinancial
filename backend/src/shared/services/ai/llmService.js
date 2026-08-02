@@ -53,6 +53,13 @@ class LlmService {
     return config.ai.enabled;
   }
 
+  // Separate from isEnabled because matching transactions needs only embeddings.
+  // Requiring a chat deployment for that would switch off categorisation in any
+  // environment provisioned with embeddings alone.
+  isEmbeddingEnabled() {
+    return config.ai.embeddingsEnabled;
+  }
+
   assertEnabled() {
     if (!this.isEnabled()) throw new AiNotConfiguredError();
   }
@@ -64,7 +71,9 @@ class LlmService {
    */
   getClient() {
     if (this.client) return this.client;
-    this.assertEnabled();
+    // Only the endpoint matters here. Which deployments exist is the caller's
+    // concern, and one client serves both chat and embeddings.
+    if (!config.ai.endpoint) throw new AiNotConfiguredError();
 
     const credential = new DefaultAzureCredential({
       // Container Apps uses a user-assigned identity, and DefaultAzureCredential
@@ -181,11 +190,8 @@ class LlmService {
    * many calls with one.
    */
   async embed({ userId, texts, purpose = 'unspecified' }) {
-    this.assertEnabled();
+    if (!this.isEmbeddingEnabled()) throw new AiNotConfiguredError();
     if (!userId) throw new Error('llmService.embed requires a userId to charge the request to');
-    if (!config.ai.embeddingDeployment) {
-      throw new AiNotConfiguredError();
-    }
 
     const input = Array.isArray(texts) ? texts : [texts];
     // Same shape as a real response, so a caller destructuring `dimensions` or

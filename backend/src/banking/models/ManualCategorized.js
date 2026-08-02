@@ -47,6 +47,22 @@ const manualCategorizedSchema = new mongoose.Schema({
   confidence: {
     type: Number,
     default: 1.0
+  },
+  // The description embedded into vector space, so a later transaction can be
+  // matched by meaning rather than by the exact string. Computed lazily the
+  // first time a user's corpus is loaded, not on write, so that correcting a
+  // category never depends on an AI service being reachable.
+  descriptionEmbedding: {
+    type: [Number],
+    default: undefined,
+    select: false
+  },
+  // Which model produced the vector. Embeddings from different models occupy
+  // different spaces and are not comparable, so a model change has to invalidate
+  // these rather than silently return nonsense similarities.
+  embeddingModel: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true

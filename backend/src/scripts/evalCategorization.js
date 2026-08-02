@@ -19,24 +19,26 @@ const config = require('../shared/config');
  *
  * Usage:
  *   npm run eval:categorization
+ *   npm run eval:categorization -- --seed-corpus
  *   npm run eval:categorization -- --from-db --user <userId> [--limit 500]
  *   npm run eval:categorization -- --json
  *
- * Caveat worth knowing before trusting a number from this: the last tier of the
- * cascade calls Google Translate through an unofficial endpoint that rate-limits
- * per source IP. When it is throttling, that tier sleeps 60s and retries three
- * times *per transaction* before giving up, so a run can take half an hour and
- * will score those cases as uncategorized. A baseline is only comparable to
- * another run that was not throttled - check the mean latency, which is ~200ms
- * per transaction on a healthy run.
+ * --seed-corpus exists because the last tier learns from the user's own past
+ * corrections, and a fresh fixture run has none - so without it that tier is
+ * measured as if it were switched off. It fabricates a correction per case under
+ * a different string for the same merchant, which is the situation the tier is
+ * built for: the user has categorised this shop before, but never under exactly
+ * this description. It needs a real Azure OpenAI endpoint and is not a substitute
+ * for --from-db against a user's actual corrections.
  */
 
 const parseArgs = (argv) => {
-  const args = { fromDb: false, json: false, limit: 500, user: null };
+  const args = { fromDb: false, json: false, limit: 500, user: null, seedCorpus: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--from-db') args.fromDb = true;
     else if (arg === '--json') args.json = true;
+    else if (arg === '--seed-corpus') args.seedCorpus = true;
     else if (arg === '--limit') args.limit = Number(argv[++i]);
     else if (arg === '--user') args.user = argv[++i];
   }
@@ -174,10 +176,65 @@ const deriveTier = ({ categorizationMethod, categorizationReasoning: why, catego
     return why.includes('Matched subcategory:') ? 'keyword-subcategory' : 'keyword-category';
   }
   if (why.startsWith('AI categorization:')) return 'legacy-ai';
+  if (why.startsWith('Similar to a transaction you categorised before:')) return 'knn';
   return categorizationMethod || 'unknown';
 };
 
-async function scoreCase({ testCase, userId, accountId, index }) {
+/**
+ * Fabricates a plausible past correction for each case.
+ *
+ * The description has to differ from the one being scored, and must not contain
+ * it: the exact-match tier falls back to a substring regex, so a correction that
+ * merely wraps the query would be answered there and the tier under test would
+ * never run. Keeping the merchant and replacing the rest is what a real corpus
+ * looks like - the same shop, a different branch, a different reference number.
+ */
+const perturb = (description, index) => {
+  const tokens = description.trim().split(/\s+/);
+  const branch = ['סניף מרכז', 'סניף צפון', 'תל אביב', 'חיפה'][description.length % 4];
+  // The reference number also keeps two merchants sharing a first word from
+  // colliding on the corpus's unique index.
+  const suffix = `${branch} ${1000 + index}`;
+  if (tokens.length > 1) return `${tokens[0]} ${suffix}`;
+  // A single token cannot be shortened without losing the merchant, so alter it
+  // rather than extend it - extending would leave the query as a substring.
+  return `${tokens[0].slice(0, -1)} ${suffix}`;
+};
+
+async function seedCorpus({ userId, cases }) {
+  const { ManualCategorized, Category, SubCategory } = require('../banking/models');
+  const llmService = require('../shared/services/ai/llmService');
+
+  if (!llmService.isEmbeddingEnabled()) {
+    say('--seed-corpus needs AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_EMBEDDING_DEPLOYMENT; skipping');
+    return 0;
+  }
+
+  let seeded = 0;
+  for (const [index, testCase] of cases.entries()) {
+    const category = await Category.findOne({ userId, name: testCase.expectedCategory });
+    if (!category) continue;
+    const subCategory = testCase.expectedSubCategory
+      ? await SubCategory.findOne({ userId, parentCategory: category._id, name: testCase.expectedSubCategory })
+      : null;
+
+    await ManualCategorized.create({
+      description: perturb(testCase.description, index),
+      userId,
+      category: category._id,
+      subCategory: subCategory?._id || null
+    });
+    seeded += 1;
+  }
+
+  say(`Seeded ${seeded} simulated corrections; embedding them now`);
+  const transactionClassifier = require('../banking/services/transactionClassifier');
+  const corpus = await transactionClassifier.forUser(userId);
+  say(`Corpus holds ${corpus?.size ?? 0} usable vectors`);
+  return seeded;
+}
+
+async function scoreCase({ testCase, userId, accountId, index, corpus }) {
   const { Transaction } = require('../banking/models');
   const categoryMappingService = require('../banking/services/categoryMappingService');
 
@@ -195,7 +252,7 @@ async function scoreCase({ testCase, userId, accountId, index }) {
   await transaction.save();
 
   const startedAt = Date.now();
-  await categoryMappingService.attemptAutoCategorization(transaction);
+  await categoryMappingService.attemptAutoCategorization(transaction, { corpus });
   const elapsedMs = Date.now() - startedAt;
 
   const populated = await Transaction.findById(transaction._id)
@@ -309,10 +366,18 @@ async function main() {
 
     say(`Scoring ${cases.length} labelled transactions...`);
 
+    if (args.seedCorpus) {
+      await seedCorpus({ userId, cases });
+    }
+
     const accountId = new mongoose.Types.ObjectId();
+    // Loaded once, as the batch worker does, so the timings reflect production
+    // rather than a corpus reload per transaction.
+    const transactionClassifier = require('../banking/services/transactionClassifier');
+    const corpus = await transactionClassifier.forUser(userId);
     const results = [];
     for (let i = 0; i < cases.length; i += 1) {
-      results.push(await scoreCase({ testCase: cases[i], userId, accountId, index: i }));
+      results.push(await scoreCase({ testCase: cases[i], userId, accountId, index: i, corpus }));
     }
 
     const summary = summarise(results);

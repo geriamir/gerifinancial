@@ -19,12 +19,14 @@ describe('llmService', () => {
     config.ai.chatDeployment = 'gpt-5-mini';
     config.ai.embeddingDeployment = 'text-embedding-3-small';
     config.ai.enabled = true;
+    config.ai.embeddingsEnabled = true;
   };
 
   const disable = () => {
     config.ai.endpoint = undefined;
     config.ai.chatDeployment = undefined;
     config.ai.enabled = false;
+    config.ai.embeddingsEnabled = false;
   };
 
   describe('when nothing is configured', () => {
