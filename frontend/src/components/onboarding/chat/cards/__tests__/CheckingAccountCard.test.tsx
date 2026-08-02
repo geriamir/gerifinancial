@@ -16,7 +16,7 @@ const handlers: ChatHandlers = {
 const openBankList = () => {
   render(<CheckingAccountCard status={{} as OnboardingStatus} handlers={handlers} />);
   fireEvent.mouseDown(screen.getByRole('combobox'));
-  return within(screen.getByRole('listbox'));
+  return screen.getByRole('listbox');
 };
 
 describe('CheckingAccountCard bank selection', () => {
@@ -24,7 +24,7 @@ describe('CheckingAccountCard bank selection', () => {
     const list = openBankList();
 
     for (const bank of CHECKING_ACCOUNT_BANKS) {
-      expect(list.getByTestId(`bank-icon-${bank.id}`)).toHaveTextContent(bank.monogram);
+      expect(within(list).getByTestId(`bank-icon-${bank.id}`)).toHaveTextContent(bank.monogram);
     }
   });
 
@@ -32,7 +32,7 @@ describe('CheckingAccountCard bank selection', () => {
     const list = openBankList();
 
     for (const bank of CHECKING_ACCOUNT_BANKS) {
-      expect(list.getByText(bank.name)).toBeInTheDocument();
+      expect(within(list).getByText(bank.name)).toBeInTheDocument();
     }
   });
 
@@ -41,7 +41,7 @@ describe('CheckingAccountCard bank selection', () => {
   it('keeps the icon visible once a bank is chosen', () => {
     const list = openBankList();
 
-    fireEvent.click(list.getByText('Bank Leumi'));
+    fireEvent.click(within(list).getByText('Bank Leumi'));
 
     expect(within(screen.getByRole('combobox')).getByTestId('bank-icon-leumi')).toBeInTheDocument();
   });

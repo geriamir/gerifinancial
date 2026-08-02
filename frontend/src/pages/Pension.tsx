@@ -282,13 +282,16 @@ const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose, onSyncComplete }
     setBankAccountId('');
 
     import('../services/api/bank').then(({ bankAccountsApi }) => {
-      bankAccountsApi.getAll().then((accounts: any[]) => {
-        const otp = accounts.filter((a: any) =>
-          isOtpBank(a.bankId) && a.status === 'active'
-        );
+      // Left to infer BankAccount[] rather than annotated `any[]`: the previous
+      // annotation is what let `OTP_BANKS.includes(a.bankId)` - a string tested
+      // against an array of bank objects, and so always false - compile and ship.
+      bankAccountsApi.getAll().then((accounts) => {
+        const otp = accounts
+          .filter((account) => isOtpBank(account.bankId) && account.status === 'active')
+          .map(({ _id, bankId, name }) => ({ _id, bankId, name }));
         setOtpAccounts(otp);
         if (otp.length === 1) setBankAccountId(otp[0]._id);
-      }).catch((err: any) => {
+      }).catch((err) => {
         console.error('Failed to load OTP bank accounts', err);
         setError('Failed to load pension provider accounts. Please try again.');
       });
