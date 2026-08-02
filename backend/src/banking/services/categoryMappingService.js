@@ -63,19 +63,32 @@ class CategoryMappingService {
   }
 
   /**
+   * The exact question the model tier is asked about a transaction. Prefetching
+   * a batch and later reading the answer back must build this identically: the
+   * answer cache is keyed on the category types, description and memo, so a
+   * request assembled even slightly differently in one of the two places files
+   * the answer under a key the lookup will never find, and every transaction
+   * quietly falls back to a request of its own.
+   */
+  toModelRequest(transaction) {
+    return {
+      description: transaction.description,
+      memo: transaction.memo || transaction.rawData?.memo || null,
+      amount: transaction.amount,
+      categoryTypes: this.deriveCategoryTypes(transaction)
+    };
+  }
+
+  /**
    * Runs the model tier for a transaction that was deferred, and settles it
    * either way. After a prefetch the answer is already cached, so this makes no
    * request at all.
    */
   async finishDeferred(transaction, catalogue) {
     try {
-      const categoryTypes = this.deriveCategoryTypes(transaction);
-      const suggestion = await llmCategorizer.suggestFrom(catalogue, {
-        description: transaction.description,
-        memo: transaction.memo || transaction.rawData?.memo || null,
-        amount: transaction.amount,
-        categoryTypes
-      });
+      const suggestion = await llmCategorizer.suggestFrom(
+        catalogue, this.toModelRequest(transaction)
+      );
 
       if (suggestion) return await this.applySuggestion(transaction, suggestion);
 
@@ -361,12 +374,9 @@ class CategoryMappingService {
         ? catalogue
         : await llmCategorizer.forUser(transaction.userId);
 
-      const llmSuggestion = await llmCategorizer.suggestFrom(activeCatalogue, {
-        description: transaction.description,
-        memo: transaction.memo || transaction.rawData?.memo || null,
-        amount: transaction.amount,
-        categoryTypes
-      });
+      const llmSuggestion = await llmCategorizer.suggestFrom(
+        activeCatalogue, this.toModelRequest(transaction)
+      );
 
       if (llmSuggestion) {
         return await this.applySuggestion(transaction, llmSuggestion);

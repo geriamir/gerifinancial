@@ -194,7 +194,11 @@ seen yet would permanently mark a transfer as an expense.
 
 Prefetch fills the same per-merchant answer cache the single-transaction path
 already reads, so nothing downstream knows whether a batch happened, and a
-transaction the batch failed to answer simply gets asked on its own. Requests
+transaction the batch failed to answer is simply asked on its own. Both sides
+build their request through `categoryMappingService.toModelRequest`, because the
+cache is keyed on the category types, description and memo: a request assembled
+even slightly differently in one of the two places files the answer under a key
+the lookup never finds, and the batch silently stops saving anything. Requests
 are grouped by which category types the transaction may be offered — mixing them
 would offer a category the transaction must not have — and answers are matched
 back by an id the model echoes, never by their position in the list. A reordered

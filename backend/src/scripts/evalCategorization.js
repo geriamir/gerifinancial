@@ -409,12 +409,9 @@ async function main() {
     let prefetchMs = 0;
     if (catalogue && deferred.length > 0) {
       const prefetchStartedAt = Date.now();
-      await llmCategorizer.prefetch(catalogue, deferred.map((entry) => ({
-        description: entry.transaction.description,
-        memo: entry.transaction.memo,
-        amount: entry.transaction.amount,
-        categoryTypes: categoryMappingService.deriveCategoryTypes(entry.transaction)
-      })));
+      await llmCategorizer.prefetch(catalogue, deferred.map(
+        (entry) => categoryMappingService.toModelRequest(entry.transaction)
+      ));
       prefetchMs = Date.now() - prefetchStartedAt;
       say(`Asked the model about ${deferred.length} transactions in ${prefetchMs} ms`);
     }

@@ -519,6 +519,37 @@ describe('CategoryMappingService', () => {
           expect(llmService.chat).not.toHaveBeenCalled();
         });
 
+        // The prefetch and the lookup that follows it derive the answer cache
+        // key independently, and a memo that lives only in rawData is exactly
+        // the kind of difference that survives every test built on a hand-made
+        // request. If the two ever disagree the batch still succeeds, the cache
+        // still fills, and every transaction quietly pays for its own request.
+        it('reads back an answer for a transaction whose memo is only in rawData', async () => {
+          const transaction = await uncategorisable({
+            rawData: { description: 'שופרסל דיל', memo: 'חיוב חודשי', chargedAmount: -250 }
+          });
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          await categoryMappingService.attemptAutoCategorization(transaction, { catalogue, deferModel: true });
+
+          llmService.__setChatResponse({
+            content: JSON.stringify({
+              answers: [{
+                id: 1,
+                category: 'Test Expense Category',
+                subCategory: 'Test Expense SubCategory',
+                confidence: 0.9
+              }]
+            })
+          });
+          await llmCategorizer.prefetch(catalogue, [categoryMappingService.toModelRequest(transaction)]);
+          llmService.chat.mockClear();
+
+          const updated = await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          expect(updated.category._id).toEqual(testExpenseCategory._id);
+          expect(llmService.chat).not.toHaveBeenCalled();
+        });
+
         it('gives a deferred transaction its default type when the model declines too', async () => {
           const transaction = await uncategorisable();
           const catalogue = await llmCategorizer.forUser(testUserId);

@@ -109,12 +109,9 @@ class TransactionCategorizationService {
     }
 
     if (deferred.length > 0) {
-      await llmCategorizer.prefetch(catalogue, deferred.map((transaction) => ({
-        description: transaction.description,
-        memo: transaction.memo || transaction.rawData?.memo || null,
-        amount: transaction.amount,
-        categoryTypes: categoryMappingService.deriveCategoryTypes(transaction)
-      })));
+      await llmCategorizer.prefetch(catalogue, deferred.map(
+        (transaction) => categoryMappingService.toModelRequest(transaction)
+      ));
 
       // Second pass reads the answers the prefetch already collected, so this
       // loop normally makes no requests at all.
