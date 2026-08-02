@@ -15,6 +15,7 @@ import {
 import { Lock as LockIcon } from '@mui/icons-material';
 import { AxiosError } from 'axios';
 import { CHECKING_ACCOUNT_BANKS } from '../../../../constants/banks';
+import { BankIcon } from '../../../bank/BankIcon';
 import { track } from '../../../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../../../constants/analytics';
 import { CardShell } from '../CardShell';
@@ -94,9 +95,11 @@ export const CheckingAccountCard: React.FC<CardProps> = ({ handlers }) => {
             onChange={handleSelect}
             label="Your bank"
             data-testid="bank-select"
+            sx={{ '& .MuiSelect-select': { display: 'flex', alignItems: 'center', gap: 1.5 } }}
           >
             {CHECKING_ACCOUNT_BANKS.map((bank) => (
-              <MenuItem key={bank.id} value={bank.id}>
+              <MenuItem key={bank.id} value={bank.id} sx={{ gap: 1.5 }}>
+                <BankIcon bankId={bank.id} size={24} />
                 {bank.name}
               </MenuItem>
             ))}
