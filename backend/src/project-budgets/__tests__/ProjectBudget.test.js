@@ -19,6 +19,13 @@ describe('ProjectBudget Model', () => {
       User.deleteMany({})
     ]);
 
+    // The uniqueness this suite asserts is enforced by an index, and Mongoose
+    // builds indexes in the background. On a loaded runner the save can beat
+    // the build, the duplicate is accepted, and the test fails for a reason
+    // that has nothing to do with the model. init() resolves once the indexes
+    // for this model are actually in place.
+    await ProjectBudget.init();
+
     // Create test user
     const userData = await createTestUser(User, {
       email: 'project-model-test@example.com',
