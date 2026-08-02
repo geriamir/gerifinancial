@@ -25,6 +25,7 @@ import {
   Settings as BankManagementIcon
 } from '@mui/icons-material';
 import { useStringParam } from '../../hooks/useUrlParams';
+import { useCategorization } from '../../contexts/CategorizationContext';
 
 // Import existing components
 import { BankAccountsList } from '../bank/BankAccountsList';
@@ -166,6 +167,9 @@ const AllTransactionsView: React.FC = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  // Categorisation happens on a queue after the rows are already saved, so
+  // without this the categories it assigns only appear on the next reload.
+  const { revision } = useCategorization();
 
   const updateFilters = (newFilters: Partial<TransactionFilters>) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
@@ -220,7 +224,7 @@ const AllTransactionsView: React.FC = () => {
       <TransactionsList 
         filters={filters} 
         onRowClick={handleTransactionClick}
-        refreshTrigger={refreshTrigger}
+        refreshTrigger={refreshTrigger + revision}
       />
 
       <TransactionDetailDialog

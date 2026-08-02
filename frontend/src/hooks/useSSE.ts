@@ -1,6 +1,27 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
+/**
+ * Every event the stream will deliver to listeners.
+ *
+ * EventSource only invokes handlers registered for an exact event name and does
+ * not fall back to onmessage for named events, so an event missing from this
+ * list is not merely unhandled - it is discarded without a trace on either end.
+ * Adding an emit on the server therefore means adding its name here too.
+ */
+export const SSE_EVENT_TYPES = [
+  'connected',
+  'heartbeat',
+  'scraping:started',
+  'scraping:progress',
+  'scraping:completed',
+  'scraping:failed',
+  'onboarding:credit-card-detection',
+  'onboarding:credit-card-matching',
+  'categorization:progress',
+  'categorization:complete'
+] as const;
+
 export interface SSEEvent {
   type: string;
   data: any;
@@ -136,16 +157,7 @@ export const useSSE = (
 
       // Listen for specific event types
       // The EventSource will automatically call these when events with matching names are received
-      const eventTypes = [
-        'connected',
-        'heartbeat',
-        'scraping:started',
-        'scraping:progress',
-        'scraping:completed',
-        'scraping:failed',
-        'onboarding:credit-card-detection',
-        'onboarding:credit-card-matching'
-      ];
+      const eventTypes = SSE_EVENT_TYPES;
 
       eventTypes.forEach((eventType) => {
         eventSource.addEventListener(eventType, (e: MessageEvent) => {

@@ -150,9 +150,42 @@ describe('transactionCategorizationService', () => {
         transactionIds: [transaction._id]
       });
 
-      const complete = emit.mock.calls.find(([, type]) => type === 'categorization-complete');
+      const complete = emit.mock.calls.find(([, type]) => type === 'categorization:complete');
       expect(complete).toBeDefined();
       expect(complete[2]).toMatchObject({ total: 1 });
+    });
+
+    // Clients register under the string form of the id, so an ObjectId here
+    // matches nothing and the browser is never told the batch finished.
+    it('addresses events to the user id the SSE clients are keyed by', async () => {
+      jest.spyOn(transactionClassifier, 'forUser').mockResolvedValue(null);
+      const emit = jest.spyOn(sseService, 'emit').mockImplementation(() => {});
+      const transaction = await makeTransaction();
+
+      await transactionCategorizationService.processBatch({
+        userId: user._id,
+        transactionIds: [transaction._id]
+      });
+
+      expect(emit).toHaveBeenCalled();
+      for (const [addressee] of emit.mock.calls) {
+        expect(addressee).toBe(user._id.toString());
+      }
+    });
+
+    it('reports progress as it goes so the browser can follow along', async () => {
+      jest.spyOn(transactionClassifier, 'forUser').mockResolvedValue(null);
+      const emit = jest.spyOn(sseService, 'emit').mockImplementation(() => {});
+      const transaction = await makeTransaction();
+
+      await transactionCategorizationService.processBatch({
+        userId: user._id,
+        transactionIds: [transaction._id]
+      });
+
+      const progress = emit.mock.calls.find(([, type]) => type === 'categorization:progress');
+      expect(progress).toBeDefined();
+      expect(progress[2]).toMatchObject({ processed: 1, total: 1 });
     });
 
     it('reports progress to the job so a stalled batch is visible', async () => {

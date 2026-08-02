@@ -49,6 +49,10 @@ class TransactionCategorizationService {
    */
   async processBatch({ userId, transactionIds }, job) {
     const corpus = await transactionClassifier.forUser(userId);
+    // Clients are keyed by the string form of the id, and the job payload may
+    // hold either that or an ObjectId depending on the caller. Emitting with
+    // the wrong one finds no client and drops the event silently.
+    const userIdStr = userId.toString();
     const results = { categorized: 0, uncategorized: 0, failed: 0 };
 
     for (let i = 0; i < transactionIds.length; i += 1) {
@@ -67,9 +71,12 @@ class TransactionCategorizationService {
       }
 
       const done = i + 1;
-      if (job && (done % 10 === 0 || done === transactionIds.length)) {
-        await job.updateProgress(Math.round((done / transactionIds.length) * 100));
-        sseService.emit(userId, 'categorization-progress', {
+      if (done % 10 === 0 || done === transactionIds.length) {
+        // The job only exists while the queue is driving this. Whether the user
+        // is told how far along their transactions are should not depend on
+        // which caller happens to be running the batch.
+        await job?.updateProgress(Math.round((done / transactionIds.length) * 100));
+        sseService.emit(userIdStr, 'categorization:progress', {
           processed: done,
           total: transactionIds.length,
           ...results
@@ -77,7 +84,7 @@ class TransactionCategorizationService {
       }
     }
 
-    sseService.emit(userId, 'categorization-complete', {
+    sseService.emit(userIdStr, 'categorization:complete', {
       total: transactionIds.length,
       ...results
     });

@@ -155,6 +155,15 @@ transactions, sets their type from the amount, and queues one
 batch and reports progress over SSE. A scrape therefore finishes as soon as the
 bank data is stored, and a slow or unavailable categoriser cannot hold it up.
 
+The cost of that split is that rows reach the browser before they have a
+category. `CategorizationProvider` (frontend) follows the
+`categorization:progress` and `categorization:complete` events, shows how far
+along the batch is, and hands the transaction lists a revision counter they use
+as a refresh trigger — so categories appear as they are assigned instead of on
+the next reload. The counter only advances when a report says transactions
+actually gained a category, to keep a few hundred of them from turning into
+dozens of refetches.
+
 `npm run eval:categorization` scores the cascade against a labelled fixture set
 and reports coverage, accuracy and which tier answered — the number any change
 here has to beat.
@@ -232,7 +241,12 @@ fan-out: clients subscribe per user, and any subsystem can push events to them
 without knowing about HTTP.
 
 The browser connects once to `GET /api/events` and receives scraping progress,
-completion and error notifications live.
+completion and error notifications live, along with categorisation progress.
+
+Named events are only delivered to listeners registered for that exact name, so
+`useSSE` keeps the list of subscribed events in `SSE_EVENT_TYPES`. An event the
+server emits but that list omits is dropped silently at both ends — adding an
+emit means adding its name there too.
 
 `EventSource` cannot set an `Authorization` header, so the stream authenticates
 with the same httpOnly session cookie as every other route — the client opts in
