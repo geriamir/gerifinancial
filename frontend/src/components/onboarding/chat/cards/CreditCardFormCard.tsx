@@ -15,6 +15,7 @@ import {
 import { Lock as LockIcon } from '@mui/icons-material';
 import { AxiosError } from 'axios';
 import { CREDIT_CARD_PROVIDERS } from '../../../../constants/banks';
+import { BankIcon } from '../../../bank/BankIcon';
 import { CardShell } from '../CardShell';
 import { CardProps } from '../types';
 
@@ -86,9 +87,11 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ handlers }) => {
             onChange={handleSelect}
             label="Card provider"
             data-testid="provider-select"
+            sx={{ '& .MuiSelect-select': { display: 'flex', alignItems: 'center', gap: 1.5 } }}
           >
             {CREDIT_CARD_PROVIDERS.map((provider) => (
-              <MenuItem key={provider.id} value={provider.id}>
+              <MenuItem key={provider.id} value={provider.id} sx={{ gap: 1.5 }}>
+                <BankIcon bankId={provider.id} size={24} />
                 {provider.name}
               </MenuItem>
             ))}

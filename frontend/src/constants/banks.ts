@@ -1,33 +1,50 @@
 export interface SupportedBank {
   id: string;
   name: string;
+  /**
+   * Two or three letters shown when there is no logo file. Unique within a
+   * group, so a list of them reads as distinct options rather than as a
+   * rendering bug.
+   */
+  monogram: string;
+  /** Background the monogram sits on. Chosen per group to stay distinguishable. */
+  color: string;
+  /**
+   * Path to a logo under `public/`, if one has been added. Bank logos are
+   * trademarks and none are bundled with this repository, so this is unset
+   * everywhere by default and the monogram is what renders. Drop a file in
+   * `public/banks/` and point this at it to use the real mark instead - no
+   * component needs to change, because `BankIcon` falls back to the monogram
+   * when the image is missing or fails to load.
+   */
+  logo?: string;
 }
 
 // Checking Account Banks (Primary onboarding focus)
 export const CHECKING_ACCOUNT_BANKS: SupportedBank[] = [
-  { id: 'hapoalim', name: 'Bank Hapoalim' },
-  { id: 'leumi', name: 'Bank Leumi' },
-  { id: 'discount', name: 'Discount Bank' },
-  { id: 'otsarHahayal', name: 'Otsar HaHayal' }
+  { id: 'hapoalim', name: 'Bank Hapoalim', monogram: 'HP', color: '#C8102E' },
+  { id: 'leumi', name: 'Bank Leumi', monogram: 'LM', color: '#1B3A6B' },
+  { id: 'discount', name: 'Discount Bank', monogram: 'DS', color: '#00843D' },
+  { id: 'otsarHahayal', name: 'Otsar HaHayal', monogram: 'OH', color: '#0F7B8A' }
 ];
 
 // Credit Card Providers (Secondary onboarding step)
 export const CREDIT_CARD_PROVIDERS: SupportedBank[] = [
-  { id: 'visaCal', name: 'Visa Cal' },
-  { id: 'max', name: 'Max' },
-  { id: 'isracard', name: 'Isracard' }
+  { id: 'visaCal', name: 'Visa Cal', monogram: 'CAL', color: '#0057B8' },
+  { id: 'max', name: 'Max', monogram: 'MAX', color: '#5B2C86' },
+  { id: 'isracard', name: 'Isracard', monogram: 'ISR', color: '#E4761B' }
 ];
 
 // API-based banks (token-based REST API, no browser scraping)
 export const API_BANKS: SupportedBank[] = [
-  { id: 'mercury', name: 'Mercury' },
-  { id: 'ibkr', name: 'Interactive Brokers' }
+  { id: 'mercury', name: 'Mercury', monogram: 'MC', color: '#5A31F4' },
+  { id: 'ibkr', name: 'Interactive Brokers', monogram: 'IB', color: '#B3202C' }
 ];
 
 // OTP-based banks (browser automation with OTP login)
 export const OTP_BANKS: SupportedBank[] = [
-  { id: 'phoenix', name: 'Phoenix Insurance (הפניקס)' },
-  { id: 'clal', name: 'Clal Insurance (כלל ביטוח)' }
+  { id: 'phoenix', name: 'Phoenix Insurance (הפניקס)', monogram: 'PX', color: '#F26522' },
+  { id: 'clal', name: 'Clal Insurance (כלל ביטוח)', monogram: 'CL', color: '#004B8D' }
 ];
 
 // All supported banks (for backward compatibility)
@@ -87,3 +104,8 @@ export const getBanksByType = (type: 'checking' | 'credit' | 'api' | 'otp'): Sup
   if (type === 'otp') return OTP_BANKS;
   return API_BANKS;
 };
+
+export const getBank = (bankId: string): SupportedBank | undefined =>
+  SUPPORTED_BANKS.find(bank => bank.id === bankId);
+
+export const getBankName = (bankId: string): string => getBank(bankId)?.name ?? bankId;

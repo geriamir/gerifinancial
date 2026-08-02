@@ -22,7 +22,8 @@ import {
 } from '@mui/icons-material';
 import { bankAccountsApi } from '../../services/api/bank';
 import { BankAccount } from '../../services/api/types';
-import { SUPPORTED_BANKS, getBankStrategies } from '../../constants/banks';
+import { getBankName, getBankStrategies } from '../../constants/banks';
+import { BankIcon } from './BankIcon';
 import { BankAccountForm } from './BankAccountForm';
 import { UpdateCredentialsDialog } from './UpdateCredentialsDialog';
 import { track } from '../../utils/analytics';
@@ -129,11 +130,6 @@ export const BankAccountsList: React.FC = () => {
     setShowUpdateCredentials(true);
   };
 
-  const getBankName = (bankId: string) => {
-    const bank = SUPPORTED_BANKS.find(bank => bank.id === bankId);
-    return bank ? bank.name : bankId;
-  };
-
   if (loading) {
     return <Typography>Loading accounts...</Typography>;
   }
@@ -182,38 +178,41 @@ export const BankAccountsList: React.FC = () => {
                   justifyContent="space-between"
                   alignItems="center"
                 >
-                  <Box>
-                    <Typography variant="h6" sx={{ mb: 0.5 }}>{account.name}</Typography>
-                    <Typography color="textSecondary" variant="body2">
-                      {getBankName(account.bankId)}
-                    </Typography>
-                    {account.currentBalance != null && (
-                      <Typography variant="body1" fontWeight="bold" sx={{ mt: 0.5 }}>
-                        {formatCurrency(account.currentBalance, account.defaultCurrency || 'ILS')}
+                  <Stack direction="row" spacing={2} alignItems="flex-start">
+                    <BankIcon bankId={account.bankId} size={40} sx={{ mt: 0.5, flexShrink: 0 }} />
+                    <Box>
+                      <Typography variant="h6" sx={{ mb: 0.5 }}>{account.name}</Typography>
+                      <Typography color="textSecondary" variant="body2">
+                        {getBankName(account.bankId)}
                       </Typography>
-                    )}
-                    {account.strategySync && Object.entries(account.strategySync)
-                      .filter(([strategy, sync]) => sync?.status === 'failed' && getBankStrategies(account.bankId).includes(strategy))
-                      .map(([strategy]) => (
-                        <Typography key={strategy} color="error" variant="caption" display="block">
-                          {getStrategyDisplayName(strategy)} sync failed
+                      {account.currentBalance != null && (
+                        <Typography variant="body1" fontWeight="bold" sx={{ mt: 0.5 }}>
+                          {formatCurrency(account.currentBalance, account.defaultCurrency || 'ILS')}
                         </Typography>
-                      ))
-                    }
-                    {account.lastError && (
-                      <Typography color="error" variant="caption" display="block" sx={{ mb: 1 }}>
-                        {account.lastError.message}
-                      </Typography>
-                    )}
-                    <AccountScraping
-                      accountId={account._id}
-                      bankId={account.bankId}
-                      lastScraped={account.lastScraped}
-                      strategySync={account.strategySync}
-                      isDisabled={account.status !== 'active'}
-                      onScrapingComplete={fetchAccounts}
-                    />
-                  </Box>
+                      )}
+                      {account.strategySync && Object.entries(account.strategySync)
+                        .filter(([strategy, sync]) => sync?.status === 'failed' && getBankStrategies(account.bankId).includes(strategy))
+                        .map(([strategy]) => (
+                          <Typography key={strategy} color="error" variant="caption" display="block">
+                            {getStrategyDisplayName(strategy)} sync failed
+                          </Typography>
+                        ))
+                      }
+                      {account.lastError && (
+                        <Typography color="error" variant="caption" display="block" sx={{ mb: 1 }}>
+                          {account.lastError.message}
+                        </Typography>
+                      )}
+                      <AccountScraping
+                        accountId={account._id}
+                        bankId={account.bankId}
+                        lastScraped={account.lastScraped}
+                        strategySync={account.strategySync}
+                        isDisabled={account.status !== 'active'}
+                        onScrapingComplete={fetchAccounts}
+                      />
+                    </Box>
+                  </Stack>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Chip
                       label={account.status}

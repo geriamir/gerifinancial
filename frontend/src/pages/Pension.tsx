@@ -40,7 +40,7 @@ import {
   PRODUCT_TYPE_LABELS,
   PRODUCT_TYPE_COLORS
 } from '../services/api/types/pension';
-import { OTP_BANKS } from '../constants/banks';
+import { isOtpBank } from '../constants/banks';
 
 const formatCurrency = (amount: number | null, currency = 'ILS'): string => {
   if (amount == null) return '—';
@@ -284,7 +284,7 @@ const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose, onSyncComplete }
     import('../services/api/bank').then(({ bankAccountsApi }) => {
       bankAccountsApi.getAll().then((accounts: any[]) => {
         const otp = accounts.filter((a: any) =>
-          OTP_BANKS.includes(a.bankId) && a.status === 'active'
+          isOtpBank(a.bankId) && a.status === 'active'
         );
         setOtpAccounts(otp);
         if (otp.length === 1) setBankAccountId(otp[0]._id);

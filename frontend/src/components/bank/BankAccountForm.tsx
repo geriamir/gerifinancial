@@ -20,6 +20,7 @@ import {
 } from '@mui/material';
 import { bankAccountsApi } from '../../services/api/bank';
 import { SUPPORTED_BANKS, isApiBank, isOtpBank } from '../../constants/banks';
+import { BankIcon } from './BankIcon';
 import { track } from '../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
 
@@ -152,9 +153,11 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
               value={formData.bankId}
               onChange={handleSelectChange}
               required
+              sx={{ '& .MuiSelect-select': { display: 'flex', alignItems: 'center', gap: 1.5 } }}
             >
               {SUPPORTED_BANKS.map(bank => (
-                <MenuItem key={bank.id} value={bank.id}>
+                <MenuItem key={bank.id} value={bank.id} sx={{ gap: 1.5 }}>
+                  <BankIcon bankId={bank.id} size={24} />
                   {bank.name}
                 </MenuItem>
               ))}
