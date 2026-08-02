@@ -11,12 +11,16 @@ Pages                        Routes                     Models
 ├─ Onboarding.tsx           ├─ /users                  ├─ User
 Components                  ├─ /onboarding             ├─ BankAccount
 ├─ OnboardingGuard          Services                   ├─ CreditCard
-├─ OnboardingWizard         ├─ BankClassification      ├─ Transaction
-├─ CheckingAccountSetup     ├─ CreditCardDetection     ├─ Category
-├─ TransactionImport        ├─ CreditCardOnboarding    └─ ...
-├─ CreditCardDetection      └─ ...
-├─ CreditCardSetup
-└─ OnboardingComplete
+├─ OnboardingChat           ├─ BankClassification      ├─ Transaction
+│  ├─ script.ts             ├─ CreditCardDetection     ├─ Category
+│  ├─ MessageBubble         ├─ CreditCardOnboarding    └─ ...
+│  └─ cards/                └─ ...
+│     ├─ CheckingAccountCard
+│     ├─ ImportProgressCard
+│     ├─ CreditCardChoiceCard
+│     ├─ CreditCardFormCard
+│     ├─ MatchingReviewCard
+│     └─ CompleteCard
 ```
 
 ---
@@ -28,7 +32,7 @@ Components                  ├─ /onboarding             ├─ BankAccount
 #### `frontend/src/pages/Onboarding.tsx`
 **Purpose**: Main onboarding page container
 **Responsibilities**:
-- Renders the OnboardingWizard component
+- Renders the OnboardingChat component
 - Provides page-level layout and styling
 - Handles page title and meta information
 
@@ -36,8 +40,8 @@ Components                  ├─ /onboarding             ├─ BankAccount
 ```typescript
 const OnboardingPage: React.FC = () => {
   return (
-    <Container maxWidth="md">
-      <OnboardingWizard />
+    <Container maxWidth="sm">
+      <OnboardingChat />
     </Container>
   );
 };
@@ -63,91 +67,105 @@ const OnboardingPage: React.FC = () => {
 OnboardingGuard → onboardingApi.getStatus() → Backend /users/onboarding-status
 ```
 
-#### `frontend/src/components/onboarding/OnboardingWizard.tsx`
+#### `frontend/src/components/onboarding/chat/OnboardingChat.tsx`
 **Purpose**: Main orchestrator component for the onboarding flow
 **Responsibilities**:
-- Manages step progression (5 steps)
-- Handles step completion callbacks
-- Manages overall onboarding state via useOnboarding hook
-- Displays progress indicators and step navigation
+- Renders the conversation and the card currently being asked for
+- Manages overall onboarding state via the useOnboarding hook
+- Displays the progress indicator and the typing indicator
 - Handles error states and loading states
 
-**State Management**:
-- Uses `useOnboarding()` custom hook
-- Manages `currentStepId` state
-- Tracks completed steps via backend synchronization
+**Presentation**: the flow is a **scripted conversation, not a generated one**.
+No language model is involved at any point. The chat is a deterministic state
+machine rendered as dialogue, which is what allows it to handle bank
+credentials: nothing the user types is ever sent anywhere except the existing
+onboarding endpoints.
 
-**Step Flow**:
+**Input is structured only** - there is no free-text box. Every answer comes
+from a field card or a quick-reply button, so the flow cannot receive input it
+has no way to interpret.
+
+**Step Flow** (unchanged - the server still owns it):
 ```
-checking-account → transaction-import → credit-card-detection → credit-card-setup → complete
+checking-account → transaction-import → credit-card-detection → credit-card-setup → credit-card-matching → complete
 ```
 
-#### `frontend/src/components/onboarding/CheckingAccountSetup.tsx`
+`credit-card-matching` is only surfaced when coverage comes back below 100%;
+at full coverage the server moves straight to `complete`.
+
+#### `frontend/src/components/onboarding/chat/script.ts`
+**Purpose**: Turns the server's onboarding state into a transcript
+**Responsibilities**:
+- `buildScript(status)` is a pure function of `OnboardingStatus`
+- Emits assistant lines, echoes of the user's answers, and card requests
+- Reports whether the next move belongs to the server (`waiting`)
+
+**The transcript is derived, never stored.** Two properties follow, and both
+are the reason it is built this way:
+- Reloading mid-setup rebuilds the same conversation, because the state it is
+  drawn from is the same state that decides what happens next. A stored
+  transcript could disagree with actual progress; a derived one cannot.
+- Its only raw material is `/onboarding/status`, which carries no credentials.
+  The bubble echoing the user's answer *physically cannot* show a password,
+  rather than relying on remembering to mask one.
+
+Message ids are stable and semantic (`greet`, `answer-checking`,
+`card:checking-account`) rather than positional, so a message keeps its
+identity as the conversation grows.
+
+Every section of the status document is read defensively - a partial payload
+must not take down the first page a new user sees.
+
+#### `frontend/src/components/onboarding/chat/cards/CheckingAccountCard.tsx`
 **Purpose**: Step 1 - Primary bank account connection
 **Responsibilities**:
 - Display only checking banks (filtered by BankClassificationService)
 - Handle bank selection and account setup
 - Validate account connectivity
-- Pass account data to next step
 
 **Bank Selection Logic**:
 - Shows only: Hapoalim, Leumi, Discount, Otsar HaHayal
 - Filters out credit card providers
 
-#### `frontend/src/components/onboarding/TransactionImport.tsx`
+#### `frontend/src/components/onboarding/chat/cards/ImportProgressCard.tsx`
 **Purpose**: Step 2 - Transaction import with real-time progress
 **Responsibilities**:
-- Simulate transaction scraping from selected bank
+- Report on the scrape already in flight (it starts when the account is
+  saved, not when this card appears)
 - Display real-time import progress (connecting → scraping → categorizing)
-- Show statistics (imported count, categorized count)
-- Auto-advance to next step on completion
+- Surface scrape failures
 
-**Progress Simulation**:
-- Stage 1: Connect to bank (10% progress)
-- Stage 2: Import transactions (10-60% progress)
-- Stage 3: AI categorization (60-100% progress)
+**Progress**: driven by `transactionImport.scrapingStatus`, refreshed over SSE.
 
-**Technical Implementation**:
-- Uses `useCallback` with proper dependencies
-- Functional state updates to avoid stale closures
-- Real-time progress indicators
-
-#### `frontend/src/components/onboarding/CreditCardDetection.tsx`
-**Purpose**: Step 3 - AI-powered credit card usage analysis
+#### `frontend/src/components/onboarding/chat/cards/CreditCardChoiceCard.tsx`
+**Purpose**: Step 3 - Acting on the credit card usage analysis
 **Responsibilities**:
-- Analyze imported transactions for credit card activity
-- Call backend credit card detection service
-- Display analysis results and recommendations
-- Present clear recommendation (connect/skip)
-
-**API Integration**:
-```
-CreditCardDetection → onboardingApi.analyzeCreditCards() → /onboarding/analyze-credit-cards
-```
+- Show sample transactions behind the recommendation
+- Offer "connect" or "skip" as quick replies
 
 **Decision Logic**:
 - If ANY unmatched credit card transactions found → Recommend "Connect"
 - If no credit card transactions found → Recommend "Skip"
 
-#### `frontend/src/components/onboarding/CreditCardSetup.tsx`
+#### `frontend/src/components/onboarding/chat/cards/CreditCardFormCard.tsx`
 **Purpose**: Step 4 - Credit card provider connection
 **Responsibilities**:
 - Show only credit card providers (Visa Cal, Max, Isracard)
 - Handle credit card account setup
-- Auto-create credit cards from scraped accounts
 - Optional step (can be skipped)
 
-**Provider Selection**:
-- Filtered by BankClassificationService
-- Shows only credit card providers, not banks
+#### `frontend/src/components/onboarding/chat/cards/MatchingReviewCard.tsx`
+**Purpose**: Step 5 - Reviewing card-to-payment coverage
+**Responsibilities**:
+- Report how many credit card payments were matched to a connected card
+- Offer adding another card, or finishing anyway (partial coverage is normal)
 
-#### `frontend/src/components/onboarding/OnboardingComplete.tsx`
-**Purpose**: Step 5 - Completion celebration and next steps
+#### `frontend/src/components/onboarding/chat/cards/CompleteCard.tsx`
+**Purpose**: Step 6 - Completion summary and next steps
 **Responsibilities**:
 - Display success message and summary
 - Show onboarding statistics
-- Provide guidance for next steps
-- Mark onboarding as complete in backend
+- Send the user on to the dashboard
 
 ### 1.3 Hooks
 
@@ -398,32 +416,37 @@ generateCreditCardDisplayName(scrapedAccount)
    └─ Redirects to /onboarding if incomplete
 
 2. Step 1: Checking Account Setup
-   ├─ CheckingAccountSetup renders checking banks only
+   ├─ CheckingAccountCard renders checking banks only
    ├─ User selects bank and connects account
    ├─ Creates BankAccount model
    └─ Updates User.onboardingStatus.completedSteps
 
 3. Step 2: Transaction Import
-   ├─ TransactionImport simulates scraping process
-   ├─ Shows real-time progress updates
+   ├─ ImportProgressCard reports on the scrape already in flight
+   ├─ Shows real-time progress updates over SSE
    ├─ Imports transactions and runs AI categorization
    └─ Creates Transaction models with Category links
 
 4. Step 3: Credit Card Detection
-   ├─ CreditCardDetection calls analyze-credit-cards API
+   ├─ CreditCardChoiceCard presents the analyze-credit-cards result
    ├─ Backend queries Transaction + Category models
    ├─ Finds unmatched credit card transactions
    ├─ Applies simplified recommendation logic
    └─ Returns recommendation to frontend
 
 5. Step 4: Credit Card Setup (Optional)
-   ├─ If recommended, shows credit card providers
+   ├─ If recommended, CreditCardFormCard shows credit card providers
    ├─ User connects credit card accounts
    ├─ Backend creates CreditCard models
    └─ Updates User.onboardingStatus.hasCreditCards
 
-6. Step 5: Completion
-   ├─ OnboardingComplete shows success message
+6. Step 5: Credit Card Matching (only below 100% coverage)
+   ├─ MatchingReviewCard reports how many payments matched a connected card
+   ├─ User adds another card, or finishes with partial coverage
+   └─ At full coverage the server skips straight to complete
+
+7. Step 6: Completion
+   ├─ CompleteCard shows success message
    ├─ Updates User.onboardingStatus.isComplete = true
    ├─ OnboardingGuard redirects to main app
    └─ User can access full application
@@ -435,7 +458,7 @@ generateCreditCardDisplayName(scrapedAccount)
 Frontend Component → Custom Hook → API Service → Backend Route → Backend Service → Database Model
 
 Example: Credit Card Analysis
-CreditCardDetection → useOnboarding → onboardingApi → /analyze-credit-cards → creditCardDetectionService → Transaction + Category models
+CreditCardChoiceCard → useOnboarding → onboardingApi → /analyze-credit-cards → creditCardDetectionService → Transaction + Category models
 ```
 
 ### 3.3 State Management Flow
