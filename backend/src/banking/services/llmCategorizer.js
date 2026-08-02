@@ -26,12 +26,18 @@ const PROMPT = [
   'You categorise bank transactions for a personal finance app used in Israel.',
   'Descriptions are usually Hebrew and are often abbreviated or truncated merchant names.',
   '',
-  'You are given the categories this user has, and one transaction. Reply with JSON only:',
-  '{"category": "<exact name from the list>", "subCategory": "<exact name from the list, or null>", "confidence": <number between 0 and 1>}',
+  'You are given the categories this user has, one per line. A line is either',
+  '  Category > Subcategory',
+  'or, where that category has no subcategories, just',
+  '  Category',
+  '',
+  'Pick the one line that fits, then reply with JSON only, splitting that line into its parts:',
+  '{"category": "<the part before the arrow>", "subCategory": "<the part after the arrow, or null>", "confidence": <number between 0 and 1>}',
   '',
   'Rules:',
-  '- Use names exactly as they appear in the list. Never invent one, and never return a name that is not listed.',
-  '- If the list has no category that genuinely fits, or you cannot tell what the merchant is,',
+  '- Copy each part exactly as it appears on the line you picked. Never invent one, never return a name',
+  '  that is not listed, and never put a whole "Category > Subcategory" line in the category field.',
+  '- If the list has no line that genuinely fits, or you cannot tell what the merchant is,',
   '  reply {"category": null, "subCategory": null, "confidence": 0}. A wrong category is worse than',
   '  none: an uncategorised transaction is visible and gets fixed, a plausible wrong one is absorbed',
   '  into the user\'s budget without anyone noticing.',
@@ -141,38 +147,59 @@ class LlmCategorizer {
   /**
    * Turns the model's answer into ids this user actually owns, or nothing.
    */
-  resolve(catalogue, categoryTypes, answer) {
-    if (!answer || !answer.category) return null;
-
+  /**
+   * Turns one pair of names into categories this user actually owns, or nothing.
+   * Split out from resolve so the same rules apply however the names were framed.
+   */
+  matchNames(catalogue, categoryTypes, categoryName, subCategoryName) {
     const category = catalogue
       .eligible(categoryTypes)
-      .find((candidate) => sameName(candidate.name, answer.category));
+      .find((candidate) => sameName(candidate.name, categoryName));
 
     // Either invented, or belonging to a type that contradicts the transaction's
     // own sign. Both are answers this user cannot own.
-    if (!category) {
-      logger.debug(`LLM offered a category this user does not have: "${answer.category}"`);
-      return null;
-    }
+    if (!category) return null;
 
     const children = catalogue.childrenOf(category._id);
-    const subCategory = answer.subCategory
-      ? children.find((child) => sameName(child.name, answer.subCategory))
+    const subCategory = subCategoryName
+      ? children.find((child) => sameName(child.name, subCategoryName))
       : null;
 
     // An expense that stops at the category is only half placed - the rest of
     // the app treats it as still needing work, so it would be picked up and
     // asked about again on the next run. Better to leave it plainly
     // uncategorised than to bank a partial answer.
-    if (children.length > 0 && !subCategory) {
-      logger.debug(
-        `LLM chose "${category.name}" without a subcategory this user has` +
-        `${answer.subCategory ? ` ("${answer.subCategory}")` : ''}`
-      );
-      return null;
-    }
+    if (children.length > 0 && !subCategory) return null;
 
     return { category, subCategory };
+  }
+
+  resolve(catalogue, categoryTypes, answer) {
+    if (!answer || !answer.category || typeof answer.category !== 'string') return null;
+
+    const matched = this.matchNames(catalogue, categoryTypes, answer.category, answer.subCategory);
+    if (matched) return matched;
+
+    // The choices are listed as "Category > Subcategory" lines, so a model asked to
+    // split them will sometimes hand the whole line back instead. That is a
+    // formatting slip rather than a wrong answer, and refusing it would quietly
+    // cost coverage on a category the user does have, so read it either way.
+    if (answer.category.includes('>')) {
+      const [categoryName, subCategoryName] = answer.category.split('>');
+      const fromPath = this.matchNames(
+        catalogue,
+        categoryTypes,
+        categoryName,
+        answer.subCategory || subCategoryName
+      );
+      if (fromPath) return fromPath;
+    }
+
+    logger.debug(
+      `LLM answer did not resolve to this user's categories: ` +
+      `"${answer.category}"${answer.subCategory ? ` > "${answer.subCategory}"` : ''}`
+    );
+    return null;
   }
 
   /**
