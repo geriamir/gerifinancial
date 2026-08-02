@@ -140,14 +140,18 @@ class ScrapingQueueService {
   }
 
   /**
-   * Add a scraping job to the appropriate queue
+   * Adds a job of any shape to the shared queue.
+   *
+   * The queues are named for scraping because that was the first thing to need
+   * them, but nothing in the machinery is specific to it - so work that merely
+   * has to happen out of band, like categorising a batch of transactions, goes
+   * through here rather than growing a second set of queues and workers.
    */
-  async addScrapingJob(jobType, bankAccountId, strategyName, jobData, options = {}) {
+  async addJob(jobType, jobData, options = {}) {
     if (!this.isInitialized) {
       await this.initialize();
     }
 
-    // Determine queue priority based on options or defaults
     const priority = options.priority || 'normal';
     const queueName = `scraping-${priority}`;
     const queue = this.queues.get(queueName);
@@ -156,24 +160,29 @@ class ScrapingQueueService {
       throw new Error(`Queue not found: ${queueName}`);
     }
 
-    const job = await queue.add(jobType, {
-      bankAccountId,
-      strategyName,
-      ...jobData
-    }, {
-      // Override default options if provided
+    const job = await queue.add(jobType, jobData, {
       attempts: options.attempts,
       delay: options.delay,
       removeOnComplete: options.removeOnComplete,
       removeOnFail: options.removeOnFail,
-      // Add job metadata
-      jobId: `${jobType}_${bankAccountId}_${strategyName}_${Date.now()}`,
-      timeout: options.timeout || 300000 // 5 minutes default timeout
+      jobId: options.jobId || `${jobType}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      timeout: options.timeout || 300000
     });
 
-    logger.info(`Added scraping job ${job.id} (${jobType}) for account ${bankAccountId} strategy ${strategyName} to ${queueName} queue`);
-    
+    logger.info(`Added job ${job.id} (${jobType}) to ${queueName} queue`);
+
     return job.id;
+  }
+
+  /**
+   * Add a job to the appropriate queue based on priority
+   */
+  async addScrapingJob(jobType, bankAccountId, strategyName, jobData, options = {}) {
+    return this.addJob(
+      jobType,
+      { bankAccountId, strategyName, ...jobData },
+      { ...options, jobId: `${jobType}_${bankAccountId}_${strategyName}_${Date.now()}` }
+    );
   }
 
   /**

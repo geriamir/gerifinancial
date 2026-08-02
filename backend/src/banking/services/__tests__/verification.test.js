@@ -4,6 +4,8 @@ const { Transaction, Category, SubCategory, ManualCategorized } = require('../..
 const transactionService = require('../transactionService');
 const categoryMappingService = require('../categoryMappingService');
 const { createTestUser } = require('../../../test/testUtils');
+const llmService = require('../../../shared/services/ai/llmService');
+const config = require('../../../shared/config');
 const { TransactionType, CategorizationMethod, TransactionStatus } = require('../../constants/enums');
 
 describe('Transaction Verification Flow', () => {
@@ -11,6 +13,12 @@ describe('Transaction Verification Flow', () => {
   let category;
   let subCategory;
   let testTransaction;
+  const originalDeployment = config.ai.embeddingDeployment;
+
+  afterEach(() => {
+    llmService.__reset();
+    config.ai.embeddingDeployment = originalDeployment;
+  });
 
   beforeEach(async () => {
     // Create test user
@@ -140,7 +148,22 @@ describe('Transaction Verification Flow', () => {
       expect(updated.categorizationMethod).toBe(CategorizationMethod.PREVIOUS_DATA);
     });
 
-    it('should apply AI categorization to transactions', async () => {
+    it('should categorize from a similar past correction as a last resort', async () => {
+      // Nothing in this description matches a keyword, and it is not a repeat
+      // of anything the user has categorised verbatim - so it reaches the last
+      // tier, which matches on meaning against the user's own corrections.
+      llmService.__setEnabled(true);
+      config.ai.embeddingDeployment = 'text-embedding-3-small';
+
+      await ManualCategorized.create({
+        description: 'XYZ24',
+        userId: user._id,
+        category: category._id,
+        subCategory: subCategory._id
+      });
+      llmService.__setEmbedding('XYZ24', [1, 0, 0, 0]);
+      llmService.__setEmbedding('XYZ24 Special Store', [0.99, 0.141, 0, 0]);
+
       const newTransaction = await Transaction.create({
         identifier: `test-${Date.now()}-3`,
         accountId: new mongoose.Types.ObjectId(),
@@ -161,9 +184,33 @@ describe('Transaction Verification Flow', () => {
       await categoryMappingService.attemptAutoCategorization(newTransaction);
 
       const updated = await Transaction.findById(newTransaction._id);
-      expect(updated.category).toBeTruthy();
-      expect(updated.subCategory).toBeTruthy();
+      expect(updated.category.toString()).toBe(category._id.toString());
+      expect(updated.subCategory.toString()).toBe(subCategory._id.toString());
       expect(updated.categorizationMethod).toBe(CategorizationMethod.AI);
+    });
+
+    // The tier is off wherever no embedding deployment is configured, and a
+    // transaction nothing recognises has to come back blank for the user to
+    // deal with rather than land in an arbitrary category.
+    it('should leave a transaction uncategorized when nothing matches', async () => {
+      const newTransaction = await Transaction.create({
+        identifier: `test-${Date.now()}-4`,
+        accountId: new mongoose.Types.ObjectId(),
+        userId: user._id,
+        amount: -80,
+        currency: 'ILS',
+        date: new Date(),
+        type: TransactionType.EXPENSE,
+        description: 'XYZ24 Special Store',
+        status: TransactionStatus.VERIFIED,
+        rawData: { description: 'XYZ24 Special Store', chargedAmount: -80 }
+      });
+
+      await categoryMappingService.attemptAutoCategorization(newTransaction);
+
+      const updated = await Transaction.findById(newTransaction._id);
+      expect(updated.category).toBeFalsy();
+      expect(updated.type).toBe(TransactionType.EXPENSE);
     });
   });
 

@@ -1,12 +1,12 @@
-jest.mock('../../services/categoryAIService', () => require('../../../test/mocks/categoryAIService'));
-
 const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../../../app');
 const { createTestUser } = require('../../../test/testUtils');
 const { User } = require('../../../auth');
-const { BankAccount, Category, SubCategory, Transaction } = require('../../models');
+const { BankAccount, Category, SubCategory, Transaction, ManualCategorized } = require('../../models');
 const transactionService = require('../../services/transactionService');
+const llmService = require('../../../shared/services/ai/llmService');
+const config = require('../../../shared/config');
 
 describe('Transaction Routes', () => {
   let token;
@@ -182,25 +182,44 @@ describe('Transaction Routes', () => {
   });
 
   describe('POST /api/transactions/:transactionId/suggest-category', () => {
+    const originalDeployment = config.ai.embeddingDeployment;
+
     beforeEach(async () => {
       // Clear mocks
       jest.clearAllMocks();
+      llmService.__reset();
     });
 
-    it('should suggest category using AI analysis', async () => {
+    afterEach(() => {
+      llmService.__reset();
+      config.ai.embeddingDeployment = originalDeployment;
+    });
+
+    it('should answer with no suggestion when the user has corrected nothing yet', async () => {
       const res = await request(app)
         .post(`/api/transactions/${transaction._id}/suggest-category`)
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
       expect(res.body).toHaveProperty('suggestion');
-      expect(res.body.suggestion).toHaveProperty('categoryId');
-      expect(res.body.suggestion).toHaveProperty('subCategoryId');
-      expect(res.body.suggestion).toHaveProperty('confidence');
-      expect(res.body.suggestion).toHaveProperty('reasoning');
+      expect(res.body.suggestion).toBeNull();
+      expect(res.body.transaction.id).toBe(transaction._id.toString());
     });
 
     it('should provide relevant suggestions for restaurant transactions', async () => {
+      // The tier learns from what this user has already put right, so the test
+      // has to give it something to have learned from.
+      llmService.__setEnabled(true);
+      config.ai.embeddingDeployment = 'text-embedding-3-small';
+      await ManualCategorized.create({
+        description: 'Local Restaurant',
+        userId: user._id,
+        category: category._id,
+        subCategory: subCategory._id
+      });
+      llmService.__setEmbedding('Local Restaurant', [1, 0, 0, 0]);
+      llmService.__setEmbedding('Local Restaurant Dining Restaurant', [0.99, 0.141, 0, 0]);
+
       const restaurantTx = await Transaction.create({
         identifier: 'test-restaurant-tx',
         accountId: bankAccount._id,
@@ -228,7 +247,20 @@ describe('Transaction Routes', () => {
       expect(res.body.suggestion.confidence).toBeGreaterThan(0.5);
     });
 
-    it('should handle ambiguous transactions with lower confidence', async () => {
+    // No suggestion is a valid answer, and a better one than a guess: the caller
+    // shows an empty field rather than a wrong category.
+    it('should answer with no suggestion when nothing resembles the transaction', async () => {
+      llmService.__setEnabled(true);
+      config.ai.embeddingDeployment = 'text-embedding-3-small';
+      await ManualCategorized.create({
+        description: 'Local Restaurant',
+        userId: user._id,
+        category: category._id,
+        subCategory: subCategory._id
+      });
+      llmService.__setEmbedding('Local Restaurant', [1, 0, 0, 0]);
+      llmService.__setEmbedding('General Payment Payment', [0, 0, 1, 0]);
+
       const ambiguousTx = await Transaction.create({
         identifier: 'test-ambiguous-tx',
         accountId: bankAccount._id,
@@ -251,8 +283,7 @@ describe('Transaction Routes', () => {
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.suggestion).toHaveProperty('confidence');
-      expect(res.body.suggestion.confidence).toBeLessThan(0.5);
+      expect(res.body.suggestion).toBeNull();
     });
 
     it('should require authentication', async () => {

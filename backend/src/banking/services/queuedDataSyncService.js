@@ -1,5 +1,6 @@
 const scrapingQueue = require('../../shared/services/scrapingQueue');
 const scrapingJobProcessors = require('./scrapingJobProcessors');
+const transactionCategorizationService = require('./transactionCategorizationService');
 const { BankAccount } = require('../models');
 const logger = require('../../shared/utils/logger');
 
@@ -24,6 +25,7 @@ class QueuedDataSyncService {
       
       // Register job processors
       await scrapingJobProcessors.registerProcessors();
+      transactionCategorizationService.registerProcessor();
       
       // Start processing jobs
       await scrapingQueue.startProcessing();

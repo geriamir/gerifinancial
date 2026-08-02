@@ -86,7 +86,6 @@ backend/src/
 ├── project-budgets/       Project budgets, planned/unplanned expenses, tagging
 ├── real-estate/           Real-estate investments, installments, rental income
 ├── rsu/                   RSU grants, sales, vesting, Israeli tax, timeline
-├── translation/           Merchant/description translation
 │
 ├── shared/                Cross-cutting infrastructure (see §3)
 ├── scripts/               One-off migrations and maintenance scripts
@@ -115,7 +114,7 @@ access goes through the other module's service — not its models directly.
 | Module | Key models | Notable services |
 |---|---|---|
 | `auth` | `User` | — |
-| `banking` | `BankAccount`, `Transaction`, `Category`, `SubCategory`, `CreditCard`, `Tag`, `BalanceSnapshot`, `TransactionExclusion`, `ManualCategorized` | `bankScraperService`, `categoryAIService`, `transactionService`, `creditCardService`, `balanceService`, `dataSyncService`, `scrapingSchedulerService`, `ibkrFlexClient`, `mercuryApiClient` |
+| `banking` | `BankAccount`, `Transaction`, `Category`, `SubCategory`, `CreditCard`, `Tag`, `BalanceSnapshot`, `TransactionExclusion`, `ManualCategorized` | `bankScraperService`, `categoryMappingService`, `transactionClassifier`, `transactionCategorizationService`, `transactionService`, `creditCardService`, `balanceService`, `dataSyncService`, `scrapingSchedulerService`, `ibkrFlexClient`, `mercuryApiClient` |
 | `foreign-currency` | `ForeignCurrencyAccount`, `CurrencyExchange` | `currencyExchangeService` |
 | `investments` | `Investment`, `Portfolio`, `InvestmentTransaction`, `InvestmentSnapshot`, `PortfolioSnapshot`, `StockPrice` | `investmentService`, `portfolioService`, `investmentSnapshotScheduler` |
 | `monthly-budgets` | `MonthlyBudget`, `YearlyBudget`, `CategoryBudget`, `TransactionPattern` | `budgetService`, `budgetCalculationService`, `smartBudgetService`, `patternService`, `recurrenceDetectionService`, `salaryAttributionHelper`, `averagingDenominatorService` |
@@ -124,9 +123,41 @@ access goes through the other module's service — not its models directly.
 | `project-budgets` | `ProjectBudget`, `UnplannedExpense` | `projectBudgetService`, `projectExpensesService`, `projectOverviewService`, `projectTemplateService`, `projectTransactionService`, `unplannedExpenseService` |
 | `real-estate` | `RealEstateInvestment` | `realEstateService`, `realEstateTransactionService` |
 | `rsu` | `RSUGrant`, `RSUSale` | `rsuService`, `vestingService`, `taxCalculationService`, `stockPriceService`, `timelineService` |
-| `translation` | `Translation` | `translationService` |
 
 Total: **30 Mongoose models** across the modules.
+
+### Transaction categorisation
+
+A scraped transaction is categorised by a cascade in `categoryMappingService`,
+tried in descending order of how much the evidence is worth:
+
+1. An exact match against something this user categorised by hand (`ManualCategorized`).
+2. Keywords on the user's categories, then on their subcategories.
+3. The nearest of the user's own past corrections *by meaning*, via
+   `transactionClassifier`: descriptions are embedded with Azure OpenAI and
+   compared by cosine similarity, and the nearest neighbours vote.
+
+Anything reaching the end is left uncategorised deliberately — the user sees it
+and decides, and that decision feeds tiers 1 and 3. A wrong category is worse
+than none, because an empty one is visible while a plausible wrong one is
+silently absorbed into budgets.
+
+Tier 3 exists because tiers 1 and 2 match *characters*: the highest-frequency
+Israeli merchants come back uncategorised despite having been categorised by
+hand many times, because the description never repeats verbatim. It learns from
+the user's own labels rather than a keyword list somebody has to maintain, and
+it degrades to "no answer" when Azure OpenAI is not configured.
+
+Categorisation does **not** run inside the scrape. `transactionService` saves
+transactions, sets their type from the amount, and queues one
+`categorize-transactions` job for the batch; the worker
+(`transactionCategorizationService`) loads the user's corpus once for the whole
+batch and reports progress over SSE. A scrape therefore finishes as soon as the
+bank data is stored, and a slow or unavailable categoriser cannot hold it up.
+
+`npm run eval:categorization` scores the cascade against a labelled fixture set
+and reports coverage, accuracy and which tier answered — the number any change
+here has to beat.
 
 ---
 

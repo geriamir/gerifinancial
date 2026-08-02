@@ -1,17 +1,26 @@
 const { ManualCategorized, Transaction, Category, SubCategory } = require('../models');
-const categoryAIService = require('./categoryAIService');
+const transactionClassifier = require('./transactionClassifier');
 const { enhancedKeywordMatcher } = require('./enhanced-keyword-matching');
 const { CategorizationMethod, TransactionType } = require('../constants/enums');
 const logger = require('../../shared/utils/logger');
 
 class CategoryMappingService {
   /**
-   * Attempt to automatically categorize a transaction using various methods:
-   * 1. Vendor mapping
-   * 2. Keyword matching
-   * 3. AI suggestion
+   * Attempt to automatically categorize a transaction, in descending order of
+   * how much the evidence is worth:
+   *
+   * 1. An exact match against something this user categorised by hand.
+   * 2. Keywords on the user's categories, then on their subcategories.
+   * 3. The nearest of the user's own past corrections, by meaning.
+   *
+   * Anything that reaches the end is left uncategorised on purpose; the user
+   * sees it and decides, and that decision feeds tier 1 and tier 3.
+   *
+   * `corpus` lets a caller working through many transactions load the user's
+   * corrections once instead of once per transaction. Omit it and one is loaded
+   * on demand.
    */
-  async attemptAutoCategorization(transaction) {
+  async attemptAutoCategorization(transaction, { corpus } = {}) {
     // Skip if already categorized
     // For Expenses: need both category and subcategory
     // For Income/Transfer: only need category (no subcategory)
@@ -227,68 +236,40 @@ class CategoryMappingService {
           .populate('subCategory');
       }
 
-      // Try AI categorization as last resort
-      // Only get categories matching the transaction type
-      const availableCategories = await Category.find({ 
-        userId: transaction.userId,
-        type: { $in: categoryTypes }
-      }).populate('subCategories').lean();
+      // Last resort: match against what this user has corrected before, by
+      // meaning rather than by string. Everything above matches characters, so
+      // this is where descriptions that never quite repeat get caught.
+      const activeCorpus = corpus !== undefined
+        ? corpus
+        : await transactionClassifier.forUser(transaction.userId);
 
-      const suggestion = await categoryAIService.suggestCategory(
-        transaction.description,
-        transaction.amount,
-        availableCategories.map(cat => ({
-          id: cat._id.toString(),
-          name: cat.name,
-          type: cat.type,
-          keywords: cat.keywords || [], // Category-level keywords for Income/Transfer
-          subCategories: cat.subCategories.map(sub => ({
-            id: sub._id.toString(),
-            name: sub.name,
-            keywords: sub.keywords || []
-          }))
-        })),
-        transaction.userId.toString(),
-        transaction.rawData?.category || '',
-        transaction.memo || transaction.rawData?.memo || ''
-      );
+      const suggestion = await transactionClassifier.suggestFrom(activeCorpus, {
+        description: transaction.description,
+        memo: transaction.memo || transaction.rawData?.memo || null
+      });
 
-      // Always categorize with AI suggestion, but mark for verification
-
-      if (suggestion.categoryId) {
-        // Get category and subcategory names for reasoning
+      if (suggestion && suggestion.categoryId) {
         const category = await Category.findById(suggestion.categoryId);
-        const subCategory = suggestion.subCategoryId ? await SubCategory.findById(suggestion.subCategoryId) : null;
-        
-        // Build reasoning based on what fields were used for AI analysis
-        const usedFields = [];
-        if (transaction.description) usedFields.push(`description: "${transaction.description}"`);
-        if (transaction.memo || transaction.rawData?.memo) usedFields.push(`memo: "${transaction.memo || transaction.rawData?.memo}"`);
-        if (transaction.rawData?.category) usedFields.push(`rawData.category: "${transaction.rawData.category}"`);
-        
-        let reasoning;
-        if (subCategory) {
-          reasoning = `AI categorization: Analyzed ${usedFields.join(', ')}. AI suggested category: "${category?.name}" > "${subCategory.name}"${suggestion.reasoning ? `. AI reasoning: ${suggestion.reasoning}` : ''}`;
-        } else {
-          reasoning = `AI categorization: Analyzed ${usedFields.join(', ')}. AI suggested category: "${category?.name}"${suggestion.reasoning ? `. AI reasoning: ${suggestion.reasoning}` : ''}`;
+        // A correction belonging to another type would push the transaction into
+        // a category that contradicts its own sign, so drop the suggestion
+        // rather than trust the neighbours over the arithmetic.
+        if (category && categoryTypes.includes(category.type)) {
+          await transaction.categorize(
+            suggestion.categoryId,
+            suggestion.subCategoryId,
+            CategorizationMethod.AI,
+            suggestion.reasoning
+          );
+
+          if (!transaction.type) {
+            transaction.type = category.type;
+            await transaction.save();
+          }
+
+          return await Transaction.findById(transaction._id)
+            .populate('category')
+            .populate('subCategory');
         }
-        
-        await transaction.categorize(
-          suggestion.categoryId,
-          suggestion.subCategoryId,
-          CategorizationMethod.AI,
-          reasoning
-        );
-        
-        // Set transaction type based on the category type
-        if (category && !transaction.type) {
-          transaction.type = category.type;
-          await transaction.save();
-        }
-        
-        return await Transaction.findById(transaction._id)
-          .populate('category')
-          .populate('subCategory');
       }
       
       // If no categorization was successful and transaction has no type, set default type based on amount
