@@ -81,10 +81,11 @@ Two related things worth knowing:
   is already at its subscription limit in this subscription, which is why the
   embedding deployment here uses `text-embedding-3-small`.
 - **Inference is on `GlobalStandard`, which may route a request outside the EU.**
-  The EU-confined alternative, `DataZoneStandard`, currently has zero chat quota
-  in every EU region and needs a support request to raise. If that changes, it is
-  a one-line change to `openAiChatSku` in `infra/main.bicep`; nothing in the
-  application code refers to the SKU.
+  This is an accepted trade-off, not an oversight. The EU-confined alternative,
+  `DataZoneStandard`, currently has zero chat quota in every EU region and would
+  need a quota request before it could be used at all. Revisit if the app ever
+  serves anyone other than its author. Switching is a change to `openAiChatSku`
+  in `infra/main.bicep` and nothing else — no application code refers to the SKU.
 
 ### Authentication to Azure OpenAI
 

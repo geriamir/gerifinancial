@@ -188,7 +188,16 @@ class LlmService {
     }
 
     const input = Array.isArray(texts) ? texts : [texts];
-    if (input.length === 0) return { vectors: [], usage: { totalTokens: 0 } };
+    // Same shape as a real response, so a caller destructuring `dimensions` or
+    // `model` does not get undefined for the one input that never reaches the API.
+    if (input.length === 0) {
+      return {
+        vectors: [],
+        dimensions: 0,
+        model: config.ai.embeddingDeployment,
+        usage: { totalTokens: 0 }
+      };
+    }
 
     await aiBudget.assertWithinBudget(userId);
 

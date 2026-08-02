@@ -61,6 +61,20 @@ async function loadFromDatabase({ user, limit }) {
   const query = { categorizationMethod: 'manual', category: { $ne: null } };
   if (user) query.userId = new mongoose.Types.ObjectId(user);
 
+  // Scoring is done under a single user, because the cascade resolves categories
+  // per user. Mixing owners would score one person's labels against another
+  // person's category tree and report the mismatch as classifier error, so
+  // refuse rather than print a number that means nothing.
+  if (!user) {
+    const owners = await Transaction.distinct('userId', query);
+    if (owners.length > 1) {
+      throw new Error(
+        `Found manually categorised transactions for ${owners.length} users. ` +
+        `Pass --user <userId> to choose one: ${owners.map(String).join(', ')}`
+      );
+    }
+  }
+
   const transactions = await Transaction.find(query)
     .populate('category', 'name type')
     .populate('subCategory', 'name')

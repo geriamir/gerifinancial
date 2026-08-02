@@ -45,14 +45,26 @@ class AiBudgetService {
   async initialize() {
     if (this.redis) return;
 
-    this.redis = new Redis({
+    const client = new Redis({
       ...config.redis,
       maxRetriesPerRequest: 3,
       enableReadyCheck: false,
       lazyConnect: true
     });
 
-    await this.redis.connect();
+    try {
+      await client.connect();
+    } catch (error) {
+      // Only publish the client once it has actually connected. Assigning it
+      // first would leave a client that never connected parked on the instance,
+      // and the `if (this.redis) return` above would then skip every later
+      // attempt - so a transient Redis outage would keep AI features dead until
+      // the process restarted, long after Redis came back.
+      client.disconnect();
+      throw error;
+    }
+
+    this.redis = client;
     logger.info('AI budget service initialized');
   }
 

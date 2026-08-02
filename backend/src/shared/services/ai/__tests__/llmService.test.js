@@ -59,6 +59,23 @@ describe('llmService', () => {
     });
   });
 
+  describe('embed', () => {
+    beforeEach(enable);
+
+    // The one input that never reaches the API still has to look like every
+    // other response, or a caller reading `dimensions` gets undefined only in
+    // the edge case - the hardest kind of bug to notice.
+    it('returns the same shape for an empty input as for a real one', async () => {
+      const result = await llmService.embed({ userId: 'u1', texts: [] });
+      expect(result).toEqual({
+        vectors: [],
+        dimensions: 0,
+        model: 'text-embedding-3-small',
+        usage: { totalTokens: 0 }
+      });
+    });
+  });
+
   describe('asUntrustedData', () => {
     it('fences the payload so it reads as data', () => {
       const wrapped = llmService.asUntrustedData('שופרסל דיל', 'transaction.description');

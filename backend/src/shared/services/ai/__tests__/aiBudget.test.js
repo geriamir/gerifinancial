@@ -11,27 +11,50 @@ const mockExpiries = new Map();
 const mockRedisState = { connectShouldFail: false };
 
 jest.mock('ioredis', () => {
-  return jest.fn().mockImplementation(() => ({
-    connect: jest.fn(async () => {
-      if (mockRedisState.connectShouldFail) throw new Error('Redis unreachable');
-    }),
-    get: jest.fn(async (key) => (mockStore.has(key) ? String(mockStore.get(key)) : null)),
-    incrby: jest.fn(async (key, by) => {
-      const next = (mockStore.get(key) || 0) + by;
-      mockStore.set(key, next);
-      return next;
-    }),
-    expire: jest.fn(async (key, seconds) => {
-      mockExpiries.set(key, seconds);
-      return 1;
-    }),
-    del: jest.fn(async (key) => {
-      mockStore.delete(key);
-      mockExpiries.delete(key);
-      return 1;
-    }),
-    quit: jest.fn(async () => 'OK')
-  }));
+  return jest.fn().mockImplementation(() => {
+    // Tracked per client, because the point of some of these tests is what
+    // happens when a client that never connected is reused. A mock that serves
+    // commands regardless of connection state would make that bug invisible.
+    let connected = false;
+    const requireConnection = () => {
+      if (!connected) throw new Error('Connection is closed.');
+    };
+
+    return {
+      connect: jest.fn(async () => {
+        if (mockRedisState.connectShouldFail) throw new Error('Redis unreachable');
+        connected = true;
+      }),
+      get: jest.fn(async (key) => {
+        requireConnection();
+        return mockStore.has(key) ? String(mockStore.get(key)) : null;
+      }),
+      incrby: jest.fn(async (key, by) => {
+        requireConnection();
+        const next = (mockStore.get(key) || 0) + by;
+        mockStore.set(key, next);
+        return next;
+      }),
+      expire: jest.fn(async (key, seconds) => {
+        requireConnection();
+        mockExpiries.set(key, seconds);
+        return 1;
+      }),
+      del: jest.fn(async (key) => {
+        requireConnection();
+        mockStore.delete(key);
+        mockExpiries.delete(key);
+        return 1;
+      }),
+      disconnect: jest.fn(() => {
+        connected = false;
+      }),
+      quit: jest.fn(async () => {
+        connected = false;
+        return 'OK';
+      })
+    };
+  });
 });
 
 describe('aiBudget', () => {
@@ -105,6 +128,17 @@ describe('aiBudget', () => {
     it('fails closed when Redis cannot be reached', async () => {
       mockRedisState.connectShouldFail = true;
       await expect(aiBudget.assertWithinBudget(userId)).rejects.toThrow('Redis unreachable');
+    });
+
+    // A failed connect must not be cached. Parking an unconnected client on the
+    // service would make a momentary outage permanent, since every later call
+    // short-circuits on "already initialised".
+    it('recovers once Redis comes back, without a restart', async () => {
+      mockRedisState.connectShouldFail = true;
+      await expect(aiBudget.assertWithinBudget(userId)).rejects.toThrow('Redis unreachable');
+
+      mockRedisState.connectShouldFail = false;
+      await expect(aiBudget.assertWithinBudget(userId)).resolves.toMatchObject({ used: 0 });
     });
   });
 
