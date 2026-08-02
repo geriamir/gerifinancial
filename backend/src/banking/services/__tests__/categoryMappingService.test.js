@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 const categoryMappingService = require('../categoryMappingService');
 const { Category, SubCategory, Transaction, ManualCategorized } = require('../../models');
 const { CategorizationMethod, TransactionType } = require('../../constants/enums');
+const llmCategorizer = require('../llmCategorizer');
+const llmService = require('../../../shared/services/ai/llmService');
+const config = require('../../../shared/config');
+
+const originalLlmEnabled = config.ai.llm.categorization;
 
 describe('CategoryMappingService', () => {
   let testUserId;
@@ -396,6 +401,113 @@ describe('CategoryMappingService', () => {
 
       // Should not have category or subCategory set
       expect(updated).toBeUndefined();
+    });
+
+    // The tier that exists for users who have corrected nothing yet: every
+    // tier ahead of it learns from the user, so all of them are silent on a
+    // first scrape.
+    describe('the model fallback tier', () => {
+      const uncategorisable = (overrides = {}) =>
+        Transaction.create({
+          identifier: `llm-tx-${Math.random()}`,
+          description: 'שופרסל דיל',
+          userId: testUserId,
+          accountId: new mongoose.Types.ObjectId(),
+          amount: -250,
+          currency: 'ILS',
+          date: new Date(),
+          rawData: { description: 'שופרסל דיל', chargedAmount: -250 },
+          ...overrides
+        });
+
+      beforeEach(() => {
+        config.ai.llm.categorization = true;
+        llmService.__setEnabled(true);
+        llmService.__setChatResponse({
+          content: JSON.stringify({
+            category: 'Test Expense Category',
+            subCategory: 'Test Expense SubCategory',
+            confidence: 0.9
+          })
+        });
+      });
+
+      afterEach(() => {
+        config.ai.llm.categorization = originalLlmEnabled;
+      });
+
+      it('categorises a transaction no earlier tier could place', async () => {
+        const updated = await categoryMappingService.attemptAutoCategorization(await uncategorisable());
+
+        expect(updated.category._id).toEqual(testExpenseCategory._id);
+        expect(updated.subCategory._id).toEqual(testExpenseSubCategory._id);
+        expect(updated.categorizationMethod).toBe(CategorizationMethod.AI);
+      });
+
+      it('records why, so the user can tell it was a guess and correct it', async () => {
+        const updated = await categoryMappingService.attemptAutoCategorization(await uncategorisable());
+
+        expect(updated.categorizationReasoning).toContain('Chose from your categories:');
+      });
+
+      it('sets the transaction type from the category it chose', async () => {
+        const updated = await categoryMappingService.attemptAutoCategorization(await uncategorisable());
+
+        expect(updated.type).toBe(TransactionType.EXPENSE);
+      });
+
+      // It is the most expensive tier and the weakest evidence, so anything the
+      // user has already taught the app has to win before it is asked.
+      it('is not consulted when a keyword already matched', async () => {
+        await categoryMappingService.attemptAutoCategorization(
+          await uncategorisable({ description: 'coffee shop', rawData: { description: 'coffee shop' } })
+        );
+
+        expect(llmService.chat).not.toHaveBeenCalled();
+      });
+
+      it('is not consulted when the user has categorised this exact description before', async () => {
+        await ManualCategorized.create({
+          description: 'שופרסל דיל',
+          userId: testUserId,
+          category: testExpenseCategory._id,
+          subCategory: testExpenseSubCategory._id
+        });
+
+        await categoryMappingService.attemptAutoCategorization(await uncategorisable());
+
+        expect(llmService.chat).not.toHaveBeenCalled();
+      });
+
+      // An environment with no Azure OpenAI has to behave exactly as it did
+      // before this tier existed.
+      it('leaves the transaction alone when the model is not configured', async () => {
+        llmService.__setEnabled(false);
+
+        const updated = await categoryMappingService.attemptAutoCategorization(await uncategorisable());
+
+        expect(updated).toBeUndefined();
+        expect(llmService.chat).not.toHaveBeenCalled();
+      });
+
+      it('leaves the transaction alone when the model declines', async () => {
+        llmService.__setChatResponse({ content: JSON.stringify({ category: null, confidence: 0 }) });
+
+        const updated = await categoryMappingService.attemptAutoCategorization(await uncategorisable());
+
+        expect(updated).toBeUndefined();
+      });
+
+      // The batch worker loads one catalogue for the whole scrape; passing it in
+      // is what keeps the repeated-merchant cache alive across transactions.
+      it('reuses a catalogue supplied by the caller', async () => {
+        const catalogue = await llmCategorizer.forUser(testUserId);
+
+        await categoryMappingService.attemptAutoCategorization(await uncategorisable(), { catalogue });
+        await categoryMappingService.attemptAutoCategorization(await uncategorisable(), { catalogue });
+
+        expect(llmService.chat).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });

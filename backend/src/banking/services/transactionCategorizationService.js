@@ -1,6 +1,7 @@
 const { Transaction } = require('../models');
 const categoryMappingService = require('./categoryMappingService');
 const transactionClassifier = require('./transactionClassifier');
+const llmCategorizer = require('./llmCategorizer');
 const scrapingQueue = require('../../shared/services/scrapingQueue');
 const sseService = require('../../shared/services/sseService');
 const logger = require('../../shared/utils/logger');
@@ -49,6 +50,7 @@ class TransactionCategorizationService {
    */
   async processBatch({ userId, transactionIds }, job) {
     const corpus = await transactionClassifier.forUser(userId);
+    const catalogue = await llmCategorizer.forUser(userId);
     // Clients are keyed by the string form of the id, and the job payload may
     // hold either that or an ObjectId depending on the caller. Emitting with
     // the wrong one finds no client and drops the event silently.
@@ -61,7 +63,7 @@ class TransactionCategorizationService {
         // Gone, or already dealt with by the user while this sat in the queue.
         if (!transaction || transaction.category) continue;
 
-        const updated = await categoryMappingService.attemptAutoCategorization(transaction, { corpus });
+        const updated = await categoryMappingService.attemptAutoCategorization(transaction, { corpus, catalogue });
         if (updated?.category) results.categorized += 1;
         else results.uncategorized += 1;
       } catch (error) {

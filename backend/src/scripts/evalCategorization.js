@@ -177,6 +177,7 @@ const deriveTier = ({ categorizationMethod, categorizationReasoning: why, catego
   }
   if (why.startsWith('AI categorization:')) return 'legacy-ai';
   if (why.startsWith('Similar to a transaction you categorised before:')) return 'knn';
+  if (why.startsWith('Chose from your categories:')) return 'llm';
   return categorizationMethod || 'unknown';
 };
 
@@ -234,7 +235,7 @@ async function seedCorpus({ userId, cases }) {
   return seeded;
 }
 
-async function scoreCase({ testCase, userId, accountId, index, corpus }) {
+async function scoreCase({ testCase, userId, accountId, index, corpus, catalogue }) {
   const { Transaction } = require('../banking/models');
   const categoryMappingService = require('../banking/services/categoryMappingService');
 
@@ -252,7 +253,7 @@ async function scoreCase({ testCase, userId, accountId, index, corpus }) {
   await transaction.save();
 
   const startedAt = Date.now();
-  await categoryMappingService.attemptAutoCategorization(transaction, { corpus });
+  await categoryMappingService.attemptAutoCategorization(transaction, { corpus, catalogue });
   const elapsedMs = Date.now() - startedAt;
 
   const populated = await Transaction.findById(transaction._id)
@@ -375,9 +376,12 @@ async function main() {
     // rather than a corpus reload per transaction.
     const transactionClassifier = require('../banking/services/transactionClassifier');
     const corpus = await transactionClassifier.forUser(userId);
+    const llmCategorizer = require('../banking/services/llmCategorizer');
+    const catalogue = await llmCategorizer.forUser(userId);
+    if (catalogue) say(`Model fallback is on, choosing from ${catalogue.size} categories`);
     const results = [];
     for (let i = 0; i < cases.length; i += 1) {
-      results.push(await scoreCase({ testCase: cases[i], userId, accountId, index: i, corpus }));
+      results.push(await scoreCase({ testCase: cases[i], userId, accountId, index: i, corpus, catalogue }));
     }
 
     const summary = summarise(results);

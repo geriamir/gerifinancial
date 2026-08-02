@@ -114,7 +114,7 @@ access goes through the other module's service — not its models directly.
 | Module | Key models | Notable services |
 |---|---|---|
 | `auth` | `User` | — |
-| `banking` | `BankAccount`, `Transaction`, `Category`, `SubCategory`, `CreditCard`, `Tag`, `BalanceSnapshot`, `TransactionExclusion`, `ManualCategorized` | `bankScraperService`, `categoryMappingService`, `transactionClassifier`, `transactionCategorizationService`, `transactionService`, `creditCardService`, `balanceService`, `dataSyncService`, `scrapingSchedulerService`, `ibkrFlexClient`, `mercuryApiClient` |
+| `banking` | `BankAccount`, `Transaction`, `Category`, `SubCategory`, `CreditCard`, `Tag`, `BalanceSnapshot`, `TransactionExclusion`, `ManualCategorized` | `bankScraperService`, `categoryMappingService`, `transactionClassifier`, `llmCategorizer`, `transactionCategorizationService`, `transactionService`, `creditCardService`, `balanceService`, `dataSyncService`, `scrapingSchedulerService`, `ibkrFlexClient`, `mercuryApiClient` |
 | `foreign-currency` | `ForeignCurrencyAccount`, `CurrencyExchange` | `currencyExchangeService` |
 | `investments` | `Investment`, `Portfolio`, `InvestmentTransaction`, `InvestmentSnapshot`, `PortfolioSnapshot`, `StockPrice` | `investmentService`, `portfolioService`, `investmentSnapshotScheduler` |
 | `monthly-budgets` | `MonthlyBudget`, `YearlyBudget`, `CategoryBudget`, `TransactionPattern` | `budgetService`, `budgetCalculationService`, `smartBudgetService`, `patternService`, `recurrenceDetectionService`, `salaryAttributionHelper`, `averagingDenominatorService` |
@@ -136,6 +136,8 @@ tried in descending order of how much the evidence is worth:
 3. The nearest of the user's own past corrections *by meaning*, via
    `transactionClassifier`: descriptions are embedded with Azure OpenAI and
    compared by cosine similarity, and the nearest neighbours vote.
+4. A language model choosing from the user's own categories, via
+   `llmCategorizer`.
 
 Anything reaching the end is left uncategorised deliberately — the user sees it
 and decides, and that decision feeds tiers 1 and 3. A wrong category is worse
@@ -148,12 +150,38 @@ hand many times, because the description never repeats verbatim. It learns from
 the user's own labels rather than a keyword list somebody has to maintain, and
 it degrades to "no answer" when Azure OpenAI is not configured.
 
+Tier 4 exists because tiers 1–3 all learn from the user, so all three are silent
+for someone who has corrected nothing yet — which is everyone on their first
+scrape, exactly when the uncategorised list is longest and least inviting. It is
+last because a model's guess is weaker evidence than the user's own labels, and
+because it is the only tier that costs money per transaction. Three things keep
+that cost bounded: the answer is cached per merchant for the batch (a scrape is
+full of the same shops, and a refusal is cached as readily as an answer), the
+per-user daily token budget stops a runaway loop, and the first
+`AiBudgetExceededError` switches the tier off for the rest of the batch instead
+of paying for the same refusal hundreds of times.
+
+The model is never allowed to invent a category. It is shown only the user's own
+categories whose type matches the transaction's sign, and its answer is resolved
+back against them by name — so a hallucinated category, or one talked into it by
+a transfer memo, resolves to nothing and the transaction is left for the user.
+That resolution, not the prompt, is what makes the tier safe to point at
+attacker-influenced text; transaction descriptions are written by whoever moved
+the money and are fenced with `llmService.asUntrustedData` on the way in. An
+answer that stops at an expense category without a subcategory is refused too:
+the rest of the app treats that as still needing work, so a partial answer would
+simply be asked about again.
+
+Set `AI_LLM_CATEGORIZATION=false` to switch tier 4 off without giving up
+embeddings and the rest of the AI features.
+
 Categorisation does **not** run inside the scrape. `transactionService` saves
 transactions, sets their type from the amount, and queues one
 `categorize-transactions` job for the batch; the worker
-(`transactionCategorizationService`) loads the user's corpus once for the whole
-batch and reports progress over SSE. A scrape therefore finishes as soon as the
-bank data is stored, and a slow or unavailable categoriser cannot hold it up.
+(`transactionCategorizationService`) loads the user's corpus and category
+catalogue once for the whole batch and reports progress over SSE. A scrape
+therefore finishes as soon as the bank data is stored, and a slow or unavailable
+categoriser cannot hold it up.
 
 The cost of that split is that rows reach the browser before they have a
 category. `CategorizationProvider` (frontend) follows the
