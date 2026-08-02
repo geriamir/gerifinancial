@@ -153,7 +153,7 @@ class TransactionClassifier {
       return;
     }
 
-    await Promise.all(
+    const writes = await Promise.allSettled(
       stale.map((correction, index) => {
         const vector = vectors[index];
         if (!vector) return Promise.resolve();
@@ -167,6 +167,18 @@ class TransactionClassifier {
         );
       })
     );
+
+    // A write that fails only means the vector is not saved yet: the in-memory
+    // copy above still serves this run, and the next load retries. Same
+    // reasoning as the embed failure above - a database blip must not take down
+    // the scrape that happens to be loading the corpus.
+    const failures = writes.filter((write) => write.status === 'rejected');
+    if (failures.length) {
+      logger.warn(
+        `Could not persist ${failures.length} of ${stale.length} correction embeddings ` +
+        `for user ${userId}: ${failures[0].reason?.message}`
+      );
+    }
 
     logger.info(`Embedded ${stale.length} corrections for user ${userId}`);
   }

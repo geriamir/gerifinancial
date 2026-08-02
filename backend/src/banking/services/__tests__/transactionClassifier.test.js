@@ -191,6 +191,24 @@ describe('transactionClassifier', () => {
 
       expect(corpus.size).toBe(0);
     });
+
+    // The corrections themselves are already stored; failing to attach a vector
+    // to them is a lost cache entry, not lost data. One rejected write used to
+    // reject the whole load, and with it the scrape that asked for it.
+    it('survives a failed write of the embeddings it just computed', async () => {
+      await correction('שופרסל דיל');
+      const updateOne = jest
+        .spyOn(ManualCategorized, 'updateOne')
+        .mockRejectedValueOnce(new Error('connection reset by peer'));
+
+      const corpus = await transactionClassifier.forUser(userId);
+
+      expect(updateOne).toHaveBeenCalled();
+      // The in-memory copy carries the vector, so this run is unaffected; only
+      // the next load pays to embed it again.
+      expect(corpus.size).toBe(1);
+      updateOne.mockRestore();
+    });
   });
 
   describe('suggestFrom', () => {
