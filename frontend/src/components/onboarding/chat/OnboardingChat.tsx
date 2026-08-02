@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Box, Typography, Alert, CircularProgress, LinearProgress } from '@mui/material';
 import { useOnboarding } from '../../../hooks/useOnboarding';
+import { OnboardingStatus } from '../../../services/api/onboarding';
 import { buildScript } from './script';
 import { useRevealedMessages } from './useRevealedMessages';
 import { MessageBubble } from './MessageBubble';
@@ -22,7 +23,31 @@ const CARDS: Record<CardId, React.FC<CardProps>> = {
   complete: CompleteCard
 };
 
-const STEP_COUNT = 5;
+/**
+ * Progress follows `currentStep`, not `completedSteps.length`.
+ *
+ * The two disagree on a normal path. When credit card coverage comes back
+ * partial, the server records both `credit-card-setup` and
+ * `credit-card-matching` as completed while leaving `isComplete` false and
+ * parking the user on the matching review - so counting completed steps would
+ * show a finished bar above a question the user still has to answer.
+ * Where they are is the honest measure.
+ */
+const STEPS: OnboardingStatus['currentStep'][] = [
+  'checking-account',
+  'transaction-import',
+  'credit-card-detection',
+  'credit-card-setup',
+  'credit-card-matching',
+  'complete'
+];
+
+const progressOf = (status: OnboardingStatus): number => {
+  if (status.isComplete) return 100;
+  const reached = STEPS.indexOf(status.currentStep);
+  if (reached < 0) return 0;
+  return (reached / (STEPS.length - 1)) * 100;
+};
 
 /**
  * Onboarding as a conversation.
@@ -85,8 +110,6 @@ export const OnboardingChat: React.FC = () => {
     );
   }
 
-  const completed = status.isComplete ? STEP_COUNT : status.completedSteps?.length ?? 0;
-
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '70vh' }}>
       <Box sx={{ mb: 2 }}>
@@ -95,7 +118,8 @@ export const OnboardingChat: React.FC = () => {
         </Typography>
         <LinearProgress
           variant="determinate"
-          value={Math.min(100, (completed / STEP_COUNT) * 100)}
+          value={progressOf(status)}
+          data-testid="onboarding-progress"
           sx={{ height: 4, borderRadius: 2, mt: 1 }}
         />
       </Box>

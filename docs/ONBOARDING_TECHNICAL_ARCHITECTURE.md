@@ -87,8 +87,11 @@ has no way to interpret.
 
 **Step Flow** (unchanged - the server still owns it):
 ```
-checking-account → transaction-import → credit-card-detection → credit-card-setup → complete
+checking-account → transaction-import → credit-card-detection → credit-card-setup → credit-card-matching → complete
 ```
+
+`credit-card-matching` is only surfaced when coverage comes back below 100%;
+at full coverage the server moves straight to `complete`.
 
 #### `frontend/src/components/onboarding/chat/script.ts`
 **Purpose**: Turns the server's onboarding state into a transcript
@@ -437,7 +440,12 @@ generateCreditCardDisplayName(scrapedAccount)
    ├─ Backend creates CreditCard models
    └─ Updates User.onboardingStatus.hasCreditCards
 
-6. Step 5: Completion
+6. Step 5: Credit Card Matching (only below 100% coverage)
+   ├─ MatchingReviewCard reports how many payments matched a connected card
+   ├─ User adds another card, or finishes with partial coverage
+   └─ At full coverage the server skips straight to complete
+
+7. Step 6: Completion
    ├─ CompleteCard shows success message
    ├─ Updates User.onboardingStatus.isComplete = true
    ├─ OnboardingGuard redirects to main app

@@ -176,4 +176,59 @@ describe('OnboardingChat', () => {
 
     expect(await screen.findByTestId('chat-typing')).toBeInTheDocument();
   });
+
+  // Partial credit card coverage is a normal outcome, and on that path the
+  // server records every step as completed while leaving isComplete false.
+  // Counting completed steps would show a finished bar above a question the
+  // user still has to answer.
+  it('does not show full progress while the user still has a decision to make', async () => {
+    mockStatus = {
+      ...importing(),
+      currentStep: 'credit-card-matching',
+      isComplete: false,
+      completedSteps: [
+        'checking-account',
+        'transaction-import',
+        'credit-card-detection',
+        'credit-card-setup',
+        'credit-card-matching'
+      ],
+      transactionImport: {
+        completed: true,
+        transactionsImported: 42,
+        completedAt: '2026-01-01T00:05:00Z',
+        scrapingStatus: { isActive: false, status: 'complete', progress: 100, message: null, error: null }
+      },
+      creditCardDetection: {
+        analyzed: true,
+        analyzedAt: '2026-01-01T00:06:00Z',
+        transactionCount: 5,
+        recommendation: 'connect',
+        sampleTransactions: []
+      },
+      creditCardMatching: {
+        completed: true,
+        completedAt: '2026-01-01T00:08:00Z',
+        totalCreditCardPayments: 10,
+        coveredPayments: 6,
+        uncoveredPayments: 4,
+        coveragePercentage: 60,
+        matchedPayments: []
+      }
+    };
+    draw();
+
+    expect(await screen.findByTestId('matching-review')).toBeInTheDocument();
+    const bar = screen.getByTestId('onboarding-progress');
+    expect(Number(bar.getAttribute('aria-valuenow'))).toBeLessThan(100);
+  });
+
+  it('shows full progress once onboarding is complete', async () => {
+    mockStatus = { ...importing(), currentStep: 'complete', isComplete: true };
+    draw();
+
+    await screen.findByTestId('onboarding-chat');
+    const bar = screen.getByTestId('onboarding-progress');
+    expect(Number(bar.getAttribute('aria-valuenow'))).toBe(100);
+  });
 });
