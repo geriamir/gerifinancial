@@ -1,5 +1,6 @@
 const { ManualCategorized, Transaction, Category, SubCategory } = require('../models');
 const transactionClassifier = require('./transactionClassifier');
+const llmCategorizer = require('./llmCategorizer');
 const { enhancedKeywordMatcher } = require('./enhanced-keyword-matching');
 const { CategorizationMethod, TransactionType } = require('../constants/enums');
 const logger = require('../../shared/utils/logger');
@@ -12,15 +13,16 @@ class CategoryMappingService {
    * 1. An exact match against something this user categorised by hand.
    * 2. Keywords on the user's categories, then on their subcategories.
    * 3. The nearest of the user's own past corrections, by meaning.
+   * 4. A language model choosing from the user's own list of categories.
    *
    * Anything that reaches the end is left uncategorised on purpose; the user
    * sees it and decides, and that decision feeds tier 1 and tier 3.
    *
-   * `corpus` lets a caller working through many transactions load the user's
-   * corrections once instead of once per transaction. Omit it and one is loaded
-   * on demand.
+   * `corpus` and `catalogue` let a caller working through many transactions load
+   * the user's corrections and categories once instead of once per transaction.
+   * Omit either and it is loaded on demand.
    */
-  async attemptAutoCategorization(transaction, { corpus } = {}) {
+  async attemptAutoCategorization(transaction, { corpus, catalogue } = {}) {
     // Skip if already categorized
     // For Expenses: need both category and subcategory
     // For Income/Transfer: only need category (no subcategory)
@@ -272,6 +274,40 @@ class CategoryMappingService {
         }
       }
       
+      // Nothing the user has taught us fits. Ask the model to pick from their
+      // own categories - the only tier that can say anything at all to someone
+      // who has never corrected a transaction, which is everyone on their first
+      // scrape. It declines far more readily than the tiers above, and costs
+      // money when it does not, so it goes last.
+      const activeCatalogue = catalogue !== undefined
+        ? catalogue
+        : await llmCategorizer.forUser(transaction.userId);
+
+      const llmSuggestion = await llmCategorizer.suggestFrom(activeCatalogue, {
+        description: transaction.description,
+        memo: transaction.memo || transaction.rawData?.memo || null,
+        amount: transaction.amount,
+        categoryTypes
+      });
+
+      if (llmSuggestion) {
+        await transaction.categorize(
+          llmSuggestion.categoryId,
+          llmSuggestion.subCategoryId,
+          CategorizationMethod.AI,
+          llmSuggestion.reasoning
+        );
+
+        if (!transaction.type) {
+          transaction.type = llmSuggestion.categoryType;
+          await transaction.save();
+        }
+
+        return await Transaction.findById(transaction._id)
+          .populate('category')
+          .populate('subCategory');
+      }
+
       // If no categorization was successful and transaction has no type, set default type based on amount
       if (!transaction.type) {
         transaction.type = transaction.amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME;

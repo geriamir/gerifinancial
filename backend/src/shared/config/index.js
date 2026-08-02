@@ -95,6 +95,25 @@ const config = {
       // a wrong category is worse than none, because the user has to notice it
       // before they can fix it.
       minConfidence: Number(process.env.AI_KNN_MIN_CONFIDENCE) || 0.6
+    },
+    // The last tier of categorisation: asking the model to pick from the user's
+    // own categories. Everything ahead of it learns from corrections the user
+    // has made, so all of it is silent on a first scrape - which is exactly when
+    // the uncategorised list is longest.
+    llm: {
+      // Unlike the tiers above it, this one costs money per transaction. It
+      // needs a chat deployment to exist at all, which is already a deliberate
+      // choice, so it is on once that is configured - but it can be switched off
+      // on its own without giving up the rest of the AI features.
+      categorization: process.env.AI_LLM_CATEGORIZATION !== 'false',
+      // How sure the model has to claim to be. Stated confidence is a weak
+      // signal on its own, which is why the answer is also resolved against the
+      // user's real categories - this only filters the cases where the model
+      // itself is hedging.
+      minConfidence: numberFromEnv(process.env.AI_LLM_MIN_CONFIDENCE, 0.7),
+      // The reply is a single small JSON object. Capping it keeps a model that
+      // decides to explain itself from being charged for the essay.
+      maxTokens: Number(process.env.AI_LLM_MAX_COMPLETION_TOKENS) || 300
     }
   }
 };
