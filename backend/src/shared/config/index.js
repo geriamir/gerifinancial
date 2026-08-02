@@ -42,8 +42,33 @@ const config = {
     // Where to land after a successful login when no return_to was supplied.
     defaultReturnTo: (process.env.DEFAULT_RETURN_TO || 'http://localhost:3000').replace(/\/$/, ''),
     sessionTtlSeconds: Number(process.env.SESSION_TTL_SEC) || 7 * 24 * 60 * 60
+  },
+  // Azure OpenAI. Authenticated with the same managed identity that reaches the
+  // vaults: the account has local authentication disabled, so there is no key to
+  // configure, leak or rotate. Left unset - which is the case for local
+  // development and every test run - the AI features report themselves
+  // unavailable instead of failing at the first call.
+  ai: {
+    endpoint: (process.env.AZURE_OPENAI_ENDPOINT || '').replace(/\/$/, '') || undefined,
+    // Deployment names rather than model names. Which model a deployment serves,
+    // and at which version, is decided in infra/main.bicep.
+    chatDeployment: process.env.AZURE_OPENAI_CHAT_DEPLOYMENT || undefined,
+    embeddingDeployment: process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT || undefined,
+    apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2025-01-01-preview',
+    requestTimeoutMs: Number(process.env.AI_REQUEST_TIMEOUT_MS) || 30000,
+    maxRetries: Number(process.env.AI_MAX_RETRIES) || 2,
+    // A per-user daily ceiling on tokens. Unlike every other quota in this app,
+    // exceeding this one costs real money, and the paths that will call the
+    // model - categorising a scrape, answering questions about transactions -
+    // are all loops that a bug could run away with. The cap is per user so one
+    // account cannot spend everyone else's allowance.
+    dailyTokenBudget: Number(process.env.AI_DAILY_TOKEN_BUDGET) || 200000
   }
 };
+
+// Every AI feature checks this rather than testing the individual settings, so
+// a half-configured environment behaves the same as an unconfigured one.
+config.ai.enabled = Boolean(config.ai.endpoint && config.ai.chatDeployment);
 
 // The session cookie has to reach the API from the frontend, which is served
 // from a different origin in every deployed environment. SameSite=None is what

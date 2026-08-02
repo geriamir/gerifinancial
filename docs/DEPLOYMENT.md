@@ -15,6 +15,7 @@ Everything lives in one resource group, `rg-gerifinancial`, in `northeurope`.
 | Images | Container Registry | `gerifinanciall2sld6nmx2xxq` |
 | App secrets | Key Vault | `gfkvl2sld6nmx2xxq` |
 | Encryption key | Key Vault | `gfkekl2sld6nmx2xxq` |
+| AI models | Azure OpenAI | `gfoail2sld6nmx2xxq` (in `swedencentral`) |
 
 Public URLs:
 
@@ -58,6 +59,57 @@ app secrets vault, so no single assignment grants both.
 
 > Do not delete or purge `gfkek…`. The lock makes this a two-step action
 > deliberately.
+
+## Why Azure OpenAI is not in northeurope
+
+Everything else runs in `northeurope`. The Azure OpenAI account does not, and
+this is not an oversight — **no chat model can be deployed in `northeurope`**.
+The region carries a much thinner model catalogue than the rest of the EU: the
+`gpt-5` family is offered there only as `GlobalProvisionedManaged`, which is
+reserved capacity billed by the hour, and every pay-as-you-go chat SKU has a
+quota limit of zero. `model-router` *can* be created there, but it answers `503`
+with an empty body, because it has no underlying capacity to route to.
+
+`swedencentral` is the nearest region with the full catalogue, so the account
+lives there while the container app that calls it stays in `northeurope`. The
+extra hop costs a few milliseconds and does not leave the EU.
+
+Two related things worth knowing:
+
+- **Quota for `Global*` SKUs is subscription-wide, not per-region.** Moving a
+  deployment to another region does not get you more of it. `text-embedding-3-large`
+  is already at its subscription limit in this subscription, which is why the
+  embedding deployment here uses `text-embedding-3-small`.
+- **Inference is on `GlobalStandard`, which may route a request outside the EU.**
+  This is an accepted trade-off, not an oversight. The EU-confined alternative,
+  `DataZoneStandard`, currently has zero chat quota in every EU region and would
+  need a quota request before it could be used at all. Revisit if the app ever
+  serves anyone other than its author. Switching is a change to `openAiChatSku`
+  in `infra/main.bicep` and nothing else — no application code refers to the SKU.
+
+### Authentication to Azure OpenAI
+
+The account is created with `disableLocalAuth: true`, so it has no API keys —
+`az cognitiveservices account keys list` fails against it by design. The API
+authenticates with its managed identity, which holds **Cognitive Services OpenAI
+User** scoped to the account.
+
+To call it from a developer machine, grant yourself the same role:
+
+```bash
+az role assignment create \
+  --assignee "$(az ad signed-in-user show --query id -o tsv)" \
+  --role "Cognitive Services OpenAI User" \
+  --scope "$(az cognitiveservices account show -n gfoail2sld6nmx2xxq -g rg-gerifinancial --query id -o tsv)"
+```
+
+Then set `AZURE_OPENAI_ENDPOINT` locally and sign in with `az login`; the client
+picks up your credentials automatically. Without `AZURE_OPENAI_ENDPOINT` set, all
+AI features are simply off, which is the default for local development and tests.
+
+> A newly created deployment returns `404 DeploymentNotFound` for a few minutes
+> while it propagates. A `401` means the role assignment is missing; a `404`
+> shortly after a deploy usually just means waiting.
 
 ## Secrets
 

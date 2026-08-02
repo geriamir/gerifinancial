@@ -1,0 +1,77 @@
+{
+  "_comment": [
+    "Labelled transactions for measuring the categorisation cascade.",
+    "",
+    "These are hand-written, plausible Israeli merchant descriptors - not real",
+    "user data, which must never be committed. They exist so the eval has a",
+    "baseline that runs anywhere, including CI. To measure against genuine",
+    "behaviour, run the eval with --from-db, which builds a set out of the",
+    "transactions a user has actually corrected by hand.",
+    "",
+    "Expected values name categories and subcategories from the per-user",
+    "defaults in monthly-budgets/services/userCategoryService.js. The eval fails",
+    "loudly if a name here no longer exists there, so renaming a category cannot",
+    "silently turn this file into a measurement of nothing."
+  ],
+  "fixtures": [
+    { "description": "שופרסל דיל", "amount": -152.3, "category": "Shopping", "subCategory": "Groceries" },
+    { "description": "רמי לוי שיווק השקמה", "amount": -412.75, "category": "Shopping", "subCategory": "Groceries" },
+    { "description": "ויקטורי רשת סופרמרקטים", "amount": -288.4, "category": "Shopping", "subCategory": "Groceries" },
+    { "description": "יינות ביתן", "amount": -196.9, "category": "Shopping", "subCategory": "Groceries" },
+    { "description": "אושר עד", "amount": -530.15, "category": "Shopping", "subCategory": "Groceries" },
+    { "description": "טיב טעם", "amount": -243.0, "category": "Shopping", "subCategory": "Groceries" },
+
+    { "description": "ארומה אספרסו בר", "amount": -32.0, "category": "Eating Out", "subCategory": "Coffee shops, Restaurant and Pubs" },
+    { "description": "קפה לנדוור", "amount": -78.5, "category": "Eating Out", "subCategory": "Coffee shops, Restaurant and Pubs" },
+    { "description": "מסעדת מול הים", "amount": -410.0, "category": "Eating Out", "subCategory": "Coffee shops, Restaurant and Pubs" },
+    { "description": "פאב הבירה השחורה", "amount": -180.0, "category": "Eating Out", "subCategory": "Coffee shops, Restaurant and Pubs" },
+    { "description": "וולט משלוחים", "amount": -96.0, "category": "Eating Out", "subCategory": "Take Away" },
+    { "description": "תן ביס משלוח", "amount": -112.4, "category": "Eating Out", "subCategory": "Take Away" },
+
+    { "description": "פז יילו דלק", "amount": -300.0, "category": "Cars and Transportation", "subCategory": "Fuel" },
+    { "description": "סונול תחנת דלק", "amount": -250.5, "category": "Cars and Transportation", "subCategory": "Fuel" },
+    { "description": "מוסך אבי תיקון רכב", "amount": -1250.0, "category": "Cars and Transportation", "subCategory": "Car Services" },
+    { "description": "חניון אחוזת החוף", "amount": -45.0, "category": "Cars and Transportation", "subCategory": "Parking" },
+    { "description": "פנגו חניה", "amount": -22.5, "category": "Cars and Transportation", "subCategory": "Parking" },
+    { "description": "כביש אגרה 6 דרך ארץ", "amount": -68.2, "category": "Cars and Transportation", "subCategory": "Toll Roads" },
+    { "description": "רב קו תחבורה ציבורית", "amount": -150.0, "category": "Cars and Transportation", "subCategory": "Public Transportation" },
+    { "description": "ביטוח רכב הראל", "amount": -420.0, "category": "Cars and Transportation", "subCategory": "Car Insurance" },
+
+    { "description": "סופר פארם בית מרקחת", "amount": -89.9, "category": "Health", "subCategory": "Pharmacy" },
+    { "description": "מכון כושר הולמס פלייס", "amount": -299.0, "category": "Health", "subCategory": "Fitness" },
+    { "description": "מספרה סטייל", "amount": -120.0, "category": "Health", "subCategory": "Grooming" },
+    { "description": "מרפאת שיניים דר כהן", "amount": -800.0, "category": "Health", "subCategory": "Dental" },
+    { "description": "אופטיקה משקפיים הלפרין", "amount": -650.0, "category": "Health", "subCategory": "Optometry" },
+    { "description": "ביטוח בריאות מגדל", "amount": -310.0, "category": "Health", "subCategory": "Health Insurance" },
+
+    { "description": "חברת החשמל לישראל", "amount": -540.0, "category": "Household", "subCategory": "Utilities" },
+    { "description": "תאגיד מים מי אביבים", "amount": -180.0, "category": "Household", "subCategory": "Utilities" },
+    { "description": "ארנונה עיריית תל אביב", "amount": -720.0, "category": "Household", "subCategory": "Property Tax" },
+    { "description": "משכנתא בנק לאומי", "amount": -4800.0, "category": "Household", "subCategory": "Mortgage" },
+    { "description": "פרטנר תקשורת טלפון", "amount": -99.0, "category": "Household", "subCategory": "Communication" },
+    { "description": "בזק בינלאומי אינטרנט", "amount": -129.0, "category": "Household", "subCategory": "Communication" },
+    { "description": "ביטוח דירה כלל", "amount": -210.0, "category": "Household", "subCategory": "Home Insurance" },
+    { "description": "גינון ותחזוקת גינה", "amount": -350.0, "category": "Household", "subCategory": "Gardening" },
+
+    { "description": "קסטרו בגדים", "amount": -320.0, "category": "Shopping", "subCategory": "Apparel and Accessories" },
+    { "description": "KSP מוצרי חשמל", "amount": -2400.0, "category": "Shopping", "subCategory": "Appliances and Electronics" },
+    { "description": "איקאה רהיטים", "amount": -1850.0, "category": "Shopping", "subCategory": "Furniture and Decorations" },
+
+    { "description": "סינמה סיטי קולנוע", "amount": -110.0, "category": "Entertainment", "subCategory": "Movies and Shows" },
+    { "description": "סטימצקי ספרים", "amount": -145.0, "category": "Entertainment", "subCategory": "Music and Reading" },
+    { "description": "מתנה ליום הולדת", "amount": -200.0, "category": "Entertainment", "subCategory": "Gifts, Weddings and Celebrations" },
+
+    { "description": "אל על טיסות", "amount": -3200.0, "category": "Travel", "subCategory": "Flights" },
+    { "description": "מלון דן בתי מלון", "amount": -1900.0, "category": "Travel", "subCategory": "Hotels" },
+    { "description": "ביטוח נסיעות פספורטכארד", "amount": -140.0, "category": "Travel", "subCategory": "Travel Insurance" },
+
+    { "description": "וטרינר חיות מחמד", "amount": -450.0, "category": "Family", "subCategory": "Pets" },
+    { "description": "קייטנת קיץ פעילויות ילדים", "amount": -1200.0, "category": "Family", "subCategory": "Daycare, Kids Activities and Summer Camps" },
+    { "description": "בית ספר תשלומי חינוך", "amount": -600.0, "category": "Family", "subCategory": "School" },
+
+    { "description": "משכורת חודשית", "amount": 18500.0, "category": "Salary" },
+    { "description": "העברת משכורת ממעסיק", "amount": 21000.0, "category": "Salary" },
+    { "description": "משיכת מזומן כספומט", "amount": -1000.0, "category": "Cash Withdrawal" },
+    { "description": "העברה פנימית לחיסכון", "amount": -2000.0, "category": "Savings" }
+  ]
+}

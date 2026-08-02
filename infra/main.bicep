@@ -31,6 +31,22 @@ param githubOAuthClientId string = ''
 @description('Mongo database name.')
 param mongoDatabaseName string = 'gerifinancial'
 
+@description('''Region for the Azure OpenAI account. Deliberately not the resource group's region: North Europe carries a reduced model catalogue and offers no chat model on a pay-as-you-go SKU (gpt-5 and gpt-5-mini are provisioned-capacity only there, and the gpt-5.4 family has no quota), so an account created there cannot serve chat at all. Sweden Central is the nearest EU region with the full catalogue. Verify with: az cognitiveservices model list --location <region>.''')
+param openAiLocation string = 'swedencentral'
+
+@description('Tokens-per-minute quota, in thousands, for each model deployment. Quota for Global* SKUs is a subscription-wide pool shared with every other account in the subscription, so these stay modest rather than claiming the whole allowance.')
+param openAiChatCapacity int = 100
+
+@description('Tokens-per-minute quota, in thousands, for the embedding deployment.')
+param openAiEmbeddingCapacity int = 100
+
+@description('''Billing and routing model for the chat deployment. GlobalStandard is pay-as-you-go and may serve a request from capacity outside the EU. DataZoneStandard keeps inference within the EU data zone and is the better fit for financial data, but currently has zero quota in every EU region and needs a quota increase before it can be selected. Nothing in the application depends on this, so it can be switched once quota exists.''')
+@allowed([
+  'GlobalStandard'
+  'DataZoneStandard'
+])
+param openAiChatSku string = 'GlobalStandard'
+
 var suffix = uniqueString(resourceGroup().id)
 var mongoClusterName = '${namePrefix}-mongo-${suffix}'
 var containerAppName = '${namePrefix}-api'
@@ -39,6 +55,11 @@ var redisAppName = '${namePrefix}-redis'
 var keyVaultName = 'gfkv${suffix}'
 var kekVaultName = 'gfkek${suffix}'
 var credentialKekName = 'credential-kek'
+
+// Globally unique and capped at 24 characters, like the vault names.
+var openAiName = 'gfoai${suffix}'
+var openAiChatDeploymentName = 'gpt-5-mini'
+var openAiEmbeddingDeploymentName = 'text-embedding-3-small'
 
 var mongoUriSecretName = 'mongodb-uri'
 var jwtSecretName = 'jwt-secret'
@@ -142,6 +163,94 @@ resource redisSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' =
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
     principalId: redisIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Azure OpenAI. Note the region: this account is deliberately not in the
+// resource group's region - see the openAiLocation parameter for why North
+// Europe cannot serve chat at all. The extra hop between the container app and
+// Sweden Central stays inside the EU and costs a few milliseconds.
+//
+// Authentication is Entra ID only. disableLocalAuth switches off the account
+// keys entirely, so there is no key to leak, rotate or store in a vault - the
+// container app's managed identity is the only way in, exactly as it is for
+// Mongo, Redis and both vaults.
+resource openAi 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
+  name: openAiName
+  location: openAiLocation
+  kind: 'OpenAI'
+  sku: {
+    name: 'S0'
+  }
+  properties: {
+    // Required for Entra ID auth: tokens are issued against the custom subdomain
+    // rather than the shared regional endpoint.
+    customSubDomainName: openAiName
+    disableLocalAuth: true
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+// GlobalStandard is pay-as-you-go with no reserved capacity. It does mean
+// inference may be served from any Azure region worldwide; DataZoneStandard
+// would confine it to the EU, and is the better fit for transaction data, but
+// it currently carries no quota in any EU region on this subscription. Moving
+// over is a SKU change here plus nothing in the application, because the
+// deployment name stays the same.
+resource chatDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
+  parent: openAi
+  name: openAiChatDeploymentName
+  sku: {
+    name: openAiChatSku
+    capacity: openAiChatCapacity
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'gpt-5-mini'
+      version: '2025-08-07'
+    }
+  }
+}
+
+// text-embedding-3-small rather than -large: -large has no quota left anywhere
+// on this subscription, and -small is a fifth of the price at half the vector
+// width (1536 dimensions), which also halves what has to be stored per
+// transaction. Ample for scoring merchant descriptions against each other.
+resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024-10-01' = {
+  parent: openAi
+  name: openAiEmbeddingDeploymentName
+  sku: {
+    name: 'GlobalStandard'
+    capacity: openAiEmbeddingCapacity
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: 'text-embedding-3-small'
+      version: '1'
+    }
+  }
+  // Deployments on one account must be created one at a time; issuing them in
+  // parallel fails with a conflict on the parent account.
+  dependsOn: [
+    chatDeployment
+  ]
+}
+
+// Cognitive Services OpenAI User: call the inference endpoints, nothing else.
+// It conveys no ability to create or alter deployments, and - unlike the
+// Contributor roles - no ability to read the account keys, which is what keeps
+// disableLocalAuth from being merely decorative.
+var openAiUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+
+resource openAiUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: openAi
+  name: guid(openAi.id, identity.id, openAiUserRoleId)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', openAiUserRoleId)
+    principalId: identity.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
@@ -327,6 +436,11 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     keyVaultCryptoUser
     keyVaultSecretsUser
     credentialKek
+    // The app resolves its Azure OpenAI token lazily, but the role assignment
+    // and both deployments should exist before it serves traffic so the first
+    // request does not fail against a half-built account.
+    openAiUser
+    embeddingDeployment
   ]
   properties: {
     managedEnvironmentId: containerEnv.id
@@ -446,6 +560,23 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'DEFAULT_RETURN_TO'
               value: 'https://${staticWebApp.properties.defaultHostname}'
             }
+            {
+              // No key: the app authenticates with the same managed identity it
+              // uses for the vaults, via AZURE_CLIENT_ID above.
+              name: 'AZURE_OPENAI_ENDPOINT'
+              value: openAi.properties.endpoint
+            }
+            {
+              // Deployment names, not model names. Pinning the model version is
+              // a property of the deployment, so swapping models is a change
+              // here and in Bicep rather than in application code.
+              name: 'AZURE_OPENAI_CHAT_DEPLOYMENT'
+              value: openAiChatDeploymentName
+            }
+            {
+              name: 'AZURE_OPENAI_EMBEDDING_DEPLOYMENT'
+              value: openAiEmbeddingDeploymentName
+            }
           ]
           probes: [
             {
@@ -494,6 +625,13 @@ output appSecretsVaultUrl string = keyVault.properties.vaultUri
 @description('Vault holding the credential key-encryption key. Purge protected and delete locked; never tear this down while any user has stored bank credentials.')
 output kekVaultName string = kekVault.name
 output kekVaultUrl string = kekVault.properties.vaultUri
+
+@description('Azure OpenAI account. Entra ID only - it has no keys to retrieve, so nothing here needs to reach a vault.')
+output openAiName string = openAi.name
+output openAiEndpoint string = openAi.properties.endpoint
+output openAiLocationUsed string = openAiLocation
+output openAiChatDeployment string = openAiChatDeploymentName
+output openAiEmbeddingDeployment string = openAiEmbeddingDeploymentName
 
 @description('Register this exact URL as the Authorization callback URL on the GitHub OAuth App.')
 output githubOAuthCallbackUrl string = '${apiPublicUrl}/api/auth/github/callback'

@@ -1,6 +1,11 @@
 // Mock services
 jest.mock('../banking/services/categoryAIService', () => require('./mocks/categoryAIService'));
 jest.mock('../banking/services/scrapingSchedulerService', () => require('./mocks/scrapingSchedulerService'));
+// The one seam to a language model, and the budget that meters it. Mocked
+// globally so no test can reach the network, spend money, or depend on an
+// Azure OpenAI deployment existing.
+jest.mock('../shared/services/ai/llmService', () => require('./mocks/llmService'));
+jest.mock('../shared/services/ai/aiBudget', () => require('./mocks/aiBudget'));
 
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
@@ -58,6 +63,12 @@ beforeAll(async () => {
 }, 45000); // 45 second timeout for setup
 
 beforeEach(async () => {
+  // Reset AI test doubles first, before any early return below: a canned chat
+  // response or a spent budget leaking into the next test would be a confusing
+  // failure to trace back.
+  require('./mocks/llmService').__reset();
+  require('./mocks/aiBudget').__reset();
+
   // Skip cleanup for RSUGrant model tests to avoid timeout issues
   const testPath = expect.getState().testPath;
   if (testPath && testPath.includes('RSUGrant.test.js')) {
