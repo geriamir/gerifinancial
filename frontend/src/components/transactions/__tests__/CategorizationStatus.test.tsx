@@ -53,7 +53,7 @@ describe('CategorizationStatus', () => {
     renderStatus();
 
     send('categorization:progress', { processed: 40, total: 40, categorized: 30, uncategorized: 10, failed: 0 });
-    send('categorization:complete', { total: 40, categorized: 30, uncategorized: 10, failed: 0 });
+    send('categorization:completed', { total: 40, categorized: 30, uncategorized: 10, failed: 0 });
 
     expect(screen.getByText(/Categorised 30 of 40 new transactions/i)).toBeInTheDocument();
     expect(screen.getByText(/10 still need a category/i)).toBeInTheDocument();
@@ -62,7 +62,7 @@ describe('CategorizationStatus', () => {
   it('says so when nothing was left over', () => {
     renderStatus();
 
-    send('categorization:complete', { total: 5, categorized: 5, uncategorized: 0, failed: 0 });
+    send('categorization:completed', { total: 5, categorized: 5, uncategorized: 0, failed: 0 });
 
     expect(screen.getByText(/Everything that came in has a category/i)).toBeInTheDocument();
   });
@@ -70,7 +70,7 @@ describe('CategorizationStatus', () => {
   it('counts transactions that failed as still needing attention', () => {
     renderStatus();
 
-    send('categorization:complete', { total: 5, categorized: 3, uncategorized: 1, failed: 1 });
+    send('categorization:completed', { total: 5, categorized: 3, uncategorized: 1, failed: 1 });
 
     expect(screen.getByText(/2 still need a category/i)).toBeInTheDocument();
   });
@@ -79,7 +79,7 @@ describe('CategorizationStatus', () => {
     const user = userEvent.setup();
     renderStatus();
 
-    send('categorization:complete', { total: 5, categorized: 5, uncategorized: 0, failed: 0 });
+    send('categorization:completed', { total: 5, categorized: 5, uncategorized: 0, failed: 0 });
     await user.click(screen.getByRole('button', { name: /close/i }));
 
     expect(screen.queryByText(/Categorised 5 of 5/i)).not.toBeInTheDocument();

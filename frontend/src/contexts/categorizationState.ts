@@ -44,11 +44,11 @@ export const initialCategorizationState: CategorizationState = {
 
 export type CategorizationEvent =
   | { type: 'categorization:progress'; data: Partial<CategorizationSummary & { processed: number }> }
-  | { type: 'categorization:complete'; data: Partial<CategorizationSummary> }
+  | { type: 'categorization:completed'; data: Partial<CategorizationSummary> }
   | { type: 'dismiss' };
 
 /** The events this state is driven by, as the server names them on the stream. */
-export const CATEGORIZATION_EVENTS = ['categorization:progress', 'categorization:complete'] as const;
+export const CATEGORIZATION_EVENTS = ['categorization:progress', 'categorization:completed'] as const;
 
 export type CategorizationEventType = (typeof CATEGORIZATION_EVENTS)[number];
 
@@ -86,7 +86,7 @@ export const reduceCategorization = (
       };
     }
 
-    case 'categorization:complete': {
+    case 'categorization:completed': {
       const total = count(event.data.total);
       const categorized = count(event.data.categorized);
       const summary: CategorizationSummary = {

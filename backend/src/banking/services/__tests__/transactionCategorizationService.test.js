@@ -150,7 +150,7 @@ describe('transactionCategorizationService', () => {
         transactionIds: [transaction._id]
       });
 
-      const complete = emit.mock.calls.find(([, type]) => type === 'categorization:complete');
+      const complete = emit.mock.calls.find(([, type]) => type === 'categorization:completed');
       expect(complete).toBeDefined();
       expect(complete[2]).toMatchObject({ total: 1 });
     });

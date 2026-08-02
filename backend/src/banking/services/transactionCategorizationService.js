@@ -84,7 +84,7 @@ class TransactionCategorizationService {
       }
     }
 
-    sseService.emit(userIdStr, 'categorization:complete', {
+    sseService.emit(userIdStr, 'categorization:completed', {
       total: transactionIds.length,
       ...results
     });

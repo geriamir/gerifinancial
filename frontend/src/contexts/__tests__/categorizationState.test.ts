@@ -19,7 +19,7 @@ const progress = (data: Record<string, number>): CategorizationEvent => ({
 });
 
 const complete = (data: Record<string, number>): CategorizationEvent => ({
-  type: 'categorization:complete',
+  type: 'categorization:completed',
   data
 });
 
