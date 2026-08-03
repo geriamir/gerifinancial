@@ -1,21 +1,16 @@
 import React, { useState } from 'react';
 import {
   Box,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   TextField,
   Button,
   Alert,
   Stack,
-  Typography,
-  SelectChangeEvent
+  Typography
 } from '@mui/material';
 import { Lock as LockIcon } from '@mui/icons-material';
 import { AxiosError } from 'axios';
 import { CREDIT_CARD_PROVIDERS } from '../../../../constants/banks';
-import { BankIcon } from '../../../bank/BankIcon';
+import { BankPicker } from '../../../bank/BankPicker';
 import { CardShell } from '../CardShell';
 import { CardProps } from '../types';
 
@@ -30,9 +25,8 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ handlers }) => {
     setForm((previous) => ({ ...previous, [name]: value }));
   };
 
-  const handleSelect = (event: SelectChangeEvent) => {
-    const { name, value } = event.target;
-    setForm((previous) => ({ ...previous, [name || '']: value }));
+  const handleProvider = (bankId: string) => {
+    setForm((previous) => ({ ...previous, bankId }));
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -77,26 +71,14 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ handlers }) => {
   return (
     <CardShell testId="credit-card-setup">
       <form onSubmit={handleSubmit}>
-        <FormControl fullWidth margin="dense" required size="small">
-          <InputLabel id="card-provider-label">Card provider</InputLabel>
-          <Select
-            labelId="card-provider-label"
-            id="card-provider-select"
-            name="bankId"
-            value={form.bankId}
-            onChange={handleSelect}
-            label="Card provider"
-            data-testid="provider-select"
-            sx={{ '& .MuiSelect-select': { display: 'flex', alignItems: 'center', gap: 1.5 } }}
-          >
-            {CREDIT_CARD_PROVIDERS.map((provider) => (
-              <MenuItem key={provider.id} value={provider.id} sx={{ gap: 1.5 }}>
-                <BankIcon bankId={provider.id} size={24} />
-                {provider.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <BankPicker
+          banks={CREDIT_CARD_PROVIDERS}
+          value={form.bankId}
+          onChange={handleProvider}
+          label="Card provider"
+          helperText="Whoever issues the card, which is not always the bank you just connected."
+          testId="provider-select"
+        />
 
         <TextField
           fullWidth

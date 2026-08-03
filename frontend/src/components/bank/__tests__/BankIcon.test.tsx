@@ -6,11 +6,18 @@ import { BankIcon } from '../BankIcon';
 import { SUPPORTED_BANKS, CHECKING_ACCOUNT_BANKS, CREDIT_CARD_PROVIDERS, API_BANKS, OTP_BANKS } from '../../../constants/banks';
 
 describe('BankIcon', () => {
-  // Most providers ship no logo, so the monogram is what actually renders for
-  // them - it is a fallback in name only.
+  // The API and OTP providers publish no mark, so for them the monogram is what
+  // actually renders - a fallback in name only. Taken off the list rather than
+  // named directly: this test used to say `visaCal`, and adding the card
+  // provider logos silently turned it into an assertion about an <img>.
   it('shows the monogram for a bank with no logo', () => {
-    render(<BankIcon bankId="visaCal" />);
-    expect(screen.getByTestId('bank-icon-visaCal')).toHaveTextContent('CAL');
+    const bank = SUPPORTED_BANKS.find((candidate) => !candidate.logo);
+    if (!bank) {
+      throw new Error('Every bank now ships a logo, so this test needs a different subject.');
+    }
+
+    render(<BankIcon bankId={bank.id} />);
+    expect(screen.getByTestId(`bank-icon-${bank.id}`)).toHaveTextContent(bank.monogram);
   });
 
   it('draws the real mark for a bank that has one', () => {

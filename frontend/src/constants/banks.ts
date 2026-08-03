@@ -30,9 +30,9 @@ export const CHECKING_ACCOUNT_BANKS: SupportedBank[] = [
 
 // Credit Card Providers (Secondary onboarding step)
 export const CREDIT_CARD_PROVIDERS: SupportedBank[] = [
-  { id: 'visaCal', name: 'Visa Cal', monogram: 'CAL', color: '#0057B8' },
-  { id: 'max', name: 'Max', monogram: 'MAX', color: '#5B2C86' },
-  { id: 'isracard', name: 'Isracard', monogram: 'ISR', color: '#E4761B' }
+  { id: 'visaCal', name: 'Visa Cal', monogram: 'CAL', color: '#0057B8', logo: '/banks/visaCal.png' },
+  { id: 'max', name: 'Max', monogram: 'MAX', color: '#5B2C86', logo: '/banks/max.png' },
+  { id: 'isracard', name: 'Isracard', monogram: 'ISR', color: '#E4761B', logo: '/banks/isracard.png' }
 ];
 
 // API-based banks (token-based REST API, no browser scraping)
