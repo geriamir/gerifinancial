@@ -4,6 +4,7 @@ const { Category, SubCategory, Transaction, ManualCategorized } = require('../..
 const { CategorizationMethod, TransactionType } = require('../../constants/enums');
 const llmCategorizer = require('../llmCategorizer');
 const llmService = require('../../../shared/services/ai/llmService');
+const { AiBudgetExceededError } = require('../../../shared/services/ai/aiBudget');
 const config = require('../../../shared/config');
 
 const originalLlmEnabled = config.ai.llm.categorization;
@@ -572,6 +573,104 @@ describe('CategoryMappingService', () => {
           await categoryMappingService.finishDeferred(transaction, catalogue);
 
           expect((await Transaction.findById(transaction._id)).type).toBe(TransactionType.EXPENSE);
+        });
+      });
+
+      // Nothing else ever revisits an uncategorised transaction - the queue is
+      // fed only by newly-saved ones - so whatever the budget cuts off would be
+      // abandoned for good unless it is written down here. The distinction
+      // matters both ways: re-asking about one the model already declined would
+      // spend the same money on the same refusal every single day.
+      describe('recording what the budget cut off', () => {
+        const spendTheBudget = () =>
+          llmService.__setChatError(new AiBudgetExceededError(testUserId, 200000, 200000));
+
+        it('marks a transaction the budget stopped the model from ever seeing', async () => {
+          const transaction = await uncategorisable();
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          spendTheBudget();
+
+          await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          const saved = await Transaction.findById(transaction._id);
+          expect(saved.awaitingModelCategorization).toBe(true);
+          expect(saved.category).toBeFalsy();
+          // Still given everything a settled transaction gets, so the user sees
+          // it in their list rather than it hiding until the model catches up.
+          expect(saved.type).toBe(TransactionType.EXPENSE);
+        });
+
+        it('leaves a transaction the model looked at and declined unmarked', async () => {
+          const transaction = await uncategorisable();
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          llmService.__setChatResponse({ content: JSON.stringify({ category: null, confidence: 0 }) });
+
+          await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          expect((await Transaction.findById(transaction._id)).awaitingModelCategorization).toBe(false);
+        });
+
+        it('clears the mark once the model has finally looked, even if it declines', async () => {
+          const transaction = await uncategorisable({ awaitingModelCategorization: true });
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          llmService.__setChatResponse({ content: JSON.stringify({ category: null, confidence: 0 }) });
+
+          await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          expect((await Transaction.findById(transaction._id)).awaitingModelCategorization).toBe(false);
+        });
+
+        it('clears the mark when the model finally places it', async () => {
+          const transaction = await uncategorisable({ awaitingModelCategorization: true });
+          const catalogue = await llmCategorizer.forUser(testUserId);
+
+          await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          const saved = await Transaction.findById(transaction._id);
+          expect(saved.category).toBeTruthy();
+          expect(saved.awaitingModelCategorization).toBe(false);
+        });
+
+        // A refusal the model already gave is an answer. Once the budget trips
+        // later in the same run, every transaction sharing that description
+        // would otherwise be marked unseen and re-asked on the next run - the
+        // exact daily spend on hopeless descriptions this is meant to avoid.
+        it('leaves one the model already declined alone when the budget trips later', async () => {
+          const first = await uncategorisable({ description: 'מכולת פינתית' });
+          const second = await uncategorisable({ description: 'מכולת פינתית' });
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          llmService.__setChatResponse({ content: JSON.stringify({ category: null, confidence: 0 }) });
+
+          await categoryMappingService.finishDeferred(first, catalogue);
+          spendTheBudget();
+          // Something else in the same run runs the budget out.
+          await categoryMappingService.finishDeferred(await uncategorisable(), catalogue);
+
+          await categoryMappingService.finishDeferred(second, catalogue);
+
+          expect((await Transaction.findById(second._id)).awaitingModelCategorization).toBe(false);
+        });
+
+        // A transaction can also fall off the cliff without a batch around it.
+        it('marks one the budget cut off on the single-call path too', async () => {
+          const transaction = await uncategorisable();
+          spendTheBudget();
+
+          await categoryMappingService.attemptAutoCategorization(transaction);
+
+          expect((await Transaction.findById(transaction._id)).awaitingModelCategorization).toBe(true);
+        });
+
+        // The model being down is not the same as the budget being spent: it
+        // costs nothing, so there is no cliff to resume from, and marking it
+        // would build a backlog that never drains.
+        it('does not mark one the model simply failed to answer', async () => {
+          const transaction = await uncategorisable();
+          llmService.__setChatError(new Error('502 Bad Gateway'));
+
+          await categoryMappingService.attemptAutoCategorization(transaction);
+
+          expect((await Transaction.findById(transaction._id)).awaitingModelCategorization).toBe(false);
         });
       });
 

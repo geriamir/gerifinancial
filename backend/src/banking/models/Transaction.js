@@ -119,6 +119,18 @@ const transactionSchema = new mongoose.Schema({
     // Stores explanation of why this categorization was chosen
     // e.g., "Matched keyword 'grocery' in description", "AI suggestion based on description pattern"
   },
+  // Set when the model tier was skipped rather than consulted, because the
+  // user's daily AI budget ran out before this transaction's turn.
+  //
+  // Without it, a transaction the model never saw looks exactly like one it saw
+  // and declined: both end with no category. That leaves only two bad options -
+  // abandon everything past the budget cliff, or re-ask about every
+  // unrecognisable description every day for ever. This separates the two, so a
+  // later run can pick up precisely what was missed.
+  awaitingModelCategorization: {
+    type: Boolean,
+    default: false
+  },
   status: {
     type: String,
     enum: Object.values(TransactionStatus),
@@ -212,12 +224,25 @@ transactionSchema.index(
   { partialFilterExpression: { uniqueId: { $type: 'string' } } }
 );
 
+// Only the transactions still owed a look from the model. Partial so the index
+// carries the outstanding few rather than a boolean for every transaction the
+// user has ever had, and so it empties itself as the backlog is worked off.
+transactionSchema.index(
+  { userId: 1, date: -1 },
+  { partialFilterExpression: { awaitingModelCategorization: true } }
+);
+
 // Helper method to categorize a transaction
 transactionSchema.methods.categorize = async function(categoryId, subCategoryId, method = CategorizationMethod.MANUAL, reasoning = null) {
   this.category = categoryId;
   this.subCategory = subCategoryId;
   this.categorizationMethod = method;
   this.categorizationReasoning = reasoning;
+  // Whoever placed it - the user, a cheap tier, or the model itself - there is
+  // nothing left for the model to be asked. Clearing it here rather than at
+  // each call site means no route to a category can leave the transaction
+  // sitting in the resume queue.
+  this.awaitingModelCategorization = false;
   await this.save();
 };
 

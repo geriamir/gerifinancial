@@ -161,6 +161,25 @@ per-user daily token budget stops a runaway loop, and the first
 `AiBudgetExceededError` switches the tier off for the rest of the batch instead
 of paying for the same refusal hundreds of times.
 
+Switching the tier off mid-batch would be a cliff rather than a ceiling if
+nothing came back for what it skipped: the categorisation queue is fed only by
+newly-saved transactions, so an uncategorised one is never revisited. A
+transaction the budget cut off is therefore marked
+`awaitingModelCategorization`, and the next scrape pulls up to
+`AI_LLM_RESUME_LIMIT` of them back into the same batched job, newest first. A
+first import that outruns a day's allowance finishes over the following days
+instead of leaving the remainder uncategorised for good.
+
+The mark is deliberately narrow. It is set only when the model never saw the
+transaction, never when it saw it and declined — the tier declines readily by
+design, and re-asking about every unrecognisable description would spend the
+whole allowance on the same refusals every day. That includes a refusal already
+sitting in the run's answer cache, which is why `llmCategorizer.suggestFrom`
+reads the cache before checking the budget and why `hasAnswerFor` exists: after
+the budget trips, an answer already paid for is still an answer. Anything that
+gains a category — from the user, a cheap tier or the model — is unmarked by
+`Transaction.categorize`, so nothing can circle in the backlog.
+
 The model is never allowed to invent a category. It is shown only the user's own
 categories whose type matches the transaction's sign, and its answer is resolved
 back against them by name — so a hallucinated category, or one talked into it by

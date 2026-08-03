@@ -61,13 +61,37 @@ class CategoryMappingService {
   }
 
   /**
-   * Nothing placed it, so record what its amount implies and leave it for the user.
+   * Nothing placed it, so record what its amount implies and leave it for the
+   * user - along with whether the model actually looked at it.
+   *
+   * A budget that ran out before this transaction's turn means the model never
+   * saw it, and it should be asked about on a later run. One the model saw and
+   * declined is finished: re-asking would spend the same money on the same
+   * refusal every day, and this tier declines readily by design.
+   *
+   * The flag is cleared as well as set, so a transaction that was owed a look
+   * and has now had one leaves the resume queue instead of circling in it.
    */
-  async applyDefaultType(transaction) {
+  async settleUnanswered(transaction, catalogue) {
+    // A refusal already in this run's cache is an answer, even though it leaves
+    // the transaction looking exactly like one the model never saw. Without
+    // that check, a budget that trips halfway through a scrape would mark every
+    // transaction sharing an already-declined description as unseen.
+    const stillOwed = Boolean(catalogue?.budgetExhausted)
+      && !llmCategorizer.hasAnswerFor(catalogue, this.toModelRequest(transaction));
+    let changed = false;
+
     if (!transaction.type) {
       transaction.type = transaction.amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME;
-      await transaction.save();
+      changed = true;
     }
+
+    if (Boolean(transaction.awaitingModelCategorization) !== stillOwed) {
+      transaction.awaitingModelCategorization = stillOwed;
+      changed = true;
+    }
+
+    if (changed) await transaction.save();
   }
 
   /**
@@ -108,7 +132,7 @@ class CategoryMappingService {
 
       if (suggestion) return await this.applySuggestion(transaction, suggestion);
 
-      await this.applyDefaultType(transaction);
+      await this.settleUnanswered(transaction, catalogue);
     } catch (error) {
       logger.error('Deferred auto-categorization failed:', error);
     }
@@ -398,7 +422,7 @@ class CategoryMappingService {
         return await this.applySuggestion(transaction, llmSuggestion);
       }
 
-      await this.applyDefaultType(transaction);
+      await this.settleUnanswered(transaction, activeCatalogue);
     } catch (error) {
       logger.error('Auto-categorization failed:', error);
       return undefined;

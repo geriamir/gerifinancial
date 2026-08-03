@@ -232,10 +232,20 @@ class TransactionService {
 
     // Queued after the loop rather than per transaction, so the batch shares one
     // load of the user's past corrections.
-    if (pendingCategorization.length) {
+    //
+    // A scrape is also the natural moment to come back to whatever the model
+    // never got to last time: the user's budget has rolled over, and the work
+    // is already batched. Without this a first import would be capped for ever
+    // at one day's allowance rather than finishing over a few days.
+    const resuming = await transactionCategorizationService.outstanding(bankAccount.userId);
+    if (resuming.length) {
+      console.log(`Resuming categorization for ${resuming.length} transaction(s) the model has not seen`);
+    }
+
+    if (pendingCategorization.length || resuming.length) {
       results.categorizationJobId = await transactionCategorizationService.enqueue(
         bankAccount.userId,
-        pendingCategorization
+        [...pendingCategorization, ...resuming]
       );
     }
 
