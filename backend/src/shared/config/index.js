@@ -131,7 +131,9 @@ const config = {
       // number adds queue traffic without categorising anything more. A large
       // first import therefore converges over several days instead of in one
       // go, which is the intended trade.
-      resumeLimit: Number(process.env.AI_LLM_RESUME_LIMIT) || 1000
+      //
+      // 0 is meaningful here - it is the off switch, honoured by `outstanding`.
+      resumeLimit: numberFromEnv(process.env.AI_LLM_RESUME_LIMIT, 1000)
     }
   }
 };

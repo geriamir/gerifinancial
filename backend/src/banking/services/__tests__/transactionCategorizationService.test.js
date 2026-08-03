@@ -423,6 +423,14 @@ describe('transactionCategorizationService', () => {
         expect(ids.map(String)).toEqual([String(newer._id)]);
       });
 
+      // The off switch. `AI_LLM_RESUME_LIMIT=0` has to survive being read from
+      // the environment, so config uses `numberFromEnv` rather than `||`.
+      it('resumes nothing at all when the limit is zero', async () => {
+        await owed();
+
+        expect(await transactionCategorizationService.outstanding(user._id, 0)).toEqual([]);
+      });
+
       // Catching up is not what the user is waiting for; the scrape that saved
       // their transactions has already done that part.
       it('does not fail a scrape when the backlog cannot be read', async () => {
