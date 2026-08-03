@@ -160,6 +160,33 @@ export interface ProjectCreationData {
   startDate: Date;
   endDate: Date;
   currency: string;
+  // Only set when a draft supplied them. Left undefined, the backend falls back
+  // to its own template, which is what the plain form has always relied on.
+  categoryBudgets?: DraftedCategoryBudget[];
+}
+
+// A budget line the AI drafter proposed, already resolved to categories the user
+// owns - the ids are what make it saveable without a second lookup.
+export interface DraftedCategoryBudget {
+  categoryId: string;
+  subCategoryId: string;
+  categoryName: string;
+  subCategoryName: string;
+  budgetedAmount: number;
+  currency: string;
+  description: string;
+}
+
+export interface ProjectDraft {
+  name?: string;
+  type?: ProjectType;
+  startDate?: string;
+  endDate?: string;
+  currency?: string;
+  categoryBudgets: DraftedCategoryBudget[];
+  // Things the model suggested that could not be used, so the user can see what
+  // was left out rather than wondering why the plan looks thin.
+  warnings: string[];
 }
 
 // Project Template for budget allocation

@@ -133,7 +133,13 @@ const config = {
       // go, which is the intended trade.
       //
       // 0 is meaningful here - it is the off switch, honoured by `outstanding`.
-      resumeLimit: numberFromEnv(process.env.AI_LLM_RESUME_LIMIT, 1000)
+      resumeLimit: numberFromEnv(process.env.AI_LLM_RESUME_LIMIT, 1000),
+      // Drafting a project from a description. Deliberately its own switch
+      // rather than riding on `categorization`: that one exists to stop paying
+      // per transaction on every scrape, whereas this is one request a user
+      // asked for by typing a description, so wanting one without the other is
+      // the normal case in both directions.
+      projectDrafting: process.env.AI_LLM_PROJECT_DRAFTING !== 'false'
     }
   }
 };

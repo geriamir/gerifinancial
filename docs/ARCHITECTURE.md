@@ -120,7 +120,7 @@ access goes through the other module's service — not its models directly.
 | `monthly-budgets` | `MonthlyBudget`, `YearlyBudget`, `CategoryBudget`, `TransactionPattern` | `budgetService`, `budgetCalculationService`, `smartBudgetService`, `patternService`, `recurrenceDetectionService`, `salaryAttributionHelper`, `averagingDenominatorService` |
 | `onboarding` | — (uses `banking` models) | `onboardingTransactionService`, `onboardingEventHandlers` |
 | `pension` | `PensionAccount`, `PensionSnapshot` | `pensionService`, `phoenixApiClient`, `clalApiClient`, `clalDataMapper` |
-| `project-budgets` | `ProjectBudget`, `UnplannedExpense` | `projectBudgetService`, `projectExpensesService`, `projectOverviewService`, `projectTemplateService`, `projectTransactionService`, `unplannedExpenseService` |
+| `project-budgets` | `ProjectBudget`, `UnplannedExpense` | `projectBudgetService`, `projectDrafter`, `projectExpensesService`, `projectOverviewService`, `projectTemplateService`, `projectTransactionService`, `unplannedExpenseService` |
 | `real-estate` | `RealEstateInvestment` | `realEstateService`, `realEstateTransactionService` |
 | `rsu` | `RSUGrant`, `RSUSale` | `rsuService`, `vestingService`, `taxCalculationService`, `stockPriceService`, `timelineService` |
 
@@ -282,6 +282,33 @@ dozens of refetches.
 and reports coverage, accuracy and which tier answered — the number any change
 here has to beat.
 
+### Drafting a project from a description
+
+Creating a project asks for a spending breakdown before the thing has begun,
+which is the part people stall on. `projectTemplateService` only ever answered
+that for vacations; a renovation or an investment starts from an empty list.
+
+`projectDrafter` (`POST /api/budgets/projects/draft`) takes a sentence — *"two
+weeks in Japan in March, about ₪40k"* — and returns a **draft**: name, type,
+dates, currency and a set of budget lines. It follows the same trust boundary as
+`llmCategorizer`: the model is shown only the categories this user actually has,
+its answer is resolved back against them by name, and a line naming anything
+else is dropped and reported in `warnings` rather than guessed at. The type,
+currency, dates and amounts are each validated against what a `ProjectBudget`
+can hold; a date range that is backwards or half-given is discarded whole.
+
+Two properties are worth keeping if this is extended:
+
+- **It writes nothing.** The draft is returned for the user to edit and submit
+  through the ordinary create endpoint, so a bad suggestion costs an edit rather
+  than a project they have to find and delete.
+- **An empty `categoryBudgets` still means "use the template".** The frontend
+  omits the field entirely when no lines survived, because sending `[]` would
+  suppress the backend's own template and leave a vacation with nothing.
+
+Spend is charged to `aiBudget` and recorded under the `project-draft` purpose,
+so it shows up in the cost breakdown alongside categorisation.
+
 ---
 
 ## 3. Shared Infrastructure (`backend/src/shared/`)
@@ -384,7 +411,7 @@ across processes or restarts.
 
 ## 4. API Surface
 
-**214 endpoints** across 20 route files. Mounted in `backend/src/app.js`:
+**215 endpoints** across 20 route files. Mounted in `backend/src/app.js`:
 
 | Mount point | Router | Endpoints |
 |---|---|---|
@@ -395,7 +422,7 @@ across processes or restarts.
 | `/api/transactions` | `banking/routes/transactions.js` | 16 |
 | `/api/budgets` | `shared/routes/budgets.js` | 6 |
 | `/api/budgets` | `monthly-budgets/routes/budgets.js` | 9 |
-| `/api/budgets` | `project-budgets/routes/budgets.js` | 15 |
+| `/api/budgets` | `project-budgets/routes/budgets.js` | 16 |
 | `/api/budgets/patterns` | `monthly-budgets/routes/patterns.js` | 8 |
 | `/api/category-budgets` | `monthly-budgets/routes/categoryBudgets.js` | 10 |
 | `/api/rsus` | `rsu/routes/rsus.js` | 31 |
