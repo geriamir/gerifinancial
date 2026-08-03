@@ -8,6 +8,7 @@ const sseService = require('../../../shared/services/sseService');
 const { Transaction, Category, SubCategory } = require('../../models');
 const { User } = require('../../../auth');
 const llmService = require('../../../shared/services/ai/llmService');
+const { AiBudgetExceededError } = require('../../../shared/services/ai/aiBudget');
 const config = require('../../../shared/config');
 const { createTestUser } = require('../../../test/testUtils');
 const { TransactionStatus, TransactionType, CategorizationMethod } = require('../../constants/enums');
@@ -366,6 +367,108 @@ describe('transactionCategorizationService', () => {
       );
 
       expect(job.updateProgress).toHaveBeenCalledWith(100);
+    });
+  });
+
+  // The queue is fed only by newly-saved transactions, so without this a
+  // transaction the budget cut off before the model ever saw it stays
+  // uncategorised for good and the daily ceiling becomes a cliff.
+  describe('resuming what the budget cut off', () => {
+    const owed = async (description = 'Some Shop', overrides = {}) => {
+      const transaction = await makeTransaction(description);
+      transaction.awaitingModelCategorization = true;
+      Object.assign(transaction, overrides);
+      await transaction.save();
+      return transaction;
+    };
+
+    describe('outstanding', () => {
+      it('returns the transactions the model never saw', async () => {
+        const waiting = await owed();
+        await makeTransaction('never deferred');
+
+        const ids = await transactionCategorizationService.outstanding(user._id);
+
+        expect(ids.map(String)).toEqual([String(waiting._id)]);
+      });
+
+      // Paying the model to have an opinion about a transaction the user has
+      // already filed themselves is pure waste.
+      it('leaves out one the user has categorised in the meantime', async () => {
+        await owed('Some Shop', { category: category._id });
+
+        expect(await transactionCategorizationService.outstanding(user._id)).toEqual([]);
+      });
+
+      it('does not hand one user another user\'s backlog', async () => {
+        await owed();
+        const other = await createTestUser(User, { email: `other${Date.now()}@example.com` });
+
+        expect(await transactionCategorizationService.outstanding(other.user._id)).toEqual([]);
+      });
+
+      // Enqueuing more than a day's allowance can pay for just runs into the
+      // same spent budget and marks them outstanding all over again, so the
+      // backlog is taken newest first rather than all at once.
+      it('takes the newest first, up to the limit', async () => {
+        const older = await owed('older');
+        older.date = new Date('2024-01-01');
+        await older.save();
+        const newer = await owed('newer');
+        newer.date = new Date('2024-06-01');
+        await newer.save();
+
+        const ids = await transactionCategorizationService.outstanding(user._id, 1);
+
+        expect(ids.map(String)).toEqual([String(newer._id)]);
+      });
+
+      // Catching up is not what the user is waiting for; the scrape that saved
+      // their transactions has already done that part.
+      it('does not fail a scrape when the backlog cannot be read', async () => {
+        jest.spyOn(Transaction, 'find').mockImplementation(() => {
+          throw new Error('Mongo is down');
+        });
+
+        await expect(transactionCategorizationService.outstanding(user._id)).resolves.toEqual([]);
+      });
+    });
+
+    // The whole point, end to end: a batch that runs out of budget comes back
+    // and finishes on the next run instead of being abandoned.
+    it('categorises on a later run what the budget cut off on an earlier one', async () => {
+      jest.spyOn(transactionClassifier, 'forUser').mockResolvedValue(null);
+      await SubCategory.create({ name: 'Groceries', parentCategory: category._id, userId: user._id });
+      const llmDefault = config.ai.llm.categorization;
+      config.ai.llm.categorization = true;
+      llmService.__setEnabled(true);
+
+      try {
+        const transactions = await Promise.all([makeTransaction('שופרסל'), makeTransaction('ארומה')]);
+        const ids = transactions.map((t) => t._id);
+        llmService.__setChatError(new AiBudgetExceededError(user._id, 200000, 200000));
+
+        const first = await transactionCategorizationService.processBatch({ userId: user._id, transactionIds: ids });
+        expect(first).toMatchObject({ categorized: 0, uncategorized: 2 });
+
+        const waiting = await transactionCategorizationService.outstanding(user._id);
+        expect(waiting.map(String).sort()).toEqual(ids.map(String).sort());
+
+        // Next day: the allowance has rolled over.
+        llmService.__setChatResponse({
+          content: JSON.stringify({ category: 'Food', subCategory: 'Groceries', confidence: 0.9 })
+        });
+
+        const second = await transactionCategorizationService.processBatch({ userId: user._id, transactionIds: waiting });
+        expect(second).toMatchObject({ categorized: 2, uncategorized: 0 });
+
+        const saved = await Transaction.find({ _id: { $in: ids } });
+        expect(saved.map((t) => t.categorizationMethod)).toEqual([CategorizationMethod.AI, CategorizationMethod.AI]);
+        // Cleared, so the backlog drains instead of circling.
+        expect(await transactionCategorizationService.outstanding(user._id)).toEqual([]);
+      } finally {
+        config.ai.llm.categorization = llmDefault;
+      }
     });
   });
 });

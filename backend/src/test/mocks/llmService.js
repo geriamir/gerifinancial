@@ -38,6 +38,31 @@ const fakeEmbedding = (text) => {
 // need "near" and "far" to mean something register their own vectors here.
 const overrides = new Map();
 
+const defaultChat = async ({ userId }) => {
+  if (!enabled) throw new AiNotConfiguredError();
+  if (!userId) throw new Error('llmService.chat requires a userId to charge the request to');
+  if (chatError) throw chatError;
+  return {
+    content: chatResponse.content,
+    finishReason: chatResponse.finishReason || 'stop',
+    model: 'mock-chat',
+    usage: { promptTokens: 10, completionTokens: 10, totalTokens: 20 }
+  };
+};
+
+const defaultEmbed = async ({ userId, texts }) => {
+  if (!enabled) throw new AiNotConfiguredError();
+  if (!userId) throw new Error('llmService.embed requires a userId to charge the request to');
+  const input = Array.isArray(texts) ? texts : [texts];
+  const vectors = input.map(fakeEmbedding);
+  return {
+    vectors,
+    dimensions: vectors.length ? MOCK_DIMENSIONS : 0,
+    model: 'mock-embedding',
+    usage: { totalTokens: input.length }
+  };
+};
+
 module.exports = {
   isEnabled: jest.fn(() => enabled),
 
@@ -47,30 +72,9 @@ module.exports = {
     if (!enabled) throw new AiNotConfiguredError();
   }),
 
-  chat: jest.fn(async ({ userId }) => {
-    if (!enabled) throw new AiNotConfiguredError();
-    if (!userId) throw new Error('llmService.chat requires a userId to charge the request to');
-    if (chatError) throw chatError;
-    return {
-      content: chatResponse.content,
-      finishReason: chatResponse.finishReason || 'stop',
-      model: 'mock-chat',
-      usage: { promptTokens: 10, completionTokens: 10, totalTokens: 20 }
-    };
-  }),
+  chat: jest.fn(defaultChat),
 
-  embed: jest.fn(async ({ userId, texts }) => {
-    if (!enabled) throw new AiNotConfiguredError();
-    if (!userId) throw new Error('llmService.embed requires a userId to charge the request to');
-    const input = Array.isArray(texts) ? texts : [texts];
-    const vectors = input.map(fakeEmbedding);
-    return {
-      vectors,
-      dimensions: vectors.length ? MOCK_DIMENSIONS : 0,
-      model: 'mock-embedding',
-      usage: { totalTokens: input.length }
-    };
-  }),
+  embed: jest.fn(defaultEmbed),
 
   asUntrustedData: jest.fn((text, label = 'data') =>
     `<untrusted source="${label}">\n${String(text ?? '').replace(/<\/?untrusted[^>]*>/gi, '').trim()}\n</untrusted>`
@@ -89,5 +93,12 @@ module.exports = {
     chatResponse = { content: '', finishReason: 'stop' };
     chatError = null;
     overrides.clear();
+    // A test that swaps in its own implementation - to drive a race from inside
+    // the request, say - is otherwise still swapped in for every test after it,
+    // because clearMocks only clears the calls. That silently makes
+    // __setChatResponse and __setChatError do nothing, which looks like a bug in
+    // whatever runs next rather than in the test that caused it.
+    module.exports.chat.mockImplementation(defaultChat);
+    module.exports.embed.mockImplementation(defaultEmbed);
   }
 };

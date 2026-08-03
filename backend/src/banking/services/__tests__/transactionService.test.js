@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const transactionService = require('../transactionService');
+const transactionCategorizationService = require('../transactionCategorizationService');
 const { User } = require('../../../auth');
 const { Transaction, Category, SubCategory, ManualCategorized } = require('../../models');
 const { createTestUser } = require('../../../test/testUtils');
@@ -213,6 +214,62 @@ describe('TransactionService', () => {
       expect(result.mostRecentTransactionDate).toEqual(completedDate);
       expect(result.skippedPending).toBe(1);
       expect(result.newTransactions).toBe(1);
+    });
+
+    // The queue is fed only by newly-saved transactions, so a backlog the AI
+    // budget cut off on an earlier run would never be looked at again. A scrape
+    // is when the allowance has rolled over and the work is already batched.
+    describe('picking up what an earlier run could not afford', () => {
+      // Spies here replace a service the whole file uses; clearMocks only
+      // clears the calls, so without this they would still be in place for
+      // every test after these.
+      afterEach(() => jest.restoreAllMocks());
+
+      const owed = (description) =>
+        Transaction.create({
+          identifier: `owed-${Math.random()}`,
+          userId: user._id,
+          accountId: mockBankAccount._id,
+          amount: -75,
+          currency: 'ILS',
+          date: new Date('2026-01-15'),
+          type: TransactionType.EXPENSE,
+          description,
+          awaitingModelCategorization: true,
+          rawData: { description, chargedAmount: -75 }
+        });
+
+      it('queues the backlog alongside the new transactions', async () => {
+        const waiting = await owed('Waiting Shop');
+        const enqueue = jest.spyOn(transactionCategorizationService, 'enqueue').mockResolvedValue('job-1');
+
+        await transactionService.processScrapedTransactions(mockScrapedAccounts, mockBankAccount);
+
+        expect(enqueue).toHaveBeenCalledTimes(1);
+        const [, ids] = enqueue.mock.calls[0];
+        expect(ids.map(String)).toContain(String(waiting._id));
+        expect(ids).toHaveLength(3);
+      });
+
+      // A user whose scrape turns up nothing new still has a backlog to work
+      // off, and this is the only thing that ever comes back for it.
+      it('queues the backlog even when the scrape found nothing new', async () => {
+        const waiting = await owed('Waiting Shop');
+        const enqueue = jest.spyOn(transactionCategorizationService, 'enqueue').mockResolvedValue('job-1');
+
+        const result = await transactionService.processScrapedTransactions([{ txns: [] }], mockBankAccount);
+
+        expect(result.newTransactions).toBe(0);
+        expect(enqueue).toHaveBeenCalledWith(user._id, [waiting._id]);
+      });
+
+      it('queues nothing when there is neither new work nor a backlog', async () => {
+        const enqueue = jest.spyOn(transactionCategorizationService, 'enqueue').mockResolvedValue('job-1');
+
+        await transactionService.processScrapedTransactions([{ txns: [] }], mockBankAccount);
+
+        expect(enqueue).not.toHaveBeenCalled();
+      });
     });
   });
 

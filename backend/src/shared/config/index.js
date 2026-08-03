@@ -121,7 +121,17 @@ const config = {
       // transaction in a group, so asking about ten at once sends it once
       // instead of ten times. Measured at ~730 input tokens per single call
       // against ~940 for a batch of ten. Set to 1 to go back to one call each.
-      batchSize: Number(process.env.AI_LLM_BATCH_SIZE) || 10
+      batchSize: Number(process.env.AI_LLM_BATCH_SIZE) || 10,
+      // How many transactions the model never got to are pulled back in per
+      // scrape, newest first.
+      //
+      // Sized against what a day's token budget can pay for rather than against
+      // the backlog: anything enqueued beyond that allowance simply runs into
+      // the same spent budget and is marked outstanding again, so a larger
+      // number adds queue traffic without categorising anything more. A large
+      // first import therefore converges over several days instead of in one
+      // go, which is the intended trade.
+      resumeLimit: Number(process.env.AI_LLM_RESUME_LIMIT) || 1000
     }
   }
 };

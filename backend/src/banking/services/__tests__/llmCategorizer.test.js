@@ -339,6 +339,48 @@ describe('llmCategorizer', () => {
       expect(llmService.chat).toHaveBeenCalledTimes(1);
     });
 
+    // Callers use a null from a spent budget to mean "the model never saw this
+    // one, come back to it later". An answer already paid for this run must not
+    // be thrown away and counted as unseen, or a transaction the model has
+    // already judged gets re-asked on every later run for ever.
+    it('still serves an answer it already has after the budget is spent', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      answering({ category: 'Food', subCategory: 'Groceries', confidence: 0.9 });
+
+      const first = await ask(catalogue);
+      expect(first).not.toBeNull();
+
+      llmService.__setChatError(new AiBudgetExceededError(userId, 200000, 200000));
+      await ask(catalogue, { description: 'something new' });
+      expect(catalogue.budgetExhausted).toBe(true);
+
+      const again = await ask(catalogue);
+      expect(again).not.toBeNull();
+      expect(String(again.categoryId)).toBe(String(first.categoryId));
+    });
+
+    // A refusal is an answer. The caller uses this to tell a transaction the
+    // model declined apart from one it never reached, and gets it wrong in the
+    // expensive direction - re-asking daily about hopeless descriptions - if a
+    // spent budget makes the cache look empty.
+    it('still knows a refusal it already has after the budget is spent', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      const request = { description: 'שופרסל דיל', memo: null, categoryTypes: EXPENSE };
+      answering({ category: 'none', confidence: 0.9 });
+
+      expect(await ask(catalogue)).toBeNull();
+      expect(llmCategorizer.hasAnswerFor(catalogue, request)).toBe(true);
+
+      llmService.__setChatError(new AiBudgetExceededError(userId, 200000, 200000));
+      await ask(catalogue, { description: 'something new' });
+      expect(catalogue.budgetExhausted).toBe(true);
+
+      expect(llmCategorizer.hasAnswerFor(catalogue, request)).toBe(true);
+      expect(llmCategorizer.hasAnswerFor(catalogue, { ...request, description: 'never asked' })).toBe(false);
+    });
+
     // A network blip is not a reason to give up on the whole batch, unlike a
     // spent budget.
     it('keeps trying after a one-off failure', async () => {

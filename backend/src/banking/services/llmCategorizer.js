@@ -274,6 +274,21 @@ class LlmCategorizer {
   }
 
   /**
+   * Whether this run already holds the model's answer for a request, refusals
+   * included.
+   *
+   * Lets a caller tell "the model looked at this and said no" apart from "the
+   * model never saw this", which is the difference between a transaction worth
+   * coming back to and one that would cost the same money for the same refusal
+   * every day. The two are otherwise indistinguishable, because both leave the
+   * transaction without a category.
+   */
+  hasAnswerFor(catalogue, { description, memo, categoryTypes }) {
+    if (!catalogue) return false;
+    return catalogue.answers.has(cacheKey(categoryTypes, description, memo));
+  }
+
+  /**
    * Suggests a category for one transaction against an already-loaded catalogue.
    *
    * Returns null rather than a low-confidence guess, on the same reasoning as
@@ -282,7 +297,6 @@ class LlmCategorizer {
    */
   async suggestFrom(catalogue, { description, memo, amount, categoryTypes }) {
     if (!catalogue || !this.isEnabled()) return null;
-    if (catalogue.budgetExhausted) return null;
 
     const text = [description, memo].filter(Boolean).join(' ').trim();
     if (!text) return null;
@@ -295,6 +309,12 @@ class LlmCategorizer {
     if (catalogue.answers.has(key)) {
       return catalogue.answers.get(key);
     }
+
+    // Deliberately checked after the cache rather than before it. An answer this
+    // run has already paid for costs nothing to reuse, and discarding it would
+    // make a transaction the model has already judged look like one it never
+    // saw - which is the single thing the caller uses this null to decide.
+    if (catalogue.budgetExhausted) return null;
 
     const choices = this.describeChoices(catalogue, categoryTypes);
     if (choices.length === 0) return null;

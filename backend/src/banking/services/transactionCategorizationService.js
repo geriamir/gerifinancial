@@ -4,6 +4,7 @@ const transactionClassifier = require('./transactionClassifier');
 const llmCategorizer = require('./llmCategorizer');
 const scrapingQueue = require('../../shared/services/scrapingQueue');
 const sseService = require('../../shared/services/sseService');
+const config = require('../../shared/config');
 const logger = require('../../shared/utils/logger');
 
 const JOB_TYPE = 'categorize-transactions';
@@ -42,6 +43,44 @@ class TransactionCategorizationService {
       // sync failed when it did not.
       logger.error(`Could not queue categorization for user ${userId}: ${error.message}`);
       return null;
+    }
+  }
+
+  /**
+   * The transactions the model never saw because the budget ran out on an
+   * earlier run, newest first.
+   *
+   * This is what keeps a budget ceiling from being a cliff. Nothing else ever
+   * revisits an uncategorised transaction - the queue is fed only by
+   * newly-saved ones - so without this, everything past the day's allowance
+   * stays uncategorised for good.
+   *
+   * `category: null` is checked as well as the flag because the user may have
+   * categorised it themselves in the meantime, and paying the model to have an
+   * opinion about a transaction they have already filed is pure waste.
+   */
+  async outstanding(userId, limit = config.ai.llm.resumeLimit) {
+    if (!limit || limit <= 0) return [];
+
+    try {
+      const rows = await Transaction.find({
+        userId,
+        awaitingModelCategorization: true,
+        category: null
+      })
+        .select('_id')
+        .sort({ date: -1 })
+        .limit(limit)
+        .lean();
+
+      return rows.map((row) => row._id);
+    } catch (error) {
+      // Resuming is catch-up work. A scrape that saved its transactions has
+      // done the part the user is waiting for, and failing it because the
+      // backlog could not be read would be a worse outcome than trying again
+      // on the next scrape.
+      logger.error(`Could not read outstanding categorization for user ${userId}: ${error.message}`);
+      return [];
     }
   }
 
