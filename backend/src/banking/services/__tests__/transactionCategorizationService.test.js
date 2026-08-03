@@ -167,6 +167,29 @@ describe('transactionCategorizationService', () => {
         const counts = progress.map(([, , payload]) => payload.processed);
         expect(counts).toEqual([...counts].sort((a, b) => a - b));
       });
+
+      // An empty batch is a real case: every transaction in the job may have
+      // been deleted or categorised by hand before the worker picked it up.
+      // Nothing to do is 100% done, and a progress bar fed NaN stops moving.
+      it('reports an empty batch as complete rather than NaN', async () => {
+        const job = { updateProgress: jest.fn().mockResolvedValue(undefined) };
+        const emit = jest.spyOn(sseService, 'emit').mockImplementation(() => {});
+
+        const results = await transactionCategorizationService.processBatch(
+          { userId: user._id, transactionIds: [] }, job
+        );
+
+        expect(results).toEqual({ categorized: 0, uncategorized: 0, failed: 0 });
+        for (const [progress] of job.updateProgress.mock.calls) {
+          expect(Number.isFinite(progress)).toBe(true);
+        }
+        expect(job.updateProgress).toHaveBeenLastCalledWith(100);
+        const reported = emit.mock.calls.filter(([, event]) => event === 'categorization:progress');
+        for (const [, , payload] of reported) {
+          expect(Number.isFinite(payload.processed)).toBe(true);
+          expect(Number.isFinite(payload.total)).toBe(true);
+        }
+      });
     });
 
     it('counts what it categorized and what it left alone', async () => {

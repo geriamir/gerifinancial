@@ -60,10 +60,15 @@ class TransactionCategorizationService {
     let settled = 0;
     const report = async (force = false) => {
       if (!force && settled % 10 !== 0) return;
+      // An empty batch is trivially finished, and 0/0 would otherwise hand the
+      // progress bar a NaN it never recovers from.
+      const percent = transactionIds.length === 0
+        ? 100
+        : Math.round((settled / transactionIds.length) * 100);
       // The job only exists while the queue is driving this. Whether the user
       // is told how far along their transactions are should not depend on
       // which caller happens to be running the batch.
-      await job?.updateProgress(Math.round((settled / transactionIds.length) * 100));
+      await job?.updateProgress(percent);
       sseService.emit(userIdStr, 'categorization:progress', {
         processed: settled,
         total: transactionIds.length,
