@@ -14,6 +14,14 @@ const logger = require('../../shared/utils/logger');
  */
 const DEFERRED = Object.freeze({ deferred: true });
 
+/**
+ * Returned when a deferred transaction turned out not to be ours to settle:
+ * it was deleted, or the user categorised it themselves while the model was
+ * answering. Distinct from undefined so the batch counts it the way the first
+ * pass counts one the user had already dealt with - as neither of ours.
+ */
+const SKIPPED = Object.freeze({ skipped: true });
+
 class CategoryMappingService {
   /**
    * The category types a transaction may be given.
@@ -84,8 +92,16 @@ class CategoryMappingService {
    * either way. After a prefetch the answer is already cached, so this makes no
    * request at all.
    */
-  async finishDeferred(transaction, catalogue) {
+  async finishDeferred(staleTransaction, catalogue) {
     try {
+      // Seconds passed while the model answered, and the user was very likely
+      // looking at the same uncategorised list. The document held from the
+      // first pass does not know they acted, and Transaction.categorize writes
+      // category, subcategory and method unconditionally -- so applying a
+      // suggestion to it would quietly replace their choice with a guess.
+      const transaction = await Transaction.findById(staleTransaction._id);
+      if (!transaction || transaction.category) return SKIPPED;
+
       const suggestion = await llmCategorizer.suggestFrom(
         catalogue, this.toModelRequest(transaction)
       );
@@ -393,3 +409,4 @@ class CategoryMappingService {
 
 module.exports = new CategoryMappingService();
 module.exports.DEFERRED = DEFERRED;
+module.exports.SKIPPED = SKIPPED;

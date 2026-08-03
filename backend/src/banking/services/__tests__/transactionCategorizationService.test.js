@@ -5,10 +5,12 @@ const transactionClassifier = require('../transactionClassifier');
 const llmCategorizer = require('../llmCategorizer');
 const scrapingQueue = require('../../../shared/services/scrapingQueue');
 const sseService = require('../../../shared/services/sseService');
-const { Transaction, Category } = require('../../models');
+const { Transaction, Category, SubCategory } = require('../../models');
 const { User } = require('../../../auth');
+const llmService = require('../../../shared/services/ai/llmService');
+const config = require('../../../shared/config');
 const { createTestUser } = require('../../../test/testUtils');
-const { TransactionStatus, TransactionType } = require('../../constants/enums');
+const { TransactionStatus, TransactionType, CategorizationMethod } = require('../../constants/enums');
 
 describe('transactionCategorizationService', () => {
   let user;
@@ -95,6 +97,11 @@ describe('transactionCategorizationService', () => {
         jest.spyOn(transactionClassifier, 'forUser').mockResolvedValue(null);
       });
 
+      const llmCategorizationDefault = config.ai.llm.categorization;
+      afterEach(() => {
+        config.ai.llm.categorization = llmCategorizationDefault;
+      });
+
       it('collects everything the cheap tiers declined into one prefetch', async () => {
         const catalogue = await seedCatalogue();
         const prefetch = jest.spyOn(llmCategorizer, 'prefetch').mockResolvedValue(undefined);
@@ -166,6 +173,53 @@ describe('transactionCategorizationService', () => {
         // Monotonic: nothing is ever counted and then uncounted.
         const counts = progress.map(([, , payload]) => payload.processed);
         expect(counts).toEqual([...counts].sort((a, b) => a - b));
+      });
+
+      // The prefetch is a real model call taking seconds, and the user is very
+      // likely looking at the same uncategorised list while it runs. The
+      // document held from the first pass does not know they acted.
+      it('does not overwrite a category the user set while the model was answering', async () => {
+        config.ai.llm.categorization = true;
+        llmService.__setEnabled(true);
+        const shopping = await Category.create({ name: 'Shopping', type: 'Expense', userId: user._id });
+        await SubCategory.create({
+          name: 'Groceries', parentCategory: shopping._id, userId: user._id
+        });
+        const chosen = await Category.create({ name: 'Chosen', type: 'Expense', userId: user._id });
+        await seedCatalogue();
+        const transaction = await makeTransaction('שופרסל');
+
+        // The user acts while the request is in flight. Driving it from inside
+        // chat rather than mocking prefetch keeps the real batching path -- the
+        // cache genuinely fills, and the second pass genuinely reads from it.
+        const prefetch = jest.spyOn(llmCategorizer, 'prefetch');
+        llmService.chat.mockImplementation(async () => {
+          const fresh = await Transaction.findById(transaction._id);
+          await fresh.categorize(chosen._id, null, CategorizationMethod.MANUAL);
+          return {
+            content: JSON.stringify({
+              answers: [{ id: 1, category: 'Shopping', subCategory: 'Groceries', confidence: 0.95 }]
+            }),
+            finishReason: 'stop',
+            usage: { promptTokens: 10, completionTokens: 10, totalTokens: 20 }
+          };
+        });
+
+        const results = await transactionCategorizationService.processBatch({
+          userId: user._id,
+          transactionIds: [transaction._id]
+        });
+
+        const after = await Transaction.findById(transaction._id);
+        expect(after.category).toEqual(chosen._id);
+        expect(after.categorizationMethod).toBe(CategorizationMethod.MANUAL);
+        // Theirs, not ours - counted the way the first pass counts one they had
+        // already dealt with.
+        expect(results).toEqual({ categorized: 0, uncategorized: 0, failed: 0 });
+        // Guards the test itself: if the transaction stopped being deferred
+        // this would pass without ever exercising the second pass.
+        expect(prefetch).toHaveBeenCalled();
+        expect(llmService.chat).toHaveBeenCalled();
       });
 
       // An empty batch is a real case: every transaction in the job may have

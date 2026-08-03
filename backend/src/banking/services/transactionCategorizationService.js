@@ -123,8 +123,13 @@ class TransactionCategorizationService {
       for (const transaction of deferred) {
         try {
           const updated = await categoryMappingService.finishDeferred(transaction, catalogue);
-          if (updated?.category) results.categorized += 1;
-          else results.uncategorized += 1;
+          // Deleted, or the user categorised it while the model was answering.
+          // Counted as neither, exactly as the first pass counts one they had
+          // already dealt with.
+          if (updated !== categoryMappingService.SKIPPED) {
+            if (updated?.category) results.categorized += 1;
+            else results.uncategorized += 1;
+          }
         } catch (error) {
           results.failed += 1;
           logger.warn(`Could not categorize transaction ${transaction._id}: ${error.message}`);

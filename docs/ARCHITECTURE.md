@@ -192,6 +192,17 @@ further than the bill does.
 default type written to it, and doing that to a transaction the model has not
 seen yet would permanently mark a transfer as an expense.
 
+The second pass re-reads each transaction before writing to it. Batching widens
+the gap between deciding a transaction needs the model and acting on the answer
+from one request to a whole batch of them, and the user is very likely looking
+at the same uncategorised list while that runs. `Transaction.categorize` sets
+category, subcategory and method unconditionally, so applying an answer to the
+document held from the first pass would replace a category the user had chosen
+in the meantime with a guess, and record it as `ai`. One that has since been
+categorised or deleted is returned as `SKIPPED` and counted as neither
+categorised nor left over, exactly as the first pass counts one the user had
+already dealt with.
+
 Prefetch fills the same per-merchant answer cache the single-transaction path
 already reads, so nothing downstream knows whether a batch happened, and a
 transaction the batch failed to answer is simply asked on its own. Both sides

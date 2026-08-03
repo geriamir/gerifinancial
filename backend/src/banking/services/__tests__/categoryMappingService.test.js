@@ -550,6 +550,20 @@ describe('CategoryMappingService', () => {
           expect(llmService.chat).not.toHaveBeenCalled();
         });
 
+        // A transaction can also be deleted while the model is answering, and
+        // saving the held document would either resurrect it or throw.
+        it('skips a deferred transaction that was deleted while the model answered', async () => {
+          const transaction = await uncategorisable();
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          await categoryMappingService.attemptAutoCategorization(transaction, { catalogue, deferModel: true });
+          await Transaction.deleteOne({ _id: transaction._id });
+
+          const result = await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          expect(result).toBe(categoryMappingService.SKIPPED);
+          expect(await Transaction.findById(transaction._id)).toBeNull();
+        });
+
         it('gives a deferred transaction its default type when the model declines too', async () => {
           const transaction = await uncategorisable();
           const catalogue = await llmCategorizer.forUser(testUserId);
