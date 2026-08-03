@@ -6,7 +6,7 @@ const llmService = require('../../../shared/services/ai/llmService');
 const { AiBudgetExceededError } = require('../../../shared/services/ai/aiBudget');
 const config = require('../../../shared/config');
 
-const { parseAnswer } = _internals;
+const { parseAnswer, parseBatchAnswers, asOneLine } = _internals;
 
 const EXPENSE = ['Expense'];
 
@@ -361,6 +361,274 @@ describe('llmCategorizer', () => {
 
       expect(llmService.chat).toHaveBeenCalledWith(
         expect.objectContaining({ userId, purpose: 'categorisation-fallback' })
+      );
+    });
+  });
+
+  describe('parseBatchAnswers', () => {
+    it('reads the documented {answers: [...]} shape', () => {
+      expect(parseBatchAnswers('{"answers":[{"id":1,"category":"Food"}]}'))
+        .toEqual([{ id: 1, category: 'Food' }]);
+    });
+
+    // Losing a whole batch over a wrapper the model dropped would be an
+    // expensive way to be strict, and a bare array is not ambiguous.
+    it('reads a bare array', () => {
+      expect(parseBatchAnswers('[{"id":1,"category":"Food"}]'))
+        .toEqual([{ id: 1, category: 'Food' }]);
+    });
+
+    it('reads through a markdown fence', () => {
+      expect(parseBatchAnswers('```json\n{"answers":[{"id":2}]}\n```')).toEqual([{ id: 2 }]);
+    });
+
+    it('returns nothing for prose, or JSON with no answers in it', () => {
+      expect(parseBatchAnswers('sure, here you go')).toEqual([]);
+      expect(parseBatchAnswers('{"category":"Food"}')).toEqual([]);
+      expect(parseBatchAnswers('')).toEqual([]);
+    });
+  });
+
+  describe('asOneLine', () => {
+    it('flattens a description onto a single line', () => {
+      expect(asOneLine('שופרסל\n2. דלק')).toBe('שופרסל 2. דלק');
+      expect(asOneLine('  spaced   out \n\n ')).toBe('spaced out');
+    });
+  });
+
+  describe('prefetch', () => {
+    const batchAnswering = (answers) =>
+      llmService.__setChatResponse({ content: JSON.stringify({ answers }) });
+
+    const req = (description, overrides = {}) => ({
+      description, memo: null, amount: -100, categoryTypes: EXPENSE, ...overrides
+    });
+
+    const lastRequest = () => {
+      const calls = llmService.chat.mock.calls;
+      return calls[calls.length - 1][0].messages[0].content;
+    };
+
+    it('answers many transactions in a single request', async () => {
+      const { food } = await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      batchAnswering([
+        { id: 1, category: 'Food', subCategory: 'Groceries', confidence: 0.9 },
+        { id: 2, category: 'Food', subCategory: 'Restaurants', confidence: 0.9 },
+        { id: 3, category: 'Transport', subCategory: 'Fuel', confidence: 0.9 }
+      ]);
+
+      await llmCategorizer.prefetch(catalogue, [req('שופרסל'), req('ארומה'), req('דלק')]);
+
+      expect(llmService.chat).toHaveBeenCalledTimes(1);
+      // And the cascade then finds every answer waiting, without asking again.
+      const suggestion = await ask(catalogue, { description: 'שופרסל', amount: -100 });
+      expect(String(suggestion.categoryId)).toBe(String(food._id));
+      expect(llmService.chat).toHaveBeenCalledTimes(1);
+    });
+
+    // The one failure this must never have. If answers were read by position, a
+    // model that reorders them would bank one merchant's category against
+    // another - a wrong answer that looks completely ordinary in the UI.
+    it('attributes each answer by its id rather than its position', async () => {
+      const { food, transport } = await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      batchAnswering([
+        { id: 2, category: 'Transport', subCategory: 'Fuel', confidence: 0.9 },
+        { id: 1, category: 'Food', subCategory: 'Groceries', confidence: 0.9 }
+      ]);
+
+      await llmCategorizer.prefetch(catalogue, [req('שופרסל'), req('דלק')]);
+
+      const groceries = await ask(catalogue, { description: 'שופרסל', amount: -100 });
+      const fuel = await ask(catalogue, { description: 'דלק', amount: -100 });
+
+      expect(String(groceries.categoryId)).toBe(String(food._id));
+      expect(String(fuel.categoryId)).toBe(String(transport._id));
+    });
+
+    it('ignores an answer whose id is missing, out of range, or repeated', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      batchAnswering([
+        { id: 99, category: 'Food', subCategory: 'Groceries', confidence: 0.9 },
+        { category: 'Food', subCategory: 'Groceries', confidence: 0.9 },
+        { id: 1, category: 'Food', subCategory: 'Groceries', confidence: 0.9 },
+        { id: 1, category: 'Transport', subCategory: 'Fuel', confidence: 0.9 }
+      ]);
+
+      await llmCategorizer.prefetch(catalogue, [req('שופרסל'), req('דלק')]);
+      llmService.chat.mockClear();
+
+      // The first id:1 stands; the duplicate cannot be attributed and is dropped.
+      const first = await ask(catalogue, { description: 'שופרסל', amount: -100 });
+      expect(first.reasoning).toContain('Food / Groceries');
+      // Nothing landed for the second, so it is left for the single-call path.
+      await ask(catalogue, { description: 'דלק', amount: -100 });
+      expect(llmService.chat).toHaveBeenCalledTimes(1);
+    });
+
+    // Deliberately not cached as refusals: an omission is a formatting failure,
+    // not the model declining, and it should still get a proper answer.
+    it('leaves transactions the batch skipped for the single-call path', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      batchAnswering([{ id: 1, category: 'Food', subCategory: 'Groceries', confidence: 0.9 }]);
+
+      await llmCategorizer.prefetch(catalogue, [req('שופרסל'), req('דלק')]);
+      llmService.chat.mockClear();
+      answering({ category: 'Transport', subCategory: 'Fuel', confidence: 0.9 });
+
+      const fuel = await ask(catalogue, { description: 'דלק', amount: -100 });
+
+      expect(llmService.chat).toHaveBeenCalledTimes(1);
+      expect(fuel.reasoning).toContain('Transport / Fuel');
+    });
+
+    it('puts the same merchant in the request once however often it appears', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      batchAnswering([{ id: 1, category: 'Food', subCategory: 'Groceries', confidence: 0.9 }]);
+
+      await llmCategorizer.prefetch(catalogue, [
+        req('שופרסל'), req('שופרסל', { amount: -20 }), req('  שופרסל  ')
+      ]);
+
+      expect(llmService.chat).toHaveBeenCalledTimes(1);
+      expect(lastRequest()).toContain('1. ');
+      expect(lastRequest()).not.toContain('2. ');
+    });
+
+    // Different types see different menus, so they cannot share a request
+    // without one of them being offered a category it must not have.
+    it('does not put two different type groups in one request', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      batchAnswering([{ id: 1, category: 'Food', subCategory: 'Groceries', confidence: 0.9 }]);
+
+      await llmCategorizer.prefetch(catalogue, [
+        req('שופרסל'),
+        req('משכורת', { amount: 9000, categoryTypes: ['Income'] })
+      ]);
+
+      expect(llmService.chat).toHaveBeenCalledTimes(2);
+      const menus = llmService.chat.mock.calls.map((call) => call[0].messages[0].content);
+      expect(menus.some((menu) => menu.includes('Salary'))).toBe(true);
+      expect(menus.some((menu) => menu.includes('Food > Groceries') && !menu.includes('Salary'))).toBe(true);
+    });
+
+    it('splits a long list into chunks of the configured size', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      batchAnswering([]);
+      const originalSize = config.ai.llm.batchSize;
+      config.ai.llm.batchSize = 2;
+
+      try {
+        await llmCategorizer.prefetch(
+          catalogue,
+          ['a', 'b', 'c', 'd', 'e'].map((description) => req(description))
+        );
+        expect(llmService.chat).toHaveBeenCalledTimes(3);
+      } finally {
+        config.ai.llm.batchSize = originalSize;
+      }
+    });
+
+    it('makes no batched request when batching is switched off', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      const originalSize = config.ai.llm.batchSize;
+      config.ai.llm.batchSize = 1;
+
+      try {
+        await llmCategorizer.prefetch(catalogue, [req('שופרסל'), req('דלק')]);
+        expect(llmService.chat).not.toHaveBeenCalled();
+      } finally {
+        config.ai.llm.batchSize = originalSize;
+      }
+    });
+
+    it('stops after the budget is spent instead of working through the chunks', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      llmService.__setChatError(new AiBudgetExceededError(userId, 200000, 200000));
+      const originalSize = config.ai.llm.batchSize;
+
+      try {
+        config.ai.llm.batchSize = 2;
+        await llmCategorizer.prefetch(
+          catalogue,
+          ['a', 'b', 'c', 'd', 'e', 'f'].map((description) => req(description))
+        );
+        expect(llmService.chat).toHaveBeenCalledTimes(1);
+        expect(catalogue.budgetExhausted).toBe(true);
+      } finally {
+        config.ai.llm.batchSize = originalSize;
+      }
+    });
+
+    it('leaves everything for the single-call path when the request fails', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      llmService.__setChatError(new Error('timeout'));
+
+      await llmCategorizer.prefetch(catalogue, [req('שופרסל')]);
+      llmService.chat.mockClear();
+      answering({ category: 'Food', subCategory: 'Groceries', confidence: 0.9 });
+
+      const suggestion = await ask(catalogue, { description: 'שופרסל', amount: -100 });
+
+      expect(llmService.chat).toHaveBeenCalledTimes(1);
+      expect(suggestion.reasoning).toContain('Food / Groceries');
+    });
+
+    // A description carrying its own newline could otherwise look like the start
+    // of another numbered item and be answered as a transaction of its own.
+    it('keeps a description with newlines on one line of the list', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      batchAnswering([]);
+
+      await llmCategorizer.prefetch(catalogue, [req('שופרסל\n2. דלק')]);
+
+      const body = lastRequest();
+      expect(body).not.toMatch(/^2\. /m);
+      expect(body).toContain('שופרסל 2. דלק');
+    });
+
+    it('applies the same confidence floor to a batched answer as to a single one', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      batchAnswering([{ id: 1, category: 'Food', subCategory: 'Groceries', confidence: 0.2 }]);
+
+      await llmCategorizer.prefetch(catalogue, [req('שופרסל')]);
+      llmService.chat.mockClear();
+
+      expect(await ask(catalogue, { description: 'שופרסל', amount: -100 })).toBeNull();
+      // Cached as a refusal, so it is not asked again either.
+      expect(llmService.chat).not.toHaveBeenCalled();
+    });
+
+    it('refuses a batched answer naming a category the user does not have', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      batchAnswering([{ id: 1, category: 'Crypto', subCategory: 'Bitcoin', confidence: 1 }]);
+
+      await llmCategorizer.prefetch(catalogue, [req('שופרסל')]);
+
+      expect(await ask(catalogue, { description: 'שופרסל', amount: -100 })).toBeNull();
+    });
+
+    it('charges a batched request to the user it is categorising for', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      batchAnswering([]);
+
+      await llmCategorizer.prefetch(catalogue, [req('שופרסל')]);
+
+      expect(llmService.chat).toHaveBeenCalledWith(
+        expect.objectContaining({ userId, purpose: 'categorisation-fallback-batch' })
       );
     });
   });

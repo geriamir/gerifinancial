@@ -57,34 +57,90 @@ class TransactionCategorizationService {
     const userIdStr = userId.toString();
     const results = { categorized: 0, uncategorized: 0, failed: 0 };
 
-    for (let i = 0; i < transactionIds.length; i += 1) {
-      try {
-        const transaction = await Transaction.findById(transactionIds[i]);
-        // Gone, or already dealt with by the user while this sat in the queue.
-        if (!transaction || transaction.category) continue;
+    let settled = 0;
+    const report = async (force = false) => {
+      if (!force && settled % 10 !== 0) return;
+      // An empty batch is trivially finished, and 0/0 would otherwise hand the
+      // progress bar a NaN it never recovers from.
+      const percent = transactionIds.length === 0
+        ? 100
+        : Math.round((settled / transactionIds.length) * 100);
+      // The job only exists while the queue is driving this. Whether the user
+      // is told how far along their transactions are should not depend on
+      // which caller happens to be running the batch.
+      await job?.updateProgress(percent);
+      sseService.emit(userIdStr, 'categorization:progress', {
+        processed: settled,
+        total: transactionIds.length,
+        ...results
+      });
+    };
 
-        const updated = await categoryMappingService.attemptAutoCategorization(transaction, { corpus, catalogue });
+    // First pass: everything the cheap tiers can place. Whatever they cannot is
+    // held back rather than asked about one at a time, so the model sees them
+    // together and the category list is sent once instead of once each.
+    const deferred = [];
+    for (const transactionId of transactionIds) {
+      try {
+        const transaction = await Transaction.findById(transactionId);
+        // Gone, or already dealt with by the user while this sat in the queue.
+        if (!transaction || transaction.category) {
+          settled += 1;
+          await report();
+          continue;
+        }
+
+        const updated = await categoryMappingService.attemptAutoCategorization(
+          transaction, { corpus, catalogue, deferModel: true }
+        );
+
+        // Not finished - it still has the model tier to come, and counting it
+        // now would mean reporting a total that later has to move backwards.
+        if (updated === categoryMappingService.DEFERRED) {
+          deferred.push(transaction);
+          continue;
+        }
+
         if (updated?.category) results.categorized += 1;
         else results.uncategorized += 1;
       } catch (error) {
         // One unparseable transaction must not cost the rest of the batch.
         results.failed += 1;
-        logger.warn(`Could not categorize transaction ${transactionIds[i]}: ${error.message}`);
+        logger.warn(`Could not categorize transaction ${transactionId}: ${error.message}`);
       }
 
-      const done = i + 1;
-      if (done % 10 === 0 || done === transactionIds.length) {
-        // The job only exists while the queue is driving this. Whether the user
-        // is told how far along their transactions are should not depend on
-        // which caller happens to be running the batch.
-        await job?.updateProgress(Math.round((done / transactionIds.length) * 100));
-        sseService.emit(userIdStr, 'categorization:progress', {
-          processed: done,
-          total: transactionIds.length,
-          ...results
-        });
+      settled += 1;
+      await report();
+    }
+
+    if (deferred.length > 0) {
+      await llmCategorizer.prefetch(catalogue, deferred.map(
+        (transaction) => categoryMappingService.toModelRequest(transaction)
+      ));
+
+      // Second pass reads the answers the prefetch already collected, so this
+      // loop normally makes no requests at all.
+      for (const transaction of deferred) {
+        try {
+          const updated = await categoryMappingService.finishDeferred(transaction, catalogue);
+          // Deleted, or the user categorised it while the model was answering.
+          // Counted as neither, exactly as the first pass counts one they had
+          // already dealt with.
+          if (updated !== categoryMappingService.SKIPPED) {
+            if (updated?.category) results.categorized += 1;
+            else results.uncategorized += 1;
+          }
+        } catch (error) {
+          results.failed += 1;
+          logger.warn(`Could not categorize transaction ${transaction._id}: ${error.message}`);
+        }
+
+        settled += 1;
+        await report();
       }
     }
+
+    await report(true);
 
     sseService.emit(userIdStr, 'categorization:completed', {
       total: transactionIds.length,

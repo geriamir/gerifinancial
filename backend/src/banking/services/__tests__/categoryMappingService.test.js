@@ -456,6 +456,125 @@ describe('CategoryMappingService', () => {
         expect(updated.type).toBe(TransactionType.EXPENSE);
       });
 
+      describe('deferring the model so a batch can be asked at once', () => {
+        it('stops before the model and says so, rather than asking', async () => {
+          const result = await categoryMappingService.attemptAutoCategorization(
+            await uncategorisable(), { deferModel: true }
+          );
+
+          expect(result).toBe(categoryMappingService.DEFERRED);
+          expect(llmService.chat).not.toHaveBeenCalled();
+        });
+
+        // The whole reason deferral needs its own return value. A default type
+        // written now would stick, because applying a suggestion only sets the
+        // type when there is not one already - so a transfer the model was about
+        // to identify would be left permanently marked an expense.
+        it('leaves a deferred transaction without a type for the model to set', async () => {
+          const transaction = await uncategorisable();
+
+          await categoryMappingService.attemptAutoCategorization(transaction, { deferModel: true });
+
+          expect((await Transaction.findById(transaction._id)).type).toBeUndefined();
+        });
+
+        it('still lets the cheap tiers finish a transaction they can place', async () => {
+          const result = await categoryMappingService.attemptAutoCategorization(
+            await uncategorisable({ description: 'coffee shop', rawData: { description: 'coffee shop' } }),
+            { deferModel: true }
+          );
+
+          expect(result).not.toBe(categoryMappingService.DEFERRED);
+          expect(result.category).toBeTruthy();
+        });
+
+        it('settles a deferred transaction from an answer the prefetch already collected', async () => {
+          const transaction = await uncategorisable();
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          await categoryMappingService.attemptAutoCategorization(transaction, { catalogue, deferModel: true });
+
+          llmService.__setChatResponse({
+            content: JSON.stringify({
+              answers: [{
+                id: 1,
+                category: 'Test Expense Category',
+                subCategory: 'Test Expense SubCategory',
+                confidence: 0.9
+              }]
+            })
+          });
+          await llmCategorizer.prefetch(catalogue, [{
+            description: transaction.description,
+            memo: null,
+            amount: transaction.amount,
+            categoryTypes: categoryMappingService.deriveCategoryTypes(transaction)
+          }]);
+          llmService.chat.mockClear();
+
+          const updated = await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          expect(updated.category._id).toEqual(testExpenseCategory._id);
+          expect(updated.type).toBe(TransactionType.EXPENSE);
+          // The point of the whole exercise: the second pass costs nothing.
+          expect(llmService.chat).not.toHaveBeenCalled();
+        });
+
+        // The prefetch and the lookup that follows it derive the answer cache
+        // key independently, and a memo that lives only in rawData is exactly
+        // the kind of difference that survives every test built on a hand-made
+        // request. If the two ever disagree the batch still succeeds, the cache
+        // still fills, and every transaction quietly pays for its own request.
+        it('reads back an answer for a transaction whose memo is only in rawData', async () => {
+          const transaction = await uncategorisable({
+            rawData: { description: 'שופרסל דיל', memo: 'חיוב חודשי', chargedAmount: -250 }
+          });
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          await categoryMappingService.attemptAutoCategorization(transaction, { catalogue, deferModel: true });
+
+          llmService.__setChatResponse({
+            content: JSON.stringify({
+              answers: [{
+                id: 1,
+                category: 'Test Expense Category',
+                subCategory: 'Test Expense SubCategory',
+                confidence: 0.9
+              }]
+            })
+          });
+          await llmCategorizer.prefetch(catalogue, [categoryMappingService.toModelRequest(transaction)]);
+          llmService.chat.mockClear();
+
+          const updated = await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          expect(updated.category._id).toEqual(testExpenseCategory._id);
+          expect(llmService.chat).not.toHaveBeenCalled();
+        });
+
+        // A transaction can also be deleted while the model is answering, and
+        // saving the held document would either resurrect it or throw.
+        it('skips a deferred transaction that was deleted while the model answered', async () => {
+          const transaction = await uncategorisable();
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          await categoryMappingService.attemptAutoCategorization(transaction, { catalogue, deferModel: true });
+          await Transaction.deleteOne({ _id: transaction._id });
+
+          const result = await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          expect(result).toBe(categoryMappingService.SKIPPED);
+          expect(await Transaction.findById(transaction._id)).toBeNull();
+        });
+
+        it('gives a deferred transaction its default type when the model declines too', async () => {
+          const transaction = await uncategorisable();
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          llmService.__setChatResponse({ content: JSON.stringify({ category: null, confidence: 0 }) });
+
+          await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          expect((await Transaction.findById(transaction._id)).type).toBe(TransactionType.EXPENSE);
+        });
+      });
+
       // It is the most expensive tier and the weakest evidence, so anything the
       // user has already taught the app has to win before it is asked.
       it('is not consulted when a keyword already matched', async () => {

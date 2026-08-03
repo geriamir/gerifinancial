@@ -175,6 +175,47 @@ simply be asked about again.
 Set `AI_LLM_CATEGORIZATION=false` to switch tier 4 off without giving up
 embeddings and the rest of the AI features.
 
+Tier 4 is asked in batches, because the category list is almost the entire
+prompt and is identical for every transaction: asking about one transaction
+sends roughly 730 tokens of menu to carry about 20 tokens of question. So
+`processBatch` runs two passes. The first runs the whole batch with
+`deferModel: true`, which stops the cascade at tier 3 and returns the `DEFERRED`
+sentinel rather than an answer; the second asks `llmCategorizer.prefetch` about
+everything that fell through, in one request per `AI_LLM_BATCH_SIZE`
+transactions, then lets each deferred transaction finish. Measured on the
+fixture set, this turned 12 requests and 10,680 tokens into 2 requests and about
+3,000 — the same 94% accuracy, a quarter of the tokens, a third of the wall
+clock. The saving is in the prompt, not the reasoning, so the token count falls
+further than the bill does.
+
+`DEFERRED` has to be distinct from "no answer": an unanswered transaction gets a
+default type written to it, and doing that to a transaction the model has not
+seen yet would permanently mark a transfer as an expense.
+
+The second pass re-reads each transaction before writing to it. Batching widens
+the gap between deciding a transaction needs the model and acting on the answer
+from one request to a whole batch of them, and the user is very likely looking
+at the same uncategorised list while that runs. `Transaction.categorize` sets
+category, subcategory and method unconditionally, so applying an answer to the
+document held from the first pass would replace a category the user had chosen
+in the meantime with a guess, and record it as `ai`. One that has since been
+categorised or deleted is returned as `SKIPPED` and counted as neither
+categorised nor left over, exactly as the first pass counts one the user had
+already dealt with.
+
+Prefetch fills the same per-merchant answer cache the single-transaction path
+already reads, so nothing downstream knows whether a batch happened, and a
+transaction the batch failed to answer is simply asked on its own. Both sides
+build their request through `categoryMappingService.toModelRequest`, because the
+cache is keyed on the category types, description and memo: a request assembled
+even slightly differently in one of the two places files the answer under a key
+the lookup never finds, and the batch silently stops saving anything. Requests
+are grouped by which category types the transaction may be offered — mixing them
+would offer a category the transaction must not have — and answers are matched
+back by an id the model echoes, never by their position in the list. A reordered
+reply read positionally would bank one merchant's category against another,
+which is a wrong answer that looks entirely ordinary.
+
 Categorisation does **not** run inside the scrape. `transactionService` saves
 transactions, sets their type from the amount, and queues one
 `categorize-transactions` job for the batch; the worker
