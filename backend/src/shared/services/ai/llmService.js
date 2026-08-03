@@ -3,6 +3,7 @@ const { DefaultAzureCredential, getBearerTokenProvider } = require('@azure/ident
 const logger = require('../../utils/logger');
 const config = require('../../config');
 const aiBudget = require('./aiBudget');
+const aiCostMeter = require('./aiCostMeter');
 
 const COGNITIVE_SERVICES_SCOPE = 'https://cognitiveservices.azure.com/.default';
 
@@ -163,6 +164,7 @@ class LlmService {
 
     const usage = response.usage || {};
     await aiBudget.record(userId, usage.total_tokens || 0);
+    aiCostMeter.record(purpose, usage.total_tokens || 0);
 
     logger.info(
       `LLM chat purpose=${purpose} tokens=${usage.total_tokens || 0} ms=${Date.now() - startedAt}`
@@ -214,6 +216,7 @@ class LlmService {
 
     const usage = response.usage || {};
     await aiBudget.record(userId, usage.total_tokens || 0);
+    aiCostMeter.record(purpose, usage.total_tokens || 0);
 
     // The API does not promise ordering, but it does return an index per item.
     const vectors = [...response.data]

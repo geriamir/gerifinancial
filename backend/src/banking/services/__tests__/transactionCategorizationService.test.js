@@ -6,10 +6,12 @@ const llmCategorizer = require('../llmCategorizer');
 const scrapingQueue = require('../../../shared/services/scrapingQueue');
 const sseService = require('../../../shared/services/sseService');
 const { Transaction, Category, SubCategory } = require('../../models');
+const ManualCategorized = require('../../models/ManualCategorized');
 const { User } = require('../../../auth');
 const llmService = require('../../../shared/services/ai/llmService');
 const { AiBudgetExceededError } = require('../../../shared/services/ai/aiBudget');
 const config = require('../../../shared/config');
+const logger = require('../../../shared/utils/logger');
 const { createTestUser } = require('../../../test/testUtils');
 const { TransactionStatus, TransactionType, CategorizationMethod } = require('../../constants/enums');
 
@@ -367,6 +369,136 @@ describe('transactionCategorizationService', () => {
       );
 
       expect(job.updateProgress).toHaveBeenCalledWith(100);
+    });
+
+    // The daily ceiling has to be picked from a real number, and until now the
+    // only evidence was per-call log lines that nobody added up over a run.
+    describe('what the run cost', () => {
+      const llmDefault = config.ai.llm.categorization;
+      const deploymentDefault = config.ai.embeddingDeployment;
+      let subCategory;
+
+      beforeEach(async () => {
+        config.ai.llm.categorization = true;
+        // Embedding is off by default in the suite, and with it off the kNN tier
+        // never calls out - so a run would spend only on chat and this would
+        // test half of what it claims to.
+        config.ai.embeddingDeployment = 'text-embedding-3-small';
+        llmService.__setEnabled(true);
+        jest.spyOn(sseService, 'emit').mockImplementation(() => {});
+        subCategory = await SubCategory.create({
+          name: 'Groceries', parentCategory: category._id, userId: user._id
+        });
+      });
+
+      afterEach(() => {
+        config.ai.llm.categorization = llmDefault;
+        config.ai.embeddingDeployment = deploymentDefault;
+      });
+
+      const answeringBatch = (count) => llmService.__setChatResponse({
+        content: JSON.stringify({
+          answers: Array.from({ length: count }, (_, index) => ({
+            id: index + 1, category: 'Food', subCategory: 'Groceries', confidence: 0.9
+          }))
+        })
+      });
+
+      const costLine = (info) => {
+        const call = info.mock.calls.find(([message]) => String(message).startsWith('Categorization cost'));
+        return call && call[0];
+      };
+
+      // Three different services spend on one run - the classifier embedding the
+      // corpus, the classifier embedding each query, the categoriser asking the
+      // model - and the total is only worth having if it covers all of them.
+      // That is the reason the meter follows the async context rather than being
+      // an argument each of them has to remember to pass on.
+      it('adds up every service that spent, not just the one that logs', async () => {
+        // Hand-picked so the corpus sits far from both transactions: a chance
+        // kNN match would place them, the model would never be asked, and this
+        // would quietly become a test of something else.
+        llmService.__setEmbedding('שופרסל דיל', [1, 0, 0, 0]);
+        llmService.__setEmbedding('ארומה', [0, 1, 0, 0]);
+        llmService.__setEmbedding('דלק', [0, 0, 1, 0]);
+        await ManualCategorized.create({
+          description: 'שופרסל דיל',
+          userId: user._id,
+          category: category._id,
+          subCategory: subCategory._id
+        });
+        answeringBatch(2);
+        const transactions = await Promise.all([makeTransaction('ארומה'), makeTransaction('דלק')]);
+        const info = jest.spyOn(logger, 'info');
+
+        await transactionCategorizationService.processBatch({
+          userId: user._id,
+          transactionIds: transactions.map((t) => t._id)
+        });
+
+        // One corpus embed and two query embeds, a token each in the mock, plus
+        // one batched chat covering both transactions.
+        expect(costLine(info)).toContain('tokens=23 calls=4');
+        expect(costLine(info)).toContain('categorisation-fallback-batch=20 in 1 call');
+        expect(costLine(info)).toContain('categorisation-corpus=1 in 1 call');
+        expect(costLine(info)).toContain('categorisation-query=2 in 2 calls');
+      });
+
+      // The figure the budget is chosen from, stated outright rather than left
+      // to be worked out from two other numbers on the line.
+      it('states the per-transaction cost the budget has to be sized against', async () => {
+        jest.spyOn(transactionClassifier, 'forUser').mockResolvedValue(null);
+        answeringBatch(2);
+        const transactions = await Promise.all([makeTransaction('ארומה'), makeTransaction('דלק')]);
+        const info = jest.spyOn(logger, 'info');
+
+        await transactionCategorizationService.processBatch({
+          userId: user._id,
+          transactionIds: transactions.map((t) => t._id)
+        });
+
+        expect(costLine(info)).toContain('transactions=2');
+        expect(costLine(info)).toContain('tokens=20');
+        expect(costLine(info)).toContain('perTransaction=10.0');
+      });
+
+      // With AI off - which is every environment that has not configured it -
+      // this would otherwise be a line per batch reporting that nothing happened.
+      it('says nothing at all when the run spent nothing', async () => {
+        llmService.__setEnabled(false);
+        jest.spyOn(transactionClassifier, 'forUser').mockResolvedValue(null);
+        const transaction = await makeTransaction();
+        const info = jest.spyOn(logger, 'info');
+
+        await transactionCategorizationService.processBatch({
+          userId: user._id,
+          transactionIds: [transaction._id]
+        });
+
+        expect(costLine(info)).toBeUndefined();
+      });
+
+      // Loading the corpus spends before any transaction is looked at, so the
+      // division genuinely can have a zero in it - and a stray Infinity would
+      // discredit the one line this whole change exists to produce.
+      it('does not divide by an empty batch', async () => {
+        await ManualCategorized.create({
+          description: 'שופרסל דיל',
+          userId: user._id,
+          category: category._id,
+          subCategory: subCategory._id
+        });
+        const info = jest.spyOn(logger, 'info');
+
+        await transactionCategorizationService.processBatch({
+          userId: user._id,
+          transactionIds: []
+        });
+
+        expect(costLine(info)).toContain('transactions=0');
+        expect(costLine(info)).not.toContain('Infinity');
+        expect(costLine(info)).not.toContain('NaN');
+      });
     });
   });
 

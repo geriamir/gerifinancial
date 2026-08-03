@@ -1,4 +1,5 @@
 const config = require('../../../config');
+const aiCostMeter = require('../aiCostMeter');
 
 // The suite mocks this module globally so nothing can reach the network by
 // accident. These tests are about the real implementation's guard rails, so they
@@ -75,6 +76,61 @@ describe('llmService', () => {
         model: 'text-embedding-3-small',
         usage: { totalTokens: 0 }
       });
+    });
+  });
+
+  // What a run costs is only knowable if every completed request reports itself.
+  // This is the one place that talks to the model, so a request that skipped it
+  // would be spend that no measurement could ever see - and the daily budget is
+  // sized from those measurements.
+  describe('metering', () => {
+    beforeEach(enable);
+
+    const clientReturning = (response) => jest.spyOn(llmService, 'getClient').mockReturnValue({
+      chat: { completions: { create: jest.fn().mockResolvedValue(response) } },
+      embeddings: { create: jest.fn().mockResolvedValue(response) }
+    });
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it('reports what a chat request spent', async () => {
+      clientReturning({
+        choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 700, completion_tokens: 30, total_tokens: 730 }
+      });
+
+      const { cost } = await aiCostMeter.measure(
+        () => llmService.chat({ userId: 'u1', messages: [], purpose: 'categorisation-fallback' })
+      );
+
+      expect(cost.byPurpose).toEqual({ 'categorisation-fallback': { tokens: 730, calls: 1 } });
+    });
+
+    it('reports what an embedding request spent', async () => {
+      clientReturning({
+        data: [{ index: 0, embedding: [0, 1] }],
+        usage: { total_tokens: 9 }
+      });
+
+      const { cost } = await aiCostMeter.measure(
+        () => llmService.embed({ userId: 'u1', texts: ['שופרסל'], purpose: 'categorisation-query' })
+      );
+
+      expect(cost.byPurpose).toEqual({ 'categorisation-query': { tokens: 9, calls: 1 } });
+    });
+
+    // A failed request bought nothing and reports no usage, so counting it would
+    // inflate the very figure the budget is chosen from.
+    it('reports nothing for a request that failed', async () => {
+      jest.spyOn(llmService, 'getClient').mockReturnValue({
+        chat: { completions: { create: jest.fn().mockRejectedValue(new Error('429')) } }
+      });
+
+      const { cost } = await aiCostMeter.measure(async () => {
+        await llmService.chat({ userId: 'u1', messages: [] }).catch(() => {});
+      });
+
+      expect(cost).toMatchObject({ tokens: 0, calls: 0 });
     });
   });
 

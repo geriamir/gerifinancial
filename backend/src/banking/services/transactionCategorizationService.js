@@ -4,6 +4,7 @@ const transactionClassifier = require('./transactionClassifier');
 const llmCategorizer = require('./llmCategorizer');
 const scrapingQueue = require('../../shared/services/scrapingQueue');
 const sseService = require('../../shared/services/sseService');
+const aiCostMeter = require('../../shared/services/ai/aiCostMeter');
 const config = require('../../shared/config');
 const logger = require('../../shared/utils/logger');
 
@@ -85,9 +86,39 @@ class TransactionCategorizationService {
   }
 
   /**
-   * Categorises a batch, reporting progress as it goes.
+   * Categorises a batch, reporting progress as it goes, and reports what the
+   * batch cost.
+   *
+   * The cost is the reason for the split: the per-transaction token figure the
+   * daily budget is sized against was never anything but an estimate, because
+   * every call logged its own tokens and nothing added them up over a run.
    */
   async processBatch({ userId, transactionIds }, job) {
+    const { result, cost } = await aiCostMeter.measure(
+      () => this.runBatch({ userId, transactionIds }, job)
+    );
+
+    // Only when something was actually spent. With AI switched off every batch
+    // would otherwise log a line saying nothing was spent, and this line exists
+    // to be found in the logs of the one import worth measuring.
+    if (cost.calls > 0) {
+      // Loading the corpus costs tokens before any transaction is looked at, so
+      // an empty batch can still spend - and dividing by it would print the
+      // Infinity that makes the whole line untrustworthy.
+      const perTransaction = transactionIds.length
+        ? ` perTransaction=${(cost.tokens / transactionIds.length).toFixed(1)}`
+        : '';
+      logger.info(
+        `Categorization cost user=${userId} transactions=${transactionIds.length} ` +
+        `tokens=${cost.tokens} calls=${cost.calls}${perTransaction} ` +
+        `(${cost.breakdown})`
+      );
+    }
+
+    return result;
+  }
+
+  async runBatch({ userId, transactionIds }, job) {
     const corpus = await transactionClassifier.forUser(userId);
     const catalogue = await llmCategorizer.forUser(userId);
     // Clients are keyed by the string form of the id, and the job payload may
