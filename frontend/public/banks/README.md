@@ -15,9 +15,9 @@ never upscaled: a blurry stored file is worse than letting the browser scale a
 sharp one.
 
 They are wired up through the `logo` field in `src/constants/banks.ts`. A path
-that points at nothing fails silently in the browser — `BankIcon` just falls
-back to the bank's monogram — so `BankIcon.test.tsx` asserts every declared
-logo resolves to a file that exists.
+that points at nothing fails silently in the browser — `BankIcon` drops the tile
+back to the bank's monogram, colour included — so `BankIcon.test.tsx` asserts
+every declared logo resolves to a file that exists.
 
 To add another bank, drop a square PNG here and set its `logo` path. No
 component needs to change.

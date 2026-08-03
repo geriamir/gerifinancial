@@ -1,7 +1,7 @@
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import { BankIcon } from '../BankIcon';
 import { SUPPORTED_BANKS, CHECKING_ACCOUNT_BANKS, CREDIT_CARD_PROVIDERS, API_BANKS, OTP_BANKS } from '../../../constants/banks';
 
@@ -29,6 +29,34 @@ describe('BankIcon', () => {
     render(<BankIcon bankId="hapoalim" />);
     const logo = within(screen.getByTestId('bank-icon-hapoalim')).getByRole('presentation', { hidden: true });
     expect(logo).toHaveStyle({ objectFit: 'contain' });
+  });
+
+  // A logo tile is white so the marks drawn for a light background sit on one.
+  // That means the monogram underneath cannot stay white as well - a 404, a bad
+  // deploy base path or a decode error would leave white on white, which reads
+  // as a blank tile rather than as a fallback.
+  it('falls back to a readable monogram when the logo will not load', () => {
+    render(<BankIcon bankId="hapoalim" />);
+    const icon = screen.getByTestId('bank-icon-hapoalim');
+
+    fireEvent.error(within(icon).getByRole('presentation', { hidden: true }));
+
+    expect(icon).toHaveTextContent('HP');
+    expect(icon).toHaveStyle({ backgroundColor: '#C8102E' });
+  });
+
+  // The failure belongs to one image, not to the component. A row of tiles
+  // reuses this for every bank, so a broken mark must not blank out the next
+  // bank that happens to render through the same instance.
+  it('does not carry a failed logo over to a different bank', () => {
+    const { rerender } = render(<BankIcon bankId="hapoalim" />);
+    fireEvent.error(within(screen.getByTestId('bank-icon-hapoalim')).getByRole('presentation', { hidden: true }));
+
+    rerender(<BankIcon bankId="leumi" />);
+
+    expect(
+      within(screen.getByTestId('bank-icon-leumi')).getByRole('presentation', { hidden: true })
+    ).toHaveAttribute('src', '/banks/leumi.png');
   });
 
   // Account rows come from the database and can outlive a bank being dropped
