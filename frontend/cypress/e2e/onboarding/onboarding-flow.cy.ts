@@ -58,8 +58,7 @@ describe('Onboarding Flow', () => {
       cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
       cy.wait(500);
       
-      cy.get('[data-testid="bank-select"]').click();
-      cy.contains('Hapoalim').click();
+      cy.get('[data-testid="bank-select-option-hapoalim"]').click();
       cy.get('[data-testid="display-name-input"]').should('be.visible').type('My Checking Account');
       cy.get('[data-testid="username-input"]').should('be.visible').type('testuser');
       cy.get('[data-testid="password-input"]').should('be.visible').type('testpass123');
@@ -132,8 +131,7 @@ describe('Onboarding Flow', () => {
       cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
       cy.wait(500);
 
-      cy.get('[data-testid="bank-select"]').click();
-      cy.contains('Hapoalim').click();
+      cy.get('[data-testid="bank-select-option-hapoalim"]').click();
       cy.get('[data-testid="display-name-input"]').should('be.visible').type('Checking');
       cy.get('[data-testid="username-input"]').should('be.visible').type('user');
       cy.get('[data-testid="password-input"]').should('be.visible').type('pass');
@@ -205,8 +203,7 @@ describe('Onboarding Flow', () => {
       cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
       cy.wait(500);
       
-      cy.get('[data-testid="bank-select"]').click();
-      cy.contains('Hapoalim').click();
+      cy.get('[data-testid="bank-select-option-hapoalim"]').click();
       cy.get('[data-testid="display-name-input"]').should('be.visible').type('Checking');
       cy.get('[data-testid="username-input"]').should('be.visible').type('user');
       cy.get('[data-testid="password-input"]').should('be.visible').type('pass');
@@ -261,8 +258,7 @@ describe('Onboarding Flow', () => {
       cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
       cy.wait(500);
       
-      cy.get('[data-testid="bank-select"]').click();
-      cy.contains('Hapoalim').click();
+      cy.get('[data-testid="bank-select-option-hapoalim"]').click();
       cy.get('[data-testid="display-name-input"]').should('be.visible').type('Checking');
       cy.get('[data-testid="username-input"]').should('be.visible').type('user');
       cy.get('[data-testid="password-input"]').should('be.visible').type('pass');
@@ -318,8 +314,7 @@ describe('Onboarding Flow', () => {
       cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
       cy.wait(500);
       
-      cy.get('[data-testid="bank-select"]').click();
-      cy.contains('Hapoalim').click();
+      cy.get('[data-testid="bank-select-option-hapoalim"]').click();
       cy.get('[data-testid="display-name-input"]').should('be.visible').type('Checking');
       cy.get('[data-testid="username-input"]').should('be.visible').type('user');
       cy.get('[data-testid="password-input"]').should('be.visible').type('pass');
@@ -373,8 +368,7 @@ describe('Onboarding Flow', () => {
         cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
         cy.wait(500);
         
-        cy.get('[data-testid="bank-select"]').click();
-        cy.contains('Hapoalim').click();
+        cy.get('[data-testid="bank-select-option-hapoalim"]').click();
         cy.get('[data-testid="display-name-input"]').type('Checking');
         cy.get('[data-testid="username-input"]').type('invalid');
         cy.get('[data-testid="password-input"]').type('invalid');
@@ -415,8 +409,7 @@ describe('Onboarding Flow', () => {
         cy.get('[data-testid="checking-account-setup"]', { timeout: 10000 }).should('be.visible');
         cy.wait(500);
         
-        cy.get('[data-testid="bank-select"]').click();
-        cy.contains('Hapoalim').click();
+        cy.get('[data-testid="bank-select-option-hapoalim"]').click();
         cy.get('[data-testid="display-name-input"]').type('Checking');
         cy.get('[data-testid="username-input"]').type('user');
         cy.get('[data-testid="password-input"]').type('pass');

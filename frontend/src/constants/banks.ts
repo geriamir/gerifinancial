@@ -11,21 +11,21 @@ export interface SupportedBank {
   color: string;
   /**
    * Path to a logo under `public/`, if one has been added. Bank logos are
-   * trademarks and none are bundled with this repository, so this is unset
-   * everywhere by default and the monogram is what renders. Drop a file in
-   * `public/banks/` and point this at it to use the real mark instead - no
-   * component needs to change, because `BankIcon` falls back to the monogram
-   * when the image is missing or fails to load.
+   * trademarks, so this is only set where the mark was taken from that bank's
+   * own public site and is used nominatively - to name the bank you are
+   * connecting to. Leave it unset and the monogram renders instead; `BankIcon`
+   * also falls back on its own if the file is missing or fails to load, so a
+   * dropped asset degrades to a readable badge rather than a blank space.
    */
   logo?: string;
 }
 
 // Checking Account Banks (Primary onboarding focus)
 export const CHECKING_ACCOUNT_BANKS: SupportedBank[] = [
-  { id: 'hapoalim', name: 'Bank Hapoalim', monogram: 'HP', color: '#C8102E' },
-  { id: 'leumi', name: 'Bank Leumi', monogram: 'LM', color: '#1B3A6B' },
-  { id: 'discount', name: 'Discount Bank', monogram: 'DS', color: '#00843D' },
-  { id: 'otsarHahayal', name: 'Otsar HaHayal', monogram: 'OH', color: '#0F7B8A' }
+  { id: 'hapoalim', name: 'Bank Hapoalim', monogram: 'HP', color: '#C8102E', logo: '/banks/hapoalim.png' },
+  { id: 'leumi', name: 'Bank Leumi', monogram: 'LM', color: '#1B3A6B', logo: '/banks/leumi.png' },
+  { id: 'discount', name: 'Discount Bank', monogram: 'DS', color: '#00843D', logo: '/banks/discount.png' },
+  { id: 'otsarHahayal', name: 'Otsar HaHayal', monogram: 'OH', color: '#0F7B8A', logo: '/banks/otsarHahayal.png' }
 ];
 
 // Credit Card Providers (Secondary onboarding step)

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { CheckingAccountCard } from '../CheckingAccountCard';
 import { CHECKING_ACCOUNT_BANKS } from '../../../../../constants/banks';
 import { OnboardingStatus } from '../../../../../services/api/onboarding';
@@ -13,36 +13,73 @@ const handlers: ChatHandlers = {
   completeOnboarding: jest.fn().mockResolvedValue(undefined)
 };
 
-const openBankList = () => {
+const showCard = () => {
   render(<CheckingAccountCard status={{} as OnboardingStatus} handlers={handlers} />);
-  fireEvent.mouseDown(screen.getByRole('combobox'));
-  return screen.getByRole('listbox');
+  return screen.getByTestId('bank-select');
 };
 
 describe('CheckingAccountCard bank selection', () => {
-  it('marks every bank in the list with its own icon', () => {
-    const list = openBankList();
+  // The whole point of showing the banks inline is recognising yours without
+  // opening anything, so every one has to be on screen from the start.
+  it('shows every bank up front rather than behind a dropdown', () => {
+    const group = showCard();
+
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(within(group).getAllByRole('radio')).toHaveLength(CHECKING_ACCOUNT_BANKS.length);
+  });
+
+  it('marks every bank in the row with its own icon', () => {
+    const group = showCard();
 
     for (const bank of CHECKING_ACCOUNT_BANKS) {
-      expect(within(list).getByTestId(`bank-icon-${bank.id}`)).toHaveTextContent(bank.monogram);
+      expect(within(group).getByTestId(`bank-icon-${bank.id}`)).toBeInTheDocument();
     }
   });
 
-  it('still names every bank, so the icon is a cue rather than the only label', () => {
-    const list = openBankList();
+  it('still names every bank, so the logo is a cue rather than the only label', () => {
+    const group = showCard();
 
     for (const bank of CHECKING_ACCOUNT_BANKS) {
-      expect(within(list).getByText(bank.name)).toBeInTheDocument();
+      expect(within(group).getByText(bank.name)).toBeInTheDocument();
     }
   });
 
-  // The whole point of the icon is recognising the account you picked without
-  // reading, so it has to survive into the closed control.
-  it('keeps the icon visible once a bank is chosen', () => {
-    const list = openBankList();
+  it('marks the chosen bank as selected and leaves the rest alone', () => {
+    const group = showCard();
 
-    fireEvent.click(within(list).getByText('Bank Leumi'));
+    fireEvent.click(within(group).getByRole('radio', { name: 'Bank Leumi' }));
 
-    expect(within(screen.getByRole('combobox')).getByTestId('bank-icon-leumi')).toBeInTheDocument();
+    expect(within(group).getByRole('radio', { name: 'Bank Leumi' })).toBeChecked();
+    expect(within(group).getByRole('radio', { name: 'Bank Hapoalim' })).not.toBeChecked();
+    expect(screen.getByTestId('bank-select-option-leumi')).toHaveAttribute('data-selected', 'true');
+    expect(screen.getByTestId('bank-select-option-hapoalim')).toHaveAttribute('data-selected', 'false');
+  });
+
+  // Each tile is a <label> around its own radio, so the bank name rendered
+  // inside is what names the control. Swap that label for a plain element and
+  // the group becomes four unnamed radios that clicking does not select.
+  it('gives each option an accessible name', () => {
+    const group = showCard();
+
+    for (const bank of CHECKING_ACCOUNT_BANKS) {
+      expect(within(group).getByRole('radio', { name: bank.name })).toBeInTheDocument();
+    }
+  });
+
+  it('submits the bank that was clicked', async () => {
+    const group = showCard();
+
+    fireEvent.click(within(group).getByRole('radio', { name: 'Discount Bank' }));
+    fireEvent.change(screen.getByLabelText(/online banking username/i), { target: { value: 'someone' } });
+    fireEvent.change(screen.getByLabelText(/online banking password/i), { target: { value: 'secret' } });
+    fireEvent.click(screen.getByTestId('connect-checking-btn'));
+
+    await waitFor(() =>
+      expect(handlers.connectCheckingAccount).toHaveBeenCalledWith(
+        'discount',
+        { username: 'someone', password: 'secret' },
+        'Main Checking'
+      )
+    );
   });
 });
