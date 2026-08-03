@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const aiCostMeter = require('../../shared/services/ai/aiCostMeter');
 
 class AiNotConfiguredError extends Error {
   constructor() {
@@ -38,23 +39,28 @@ const fakeEmbedding = (text) => {
 // need "near" and "far" to mean something register their own vectors here.
 const overrides = new Map();
 
-const defaultChat = async ({ userId }) => {
+const defaultChat = async ({ userId, purpose }) => {
   if (!enabled) throw new AiNotConfiguredError();
   if (!userId) throw new Error('llmService.chat requires a userId to charge the request to');
   if (chatError) throw chatError;
+  const usage = { promptTokens: 10, completionTokens: 10, totalTokens: 20 };
+  // The real service meters every call it completes, so a mock that did not
+  // would let a run report a cost of zero and pass.
+  aiCostMeter.record(purpose, usage.totalTokens);
   return {
     content: chatResponse.content,
     finishReason: chatResponse.finishReason || 'stop',
     model: 'mock-chat',
-    usage: { promptTokens: 10, completionTokens: 10, totalTokens: 20 }
+    usage
   };
 };
 
-const defaultEmbed = async ({ userId, texts }) => {
+const defaultEmbed = async ({ userId, texts, purpose }) => {
   if (!enabled) throw new AiNotConfiguredError();
   if (!userId) throw new Error('llmService.embed requires a userId to charge the request to');
   const input = Array.isArray(texts) ? texts : [texts];
   const vectors = input.map(fakeEmbedding);
+  aiCostMeter.record(purpose, input.length);
   return {
     vectors,
     dimensions: vectors.length ? MOCK_DIMENSIONS : 0,

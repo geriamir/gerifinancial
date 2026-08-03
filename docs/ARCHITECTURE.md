@@ -194,6 +194,32 @@ simply be asked about again.
 Set `AI_LLM_CATEGORIZATION=false` to switch tier 4 off without giving up
 embeddings and the rest of the AI features.
 
+Both ceilings — the daily budget and the resume limit — are only as good as the
+per-transaction cost they are sized against, and until a real import has run
+that cost is a guess. `aiCostMeter` measures it: every completed request reports
+itself from `llmService`, and `processBatch` logs the total for the run it
+belongs to:
+
+```
+Categorization cost user=… transactions=412 tokens=51004 calls=430 perTransaction=123.8
+  (categorisation-fallback-batch=48200 in 42 calls, categorisation-query=2804 in 412 calls, …)
+```
+
+The breakdown is what makes the line actionable — it says whether the money went
+on the model or on embeddings, and a run is normally dominated by whichever of
+those the last change did not address. Divide a day's allowance by
+`perTransaction` to get the transactions a day can categorise; that number is
+what `AI_LLM_RESUME_LIMIT` should be near, since enqueuing more than a day can
+pay for only marks the surplus outstanding again.
+
+The meter follows the async context rather than being passed down as an
+argument, because three services spend on one run — the classifier embedding the
+corpus, the classifier embedding each query, the categoriser asking the model —
+and a total that missed any of them would be quietly wrong. A before/after
+reading of the per-user counter in `aiBudget` would not work either: the
+low-priority queue runs two jobs at once and the request-driven AI paths share
+the process, so one run would be charged for another's tokens.
+
 Tier 4 is asked in batches, because the category list is almost the entire
 prompt and is identical for every transaction: asking about one transaction
 sends roughly 730 tokens of menu to carry about 20 tokens of question. So
