@@ -86,8 +86,7 @@ const draw = () =>
   );
 
 const fillForm = async (user: ReturnType<typeof userEvent.setup>) => {
-  await user.click(screen.getByLabelText(/Your bank/i));
-  await user.click(await screen.findByText('Bank Leumi'));
+  await user.click(screen.getByRole('radio', { name: 'Bank Leumi' }));
   await user.type(screen.getByLabelText(/Online banking username/i), 'someuser');
   await user.type(screen.getByLabelText(/Online banking password/i), 'hunter2');
   await user.click(screen.getByTestId('connect-checking-btn'));

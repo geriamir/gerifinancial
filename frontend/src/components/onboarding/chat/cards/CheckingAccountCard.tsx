@@ -1,21 +1,15 @@
 import React, { useState } from 'react';
 import {
   Box,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   TextField,
   Button,
-  FormHelperText,
   Alert,
-  Typography,
-  SelectChangeEvent
+  Typography
 } from '@mui/material';
 import { Lock as LockIcon } from '@mui/icons-material';
 import { AxiosError } from 'axios';
 import { CHECKING_ACCOUNT_BANKS } from '../../../../constants/banks';
-import { BankIcon } from '../../../bank/BankIcon';
+import { BankPicker } from '../../../bank/BankPicker';
 import { track } from '../../../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../../../constants/analytics';
 import { CardShell } from '../CardShell';
@@ -33,9 +27,8 @@ export const CheckingAccountCard: React.FC<CardProps> = ({ handlers }) => {
     setForm((previous) => ({ ...previous, [name]: value }));
   };
 
-  const handleSelect = (event: SelectChangeEvent) => {
-    const { name, value } = event.target;
-    setForm((previous) => ({ ...previous, [name || '']: value }));
+  const handleBank = (bankId: string) => {
+    setForm((previous) => ({ ...previous, bankId }));
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -85,27 +78,14 @@ export const CheckingAccountCard: React.FC<CardProps> = ({ handlers }) => {
   return (
     <CardShell testId="checking-account-setup">
       <form onSubmit={handleSubmit}>
-        <FormControl fullWidth margin="dense" required size="small">
-          <InputLabel id="checking-bank-label">Your bank</InputLabel>
-          <Select
-            labelId="checking-bank-label"
-            id="checking-bank-select"
-            name="bankId"
-            value={form.bankId}
-            onChange={handleSelect}
-            label="Your bank"
-            data-testid="bank-select"
-            sx={{ '& .MuiSelect-select': { display: 'flex', alignItems: 'center', gap: 1.5 } }}
-          >
-            {CHECKING_ACCOUNT_BANKS.map((bank) => (
-              <MenuItem key={bank.id} value={bank.id} sx={{ gap: 1.5 }}>
-                <BankIcon bankId={bank.id} size={24} />
-                {bank.name}
-              </MenuItem>
-            ))}
-          </Select>
-          <FormHelperText>Credit cards come later - this is your day-to-day account.</FormHelperText>
-        </FormControl>
+        <BankPicker
+          banks={CHECKING_ACCOUNT_BANKS}
+          value={form.bankId}
+          onChange={handleBank}
+          label="Your bank"
+          helperText="Credit cards come later - this is your day-to-day account."
+          testId="bank-select"
+        />
 
         <TextField
           fullWidth
