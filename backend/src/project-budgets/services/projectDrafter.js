@@ -122,18 +122,24 @@ class ProjectDrafter {
     return { categories, subCategories };
   }
 
+  /**
+   * Renders the choices the model is allowed to make.
+   *
+   * Every line is "Category > Subcategory", never a bare category, because a
+   * ProjectBudget line requires both ids. A category with no subcategories is
+   * therefore left out of the menu entirely rather than offered and refused
+   * later: offering it would spend tokens on an answer that is guaranteed to be
+   * dropped, and report it back as though the user had asked for something they
+   * do not have.
+   */
   describeChoices({ categories, subCategories }) {
     const lines = [];
     for (const category of categories) {
       const children = subCategories.filter(
         (sub) => String(sub.parentCategory) === String(category._id)
       );
-      if (children.length === 0) {
-        lines.push(`- ${category.name}`);
-      } else {
-        for (const child of children) {
-          lines.push(`- ${category.name} > ${child.name}`);
-        }
+      for (const child of children) {
+        lines.push(`- ${category.name} > ${child.name}`);
       }
     }
     return lines;
@@ -232,7 +238,7 @@ class ProjectDrafter {
         const named = [line?.category, line?.subCategory].filter(Boolean).join(' > ');
         warnings.push(
           named
-            ? `Left out "${String(named).slice(0, 60)}" - you have no category by that name.`
+            ? `Left out "${String(named).slice(0, 60)}" - it does not match any of your categories.`
             : 'Left out a suggested budget line that did not name a category.'
         );
       }

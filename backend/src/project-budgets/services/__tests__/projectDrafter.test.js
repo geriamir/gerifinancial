@@ -36,6 +36,10 @@ describe('projectDrafter', () => {
     const furniture = await SubCategory.create({
       name: 'Furniture and Decorations', parentCategory: shopping._id, userId: owner
     });
+    // Given a child on purpose. Childless categories are left out of the menu
+    // anyway, so an income category without one would hide whether the expense
+    // filter is doing anything.
+    await SubCategory.create({ name: 'Bonus', parentCategory: salary._id, userId: owner });
     return { household, shopping, salary, repairs, furniture };
   };
 
@@ -180,6 +184,27 @@ describe('projectDrafter', () => {
 
       const { messages } = llmService.chat.mock.calls[0][0];
       expect(messages[0].content.match(/- Household > Maintenance and Repairs/g)).toHaveLength(1);
+    });
+
+    // A budget line needs a subcategory, so a category without one is a choice
+    // the model could pick but nothing could save.
+    it('does not offer a category that has no subcategories', async () => {
+      await seed();
+      await Category.create({ name: 'Sundries', type: 'Expense', userId });
+      answering(fullAnswer());
+
+      await projectDrafter.draft({ userId, description: 'kitchen' });
+
+      const { messages } = llmService.chat.mock.calls[0][0];
+      expect(messages[0].content).not.toContain('Sundries');
+    });
+
+    it('offers nothing at all when no category of theirs has subcategories', async () => {
+      await Category.create({ name: 'Sundries', type: 'Expense', userId });
+      answering(fullAnswer());
+
+      expect(await projectDrafter.draft({ userId, description: 'kitchen' })).toBeNull();
+      expect(llmService.chat).not.toHaveBeenCalled();
     });
   });
 

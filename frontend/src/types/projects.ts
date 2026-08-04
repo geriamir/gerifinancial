@@ -160,8 +160,10 @@ export interface ProjectCreationData {
   startDate: Date;
   endDate: Date;
   currency: string;
-  // Only set when a draft supplied them. Left undefined, the backend falls back
-  // to its own template, which is what the plain form has always relied on.
+  // Omitted or empty, the backend builds the budget from its own template for
+  // the project type - which is what the plain form has always relied on. Only a
+  // non-empty list replaces that with an explicit budget, so the dialog can pass
+  // its drafted lines here without having to special-case having none.
   categoryBudgets?: DraftedCategoryBudget[];
 }
 
