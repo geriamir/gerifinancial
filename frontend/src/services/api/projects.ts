@@ -2,6 +2,7 @@ import api from './base';
 import {
   ProjectBudget,
   ProjectCreationData,
+  ProjectDraft,
   ProjectFilters,
   ProjectProgress,
   ProjectsListResponse,
@@ -68,8 +69,7 @@ class ProjectsApiService {
 
   async createProject(data: ProjectCreationData): Promise<ApiResponse<ProjectBudget>> {
     try {
-      // Send simplified data - backend will create template-based budget
-      const backendData = {
+      const backendData: Record<string, unknown> = {
         name: data.name,
         type: data.type,
         startDate: data.startDate.toISOString(),
@@ -77,12 +77,39 @@ class ProjectsApiService {
         currency: data.currency
       };
 
+      // Sent only when there are lines to send. An empty array would read as
+      // "this project has no budget" and suppress the backend's own template.
+      if (data.categoryBudgets && data.categoryBudgets.length > 0) {
+        backendData.categoryBudgets = data.categoryBudgets.map((line) => ({
+          categoryId: line.categoryId,
+          subCategoryId: line.subCategoryId,
+          budgetedAmount: line.budgetedAmount,
+          currency: line.currency,
+          description: line.description
+        }));
+      }
+
       const response = await api.post(this.baseUrl, backendData);
       
       return {
         success: true,
         data: response.data.data || response.data
       };
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Asks the backend to draft a project from a description. Creates nothing.
+   *
+   * Resolves to null when there is no draft to be had - the feature is optional,
+   * and the user still has the form in front of them.
+   */
+  async draftProject(description: string): Promise<ProjectDraft | null> {
+    try {
+      const response = await api.post(`${this.baseUrl}/draft`, { description });
+      return response.data?.data || null;
     } catch (error) {
       throw this.handleError(error);
     }

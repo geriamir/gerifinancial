@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const { body, param, query, validationResult } = require('express-validator');
 const auth = require('../../shared/middleware/auth');
 const projectBudgetService = require('../services/projectBudgetService');
+const projectDrafter = require('../services/projectDrafter');
 const projectExpensesService = require('../services/projectExpensesService');
 const projectOverviewService = require('../services/projectOverviewService');
 const projectTransactionService = require('../services/projectTransactionService');
@@ -71,6 +72,47 @@ router.get('/projects',
       res.status(500).json({
         success: false,
         message: 'Failed to fetch project budgets',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/budgets/projects/draft
+ * Draft a project from a free-text description. Creates nothing - the draft is
+ * returned for the user to edit and submit through POST /projects.
+ */
+router.post('/projects/draft',
+  auth,
+  [
+    body('description').isString().isLength({ min: 1, max: 1000 })
+      .withMessage('Description must be 1-1000 characters')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const draft = await projectDrafter.draft({
+        userId: req.user._id,
+        description: req.body.description
+      });
+
+      // Not an error: the feature is optional and the caller has a perfectly
+      // good empty form to fall back to.
+      if (!draft) {
+        return res.json({
+          success: true,
+          data: null,
+          message: 'Could not draft this project - fill in the form instead'
+        });
+      }
+
+      res.json({ success: true, data: draft });
+    } catch (error) {
+      logger.error('Error drafting project budget:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to draft project budget',
         error: error.message
       });
     }

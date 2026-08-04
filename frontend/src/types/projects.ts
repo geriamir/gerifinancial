@@ -160,6 +160,35 @@ export interface ProjectCreationData {
   startDate: Date;
   endDate: Date;
   currency: string;
+  // Omitted or empty, the backend builds the budget from its own template for
+  // the project type - which is what the plain form has always relied on. Only a
+  // non-empty list replaces that with an explicit budget, so the dialog can pass
+  // its drafted lines here without having to special-case having none.
+  categoryBudgets?: DraftedCategoryBudget[];
+}
+
+// A budget line the AI drafter proposed, already resolved to categories the user
+// owns - the ids are what make it saveable without a second lookup.
+export interface DraftedCategoryBudget {
+  categoryId: string;
+  subCategoryId: string;
+  categoryName: string;
+  subCategoryName: string;
+  budgetedAmount: number;
+  currency: string;
+  description: string;
+}
+
+export interface ProjectDraft {
+  name?: string;
+  type?: ProjectType;
+  startDate?: string;
+  endDate?: string;
+  currency?: string;
+  categoryBudgets: DraftedCategoryBudget[];
+  // Things the model suggested that could not be used, so the user can see what
+  // was left out rather than wondering why the plan looks thin.
+  warnings: string[];
 }
 
 // Project Template for budget allocation

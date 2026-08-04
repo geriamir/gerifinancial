@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -16,19 +16,24 @@ import {
   IconButton,
   Card,
   CardContent,
-  Alert
+  Alert,
+  CircularProgress,
+  Divider
 } from '@mui/material';
 import {
   Close as CloseIcon,
   Save as SaveIcon,
   BeachAccess as VacationIcon,
   Home as HomeIcon,
-  TrendingUp as InvestmentIcon
+  TrendingUp as InvestmentIcon,
+  AutoAwesome as DraftIcon,
+  DeleteOutline as RemoveIcon
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useNavigate } from 'react-router-dom';
-import { ProjectCreationData, ProjectBudget, ProjectType } from '../../../types/projects';
+import { ProjectCreationData, ProjectBudget, ProjectType, DraftedCategoryBudget } from '../../../types/projects';
 import { useProject } from '../../../contexts/ProjectContext';
+import { projectsApi } from '../../../services/api/projects';
 
 interface SimpleProjectCreationDialogProps {
   open: boolean;
@@ -78,21 +83,79 @@ const SimpleProjectCreationDialog: React.FC<SimpleProjectCreationDialogProps> = 
   
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const projectNameRef = useRef<HTMLInputElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
-  // Focus on project name when dialog opens
-  useEffect(() => {
-    if (open) {
-      // Longer delay to ensure dialog focus trap is established first
-      const timer = setTimeout(() => {
-        if (projectNameRef.current) {
-          projectNameRef.current.focus();
-          projectNameRef.current.select(); // Also select the text if any
-        }
-      }, 300);
-      return () => clearTimeout(timer);
+  const [description, setDescription] = useState('');
+  const [isDrafting, setIsDrafting] = useState(false);
+  const [draftLines, setDraftLines] = useState<DraftedCategoryBudget[]>([]);
+  const [draftWarnings, setDraftWarnings] = useState<string[]>([]);
+  const [draftMessage, setDraftMessage] = useState<string | null>(null);
+
+  /**
+   * Fills the form from a description, leaving anything the drafter could not
+   * work out for the user to complete. Nothing is created until they submit, so
+   * a bad draft costs them an edit rather than a project they have to delete.
+   */
+  const handleDraft = async () => {
+    if (!description.trim() || isDrafting) return;
+
+    setIsDrafting(true);
+    setDraftMessage(null);
+    try {
+      const draft = await projectsApi.draftProject(description.trim());
+
+      if (!draft) {
+        setDraftMessage("Couldn't draft this one - fill in the form below instead.");
+        return;
+      }
+
+      setFormData(prev => {
+        const startDate = draft.startDate ? new Date(draft.startDate) : prev.startDate;
+        const endDate = draft.endDate ? new Date(draft.endDate) : prev.endDate;
+        return {
+          ...prev,
+          name: draft.name || prev.name,
+          type: draft.type || prev.type,
+          currency: draft.currency || prev.currency,
+          startDate,
+          endDate
+        };
+      });
+      setDraftLines(draft.categoryBudgets);
+      setDraftWarnings(draft.warnings);
+      setErrors({});
+      if (draft.categoryBudgets.length === 0) {
+        setDraftMessage('Drafted the outline, but none of the spending matched your categories.');
+      }
+    } catch (error) {
+      setDraftMessage("Couldn't draft this one - fill in the form below instead.");
+    } finally {
+      setIsDrafting(false);
     }
-  }, [open]);
+  };
+
+  const handleLineAmountChange = (index: number) => (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const amount = Number(event.target.value);
+    setDraftLines(prev => prev.map((line, i) => (
+      i === index ? { ...line, budgetedAmount: Number.isFinite(amount) && amount > 0 ? amount : 0 } : line
+    )));
+  };
+
+  const handleRemoveLine = (index: number) => () => {
+    setDraftLines(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Focus the description when the dialog opens: it is the top of the form and
+  // the quickest way in. It deliberately gives up if the cursor is already in a
+  // field - this used to fire on a timer and land mid-sentence, selecting what
+  // had been typed so far so the next keystroke wiped it.
+  const focusDescription = () => {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+    descriptionRef.current?.focus();
+  };
 
   const handleFieldChange = (field: keyof ProjectCreationData) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement> | any
@@ -222,7 +285,11 @@ const SimpleProjectCreationDialog: React.FC<SimpleProjectCreationDialogProps> = 
     try {
       setIsSubmitting(true);
       
-      const project = await createProject(formData);
+      const project = await createProject({
+        ...formData,
+        currency: formData.currency,
+        categoryBudgets: draftLines.map((line) => ({ ...line, currency: formData.currency }))
+      });
       onSuccess(project);
       handleClose();
       
@@ -248,6 +315,10 @@ const SimpleProjectCreationDialog: React.FC<SimpleProjectCreationDialogProps> = 
         currency: 'ILS'
       });
       setErrors({});
+      setDescription('');
+      setDraftLines([]);
+      setDraftWarnings([]);
+      setDraftMessage(null);
       onClose();
     }
   };
@@ -261,12 +332,7 @@ const SimpleProjectCreationDialog: React.FC<SimpleProjectCreationDialogProps> = 
       TransitionProps={{
         onEntered: () => {
           // Focus after the dialog transition completes
-          setTimeout(() => {
-            if (projectNameRef.current) {
-              projectNameRef.current.focus();
-              projectNameRef.current.select();
-            }
-          }, 50);
+          setTimeout(focusDescription, 50);
         }
       }}
       PaperProps={{
@@ -292,6 +358,38 @@ const SimpleProjectCreationDialog: React.FC<SimpleProjectCreationDialogProps> = 
 
       <DialogContent sx={{ pb: 2 }}>
         <Box display="flex" flexDirection="column" gap={3} mt={1}>
+          {/* Describe it and let the drafter fill the form in */}
+          <Box>
+            <TextField
+              fullWidth
+              multiline
+              minRows={2}
+              label="Describe your project (optional)"
+              placeholder="Renovating the kitchen from March, budget around 80,000"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              disabled={isSubmitting || isDrafting}
+              inputProps={{ maxLength: 1000 }}
+              inputRef={descriptionRef}
+              helperText="Or skip this and fill in the form yourself"
+            />
+            <Box display="flex" justifyContent="flex-end" mt={1}>
+              <Button
+                onClick={handleDraft}
+                disabled={!description.trim() || isDrafting || isSubmitting}
+                startIcon={isDrafting ? <CircularProgress size={16} /> : <DraftIcon />}
+                size="small"
+              >
+                {isDrafting ? 'Drafting...' : 'Draft with AI'}
+              </Button>
+            </Box>
+            {draftMessage && (
+              <Alert severity="info" sx={{ mt: 1 }}>{draftMessage}</Alert>
+            )}
+          </Box>
+
+          <Divider />
+
           {/* Project Name */}
           <TextField
             fullWidth
@@ -302,7 +400,6 @@ const SimpleProjectCreationDialog: React.FC<SimpleProjectCreationDialogProps> = 
             helperText={errors.name || 'Give your project a clear, descriptive name'}
             disabled={isSubmitting}
             inputProps={{ maxLength: 100 }}
-            inputRef={projectNameRef}
             required
           />
 
@@ -409,11 +506,76 @@ const SimpleProjectCreationDialog: React.FC<SimpleProjectCreationDialogProps> = 
             </FormHelperText>
           </FormControl>
 
+          {/* Drafted budget lines */}
+          {draftLines.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                Budget ({draftLines.length} {draftLines.length === 1 ? 'line' : 'lines'})
+              </Typography>
+              <Box display="flex" flexDirection="column" gap={1}>
+                {draftLines.map((line, index) => (
+                  <Box
+                    key={`${line.categoryId}-${line.subCategoryId}-${index}`}
+                    display="flex"
+                    alignItems="center"
+                    gap={1}
+                  >
+                    <Box flex={1} minWidth={0}>
+                      <Typography variant="body2" noWrap>
+                        {line.categoryName} › {line.subCategoryName}
+                      </Typography>
+                      {line.description && (
+                        <Typography variant="caption" color="text.secondary" noWrap display="block">
+                          {line.description}
+                        </Typography>
+                      )}
+                    </Box>
+                    <TextField
+                      size="small"
+                      type="number"
+                      value={line.budgetedAmount}
+                      onChange={handleLineAmountChange(index)}
+                      disabled={isSubmitting}
+                      sx={{ width: 130 }}
+                      inputProps={{ min: 0, 'aria-label': `Budget for ${line.subCategoryName}` }}
+                    />
+                    <IconButton
+                      onClick={handleRemoveLine(index)}
+                      disabled={isSubmitting}
+                      size="small"
+                      aria-label={`Remove ${line.subCategoryName}`}
+                    >
+                      <RemoveIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Box>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                These are estimates - edit anything that looks wrong, or remove it.
+              </Typography>
+            </Box>
+          )}
+
+          {draftWarnings.length > 0 && (
+            <Alert severity="warning">
+              <Typography variant="body2" component="div">
+                Left out of the budget:
+                <ul style={{ margin: '4px 0 0', paddingInlineStart: 20 }}>
+                  {draftWarnings.map((warning, index) => (
+                    <li key={index}>{warning}</li>
+                  ))}
+                </ul>
+              </Typography>
+            </Alert>
+          )}
+
           {/* Info Alert */}
           <Alert severity="info" sx={{ mt: 2 }}>
             <Typography variant="body2">
               <strong>What happens next?</strong><br />
-              • Default budget items (Flights, Hotels, Insurance) will be added — edit amounts from the project page<br />
+              {draftLines.length > 0
+                ? <>• The budget above is created with the project — edit amounts any time from the project page<br /></>
+                : <>• A starting budget is added where one exists for this project type — edit it from the project page<br /></>}
               • You can add more budget categories and funding sources after creation<br />
               • A project tag will be created for tracking related transactions
             </Typography>
