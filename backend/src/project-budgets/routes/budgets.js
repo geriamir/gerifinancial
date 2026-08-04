@@ -7,6 +7,7 @@ const projectDrafter = require('../services/projectDrafter');
 const projectExpensesService = require('../services/projectExpensesService');
 const projectOverviewService = require('../services/projectOverviewService');
 const projectTransactionService = require('../services/projectTransactionService');
+const projectTransactionMatcher = require('../services/projectTransactionMatcher');
 const logger = require('../../shared/utils/logger');
 const { ProjectBudget } = require('../models');
 const { Transaction } = require('../../banking');
@@ -128,7 +129,7 @@ router.post('/projects',
   [
     body('name').isString().isLength({ min: 1, max: 100 }).withMessage('Name must be 1-100 characters'),
     body('type').isIn(['vacation', 'home_renovation', 'investment']).withMessage('Project type must be vacation, home_renovation, or investment'),
-    body('description').optional().isString().isLength({ max: 500 }).withMessage('Description must be under 500 characters'),
+    body('description').optional().isString().isLength({ max: 1000 }).withMessage('Description must be under 1000 characters'),
     body('startDate').isISO8601().withMessage('Start date must be valid ISO8601 date'),
     body('endDate').isISO8601().withMessage('End date must be valid ISO8601 date'),
     body('fundingSources').optional().isArray().withMessage('Funding sources must be an array'),
@@ -231,7 +232,7 @@ router.put('/projects/:id',
   [
     param('id').isMongoId().withMessage('Invalid project ID'),
     body('name').optional().isString().isLength({ min: 1, max: 100 }).withMessage('Name must be 1-100 characters'),
-    body('description').optional().isString().isLength({ max: 500 }).withMessage('Description must be under 500 characters'),
+    body('description').optional().isString().isLength({ max: 1000 }).withMessage('Description must be under 1000 characters'),
     body('startDate').optional().isISO8601().withMessage('Start date must be valid ISO8601 date'),
     body('endDate').optional().isISO8601().withMessage('End date must be valid ISO8601 date'),
     body('status').optional().isIn(['planning', 'active', 'completed', 'cancelled']).withMessage('Invalid status'),
@@ -973,6 +974,89 @@ router.get('/projects/:id/discover-transactions',
       res.status(500).json({
         success: false,
         message: 'Failed to discover transactions',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/budgets/projects/:id/suggestions
+ * Transactions the matcher thinks belong to this project, awaiting review.
+ * Query params: refresh (boolean, look for new matches first),
+ *               includeUnlikely (boolean, include ones the model doubted)
+ */
+router.get('/projects/:id/suggestions',
+  auth,
+  [
+    param('id').isMongoId().withMessage('Invalid project ID'),
+    query('refresh').optional().isBoolean().toBoolean(),
+    query('includeUnlikely').optional().isBoolean().toBoolean()
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      if (req.query.refresh) {
+        await projectTransactionMatcher.refreshSuggestions(req.params.id, req.user._id);
+      }
+
+      const suggestions = await projectTransactionMatcher.getSuggestions(
+        req.params.id,
+        req.user._id,
+        { includeUnlikely: Boolean(req.query.includeUnlikely) }
+      );
+
+      res.json({ success: true, data: suggestions });
+    } catch (error) {
+      if (error.message === 'Project not found') {
+        return res.status(404).json({ success: false, message: error.message });
+      }
+      logger.error('Error reading project suggestions:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to read project suggestions',
+        error: error.message
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/budgets/projects/:id/suggestions/:transactionId
+ * Accept a suggestion (tagging the transaction to the project) or reject it.
+ */
+router.post('/projects/:id/suggestions/:transactionId',
+  auth,
+  [
+    param('id').isMongoId().withMessage('Invalid project ID'),
+    param('transactionId').isMongoId().withMessage('Invalid transaction ID'),
+    body('action').isIn(['accept', 'reject']).withMessage('Action must be accept or reject')
+  ],
+  handleValidationErrors,
+  async (req, res) => {
+    try {
+      const result = await projectTransactionMatcher.resolveSuggestion(
+        req.params.id,
+        req.user._id,
+        req.params.transactionId,
+        req.body.action
+      );
+
+      res.json({ success: true, data: result });
+    } catch (error) {
+      // The user asking about something that is not theirs, already decided, or
+      // gone is not a server fault, and answering 500 would have the UI offer a
+      // retry that cannot succeed.
+      if (/not found|already been decided/i.test(error.message)) {
+        return res.status(error.message.includes('already') ? 409 : 404).json({
+          success: false,
+          message: error.message
+        });
+      }
+      logger.error('Error resolving project suggestion:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to resolve project suggestion',
         error: error.message
       });
     }

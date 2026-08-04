@@ -502,6 +502,109 @@ describe('transactionCategorizationService', () => {
     });
   });
 
+  // A transaction cannot be matched to a project until it has a category to
+  // match a budget line with, so the end of a categorisation run is the first
+  // moment the question can be asked.
+  describe('offering what was categorised to projects', () => {
+    const matcher = require('../../../project-budgets/services/projectTransactionMatcher');
+
+    const categorizeInto = (targetCategory) =>
+      jest.spyOn(categoryMappingService, 'attemptAutoCategorization')
+        .mockImplementation(async (transaction) => {
+          transaction.category = targetCategory._id;
+          await transaction.save();
+          return transaction;
+        });
+
+    it('offers exactly the transactions it managed to categorise', async () => {
+      const offer = jest.spyOn(matcher, 'matchNewlyCategorized').mockResolvedValue({ projects: 1, added: 1 });
+      categorizeInto(category);
+      const done = await makeTransaction('CATEGORISED');
+
+      await transactionCategorizationService.processBatch({
+        userId: user._id,
+        transactionIds: [done._id]
+      });
+
+      expect(offer).toHaveBeenCalledTimes(1);
+      const [, offered] = offer.mock.calls[0];
+      expect(offered.map(String)).toEqual([String(done._id)]);
+    });
+
+    it('does not offer a transaction it could not categorise', async () => {
+      const offer = jest.spyOn(matcher, 'matchNewlyCategorized').mockResolvedValue({ projects: 0, added: 0 });
+      jest.spyOn(categoryMappingService, 'attemptAutoCategorization').mockResolvedValue(undefined);
+      const stuck = await makeTransaction('NOT CATEGORISED');
+
+      await transactionCategorizationService.processBatch({
+        userId: user._id,
+        transactionIds: [stuck._id]
+      });
+
+      expect(offer).not.toHaveBeenCalled();
+    });
+
+    // Suggestions are an extra. A scrape that categorised everything correctly
+    // has succeeded whether or not anything could be offered to a project.
+    it('does not fail the run when matching blows up', async () => {
+      jest.spyOn(matcher, 'matchNewlyCategorized').mockRejectedValue(new Error('mongo went away'));
+      categorizeInto(category);
+      const done = await makeTransaction('CATEGORISED');
+
+      await expect(transactionCategorizationService.processBatch({
+        userId: user._id,
+        transactionIds: [done._id]
+      })).resolves.toMatchObject({ categorized: 1 });
+    });
+
+    // Swallowing the failure is right; swallowing it without a trace would make
+    // "no suggestions ever appear" indistinguishable from "nothing matched".
+    it('leaves the reason matching failed in the log', async () => {
+      jest.spyOn(matcher, 'matchNewlyCategorized').mockRejectedValue(new Error('mongo went away'));
+      const error = jest.spyOn(logger, 'error');
+      categorizeInto(category);
+      const done = await makeTransaction('CATEGORISED');
+
+      await transactionCategorizationService.processBatch({
+        userId: user._id,
+        transactionIds: [done._id]
+      });
+
+      expect(error.mock.calls.map(([message]) => String(message)).join('\n'))
+        .toContain('mongo went away');
+    });
+
+    it('tells the browser when something was offered', async () => {
+      jest.spyOn(matcher, 'matchNewlyCategorized').mockResolvedValue({ projects: 1, added: 3 });
+      const emit = jest.spyOn(sseService, 'emit');
+      categorizeInto(category);
+      const done = await makeTransaction('CATEGORISED');
+
+      await transactionCategorizationService.processBatch({
+        userId: user._id,
+        transactionIds: [done._id]
+      });
+
+      expect(emit).toHaveBeenCalledWith(user._id.toString(), 'projects:suggestions', { added: 3 });
+    });
+
+    it('says nothing to the browser when nothing was offered', async () => {
+      jest.spyOn(matcher, 'matchNewlyCategorized').mockResolvedValue({ projects: 2, added: 0 });
+      const emit = jest.spyOn(sseService, 'emit');
+      categorizeInto(category);
+      const done = await makeTransaction('CATEGORISED');
+
+      await transactionCategorizationService.processBatch({
+        userId: user._id,
+        transactionIds: [done._id]
+      });
+
+      expect(emit).not.toHaveBeenCalledWith(
+        user._id.toString(), 'projects:suggestions', expect.anything()
+      );
+    });
+  });
+
   // The queue is fed only by newly-saved transactions, so without this a
   // transaction the budget cut off before the model ever saw it stays
   // uncategorised for good and the daily ceiling becomes a cliff.

@@ -38,8 +38,12 @@ window.ResizeObserver = class {
   disconnect() {}
 } as unknown as typeof ResizeObserver;
 
-// Mock useSSE hook for testing
+// Mock useSSE hook for testing. Only the hook is replaced: spreading the real
+// module keeps its other exports - notably SSE_EVENT_TYPES, the list of event
+// names the browser actually subscribes to - reachable from tests, instead of
+// silently undefined.
 jest.mock('./hooks/useSSE', () => ({
+  ...jest.requireActual('./hooks/useSSE'),
   useSSE: jest.fn(() => ({
     connected: false,
     error: null,

@@ -120,7 +120,7 @@ access goes through the other module's service — not its models directly.
 | `monthly-budgets` | `MonthlyBudget`, `YearlyBudget`, `CategoryBudget`, `TransactionPattern` | `budgetService`, `budgetCalculationService`, `smartBudgetService`, `patternService`, `recurrenceDetectionService`, `salaryAttributionHelper`, `averagingDenominatorService` |
 | `onboarding` | — (uses `banking` models) | `onboardingTransactionService`, `onboardingEventHandlers` |
 | `pension` | `PensionAccount`, `PensionSnapshot` | `pensionService`, `phoenixApiClient`, `clalApiClient`, `clalDataMapper` |
-| `project-budgets` | `ProjectBudget`, `UnplannedExpense` | `projectBudgetService`, `projectDrafter`, `projectExpensesService`, `projectOverviewService`, `projectTemplateService`, `projectTransactionService`, `unplannedExpenseService` |
+| `project-budgets` | `ProjectBudget`, `UnplannedExpense` | `projectBudgetService`, `projectDrafter`, `projectExpensesService`, `projectOverviewService`, `projectTemplateService`, `projectTransactionMatcher`, `projectTransactionService`, `unplannedExpenseService` |
 | `real-estate` | `RealEstateInvestment` | `realEstateService`, `realEstateTransactionService` |
 | `rsu` | `RSUGrant`, `RSUSale` | `rsuService`, `vestingService`, `taxCalculationService`, `stockPriceService`, `timelineService` |
 
@@ -309,6 +309,63 @@ Two properties are worth keeping if this is extended:
 Spend is charged to `aiBudget` and recorded under the `project-draft` purpose,
 so it shows up in the cost breakdown alongside categorisation.
 
+### Matching transactions to a project
+
+A project's `categoryBudgets` are literally `(category, subCategory)` pairs, and
+a categorised transaction is literally such a pair plus a date. So once
+categorisation has run, finding the transactions that *could* belong to a
+project needs no model at all — it is a query.
+
+`projectTransactionMatcher` runs at the end of every categorisation batch
+(`transactionCategorizationService.offerToProjects`) over the transactions that
+batch just categorised, and can also be run over a whole project on demand
+(`GET /api/budgets/projects/:id/suggestions?refresh=true`). A transaction is a
+candidate for a project when it falls inside the project's dates **and** either:
+
+- it matches one of the project's budget lines on the **pair** — the category
+  alone is not enough, or a renovation budgeting `Household > Maintenance` would
+  swallow every `Household > Plumbing` bill; or
+- it was charged in the project's own currency, and that currency is not ILS.
+  This is what the old currency-only heuristic was genuinely good at (a trip
+  abroad), without its flaw: a shekel project matching on currency would offer
+  every transaction in its window.
+
+The model is then asked to **rank** the shortlist, seeing the project's name,
+type, dates, description and budget lines, and for each candidate its
+description, amount, category pair and the currency it was really charged in
+(`rawData.originalCurrency`, normalised — it holds `₪ $ € £` as often as ISO
+codes). Currency is evidence, not a verdict: the prompt says to weigh it with
+the merchant, never instead of it.
+
+Three properties are worth keeping:
+
+- **It suggests, never tags.** A wrongly tagged transaction silently distorts
+  what the project claims to have cost. Suggestions land in
+  `ProjectBudget.transactionSuggestions` as `pending` and only an accept calls
+  `projectTransactionService.allocateTransactionToProject`.
+- **Every candidate is stored, including the ones the model rejected.** Storing
+  only the winners would mean re-paying to ask about the same rejected
+  transaction after every scrape. `AI_LLM_PROJECT_MATCH_MIN_CONFIDENCE` filters
+  what is *shown*, so raising it hides suggestions rather than discarding them.
+- **The verdict is stored separately from the confidence.** `confidence` is how
+  sure the model was of the verdict it gave, *not* how likely the transaction is
+  to belong — so a firm rejection carries a **high** confidence. Reading
+  confidence alone would rank the model's most certain rejections as its best
+  matches, which is why `belongs` is persisted and why `reviewOrder()` sorts
+  what is offered above what is not, reversing the order within the rejected
+  ones so the least certain rejection is the one read first.
+- **It degrades to the plain rule.** If the model fails, the budget is spent or
+  the reply is not JSON, candidates are recorded unscored — and unscored
+  candidates are still offered, because they earned their place by matching a
+  budget line inside the window.
+
+Note that `getActiveProjects()` is the wrong door here: it wants `status:
+'active'` and *today* inside the window, while new projects are created
+`planning` and the window that matters is around the transaction. The matcher
+uses its own `openProjects()` (`planning` or `active`, no date-vs-now test).
+
+Spend is recorded under the `project-match` purpose.
+
 ---
 
 ## 3. Shared Infrastructure (`backend/src/shared/`)
@@ -411,7 +468,7 @@ across processes or restarts.
 
 ## 4. API Surface
 
-**215 endpoints** across 20 route files. Mounted in `backend/src/app.js`:
+**218 endpoints** across 20 route files. Mounted in `backend/src/app.js`:
 
 | Mount point | Router | Endpoints |
 |---|---|---|
@@ -422,7 +479,7 @@ across processes or restarts.
 | `/api/transactions` | `banking/routes/transactions.js` | 16 |
 | `/api/budgets` | `shared/routes/budgets.js` | 6 |
 | `/api/budgets` | `monthly-budgets/routes/budgets.js` | 9 |
-| `/api/budgets` | `project-budgets/routes/budgets.js` | 16 |
+| `/api/budgets` | `project-budgets/routes/budgets.js` | 18 |
 | `/api/budgets/patterns` | `monthly-budgets/routes/patterns.js` | 8 |
 | `/api/category-budgets` | `monthly-budgets/routes/categoryBudgets.js` | 10 |
 | `/api/rsus` | `rsu/routes/rsus.js` | 31 |

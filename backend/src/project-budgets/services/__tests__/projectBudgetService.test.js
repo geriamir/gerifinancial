@@ -134,6 +134,28 @@ describe('ProjectBudgetService', () => {
       expect(result.status).toBe('planning'); // Default status
     });
 
+    test('keeps the description the project was created with', async () => {
+      // The schema had no `description` field, so mongoose dropped this in
+      // silence on every create - the sentence the user typed to draft the
+      // project was thrown away. It is the only thing that distinguishes two
+      // projects spending from the same category, so the matcher depends on it.
+      const result = await projectBudgetService.createProjectBudget(testUser._id, {
+        name: 'Kitchen Renovation',
+        type: 'home_renovation',
+        description: 'Renovating the kitchen - new cabinets, counters and appliances',
+        startDate: new Date('2025-08-01'),
+        endDate: new Date('2025-12-01')
+      });
+
+      expect(result.description).toBe('Renovating the kitchen - new cabinets, counters and appliances');
+
+      // Read back from the database rather than trusting the returned document,
+      // which is what hid the bug: the in-memory object carried the field even
+      // though it was never persisted.
+      const stored = await ProjectBudget.findById(result._id).lean();
+      expect(stored.description).toBe('Renovating the kitchen - new cabinets, counters and appliances');
+    });
+
     test('should throw error for invalid project data', async () => {
       const invalidProjectData = {
         name: '', // Empty name should fail validation

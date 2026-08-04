@@ -126,6 +126,11 @@ class TransactionCategorizationService {
     // the wrong one finds no client and drops the event silently.
     const userIdStr = userId.toString();
     const results = { categorized: 0, uncategorized: 0, failed: 0 };
+    // The ids, not just the count. A transaction can only be matched to a
+    // project once it has a category to match a budget line with, so this batch
+    // is the first moment the question can be asked - and asking about only
+    // what just changed keeps a scrape from re-examining the whole history.
+    const categorizedIds = [];
 
     let settled = 0;
     const report = async (force = false) => {
@@ -171,8 +176,10 @@ class TransactionCategorizationService {
           continue;
         }
 
-        if (updated?.category) results.categorized += 1;
-        else results.uncategorized += 1;
+        if (updated?.category) {
+          results.categorized += 1;
+          categorizedIds.push(transaction._id);
+        } else results.uncategorized += 1;
       } catch (error) {
         // One unparseable transaction must not cost the rest of the batch.
         results.failed += 1;
@@ -197,8 +204,10 @@ class TransactionCategorizationService {
           // Counted as neither, exactly as the first pass counts one they had
           // already dealt with.
           if (updated !== categoryMappingService.SKIPPED) {
-            if (updated?.category) results.categorized += 1;
-            else results.uncategorized += 1;
+            if (updated?.category) {
+              results.categorized += 1;
+              categorizedIds.push(transaction._id);
+            } else results.uncategorized += 1;
           }
         } catch (error) {
           results.failed += 1;
@@ -222,7 +231,36 @@ class TransactionCategorizationService {
       `(${results.uncategorized} left for the user, ${results.failed} failed)`
     );
 
+    await this.offerToProjects(userId, userIdStr, categorizedIds);
+
     return results;
+  }
+
+  /**
+   * Offers what was just categorised to whichever projects could own it.
+   *
+   * Runs after the completion event rather than before it, because the user is
+   * waiting to be told their transactions are categorised and should not also
+   * be waiting on a model deciding which of them belong to a renovation.
+   *
+   * Required lazily so that banking does not load the project-budgets subsystem
+   * at startup - the matcher reads banking's own Transaction model, and taking
+   * the dependency at require time would close the loop.
+   */
+  async offerToProjects(userId, userIdStr, categorizedIds) {
+    if (categorizedIds.length === 0) return;
+
+    try {
+      const matcher = require('../../project-budgets/services/projectTransactionMatcher');
+      const { added } = await matcher.matchNewlyCategorized(userId, categorizedIds);
+      if (added > 0) {
+        sseService.emit(userIdStr, 'projects:suggestions', { added });
+      }
+    } catch (error) {
+      // Suggestions are an extra. A scrape that categorised everything correctly
+      // has succeeded whether or not anything could be offered to a project.
+      logger.error(`Could not offer transactions to projects: ${error.message}`);
+    }
   }
 
   registerProcessor() {

@@ -139,7 +139,21 @@ const config = {
       // per transaction on every scrape, whereas this is one request a user
       // asked for by typing a description, so wanting one without the other is
       // the normal case in both directions.
-      projectDrafting: process.env.AI_LLM_PROJECT_DRAFTING !== 'false'
+      projectDrafting: process.env.AI_LLM_PROJECT_DRAFTING !== 'false',
+      // Deciding which categorised transactions belong to a project the user is
+      // running. Its own switch for the same reason as drafting: this one is
+      // paid per scrape rather than per user action, so wanting the drafter
+      // without it is a normal thing to want.
+      projectMatching: process.env.AI_LLM_PROJECT_MATCHING !== 'false',
+      // How sure the model has to be before a candidate is offered for review.
+      // Everything the shortlist found is stored with whatever score it was
+      // given; this only decides what is worth showing, so raising it hides
+      // suggestions rather than discarding them.
+      projectMatchMinConfidence: numberFromEnv(process.env.AI_LLM_PROJECT_MATCH_MIN_CONFIDENCE, 0.6),
+      // How many candidates go to the model in one request. The project and its
+      // budget lines are the bulk of the prompt and are the same for every
+      // candidate, so asking about a page of them costs barely more than one.
+      projectMatchBatchSize: Number(process.env.AI_LLM_PROJECT_MATCH_BATCH_SIZE) || 25
     }
   }
 };

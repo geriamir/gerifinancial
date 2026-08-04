@@ -2,6 +2,35 @@ import { AxiosResponse } from 'axios';
 import api from './base';
 import { ProjectBudget } from '../../types/projects';
 
+/**
+ * A transaction the matcher thinks belongs to a project, awaiting review.
+ * `confidence` is null when the model could not be reached — the candidate is
+ * still offered, because it earned its place by matching a budget line inside
+ * the project's dates.
+ */
+export interface ProjectSuggestion {
+  transaction: {
+    _id: string;
+    description: string;
+    memo?: string;
+    amount: number;
+    currency: string;
+    date: string;
+    category?: { _id: string; name: string };
+    subCategory?: { _id: string; name: string };
+  };
+  /**
+   * What the model decided, null when it was never reached. Kept apart from
+   * `confidence`, which is how sure it was of that decision rather than how
+   * likely the transaction is to belong - so a firm rejection carries a high
+   * confidence, and showing that number as a match score would invert it.
+   */
+  belongs: boolean | null;
+  confidence: number | null;
+  reason: string;
+  suggestedAt: string;
+}
+
 
 export interface MonthlyBudget {
   _id: string;
@@ -407,4 +436,27 @@ export const budgetsApi = {
     return api.get(`/budgets/projects/${projectId}/discover-transactions${qs ? `?${qs}` : ''}`)
       .then((res: AxiosResponse) => res.data);
   },
+
+  getProjectSuggestions: (projectId: string, params?: {
+    refresh?: boolean;
+    includeUnlikely?: boolean;
+  }): Promise<{
+    success: boolean;
+    data: ProjectSuggestion[];
+  }> => {
+    const queryParams = new URLSearchParams();
+    if (params?.refresh) queryParams.set('refresh', 'true');
+    if (params?.includeUnlikely) queryParams.set('includeUnlikely', 'true');
+    const qs = queryParams.toString();
+    return api.get(`/budgets/projects/${projectId}/suggestions${qs ? `?${qs}` : ''}`)
+      .then((res: AxiosResponse) => res.data);
+  },
+
+  resolveProjectSuggestion: (
+    projectId: string,
+    transactionId: string,
+    action: 'accept' | 'reject'
+  ): Promise<{ success: boolean; data: { status: string } }> =>
+    api.post(`/budgets/projects/${projectId}/suggestions/${transactionId}`, { action })
+      .then((res: AxiosResponse) => res.data),
 };
