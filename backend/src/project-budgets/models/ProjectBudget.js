@@ -20,6 +20,21 @@ const projectBudgetSchema = new mongoose.Schema({
     enum: ['vacation', 'home_renovation', 'investment'],
     required: true
   },
+  // What the project is, in the user's own words - the sentence they typed to
+  // draft it. Kept because it is the only thing that separates two projects
+  // sharing a category: "renovating the kitchen" and "redoing the bathroom"
+  // both spend from Household > Maintenance and Repairs, and the description is
+  // what lets the matcher tell their transactions apart.
+  //
+  // createProjectBudget and the update whitelist have always passed this field;
+  // without it declared here mongoose dropped it in silence, so every
+  // description written since the project feature shipped was discarded.
+  description: {
+    type: String,
+    trim: true,
+    maxlength: 1000,
+    default: ''
+  },
   
   // Timeline
   startDate: {
@@ -142,7 +157,47 @@ const projectBudgetSchema = new mongoose.Schema({
     type: String,
     trim: true,
     maxlength: 1000
-  }
+  },
+
+  // Transactions the matcher has offered for this project, and what became of
+  // each one.
+  //
+  // Recorded rather than recomputed on every visit for two reasons. A rejection
+  // has to stick: a transaction the user has already said does not belong here
+  // must not be offered again on the next scrape, or the list becomes noise
+  // they learn to ignore. And the model is asked about a transaction once -
+  // whatever it answered is kept, so opening the project a second time costs
+  // nothing.
+  transactionSuggestions: [{
+    transaction: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Transaction',
+      required: true
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'accepted', 'rejected'],
+      default: 'pending'
+    },
+    // How sure the model was that this belongs to the project, 0-1. Absent when
+    // the shortlist was built without the model.
+    confidence: {
+      type: Number,
+      min: 0,
+      max: 1
+    },
+    // The model's one-line justification, shown to the user so they can judge
+    // the suggestion instead of taking it on trust.
+    reason: {
+      type: String,
+      trim: true,
+      maxlength: 300
+    },
+    suggestedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
 }, {
   timestamps: true
 });
@@ -155,6 +210,10 @@ projectBudgetSchema.index({ userId: 1, status: 1 });
 
 // Index for date-based queries
 projectBudgetSchema.index({ startDate: 1, endDate: 1 });
+
+// The matcher asks "has this transaction already been offered here?" once per
+// candidate, so the lookup has to be cheap.
+projectBudgetSchema.index({ 'transactionSuggestions.transaction': 1 });
 
 
 

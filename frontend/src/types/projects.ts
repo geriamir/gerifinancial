@@ -160,6 +160,10 @@ export interface ProjectCreationData {
   startDate: Date;
   endDate: Date;
   currency: string;
+  // The sentence the user typed to draft the project, kept with it. Two projects
+  // can spend from the same category, so this is what later lets a transaction
+  // be matched to the right one.
+  description?: string;
   // Omitted or empty, the backend builds the budget from its own template for
   // the project type - which is what the plain form has always relied on. Only a
   // non-empty list replaces that with an explicit budget, so the dialog can pass

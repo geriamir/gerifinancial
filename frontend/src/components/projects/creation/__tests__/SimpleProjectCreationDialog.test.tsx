@@ -92,6 +92,11 @@ describe('SimpleProjectCreationDialog drafting', () => {
   // The dialog focuses a field for you shortly after it opens. Typing straight
   // away used to race that, and the rest of the sentence landed in whichever
   // field won - so a description arrived at the drafter truncated.
+  //
+  // The whole sentence has to go in one character at a time for the race to be
+  // reproduced, which is slow enough to overrun the default 5s timeout when the
+  // suite runs under load; hence the explicit one. Typing faster would let the
+  // sentence finish before the focus lands and stop testing anything.
   it('keeps every character typed into the description', async () => {
     const user = userEvent.setup();
     renderDialog();
@@ -101,7 +106,7 @@ describe('SimpleProjectCreationDialog drafting', () => {
 
     expect(screen.getByLabelText(/describe your project/i)).toHaveValue(sentence);
     expect(screen.getByLabelText(/project name/i)).toHaveValue('');
-  });
+  }, 20000);
 
   it('creates the project with the drafted budget', async () => {
     const user = userEvent.setup();
@@ -194,6 +199,21 @@ describe('SimpleProjectCreationDialog drafting', () => {
     // request carries no budget of its own.
     expect(mockCreateProject.mock.calls[0][0].categoryBudgets).toEqual([]);
     expect(mockDraftProject).not.toHaveBeenCalled();
+  });
+
+  it('keeps the sentence the project was drafted from', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    await describeIt(user, 'renovating the kitchen');
+    await screen.findByText(/Household › Maintenance and Repairs/);
+    await user.click(screen.getByRole('button', { name: /create project/i }));
+
+    await waitFor(() => expect(mockCreateProject).toHaveBeenCalled());
+    // Not just an input to the drafter. Two projects can spend the same
+    // categories over the same months, and this is what later tells their
+    // transactions apart.
+    expect(mockCreateProject.mock.calls[0][0].description).toBe('renovating the kitchen');
   });
 
   it('keeps the drafted budget in the currency the form ends up on', async () => {

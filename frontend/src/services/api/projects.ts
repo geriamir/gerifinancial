@@ -77,6 +77,13 @@ class ProjectsApiService {
         currency: data.currency
       };
 
+      // Kept only when the user actually wrote something. The backend trims to
+      // an empty string anyway, but sending one would overwrite nothing with
+      // nothing on a field the matcher reads.
+      if (data.description && data.description.trim()) {
+        backendData.description = data.description.trim();
+      }
+
       // Sent only when there are lines to send. An empty array would read as
       // "this project has no budget" and suppress the backend's own template.
       if (data.categoryBudgets && data.categoryBudgets.length > 0) {

@@ -23,7 +23,8 @@ export const SSE_EVENT_TYPES = [
   'onboarding:credit-card-detection',
   'onboarding:credit-card-matching',
   'categorization:progress',
-  'categorization:completed'
+  'categorization:completed',
+  'projects:suggestions'
 ] as const;
 
 export interface SSEEvent {

@@ -288,6 +288,10 @@ const SimpleProjectCreationDialog: React.FC<SimpleProjectCreationDialogProps> = 
       const project = await createProject({
         ...formData,
         currency: formData.currency,
+        // Saved with the project, not just used to draft it: it is what tells
+        // this project's transactions apart from another one spending the same
+        // categories over the same months.
+        description,
         categoryBudgets: draftLines.map((line) => ({ ...line, currency: formData.currency }))
       });
       onSuccess(project);

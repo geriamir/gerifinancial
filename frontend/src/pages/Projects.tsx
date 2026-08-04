@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Box, 
@@ -15,6 +15,7 @@ import {
   CardContent,
   Alert,
   Chip,
+  Badge,
   Paper,
   Dialog,
   DialogTitle,
@@ -29,7 +30,8 @@ import {
   Edit,
   Save,
   Cancel,
-  TravelExplore
+  TravelExplore,
+  AutoAwesome
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import ProjectBudgetsList from '../components/budget/ProjectBudgetsList';
@@ -38,11 +40,13 @@ import ProjectExpensesList from '../components/budget/ProjectExpensesList';
 import { getBudgetStatus } from '../utils/budgetUtils';
 import { updatePlannedExpense, deletePlannedExpense } from '../utils/projectHelpers';
 import { useProject } from '../contexts/ProjectContext';
+import { useCategorization } from '../contexts/CategorizationContext';
 import { FundingSource } from '../types/projects';
 import { SUPPORTED_CURRENCIES, formatCurrency, getCurrencySymbol } from '../types/foreignCurrency';
 import { categoriesApi } from '../services/api/categories';
 import { budgetsApi } from '../services/api/budgets';
 import DiscoverTransactionsDialog from '../components/project/DiscoverTransactionsDialog';
+import ProjectSuggestionsDialog from '../components/project/ProjectSuggestionsDialog';
 
 const FUNDING_SOURCE_TYPES = [
   { value: 'ongoing_funds', label: 'Ongoing Funds' },
@@ -55,6 +59,7 @@ const FUNDING_SOURCE_TYPES = [
 const Projects: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const { projects, loading, updateProject, deleteProject } = useProject();
+  const { projectSuggestionsNonce } = useCategorization();
   const navigate = useNavigate();
   
   // Editing state management - only one item can be edited at a time
@@ -88,8 +93,27 @@ const Projects: React.FC = () => {
     }>;
   } | null>(null);
   const [discoverDialogOpen, setDiscoverDialogOpen] = useState(false);
+  const [suggestionsDialogOpen, setSuggestionsDialogOpen] = useState(false);
+  const [pendingSuggestions, setPendingSuggestions] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Refetched whenever a categorisation run reports new matches, so the badge
+  // appears after a scrape without the user reloading the page.
+  const countSuggestions = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const result = await budgetsApi.getProjectSuggestions(projectId);
+      setPendingSuggestions(result.data.length);
+    } catch (error) {
+      // A badge that cannot be counted is not worth an error on the page.
+      console.error('Failed to count project suggestions:', error);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    countSuggestions();
+  }, [countSuggestions, projectSuggestionsNonce]);
 
   // Load categories when component mounts
   useEffect(() => {
@@ -181,6 +205,25 @@ const Projects: React.FC = () => {
     }
 
     // Helper functions for local editing values (moved after null checks)
+    const refreshBreakdown = async () => {
+      try {
+        const response = await budgetsApi.getProjectExpenseBreakdown(specificProject._id);
+        const breakdown = response.data || response;
+        updateProject(specificProject._id, {
+          categoryBreakdown: breakdown.plannedCategories || breakdown.categoryBreakdown,
+          unplannedExpenses: breakdown.unplannedExpenses,
+          totalPaid: breakdown.totalPaid,
+          totalPlannedPaid: breakdown.totalPlannedPaid,
+          totalUnplannedPaid: breakdown.totalUnplannedPaid,
+          progress: breakdown.progress,
+          isOverBudget: breakdown.isOverBudget,
+          remainingBudget: breakdown.totalBudget - breakdown.totalPaid
+        });
+      } catch (error) {
+        console.error('Failed to refresh project data after tagging:', error);
+      }
+    };
+
     const startEditingFunding = (index: number) => {
       const source = (specificProject.fundingSources || [])[index];
       
@@ -367,6 +410,16 @@ const Projects: React.FC = () => {
                   <Typography variant="h4" component="h1" sx={{ flex: 1 }}>
                     {specificProject.name || 'Untitled Project'}
                   </Typography>
+                  <Badge badgeContent={pendingSuggestions} color="primary">
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<AutoAwesome />}
+                      onClick={() => setSuggestionsDialogOpen(true)}
+                    >
+                      Suggestions
+                    </Button>
+                  </Badge>
                   <Button
                     variant="outlined"
                     size="small"
@@ -789,23 +842,20 @@ const Projects: React.FC = () => {
         onClose={() => setDiscoverDialogOpen(false)}
         projectId={specificProject._id}
         projectName={specificProject.name || 'Project'}
-        onTagged={async () => {
-          try {
-            const response = await budgetsApi.getProjectExpenseBreakdown(specificProject._id);
-            const breakdown = response.data || response;
-            updateProject(specificProject._id, {
-              categoryBreakdown: breakdown.plannedCategories || breakdown.categoryBreakdown,
-              unplannedExpenses: breakdown.unplannedExpenses,
-              totalPaid: breakdown.totalPaid,
-              totalPlannedPaid: breakdown.totalPlannedPaid,
-              totalUnplannedPaid: breakdown.totalUnplannedPaid,
-              progress: breakdown.progress,
-              isOverBudget: breakdown.isOverBudget,
-              remainingBudget: breakdown.totalBudget - breakdown.totalPaid
-            });
-          } catch (error) {
-            console.error('Failed to refresh project data after tagging:', error);
-          }
+        onTagged={refreshBreakdown}
+      />
+
+      <ProjectSuggestionsDialog
+        open={suggestionsDialogOpen}
+        onClose={() => {
+          setSuggestionsDialogOpen(false);
+          countSuggestions();
+        }}
+        projectId={specificProject._id}
+        projectName={specificProject.name || 'Project'}
+        onAccepted={async () => {
+          await refreshBreakdown();
+          setPendingSuggestions(prev => Math.max(0, prev - 1));
         }}
       />
 
