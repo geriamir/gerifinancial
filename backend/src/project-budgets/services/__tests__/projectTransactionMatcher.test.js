@@ -458,6 +458,33 @@ describe('projectTransactionMatcher', () => {
       expect(await matcher.shortlist(reloaded)).toHaveLength(0);
     });
 
+    // Confidence says how sure the model was of the verdict it gave, not how
+    // likely the transaction is to belong - so a firm rejection carries a *high*
+    // confidence. Reading it back without the verdict would show the model's
+    // most certain rejections as its best matches, at the top of the list.
+    it('keeps the model\'s verdict, not just how sure it was', async () => {
+      const project = await makeProject();
+      await makeTransaction({ description: 'SUPERMARKET' });
+      answering([{ n: 1, belongs: false, confidence: 0.9, reason: 'ordinary household spending' }]);
+
+      await matcher.suggestFor(project);
+
+      const stored = await ProjectBudget.findById(project._id).lean();
+      expect(stored.transactionSuggestions[0].belongs).toBe(false);
+      expect(stored.transactionSuggestions[0].confidence).toBe(0.9);
+    });
+
+    it('does not offer a confident rejection when the list is read back', async () => {
+      const project = await makeProject();
+      await makeTransaction({ description: 'SUPERMARKET' });
+      answering([{ n: 1, belongs: false, confidence: 0.9, reason: 'ordinary household spending' }]);
+      await matcher.suggestFor(project);
+
+      const suggestions = await matcher.getSuggestions(project._id, userId);
+
+      expect(suggestions).toHaveLength(0);
+    });
+
     it('does not offer a match the model was unsure of', async () => {
       config.ai.llm.projectMatchMinConfidence = 0.6;
       const project = await makeProject();
@@ -558,12 +585,69 @@ describe('projectTransactionMatcher', () => {
       // Recorded worst-first on purpose, so that a list coming back best-first
       // can only be the sort doing it rather than the order they went in.
       project.transactionSuggestions.push(
-        { transaction: doubtful._id, status: 'pending', confidence: 0.1, reason: 'ordinary' },
-        { transaction: good._id, status: 'pending', confidence: 0.9, reason: 'tiling' }
+        { transaction: doubtful._id, status: 'pending', belongs: true, confidence: 0.1, reason: 'ordinary' },
+        { transaction: good._id, status: 'pending', belongs: true, confidence: 0.9, reason: 'tiling' }
       );
       await project.save();
       return { project, good, doubtful };
     };
+
+    // The model was *sure* this one does not belong, so it carries a higher
+    // confidence than a genuine match the model was only fairly sure of.
+    const seedConfidentRejection = async () => {
+      const project = await makeProject();
+      const match = await makeTransaction({ description: 'TILE SHOP' });
+      const rejected = await makeTransaction({ description: 'SUPERMARKET' });
+      project.transactionSuggestions.push(
+        { transaction: rejected._id, status: 'pending', belongs: false, confidence: 0.95, reason: 'weekly shop' },
+        { transaction: match._id, status: 'pending', belongs: true, confidence: 0.7, reason: 'tiling' }
+      );
+      await project.save();
+      return { project, match, rejected };
+    };
+
+    it('keeps a confident rejection out of the offered list', async () => {
+      const { project, match } = await seedConfidentRejection();
+
+      const suggestions = await matcher.getSuggestions(project._id, userId);
+
+      expect(suggestions.map((s) => String(s.transaction._id))).toEqual([String(match._id)]);
+    });
+
+    it('ranks a real match above a rejection the model was surer of', async () => {
+      const { project, match, rejected } = await seedConfidentRejection();
+
+      const suggestions = await matcher.getSuggestions(project._id, userId, { includeUnlikely: true });
+
+      expect(suggestions.map((s) => String(s.transaction._id)))
+        .toEqual([String(match._id), String(rejected._id)]);
+    });
+
+    // A rejection the model was unsure of is the one worth a second look; one it
+    // was certain of is the last thing the user needs to read.
+    it('puts the least certain rejection first among the doubted ones', async () => {
+      const project = await makeProject();
+      const certain = await makeTransaction({ description: 'SUPERMARKET' });
+      const unsure = await makeTransaction({ description: 'HARDWARE' });
+      project.transactionSuggestions.push(
+        { transaction: certain._id, status: 'pending', belongs: false, confidence: 0.95, reason: 'weekly shop' },
+        { transaction: unsure._id, status: 'pending', belongs: false, confidence: 0.55, reason: 'could go either way' }
+      );
+      await project.save();
+
+      const suggestions = await matcher.getSuggestions(project._id, userId, { includeUnlikely: true });
+
+      expect(suggestions.map((s) => String(s.transaction._id)))
+        .toEqual([String(unsure._id), String(certain._id)]);
+    });
+
+    it('tells the caller what the model decided', async () => {
+      const { project } = await seedConfidentRejection();
+
+      const suggestions = await matcher.getSuggestions(project._id, userId, { includeUnlikely: true });
+
+      expect(suggestions.map((s) => s.belongs)).toEqual([true, false]);
+    });
 
     it('offers only what cleared the confidence threshold', async () => {
       const { project, good } = await seedSuggestions();

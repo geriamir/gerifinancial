@@ -386,15 +386,15 @@ class ProjectTransactionMatcher {
     let offered = 0;
     for (const transaction of candidates) {
       const verdict = verdicts.get(String(transaction._id));
-      project.transactionSuggestions.push({
+      const entry = {
         transaction: transaction._id,
         status: 'pending',
+        belongs: verdict ? verdict.belongs : undefined,
         confidence: verdict ? verdict.confidence : undefined,
         reason: verdict ? verdict.reason : undefined
-      });
-      if (this.isOffered({ confidence: verdict?.confidence, belongs: verdict?.belongs }, threshold)) {
-        offered += 1;
-      }
+      };
+      project.transactionSuggestions.push(entry);
+      if (this.isOffered(entry, threshold)) offered += 1;
     }
 
     await project.save();
@@ -441,13 +441,31 @@ class ProjectTransactionMatcher {
       // at nothing; populate gives null rather than failing the whole read.
       .filter((entry) => entry.transaction)
       .filter((entry) => includeUnlikely || this.isOffered(entry))
-      .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0))
+      .sort((a, b) => this.reviewOrder(b) - this.reviewOrder(a))
       .map((entry) => ({
         transaction: entry.transaction,
+        belongs: entry.belongs ?? null,
         confidence: entry.confidence ?? null,
         reason: entry.reason || '',
         suggestedAt: entry.suggestedAt
       }));
+  }
+
+  /**
+   * Where a suggestion sits in the review list. Higher is read first.
+   *
+   * Confidence alone cannot order this list, because it says how sure the model
+   * was of its verdict rather than how likely the transaction is to belong - so
+   * sorting by it would put the model's firmest rejections above its best
+   * matches. What is offered therefore always outranks what is not.
+   *
+   * Within the rejected ones, the order is reversed: the ones the model was
+   * least sure about are the ones worth a second look, and a rejection it was
+   * certain of is the last thing the user needs to see.
+   */
+  reviewOrder(entry) {
+    const confidence = entry.confidence ?? 0;
+    return this.isOffered(entry) ? 2 + confidence : 1 - confidence;
   }
 
   /**

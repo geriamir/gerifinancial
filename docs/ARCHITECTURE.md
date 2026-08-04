@@ -347,6 +347,13 @@ Three properties are worth keeping:
   only the winners would mean re-paying to ask about the same rejected
   transaction after every scrape. `AI_LLM_PROJECT_MATCH_MIN_CONFIDENCE` filters
   what is *shown*, so raising it hides suggestions rather than discarding them.
+- **The verdict is stored separately from the confidence.** `confidence` is how
+  sure the model was of the verdict it gave, *not* how likely the transaction is
+  to belong — so a firm rejection carries a **high** confidence. Reading
+  confidence alone would rank the model's most certain rejections as its best
+  matches, which is why `belongs` is persisted and why `reviewOrder()` sorts
+  what is offered above what is not, reversing the order within the rejected
+  ones so the least certain rejection is the one read first.
 - **It degrades to the plain rule.** If the model fails, the budget is spent or
   the reply is not JSON, candidates are recorded unscored — and unscored
   candidates are still offered, because they earned their place by matching a

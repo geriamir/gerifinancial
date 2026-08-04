@@ -853,9 +853,13 @@ const Projects: React.FC = () => {
         }}
         projectId={specificProject._id}
         projectName={specificProject.name || 'Project'}
-        onAccepted={async () => {
-          await refreshBreakdown();
-          setPendingSuggestions(prev => Math.max(0, prev - 1));
+        onResolved={async (action) => {
+          if (action === 'accept') await refreshBreakdown();
+          // Counted from the server rather than guessed at, because the badge
+          // shows only what is offered while the dialog can also show what the
+          // model doubted - decrementing locally would drift as soon as one of
+          // those was decided.
+          await countSuggestions();
         }}
       />
 

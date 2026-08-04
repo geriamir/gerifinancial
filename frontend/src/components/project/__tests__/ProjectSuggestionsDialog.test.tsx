@@ -26,11 +26,12 @@ const suggestion = (overrides: Partial<ProjectSuggestion> = {}): ProjectSuggesti
   },
   confidence: 0.91,
   reason: 'A hardware shop during the renovation window',
+  belongs: true,
   suggestedAt: '2026-03-05T00:00:00.000Z',
   ...overrides
 });
 
-const onAccepted = jest.fn();
+const onResolved = jest.fn();
 
 const renderDialog = () => render(
   <ProjectSuggestionsDialog
@@ -38,7 +39,7 @@ const renderDialog = () => render(
     onClose={jest.fn()}
     projectId="p1"
     projectName="Kitchen renovation"
-    onAccepted={onAccepted}
+    onResolved={onResolved}
   />
 );
 
@@ -72,6 +73,21 @@ describe('what it shows', () => {
 
     expect(await screen.findByText('unscored')).toBeInTheDocument();
     expect(screen.queryByText('0%')).not.toBeInTheDocument();
+  });
+
+  // Confidence is how sure the model was of its verdict, so a firm rejection
+  // carries a high one. Printing it as a match score would tell the user the
+  // opposite of what the model said.
+  it('never shows a rejection as a high-scoring match', async () => {
+    mockGet.mockResolvedValue({
+      success: true,
+      data: [suggestion({ belongs: false, confidence: 0.95, reason: 'the weekly shop' })]
+    });
+
+    renderDialog();
+
+    expect(await screen.findByText('model says no')).toBeInTheDocument();
+    expect(screen.queryByText('95%')).not.toBeInTheDocument();
   });
 
   it('does not ask for the doubted ones until told to', async () => {
@@ -130,7 +146,19 @@ describe('deciding', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
 
     await waitFor(() => expect(mockResolve).toHaveBeenCalledWith('p1', 't1', 'accept'));
-    expect(onAccepted).toHaveBeenCalled();
+    expect(onResolved).toHaveBeenCalledWith('accept');
+  });
+
+  // The badge counts what is waiting, and a rejection changes that just as much
+  // as an accept does.
+  it('reports a rejection too, so the count stays right', async () => {
+    renderDialog();
+    await screen.findByText('HOME CENTER');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Not this' }));
+
+    await waitFor(() => expect(mockResolve).toHaveBeenCalledWith('p1', 't1', 'reject'));
+    expect(onResolved).toHaveBeenCalledWith('reject');
   });
 
   it('rejects without touching the project totals', async () => {
@@ -140,7 +168,8 @@ describe('deciding', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Not this' }));
 
     await waitFor(() => expect(mockResolve).toHaveBeenCalledWith('p1', 't1', 'reject'));
-    expect(onAccepted).not.toHaveBeenCalled();
+    expect(onResolved).not.toHaveBeenCalledWith('accept');
+    expect(screen.queryByText(/added \d+ transaction/i)).not.toBeInTheDocument();
   });
 
   it('takes a decided suggestion off the list', async () => {
@@ -164,7 +193,7 @@ describe('deciding', () => {
 
     expect(await screen.findByText('already been decided')).toBeInTheDocument();
     expect(screen.getByText('HOME CENTER')).toBeInTheDocument();
-    expect(onAccepted).not.toHaveBeenCalled();
+    expect(onResolved).not.toHaveBeenCalled();
   });
 
   it('only decides the one that was clicked', async () => {

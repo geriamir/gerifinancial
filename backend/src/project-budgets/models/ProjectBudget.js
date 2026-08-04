@@ -179,8 +179,19 @@ const projectBudgetSchema = new mongoose.Schema({
       enum: ['pending', 'accepted', 'rejected'],
       default: 'pending'
     },
-    // How sure the model was that this belongs to the project, 0-1. Absent when
-    // the shortlist was built without the model.
+    // The model's verdict: whether it thought this belongs to the project.
+    // Absent when the shortlist was built without the model.
+    //
+    // Kept separately from `confidence`, which is how sure the model was of the
+    // verdict it gave rather than how likely the transaction is to belong. A
+    // confident rejection is therefore `belongs: false` with a *high*
+    // confidence, so reading confidence alone would rank the model's firmest
+    // rejections as its best matches.
+    belongs: {
+      type: Boolean
+    },
+    // How sure the model was of the verdict above, 0-1. Absent when the
+    // shortlist was built without the model.
     confidence: {
       type: Number,
       min: 0,

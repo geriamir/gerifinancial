@@ -19,6 +19,13 @@ export interface ProjectSuggestion {
     category?: { _id: string; name: string };
     subCategory?: { _id: string; name: string };
   };
+  /**
+   * What the model decided, null when it was never reached. Kept apart from
+   * `confidence`, which is how sure it was of that decision rather than how
+   * likely the transaction is to belong - so a firm rejection carries a high
+   * confidence, and showing that number as a match score would invert it.
+   */
+  belongs: boolean | null;
   confidence: number | null;
   reason: string;
   suggestedAt: string;

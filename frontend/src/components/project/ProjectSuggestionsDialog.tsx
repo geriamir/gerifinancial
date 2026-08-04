@@ -31,7 +31,7 @@ interface ProjectSuggestionsDialogProps {
   onClose: () => void;
   projectId: string;
   projectName: string;
-  onAccepted: () => void;
+  onResolved: (action: 'accept' | 'reject') => void;
 }
 
 /**
@@ -46,7 +46,7 @@ const ProjectSuggestionsDialog: React.FC<ProjectSuggestionsDialogProps> = ({
   onClose,
   projectId,
   projectName,
-  onAccepted
+  onResolved
 }) => {
   const [suggestions, setSuggestions] = useState<ProjectSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -98,8 +98,10 @@ const ProjectSuggestionsDialog: React.FC<ProjectSuggestionsDialogProps> = ({
       setSuggestions(prev => prev.filter(s => s.transaction._id !== transactionId));
       if (action === 'accept') {
         setAccepted(prev => prev + 1);
-        onAccepted();
       }
+      // Every decision changes what is waiting, not just an accept: rejecting an
+      // offered suggestion takes it off the list too.
+      onResolved(action);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || `Failed to ${action} suggestion`);
     } finally {
@@ -198,12 +200,21 @@ const ProjectSuggestionsDialog: React.FC<ProjectSuggestionsDialogProps> = ({
                 )}
                 {/* No confidence means the model was never reached. The candidate
                     still matched a budget line inside the project's dates, and
-                    saying "0%" would misrepresent that as a bad match. */}
-                <Chip
-                  size="small"
-                  color={s.confidence == null ? 'default' : s.confidence >= 0.8 ? 'success' : 'warning'}
-                  label={s.confidence == null ? 'unscored' : `${Math.round(s.confidence * 100)}%`}
-                />
+                    saying "0%" would misrepresent that as a bad match.
+
+                    A rejection shows no number at all: confidence measures how
+                    sure the model was of its verdict, so a firm rejection carries
+                    a high one, and printing it as a match score would say the
+                    opposite of what the model meant. */}
+                {s.belongs === false ? (
+                  <Chip size="small" color="default" variant="outlined" label="model says no" />
+                ) : (
+                  <Chip
+                    size="small"
+                    color={s.confidence == null ? 'default' : s.confidence >= 0.8 ? 'success' : 'warning'}
+                    label={s.confidence == null ? 'unscored' : `${Math.round(s.confidence * 100)}%`}
+                  />
+                )}
               </Box>
               {s.reason && (
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
