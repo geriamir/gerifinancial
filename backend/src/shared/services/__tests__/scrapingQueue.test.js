@@ -1,5 +1,3 @@
-const config = require('../../config');
-
 // BullMQ is the thing under test here - what matters is the options the queues
 // and workers are constructed with, not that a real Redis answers.
 jest.mock('bullmq');
@@ -7,32 +5,47 @@ jest.mock('bullmq');
 // setup.js swaps this module out for a stub everywhere else, since no test
 // should reach Redis. This suite is the one place that has to see the real one.
 describe('scrapingQueue wiring', () => {
-  const REMOTE_HOST = 'redis.internal.test';
-  const REMOTE_PORT = '6380';
-  const originalHost = process.env.REDIS_HOST;
-  const originalPort = process.env.REDIS_PORT;
+  const REMOTE = {
+    REDIS_HOST: 'redis.internal.test',
+    REDIS_PORT: '6380',
+    REDIS_PASSWORD: 'a-password-that-must-be-carried-through',
+    REDIS_DB: '3'
+  };
+  const originalEnv = {};
 
   let scrapingQueue;
+  let config;
   let Queue;
   let Worker;
 
   beforeEach(() => {
-    // A host that is deliberately not localhost: the failure this guards
-    // against is a silent fallback to BullMQ's own 127.0.0.1 default, which
-    // looks correct in development and only breaks once Redis lives elsewhere.
-    process.env.REDIS_HOST = REMOTE_HOST;
-    process.env.REDIS_PORT = REMOTE_PORT;
+    // A host that is deliberately not localhost, and credentials that are
+    // deliberately not empty: the failure this guards against is a silent
+    // fallback to BullMQ's own 127.0.0.1 default, which looks correct in
+    // development and only breaks once Redis lives somewhere else.
+    for (const [key, value] of Object.entries(REMOTE)) {
+      originalEnv[key] = process.env[key];
+      process.env[key] = value;
+    }
+
     jest.resetModules();
     ({ Queue, Worker } = require('bullmq'));
+    // Required after the reset so this is the same instance the service reads.
+    // config derives its values from the environment at require time, so a copy
+    // loaded earlier would still describe the old one.
+    config = require('../../config');
     scrapingQueue = jest.requireActual('../scrapingQueue');
   });
 
   afterEach(async () => {
-    await scrapingQueue.shutdown().catch(() => {});
-    if (originalHost === undefined) delete process.env.REDIS_HOST;
-    else process.env.REDIS_HOST = originalHost;
-    if (originalPort === undefined) delete process.env.REDIS_PORT;
-    else process.env.REDIS_PORT = originalPort;
+    // Not wrapped in a catch: a shutdown that starts throwing is something
+    // these tests should report rather than hide.
+    await scrapingQueue.shutdown();
+
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
   it('points its queues at the configured Redis rather than localhost', async () => {
@@ -41,7 +54,10 @@ describe('scrapingQueue wiring', () => {
     expect(Queue).toHaveBeenCalled();
     for (const [, options] of Queue.mock.calls) {
       expect(options.connection).toEqual(
-        expect.objectContaining({ host: REMOTE_HOST, port: Number(REMOTE_PORT) })
+        expect.objectContaining({
+          host: REMOTE.REDIS_HOST,
+          port: Number(REMOTE.REDIS_PORT)
+        })
       );
     }
   });
@@ -83,6 +99,10 @@ describe('scrapingQueue wiring', () => {
     await scrapingQueue.initialize();
 
     const [, options] = Queue.mock.calls[0];
+    expect(options.connection.password).toBe(REMOTE.REDIS_PASSWORD);
+    expect(options.connection.db).toBe(Number(REMOTE.REDIS_DB));
+    // Pinned to config as well as to the raw values, so this still holds if
+    // the way credentials reach the queue changes.
     expect(options.connection.password).toBe(config.redis.password);
     expect(options.connection.db).toBe(config.redis.db);
   });
