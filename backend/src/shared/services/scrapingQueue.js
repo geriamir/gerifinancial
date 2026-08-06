@@ -69,8 +69,14 @@ class ScrapingQueueService {
     try {
       // Create queues for different priorities
       for (const [queueName, config] of Object.entries(this.queueConfigs)) {
+        // `connection`, not `redis`: the latter is Bull v3's option name, and
+        // BullMQ ignores unknown keys rather than rejecting them. A queue built
+        // with `redis` silently falls back to BullMQ's own default of
+        // 127.0.0.1:6379 and can never reach a remote Redis - which in
+        // production meant every scrape sat unqueued behind a connection that
+        // was refused forever.
         const queue = new Queue(queueName, {
-          redis: this.redisConfig,
+          connection: this.redisConfig,
           defaultJobOptions: config.defaultJobOptions
         });
 
