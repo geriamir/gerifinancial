@@ -1,0 +1,170 @@
+name: Production Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: How far back to search
+        required: true
+        default: '30'
+        type: choice
+        options:
+          - '5'
+          - '15'
+          - '30'
+          - '60'
+          - '180'
+      stream:
+        description: Which Container Apps logs to show
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - console
+          - system
+      filter:
+        description: Only lines containing this text (optional)
+        required: false
+        type: string
+      exclude:
+        description: Hide lines containing this text (optional)
+        required: false
+        type: string
+      limit:
+        description: Maximum number of lines
+        required: true
+        default: '250'
+        type: choice
+        options:
+          - '100'
+          - '250'
+          - '500'
+
+# The Azure login exchanges this workflow's short-lived GitHub OIDC token. No
+# Azure credential or Log Analytics shared key is stored in the repository.
+permissions:
+  contents: read
+
+env:
+  AZURE_RESOURCE_GROUP: rg-gerifinancial
+  CONTAINER_APP: gerifinancial-api
+  LOG_ANALYTICS_WORKSPACE: gerifinancial-logs
+
+jobs:
+  logs:
+    name: Read production logs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Require the default branch
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error title=Run from main::Production access is federated to the main branch."
+          exit 1
+
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Query Log Analytics
+        env:
+          MINUTES: ${{ inputs.minutes }}
+          STREAM: ${{ inputs.stream }}
+          FILTER: ${{ inputs.filter }}
+          EXCLUDE: ${{ inputs.exclude }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          set -euo pipefail
+
+          workspace="$(
+            az monitor log-analytics workspace show \
+              -n "$LOG_ANALYTICS_WORKSPACE" \
+              -g "$AZURE_RESOURCE_GROUP" \
+              --query customerId -o tsv
+          )"
+
+          case "$STREAM" in
+            console)
+              source_query="$(cat <<'KQL'
+          ContainerAppConsoleLogs_CL
+          | where ContainerAppName_s == 'gerifinancial-api'
+          | project TimeGenerated, Revision = RevisionName_s, Stream = 'app', Line = Log_s
+          KQL
+              )"
+              ;;
+            system)
+              source_query="$(cat <<'KQL'
+          ContainerAppSystemLogs_CL
+          | where ContainerAppName_s == 'gerifinancial-api'
+          | project TimeGenerated, Revision = RevisionName_s, Stream = 'sys', Line = Log_s
+          KQL
+              )"
+              ;;
+            both)
+              source_query="$(cat <<'KQL'
+          union isfuzzy=true withsource=Source ContainerAppConsoleLogs_CL, ContainerAppSystemLogs_CL
+          | where ContainerAppName_s == 'gerifinancial-api'
+          | project TimeGenerated,
+                    Revision = RevisionName_s,
+                    Stream = iff(Source contains 'Console', 'app', 'sys'),
+                    Line = Log_s
+          KQL
+              )"
+              ;;
+          esac
+
+          # jq emits a quoted JSON string, whose escaping is also valid for a
+          # KQL string literal. Inputs are passed via the environment rather
+          # than interpolated into this script by the expression engine.
+          filter_literal="$(jq -Rn --arg value "$FILTER" '$value')"
+          exclude_literal="$(jq -Rn --arg value "$EXCLUDE" '$value')"
+
+          query="$source_query"
+          if [[ -n "$FILTER" ]]; then
+            query+=$'\n'"| where Line contains $filter_literal"
+          fi
+          if [[ -n "$EXCLUDE" ]]; then
+            query+=$'\n'"| where Line !contains $exclude_literal"
+          fi
+          query+=$'\n'"| top $LIMIT by TimeGenerated desc"
+          query+=$'\n''| order by TimeGenerated asc'
+
+          az monitor log-analytics query \
+            --workspace "$workspace" \
+            --analytics-query "$query" \
+            --timespan "PT${MINUTES}M" \
+            --output json > result.json
+
+          count="$(jq 'length' result.json)"
+          jq -r '.[] | "\(.TimeGenerated) [\(.Stream)] [\(.Revision // "-")] \(.Line)"' \
+            result.json \
+            | sed -E $'s/\033\\[[0-9;]*[mK]//g' \
+            > production.log
+
+          if [[ "$count" == '0' ]]; then
+            echo "No matching lines were ingested in the last $MINUTES minute(s)."
+            echo "Log Analytics normally trails the application by 1-3 minutes."
+          else
+            cat production.log
+          fi
+
+          {
+            echo "## Production logs"
+            echo
+            echo "$count line(s) from the last $MINUTES minute(s); stream: \`$STREAM\`."
+            if [[ -n "$FILTER" ]]; then
+              echo "Filter: \`$FILTER\`."
+            fi
+            if [[ -n "$EXCLUDE" ]]; then
+              echo "Excluded: \`$EXCLUDE\`."
+            fi
+            echo
+            echo '```text'
+            cat production.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
