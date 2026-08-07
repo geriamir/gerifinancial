@@ -1,6 +1,10 @@
 const { User } = require('../../auth');
 const { BankAccount, Transaction, CreditCard, scrapingEvents, creditCardDetectionService } = require('../../banking');
+const onboardingCreditCardDetectionService = require('./onboardingCreditCardDetectionService');
 const logger = require('../../shared/utils/logger');
+
+const CATEGORIZATION_HANDOFF_RETRIES = 10;
+const CATEGORIZATION_HANDOFF_DELAY_MS = 100;
 
 /**
  * Event handlers for onboarding-specific scraping events
@@ -28,6 +32,11 @@ class OnboardingEventHandlers {
 
     // Listen for checking-accounts strategy failure
     scrapingEvents.on('checking-accounts:failed', this.handleCheckingAccountsFailed.bind(this));
+
+    // Credit-card payments are category-backed, so detection has to wait for
+    // the queued categorisation batch rather than the scrape itself.
+    scrapingEvents.on('categorization:completed', this.handleCategorizationCompleted.bind(this));
+    scrapingEvents.on('categorization:failed', this.handleCategorizationFailed.bind(this));
 
     // Listen for credit card scraping completion to trigger matching
     scrapingEvents.on('credit-cards:completed', this.handleCreditCardsCompleted.bind(this));
@@ -157,12 +166,9 @@ class OnboardingEventHandlers {
       
       // Handle onboarding checking account completion
       if (isOnboardingCheckingAccount && !isOnboardingComplete) {
-        // Run credit card detection
-        logger.info(`Running credit card detection for user ${userId}`);
-        const analysis = await creditCardDetectionService.analyzeCreditCardUsage(userId, 2);
-        
-        // Update new onboarding structure - always show detection step first
-        const updateResult = await User.findByIdAndUpdate(
+        const categorizationPending = Boolean(result.transactions?.categorizationJobId);
+
+        await User.findByIdAndUpdate(
           userId,
           {
             $set: {
@@ -173,12 +179,7 @@ class OnboardingEventHandlers {
               'onboarding.transactionImport.scrapingStatus.status': 'complete',
               'onboarding.transactionImport.scrapingStatus.progress': 100,
               'onboarding.transactionImport.scrapingStatus.message': `Import complete! ${newTransactions} transactions imported.`,
-              'onboarding.creditCardDetection.analyzed': true,
-              'onboarding.creditCardDetection.analyzedAt': new Date(),
-              'onboarding.creditCardDetection.transactionCount': analysis.transactionCount,
-              'onboarding.creditCardDetection.recommendation': analysis.recommendation,
-              'onboarding.creditCardDetection.sampleTransactions': analysis.sampleTransactions.slice(0, 5),
-              'onboarding.currentStep': 'credit-card-detection' // Always show detection UI first
+              'onboarding.currentStep': 'transaction-import'
             },
             $addToSet: {
               'onboarding.completedSteps': 'transaction-import'
@@ -186,14 +187,12 @@ class OnboardingEventHandlers {
           },
           { new: true }
         );
-        
-        logger.info(`✅ Onboarding: Credit card detection completed for user ${userId} - recommendation: ${analysis.recommendation}, currentStep: ${updateResult.onboarding.currentStep}, isActive: ${updateResult.onboarding.transactionImport.scrapingStatus.isActive}`);
-        
-        // Emit credit card detection completed event
-        scrapingEvents.emit('credit-card-detection:completed', {
-          userId,
-          analysis
-        });
+
+        if (categorizationPending) {
+          logger.info(`Onboarding: Waiting for categorization job ${result.transactions.categorizationJobId} before credit card detection for user ${userId}`);
+        } else {
+          await onboardingCreditCardDetectionService.complete(userId);
+        }
       }
       
       // Handle onboarding credit card account completion
@@ -209,7 +208,7 @@ class OnboardingEventHandlers {
           logger.info(`Account ${bankAccountId} completed but not the currently tracked account (${processingAccountId}), skipping matching`);
           return;
         }
-        
+
         logger.info(`Processing account ${bankAccountId} completed, running payment matching for user ${userId}`);
 
         // Get all credit cards for this user
@@ -500,6 +499,51 @@ class OnboardingEventHandlers {
       logger.error(`❌ Onboarding: Stack trace:`, error.stack);
       // Don't throw - this is async post-processing
     }
+  }
+
+  async handleCategorizationCompleted(data) {
+    const { userId } = data;
+
+    try {
+      await this.completeCreditCardDetectionAfterCategorization(userId);
+    } catch (error) {
+      logger.error(`Onboarding: Failed credit card detection after categorization for user ${userId}:`, error);
+    }
+  }
+
+  async handleCategorizationFailed(data) {
+    const { userId, error } = data;
+    logger.warn(`Onboarding: Categorization exhausted its retries for user ${userId}; detecting cards from the transactions available now: ${error}`);
+
+    try {
+      await this.completeCreditCardDetectionAfterCategorization(userId);
+    } catch (detectionError) {
+      logger.error(`Onboarding: Failed fallback credit card detection for user ${userId}:`, detectionError);
+    }
+  }
+
+  async completeCreditCardDetectionAfterCategorization(userId) {
+    for (let attempt = 0; attempt < CATEGORIZATION_HANDOFF_RETRIES; attempt += 1) {
+      const completed = await onboardingCreditCardDetectionService.complete(userId);
+      if (completed) return completed;
+
+      const user = await User.findById(userId)
+        .select('onboarding.currentStep onboarding.transactionImport.completed')
+        .lean();
+
+      const scrapeCompletionStillWriting =
+        user?.onboarding?.currentStep === 'transaction-import' &&
+        user?.onboarding?.transactionImport?.completed !== true;
+
+      if (!scrapeCompletionStillWriting) {
+        return null;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, CATEGORIZATION_HANDOFF_DELAY_MS));
+    }
+
+    logger.warn(`Onboarding: Categorization completed before the import state settled for user ${userId}; status polling will retry detection`);
+    return null;
   }
 
   /**

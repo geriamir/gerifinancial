@@ -227,6 +227,139 @@ describe('Onboarding Event Handlers', () => {
       expect(callArgs[1]).toEqual(2);
     });
 
+    it('waits for categorization before deciding whether cards exist', async () => {
+      scrapingEvents.emit('checking-accounts:completed', {
+        strategyName: 'checking-accounts',
+        bankAccountId: checkingAccountId,
+        userId: testUser._id,
+        result: {
+          transactions: {
+            newTransactions: 150,
+            categorizationJobId: 'categorize-150'
+          }
+        }
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      let updatedUser = await User.findById(testUser._id);
+      expect(updatedUser.onboarding.transactionImport.completed).toBe(true);
+      expect(updatedUser.onboarding.currentStep).toBe('transaction-import');
+      expect(updatedUser.onboarding.creditCardDetection.analyzed).toBe(false);
+      expect(creditCardDetectionService.analyzeCreditCardUsage).not.toHaveBeenCalled();
+
+      scrapingEvents.emit('categorization:completed', {
+        userId: testUser._id.toString(),
+        total: 150,
+        categorized: 96,
+        uncategorized: 54,
+        failed: 0
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      updatedUser = await User.findById(testUser._id);
+      expect(creditCardDetectionService.analyzeCreditCardUsage).toHaveBeenCalledWith(
+        testUser._id.toString(),
+        2
+      );
+      expect(updatedUser.onboarding.creditCardDetection.analyzed).toBe(true);
+      expect(updatedUser.onboarding.creditCardDetection.transactionCount).toBe(10);
+      expect(updatedUser.onboarding.currentStep).toBe('credit-card-detection');
+    });
+
+    it('does not lose a categorization event that beats the scrape-completion write', async () => {
+      scrapingEvents.emit('checking-accounts:completed', {
+        strategyName: 'checking-accounts',
+        bankAccountId: checkingAccountId,
+        userId: testUser._id,
+        result: {
+          transactions: {
+            newTransactions: 1,
+            categorizationJobId: 'categorize-one'
+          }
+        }
+      });
+
+      // EventEmitter does not await async listeners. A one-row categorization
+      // batch can therefore finish while the completion handler is at its first
+      // database read.
+      scrapingEvents.emit('categorization:completed', {
+        userId: testUser._id.toString(),
+        total: 1,
+        categorized: 1,
+        uncategorized: 0,
+        failed: 0
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const updatedUser = await User.findById(testUser._id);
+      expect(creditCardDetectionService.analyzeCreditCardUsage).toHaveBeenCalledWith(
+        testUser._id.toString(),
+        2
+      );
+      expect(updatedUser.onboarding.creditCardDetection.analyzed).toBe(true);
+      expect(updatedUser.onboarding.currentStep).toBe('credit-card-detection');
+    });
+
+    it('does not move onboarding backwards when a late categorization batch finishes', async () => {
+      testUser.onboarding.transactionImport = {
+        completed: true,
+        transactionsImported: 150,
+        completedAt: new Date()
+      };
+      testUser.onboarding.currentStep = 'credit-card-setup';
+      await testUser.save();
+
+      scrapingEvents.emit('categorization:completed', {
+        userId: testUser._id.toString(),
+        total: 20,
+        categorized: 20,
+        uncategorized: 0,
+        failed: 0
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      const updatedUser = await User.findById(testUser._id);
+      expect(creditCardDetectionService.analyzeCreditCardUsage).not.toHaveBeenCalled();
+      expect(updatedUser.onboarding.currentStep).toBe('credit-card-setup');
+    });
+
+    it('falls back to the available transactions when categorization exhausts its retries', async () => {
+      scrapingEvents.emit('checking-accounts:completed', {
+        strategyName: 'checking-accounts',
+        bankAccountId: checkingAccountId,
+        userId: testUser._id,
+        result: {
+          transactions: {
+            newTransactions: 150,
+            categorizationJobId: 'categorize-150'
+          }
+        }
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+      expect(creditCardDetectionService.analyzeCreditCardUsage).not.toHaveBeenCalled();
+
+      scrapingEvents.emit('categorization:failed', {
+        userId: testUser._id.toString(),
+        total: 150,
+        error: 'corpus unavailable'
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      const updatedUser = await User.findById(testUser._id);
+      expect(creditCardDetectionService.analyzeCreditCardUsage).toHaveBeenCalledWith(
+        testUser._id.toString(),
+        2
+      );
+      expect(updatedUser.onboarding.creditCardDetection.analyzed).toBe(true);
+      expect(updatedUser.onboarding.currentStep).toBe('credit-card-detection');
+    });
+
     it('should complete onboarding if no credit cards detected', async () => {
       // Mock detection with skip recommendation
       creditCardDetectionService.analyzeCreditCardUsage.mockResolvedValue({

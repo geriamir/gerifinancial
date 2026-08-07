@@ -3,6 +3,7 @@ const transactionCategorizationService = require('../transactionCategorizationSe
 const categoryMappingService = require('../categoryMappingService');
 const transactionClassifier = require('../transactionClassifier');
 const llmCategorizer = require('../llmCategorizer');
+const scrapingEvents = require('../scrapingEvents');
 const scrapingQueue = require('../../../shared/services/scrapingQueue');
 const sseService = require('../../../shared/services/sseService');
 const { Transaction, Category, SubCategory } = require('../../models');
@@ -74,6 +75,43 @@ describe('transactionCategorizationService', () => {
   });
 
   describe('processBatch', () => {
+    it('reports a final-attempt batch failure to internal consumers', async () => {
+      jest.spyOn(transactionClassifier, 'forUser').mockRejectedValue(new Error('corpus unavailable'));
+      const emit = jest.spyOn(scrapingEvents, 'emit').mockImplementation(() => true);
+
+      await expect(transactionCategorizationService.processBatch({
+        userId: user._id,
+        transactionIds: [new mongoose.Types.ObjectId()]
+      }, {
+        attemptsMade: 1,
+        opts: { attempts: 2 }
+      })).rejects.toThrow('corpus unavailable');
+
+      expect(emit).toHaveBeenCalledWith('categorization:failed', {
+        userId: user._id.toString(),
+        total: 1,
+        error: 'corpus unavailable'
+      });
+    });
+
+    it('does not report failure while the queue still has a retry left', async () => {
+      jest.spyOn(transactionClassifier, 'forUser').mockRejectedValue(new Error('try again'));
+      const emit = jest.spyOn(scrapingEvents, 'emit').mockImplementation(() => true);
+
+      await expect(transactionCategorizationService.processBatch({
+        userId: user._id,
+        transactionIds: [new mongoose.Types.ObjectId()]
+      }, {
+        attemptsMade: 0,
+        opts: { attempts: 2 }
+      })).rejects.toThrow('try again');
+
+      expect(emit).not.toHaveBeenCalledWith(
+        'categorization:failed',
+        expect.anything()
+      );
+    });
+
     it('loads the corpus once for the whole batch', async () => {
       const forUser = jest.spyOn(transactionClassifier, 'forUser').mockResolvedValue(null);
       const transactions = await Promise.all([makeTransaction(), makeTransaction(), makeTransaction()]);
@@ -322,6 +360,25 @@ describe('transactionCategorizationService', () => {
       const complete = emit.mock.calls.find(([, type]) => type === 'categorization:completed');
       expect(complete).toBeDefined();
       expect(complete[2]).toMatchObject({ total: 1 });
+    });
+
+    it('tells internal consumers only after the categorization batch is done', async () => {
+      jest.spyOn(transactionClassifier, 'forUser').mockResolvedValue(null);
+      const emit = jest.spyOn(scrapingEvents, 'emit').mockImplementation(() => true);
+      const transaction = await makeTransaction();
+
+      await transactionCategorizationService.processBatch({
+        userId: user._id,
+        transactionIds: [transaction._id]
+      });
+
+      expect(emit).toHaveBeenCalledWith(
+        'categorization:completed',
+        expect.objectContaining({
+          userId: user._id.toString(),
+          total: 1
+        })
+      );
     });
 
     // Clients register under the string form of the id, so an ObjectId here

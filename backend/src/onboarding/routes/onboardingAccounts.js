@@ -4,6 +4,7 @@ const auth = require('../../shared/middleware/auth');
 const logger = require('../../shared/utils/logger');
 const { User } = require('../../auth');
 const { bankAccountService } = require('../../banking');
+const onboardingCreditCardDetectionService = require('../services/onboardingCreditCardDetectionService');
 
 /**
  * @route   POST /api/onboarding/checking-account
@@ -289,7 +290,7 @@ router.get('/status', auth, async (req, res) => {
   try {
     const userId = req.user._id || req.user.userId;
     
-    const user = await User.findById(userId)
+    let user = await User.findById(userId)
       .populate('onboarding.checkingAccount.accountId')
       .populate('onboarding.creditCardSetup.creditCardAccounts.accountId');
     
@@ -298,6 +299,12 @@ router.get('/status', auth, async (req, res) => {
         success: false,
         error: 'User not found'
       });
+    }
+
+    if (await onboardingCreditCardDetectionService.refreshIfStale(user)) {
+      user = await User.findById(userId)
+        .populate('onboarding.checkingAccount.accountId')
+        .populate('onboarding.creditCardSetup.creditCardAccounts.accountId');
     }
     
     // Transform old credit card matching data to new format if needed
