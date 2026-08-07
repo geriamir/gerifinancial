@@ -40,7 +40,7 @@ export const buildScript = (status: OnboardingStatus | null): Script => {
   say('greet', "Hi. I'll get GeriFinancial set up with you - it takes a couple of minutes.");
   say(
     'ask-checking',
-    "Let's start with your main checking account. I'll bring in the last six months of transactions so there's something to look at straight away."
+    "Let's start with your main checking account. I'll bring in the past year of transactions so there's something to look at straight away."
   );
 
   // 1. Checking account.
@@ -116,7 +116,7 @@ const describeCheckingAccount = (checking: OnboardingStatus['checkingAccount']):
 };
 
 const describeImport = (count: number): string => {
-  if (!count) return 'That worked. I did not find any transactions in the last six months.';
+  if (!count) return 'That worked. I did not find any transactions in the past year.';
   return `Imported ${count.toLocaleString()} transaction${count === 1 ? '' : 's'} and sorted them into categories.`;
 };
 

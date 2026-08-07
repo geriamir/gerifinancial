@@ -150,7 +150,7 @@ class OnboardingTransactionService {
         status: 'scraping',
         stage: 'scraping',
         progress: 15,
-        message: 'Importing and processing data from the last 6 months...'
+        message: 'Importing and processing data from the past year...'
       });
 
       // Perform comprehensive data sync using dataSyncService

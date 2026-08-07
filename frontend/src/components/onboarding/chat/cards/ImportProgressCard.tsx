@@ -71,7 +71,7 @@ const describeStage = (scraping?: { status: string | null; message: string | nul
       return {
         icon: <DownloadIcon color="primary" />,
         text: 'Importing Transactions',
-        detail: scraping.message || 'Pulling the last six months across.'
+        detail: scraping.message || 'Pulling the past year across.'
       };
     case 'categorizing':
       return {

@@ -2,6 +2,7 @@ const { Transaction } = require('../models');
 const categoryMappingService = require('./categoryMappingService');
 const transactionClassifier = require('./transactionClassifier');
 const llmCategorizer = require('./llmCategorizer');
+const scrapingEvents = require('./scrapingEvents');
 const scrapingQueue = require('../../shared/services/scrapingQueue');
 const sseService = require('../../shared/services/sseService');
 const aiCostMeter = require('../../shared/services/ai/aiCostMeter');
@@ -94,9 +95,27 @@ class TransactionCategorizationService {
    * every call logged its own tokens and nothing added them up over a run.
    */
   async processBatch({ userId, transactionIds }, job) {
-    const { result, cost } = await aiCostMeter.measure(
-      () => this.runBatch({ userId, transactionIds }, job)
-    );
+    let measured;
+    try {
+      measured = await aiCostMeter.measure(
+        () => this.runBatch({ userId, transactionIds }, job)
+      );
+    } catch (error) {
+      const attempts = job?.opts?.attempts || 1;
+      // Mirrors BullMQ's shouldRetryJob check: attemptsMade is the number that
+      // failed before the attempt currently executing.
+      const isFinalAttempt = !job || job.attemptsMade + 1 >= attempts;
+      if (isFinalAttempt) {
+        scrapingEvents.emit('categorization:failed', {
+          userId: userId.toString(),
+          total: transactionIds.length,
+          error: error.message
+        });
+      }
+      throw error;
+    }
+
+    const { result, cost } = measured;
 
     // Only when something was actually spent. With AI switched off every batch
     // would otherwise log a line saying nothing was spent, and this line exists
@@ -230,6 +249,15 @@ class TransactionCategorizationService {
       `Categorized ${results.categorized}/${transactionIds.length} transactions for user ${userId} ` +
       `(${results.uncategorized} left for the user, ${results.failed} failed)`
     );
+
+    // Internal consumers need the same boundary as the browser: credit-card
+    // detection cannot inspect category-backed payments until this batch has
+    // finished writing those categories.
+    scrapingEvents.emit('categorization:completed', {
+      userId: userIdStr,
+      total: transactionIds.length,
+      ...results
+    });
 
     await this.offerToProjects(userId, userIdStr, categorizedIds);
 

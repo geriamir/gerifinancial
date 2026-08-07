@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const app = require('../../app');
 const config = require('../../shared/config');
 const { User } = require('../../auth');
-const { BankAccount } = require('../../banking');
+const { BankAccount, Transaction, Category } = require('../../banking');
 const scrapingEvents = require('../../banking/services/scrapingEvents');
 
 // Mock the banking module
@@ -37,6 +37,8 @@ describe('Onboarding Accounts API', () => {
     // Clear collections
     await User.deleteMany({});
     await BankAccount.deleteMany({});
+    await Transaction.deleteMany({});
+    await Category.deleteMany({});
 
     // Create test user
     testUser = await User.create({
@@ -405,6 +407,163 @@ describe('Onboarding Accounts API', () => {
       const { data } = response.body;
       expect(data.currentStep).toBe('checking-account');
       expect(data.isComplete).toBe(false);
+    });
+
+    it('repairs a zero-result card analysis that ran before categorization finished', async () => {
+      const analyzedAt = new Date(Date.now() - 60 * 1000);
+      const accountId = new mongoose.Types.ObjectId();
+      const category = await Category.create({
+        name: 'Credit Card',
+        type: 'Transfer',
+        userId: testUser._id
+      });
+
+      await Transaction.create({
+        identifier: 'card-payment-after-analysis',
+        userId: testUser._id,
+        accountId,
+        amount: -4321,
+        currency: 'ILS',
+        date: new Date(),
+        description: 'MAX monthly payment',
+        category: category._id,
+        rawData: { description: 'MAX monthly payment' }
+      });
+
+      testUser.onboarding = {
+        isComplete: false,
+        currentStep: 'credit-card-detection',
+        transactionImport: {
+          completed: true,
+          transactionsImported: 150,
+          completedAt: analyzedAt
+        },
+        creditCardDetection: {
+          analyzed: true,
+          analyzedAt,
+          transactionCount: 0,
+          recommendation: 'skip',
+          sampleTransactions: []
+        },
+        completedSteps: ['checking-account', 'transaction-import']
+      };
+      await testUser.save();
+
+      const response = await request(app)
+        .get('/api/onboarding/status')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.creditCardDetection.transactionCount).toBe(1);
+      expect(response.body.data.creditCardDetection.recommendation).not.toBe('skip');
+      expect(response.body.data.creditCardDetection.sampleTransactions).toEqual([
+        expect.objectContaining({ description: 'MAX monthly payment', amount: 4321 })
+      ]);
+
+      const repairedUser = await User.findById(testUser._id);
+      expect(repairedUser.onboarding.creditCardDetection.transactionCount).toBe(1);
+      expect(repairedUser.onboarding.creditCardDetection.analyzedAt.getTime())
+        .toBeGreaterThan(analyzedAt.getTime());
+    });
+
+    it('does not refresh when only an older transaction was categorized after analysis', async () => {
+      const analyzedAt = new Date(Date.now() - 60 * 1000);
+      const oldTransactionDate = new Date();
+      oldTransactionDate.setMonth(oldTransactionDate.getMonth() - 3);
+      const category = await Category.create({
+        name: 'Credit Card',
+        type: 'Transfer',
+        userId: testUser._id
+      });
+
+      await Transaction.create({
+        identifier: 'old-card-payment-after-analysis',
+        userId: testUser._id,
+        accountId: new mongoose.Types.ObjectId(),
+        amount: -2345,
+        currency: 'ILS',
+        date: oldTransactionDate,
+        description: 'Old MAX monthly payment',
+        category: category._id,
+        rawData: { description: 'Old MAX monthly payment' }
+      });
+
+      testUser.onboarding = {
+        isComplete: false,
+        currentStep: 'credit-card-detection',
+        transactionImport: {
+          completed: true,
+          transactionsImported: 150,
+          completedAt: analyzedAt
+        },
+        creditCardDetection: {
+          analyzed: true,
+          analyzedAt,
+          transactionCount: 0,
+          recommendation: 'skip',
+          sampleTransactions: []
+        },
+        completedSteps: ['checking-account', 'transaction-import']
+      };
+      await testUser.save();
+
+      const response = await request(app)
+        .get('/api/onboarding/status')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.creditCardDetection.transactionCount).toBe(0);
+
+      const unchangedUser = await User.findById(testUser._id);
+      expect(unchangedUser.onboarding.creditCardDetection.analyzedAt.getTime())
+        .toBe(analyzedAt.getTime());
+    });
+
+    it('does not wait forever when a categorization job never finishes', async () => {
+      const importCompletedAt = new Date(Date.now() - 16 * 60 * 1000);
+      const category = await Category.create({
+        name: 'Credit Card',
+        type: 'Transfer',
+        userId: testUser._id
+      });
+
+      await Transaction.create({
+        identifier: 'card-payment-after-timeout',
+        userId: testUser._id,
+        accountId: new mongoose.Types.ObjectId(),
+        amount: -1234,
+        currency: 'ILS',
+        date: new Date(),
+        description: 'Isracard monthly payment',
+        category: category._id,
+        rawData: { description: 'Isracard monthly payment' }
+      });
+
+      testUser.onboarding = {
+        isComplete: false,
+        currentStep: 'transaction-import',
+        transactionImport: {
+          completed: true,
+          transactionsImported: 150,
+          completedAt: importCompletedAt
+        },
+        creditCardDetection: {
+          analyzed: false,
+          transactionCount: 0,
+          sampleTransactions: []
+        },
+        completedSteps: ['checking-account', 'transaction-import']
+      };
+      await testUser.save();
+
+      const response = await request(app)
+        .get('/api/onboarding/status')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.currentStep).toBe('credit-card-detection');
+      expect(response.body.data.creditCardDetection.analyzed).toBe(true);
+      expect(response.body.data.creditCardDetection.transactionCount).toBe(1);
     });
   });
 });
