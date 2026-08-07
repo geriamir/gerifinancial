@@ -5,6 +5,7 @@ const scrapingEvents = require('../../banking/services/scrapingEvents');
 const logger = require('../../shared/utils/logger');
 
 const DETECTION_WAIT_TIMEOUT_MS = 15 * 60 * 1000;
+const DETECTION_LOOKBACK_MONTHS = 2;
 
 class OnboardingCreditCardDetectionService {
   /**
@@ -26,7 +27,10 @@ class OnboardingCreditCardDetectionService {
     }
 
     logger.info(`Running credit card detection for user ${userId}`);
-    const analysis = await creditCardDetectionService.analyzeCreditCardUsage(userId, 2);
+    const analysis = await creditCardDetectionService.analyzeCreditCardUsage(
+      userId,
+      DETECTION_LOOKBACK_MONTHS
+    );
 
     const updatedUser = await User.findOneAndUpdate(
       eligibility,
@@ -94,9 +98,13 @@ class OnboardingCreditCardDetectionService {
       return false;
     }
 
+    const detectionStartDate = new Date();
+    detectionStartDate.setMonth(detectionStartDate.getMonth() - DETECTION_LOOKBACK_MONTHS);
+
     const categorizedAfterAnalysis = await Transaction.exists({
       userId: user._id,
       category: { $exists: true, $ne: null },
+      date: { $gte: detectionStartDate },
       updatedAt: { $gt: detection.analyzedAt }
     });
 
