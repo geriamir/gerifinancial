@@ -80,6 +80,7 @@ describe('buildScript', () => {
   it('opens by asking for the checking account', () => {
     const script = buildScript(baseStatus());
 
+    expect(textOf(script)).toContain('past year of transactions');
     expect(cardsOf(script)).toEqual(['checking-account']);
     expect(script.waiting).toBe(false);
   });
@@ -107,6 +108,21 @@ describe('buildScript', () => {
     const script = buildScript(imported());
 
     expect(textOf(script)).toContain('1,432 transactions');
+  });
+
+  it('describes an empty import using the one-year window', () => {
+    const script = buildScript(
+      imported({
+        transactionImport: {
+          completed: true,
+          transactionsImported: 0,
+          completedAt: '2026-01-01T00:05:00Z',
+          scrapingStatus: { isActive: false, status: 'complete', progress: 100, message: null, error: null }
+        }
+      })
+    );
+
+    expect(textOf(script)).toContain('did not find any transactions in the past year');
   });
 
   it('waits with no card while the detection is still running', () => {

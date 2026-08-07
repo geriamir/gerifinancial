@@ -137,6 +137,21 @@ describe('BankAccount Model', () => {
         verbose: false
       });
     });
+
+    it('should default first-time scraping to the past year', async () => {
+      const before = new Date();
+      before.setMonth(before.getMonth() - 12);
+      const account = await BankAccount.create(mockAccount);
+      const defaultStartDate = account.getDefaultStartDate();
+      const after = new Date();
+      after.setMonth(after.getMonth() - 12);
+
+      expect(account.scrapingConfig.options.monthsBack).toBe(12);
+      expect(account.scrapingConfig.options.startDate.getTime()).toBeGreaterThanOrEqual(before.getTime());
+      expect(account.scrapingConfig.options.startDate.getTime()).toBeLessThanOrEqual(after.getTime());
+      expect(defaultStartDate.getTime()).toBeGreaterThanOrEqual(before.getTime());
+      expect(defaultStartDate.getTime()).toBeLessThanOrEqual(after.getTime());
+    });
   });
 
   describe('Default Currency', () => {

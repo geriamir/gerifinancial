@@ -1,4 +1,4 @@
-const DEFAULT_LOOKBACK_MONTHS = 6;
+const DEFAULT_LOOKBACK_MONTHS = 12;
 
 /**
  * Resolves the date a scrape should start from. Incremental when the account

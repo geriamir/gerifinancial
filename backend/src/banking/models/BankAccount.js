@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const credentialEncryption = require('../../shared/services/credentialEncryption');
-const { resolveStartDate } = require('../utils/scraperDates');
+const { resolveStartDate, DEFAULT_LOOKBACK_MONTHS } = require('../utils/scraperDates');
 const logger = require('../../shared/utils/logger');
 const { OTP_BANKS } = require('../constants/enums');
 
@@ -180,18 +180,14 @@ const bankAccountSchema = new mongoose.Schema({
     options: {
       startDate: {
         type: Date,
-        default: () => {
-          const date = new Date();
-          date.setMonth(date.getMonth() - 6); // Default to 6 months ago for first scraping
-          return date;
-        }
+        default: () => resolveStartDate(null)
       },
       // Number of months of transactions to fetch
       monthsBack: {
         type: Number,
         min: 1,
         max: 12,
-        default: 6
+        default: DEFAULT_LOOKBACK_MONTHS
       }
     }
   }

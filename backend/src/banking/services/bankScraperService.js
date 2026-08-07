@@ -53,7 +53,7 @@ class BankScraperService {
   }
 
   createScraper(bankAccount, options = {}) {
-    // Get smart start date from bank account (uses lastScraped if available, otherwise 6 months back)
+    // Get smart start date from bank account (uses lastScraped if available, otherwise 12 months back)
     const {
       startDate = resolveStartDate(bankAccount.lastScraped),
       showBrowser = false,
