@@ -5,6 +5,7 @@ const logger = require('../../shared/utils/logger');
 
 const CATEGORIZATION_HANDOFF_RETRIES = 10;
 const CATEGORIZATION_HANDOFF_DELAY_MS = 100;
+const IMPORT_RELATED_STEPS = ['checking-account', 'transaction-import'];
 
 /**
  * Event handlers for onboarding-specific scraping events
@@ -94,12 +95,12 @@ class OnboardingEventHandlers {
               'onboarding.transactionImport.scrapingStatus.isActive': true,
               'onboarding.transactionImport.scrapingStatus.status': 'scraping',
               'onboarding.transactionImport.scrapingStatus.progress': 50,
-              'onboarding.transactionImport.scrapingStatus.message': 'Importing transactions...',
-              'onboarding.currentStep': 'transaction-import'
+              'onboarding.transactionImport.scrapingStatus.message': 'Importing transactions...'
             }
           },
           { new: true }
         );
+        await this.advanceToTransactionImportIfEligible(userId);
         logger.info(`✅ Onboarding: Updated onboarding scraping status for checking account ${bankAccountId} - isActive: ${updateResult.onboarding.transactionImport.scrapingStatus.isActive}`);
       }
       
@@ -108,6 +109,20 @@ class OnboardingEventHandlers {
       logger.error(`❌ Onboarding: Failed to set initial scraping status for account ${bankAccountId}:`, error.message);
       logger.error(error.stack);
     }
+  }
+
+  async advanceToTransactionImportIfEligible(userId) {
+    return User.updateOne(
+      {
+        _id: userId,
+        'onboarding.currentStep': { $in: IMPORT_RELATED_STEPS }
+      },
+      {
+        $set: {
+          'onboarding.currentStep': 'transaction-import'
+        }
+      }
+    );
   }
 
   /**
@@ -178,8 +193,7 @@ class OnboardingEventHandlers {
               'onboarding.transactionImport.scrapingStatus.isActive': false,
               'onboarding.transactionImport.scrapingStatus.status': 'complete',
               'onboarding.transactionImport.scrapingStatus.progress': 100,
-              'onboarding.transactionImport.scrapingStatus.message': `Import complete! ${newTransactions} transactions imported.`,
-              'onboarding.currentStep': 'transaction-import'
+              'onboarding.transactionImport.scrapingStatus.message': `Import complete! ${newTransactions} transactions imported.`
             },
             $addToSet: {
               'onboarding.completedSteps': 'transaction-import'
@@ -187,6 +201,7 @@ class OnboardingEventHandlers {
           },
           { new: true }
         );
+        await this.advanceToTransactionImportIfEligible(userId);
 
         if (categorizationPending) {
           logger.info(`Onboarding: Waiting for categorization job ${result.transactions.categorizationJobId} before credit card detection for user ${userId}`);

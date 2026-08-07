@@ -150,6 +150,38 @@ describe('Onboarding Event Handlers', () => {
         expect(updatedUser.onboarding.transactionImport.scrapingStatus.isActive).not.toBe(true);
       }
     });
+
+    it('does not move onboarding backwards when a later sync starts', async () => {
+      testUser.onboarding = {
+        startedAt: new Date(),
+        checkingAccount: {
+          connected: true,
+          accountId: checkingAccountId,
+          connectedAt: new Date(),
+          bankId: 'hapoalim'
+        },
+        currentStep: 'credit-card-setup',
+        transactionImport: {
+          completed: true,
+          transactionsImported: 150,
+          completedAt: new Date()
+        },
+        completedSteps: ['checking-account', 'transaction-import', 'credit-card-detection']
+      };
+      await testUser.save();
+
+      scrapingEvents.emit('checking-accounts:started', {
+        strategyName: 'checking-accounts',
+        bankAccountId: checkingAccountId,
+        userId: testUser._id
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const updatedUser = await User.findById(testUser._id);
+      expect(updatedUser.onboarding.currentStep).toBe('credit-card-setup');
+      expect(updatedUser.onboarding.transactionImport.scrapingStatus.status).toBe('scraping');
+    });
   });
 
   describe('checking-accounts:completed event', () => {
@@ -325,6 +357,39 @@ describe('Onboarding Event Handlers', () => {
       const updatedUser = await User.findById(testUser._id);
       expect(creditCardDetectionService.analyzeCreditCardUsage).not.toHaveBeenCalled();
       expect(updatedUser.onboarding.currentStep).toBe('credit-card-setup');
+    });
+
+    it('does not move onboarding backwards when a later checking sync completes', async () => {
+      testUser.onboarding.transactionImport = {
+        completed: true,
+        transactionsImported: 150,
+        completedAt: new Date()
+      };
+      testUser.onboarding.currentStep = 'credit-card-setup';
+      testUser.onboarding.completedSteps = [
+        'checking-account',
+        'transaction-import',
+        'credit-card-detection'
+      ];
+      await testUser.save();
+
+      scrapingEvents.emit('checking-accounts:completed', {
+        strategyName: 'checking-accounts',
+        bankAccountId: checkingAccountId,
+        userId: testUser._id,
+        result: {
+          transactions: {
+            newTransactions: 25
+          }
+        }
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      const updatedUser = await User.findById(testUser._id);
+      expect(updatedUser.onboarding.currentStep).toBe('credit-card-setup');
+      expect(updatedUser.onboarding.transactionImport.transactionsImported).toBe(25);
+      expect(creditCardDetectionService.analyzeCreditCardUsage).not.toHaveBeenCalled();
     });
 
     it('falls back to the available transactions when categorization exhausts its retries', async () => {
