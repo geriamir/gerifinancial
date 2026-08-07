@@ -43,8 +43,7 @@ on:
 
 # The Azure login exchanges this workflow's short-lived GitHub OIDC token. No
 # Azure credential or Log Analytics shared key is stored in the repository.
-permissions:
-  contents: read
+permissions: {}
 
 env:
   AZURE_RESOURCE_GROUP: rg-gerifinancial
@@ -56,7 +55,6 @@ jobs:
     name: Read production logs
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       id-token: write
     steps:
       - name: Require the default branch
@@ -87,28 +85,29 @@ jobs:
               -g "$AZURE_RESOURCE_GROUP" \
               --query customerId -o tsv
           )"
+          app_literal="$(jq -Rn --arg value "$CONTAINER_APP" '$value')"
 
           case "$STREAM" in
             console)
-              source_query="$(cat <<'KQL'
+              source_query="$(cat <<KQL
           ContainerAppConsoleLogs_CL
-          | where ContainerAppName_s == 'gerifinancial-api'
+          | where ContainerAppName_s == $app_literal
           | project TimeGenerated, Revision = RevisionName_s, Stream = 'app', Line = Log_s
           KQL
               )"
               ;;
             system)
-              source_query="$(cat <<'KQL'
+              source_query="$(cat <<KQL
           ContainerAppSystemLogs_CL
-          | where ContainerAppName_s == 'gerifinancial-api'
+          | where ContainerAppName_s == $app_literal
           | project TimeGenerated, Revision = RevisionName_s, Stream = 'sys', Line = Log_s
           KQL
               )"
               ;;
             both)
-              source_query="$(cat <<'KQL'
+              source_query="$(cat <<KQL
           union isfuzzy=true withsource=Source ContainerAppConsoleLogs_CL, ContainerAppSystemLogs_CL
-          | where ContainerAppName_s == 'gerifinancial-api'
+          | where ContainerAppName_s == $app_literal
           | project TimeGenerated,
                     Revision = RevisionName_s,
                     Stream = iff(Source contains 'Console', 'app', 'sys'),
@@ -153,18 +152,25 @@ jobs:
             cat production.log
           fi
 
+          summary_text() {
+            tr '\r\n' ' ' \
+              | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+          }
+          summary_filter="$(printf '%s' "$FILTER" | summary_text)"
+          summary_exclude="$(printf '%s' "$EXCLUDE" | summary_text)"
+
           {
             echo "## Production logs"
             echo
             echo "$count line(s) from the last $MINUTES minute(s); stream: \`$STREAM\`."
             if [[ -n "$FILTER" ]]; then
-              echo "Filter: \`$FILTER\`."
+              echo "Filter: <code>$summary_filter</code>."
             fi
             if [[ -n "$EXCLUDE" ]]; then
-              echo "Excluded: \`$EXCLUDE\`."
+              echo "Excluded: <code>$summary_exclude</code>."
             fi
             echo
-            echo '```text'
-            cat production.log
-            echo '```'
+            echo '<pre>'
+            summary_text < production.log
+            echo '</pre>'
           } >> "$GITHUB_STEP_SUMMARY"
