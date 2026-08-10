@@ -107,12 +107,21 @@ class OnboardingCreditCardDetectionService {
       date: { $gte: detectionStartDate },
       updatedAt: { $gt: detection.analyzedAt }
     });
+    const likelyPaymentsMissed = await creditCardDetectionService.hasLikelyCreditCardPayments(
+      user._id,
+      DETECTION_LOOKBACK_MONTHS
+    );
 
-    if (!categorizedAfterAnalysis) {
+    if (!categorizedAfterAnalysis && !likelyPaymentsMissed) {
       return false;
     }
 
-    logger.info(`Refreshing stale credit card detection for user ${user._id} after categorization completed`);
+    logger.info(
+      `Refreshing stale credit card detection for user ${user._id} ` +
+      (likelyPaymentsMissed
+        ? 'after recognizable card payments were missed'
+        : 'after categorization completed')
+    );
     return Boolean(await this.complete(user._id, ['credit-card-detection']));
   }
 }

@@ -2,6 +2,7 @@ const CreditCard = require('../models/CreditCard');
 const BankAccount = require('../models/BankAccount');
 const Transaction = require('../models/Transaction');
 const logger = require('../../shared/utils/logger');
+const { creditCardPaymentMatchStage } = require('./creditCardPaymentMatcher');
 const mongoose = require('mongoose');
 
 /**
@@ -141,12 +142,7 @@ class CreditCardOnboardingService {
             as: 'categoryDetails'
           }
         },
-        {
-          $match: {
-            'categoryDetails.name': 'Credit Card',
-            'categoryDetails.type': 'Transfer'
-          }
-        },
+        creditCardPaymentMatchStage(),
         {
           $group: {
             _id: {

@@ -3,6 +3,10 @@ const Transaction = require('../models/Transaction');
 const CreditCard = require('../models/CreditCard');
 const User = require('../../auth/models/User');
 const logger = require('../../shared/utils/logger');
+const {
+  likelyPaymentTextQuery,
+  creditCardPaymentMatchStage
+} = require('./creditCardPaymentMatcher');
 
 /**
  * Service for detecting credit card usage from transaction data
@@ -42,12 +46,7 @@ class CreditCardDetectionService {
             as: 'categoryDetails'
           }
         },
-        {
-          $match: {
-            'categoryDetails.name': 'Credit Card',
-            'categoryDetails.type': 'Transfer'
-          }
-        },
+        creditCardPaymentMatchStage(),
         {
           $group: {
             _id: null,
@@ -129,12 +128,7 @@ class CreditCardDetectionService {
             as: 'categoryDetails'
           }
         },
-        {
-          $match: {
-            'categoryDetails.name': 'Credit Card',
-            'categoryDetails.type': 'Transfer'
-          }
-        },
+        creditCardPaymentMatchStage(),
         {
           $group: {
             _id: {
@@ -199,12 +193,7 @@ class CreditCardDetectionService {
             as: 'categoryDetails'
           }
         },
-        {
-          $match: {
-            'categoryDetails.name': 'Credit Card',
-            'categoryDetails.type': 'Transfer'
-          }
-        },
+        creditCardPaymentMatchStage(),
         {
           $count: 'total'
         }
@@ -216,6 +205,17 @@ class CreditCardDetectionService {
       logger.error(`Error checking credit card transactions for user ${userId}:`, error);
       return false;
     }
+  }
+
+  async hasLikelyCreditCardPayments(userId, monthsBack = 2) {
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - monthsBack);
+
+    return Boolean(await Transaction.exists({
+      userId: new mongoose.Types.ObjectId(userId),
+      date: { $gte: startDate },
+      ...likelyPaymentTextQuery()
+    }));
   }
   
   /**
@@ -389,12 +389,7 @@ class CreditCardDetectionService {
             as: 'categoryDetails'
           }
         },
-        {
-          $match: {
-            'categoryDetails.name': 'Credit Card',
-            'categoryDetails.type': 'Transfer'
-          }
-        },
+        creditCardPaymentMatchStage(),
         {
           $sort: { date: -1 }
         }

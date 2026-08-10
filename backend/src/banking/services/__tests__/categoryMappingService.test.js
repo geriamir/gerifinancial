@@ -162,6 +162,58 @@ describe('CategoryMappingService', () => {
       expect(transaction.categorizationMethod).toBe(CategorizationMethod.PREVIOUS_DATA);
     });
 
+    it('should allow a transfer category to correct a pre-typed expense', async () => {
+      const creditCardCategory = await Category.create({
+        name: 'Credit Card',
+        type: TransactionType.TRANSFER,
+        keywords: ['כרטיס אשראי', 'ישראכרט'],
+        userId: testUserId
+      });
+      const transaction = await Transaction.create({
+        identifier: 'test-card-payment-pretyped-expense',
+        description: 'כרטיסי אשראי-י',
+        userId: testUserId,
+        accountId: new mongoose.Types.ObjectId(),
+        amount: -10009.46,
+        currency: 'ILS',
+        date: new Date(),
+        type: TransactionType.EXPENSE,
+        rawData: {
+          description: 'כרטיסי אשראי-י',
+          chargedAmount: -10009.46
+        }
+      });
+
+      const updated = await categoryMappingService.attemptAutoCategorization(transaction);
+
+      expect(updated.category._id.toString()).toBe(creditCardCategory._id.toString());
+      expect(updated.category.type).toBe(TransactionType.TRANSFER);
+      expect(updated.type).toBe(TransactionType.TRANSFER);
+    });
+
+    it('should align a pre-typed expense with a matched transfer subcategory', async () => {
+      const transaction = await Transaction.create({
+        identifier: 'test-transfer-subcategory-pretyped-expense',
+        description: 'Bank transfer',
+        userId: testUserId,
+        accountId: new mongoose.Types.ObjectId(),
+        amount: -1000,
+        currency: 'ILS',
+        date: new Date(),
+        type: TransactionType.EXPENSE,
+        rawData: {
+          description: 'Bank transfer',
+          chargedAmount: -1000
+        }
+      });
+
+      const updated = await categoryMappingService.attemptAutoCategorization(transaction);
+
+      expect(updated.category._id.toString()).toBe(testTransferCategory._id.toString());
+      expect(updated.subCategory._id.toString()).toBe(testTransferSubCategory._id.toString());
+      expect(updated.type).toBe(TransactionType.TRANSFER);
+    });
+
     it('should only use income categories for positive amounts using manual categorization', async () => {
       // Create manual categorization entries for both income and expense
       // Create manual categorization entry with a slightly different description

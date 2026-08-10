@@ -373,13 +373,26 @@ describe('Onboarding Event Handlers', () => {
       ];
       await testUser.save();
 
+      for (let index = 0; index < 3; index += 1) {
+        await Transaction.create({
+          identifier: `existing-checking-transaction-${index}`,
+          userId: testUser._id,
+          accountId: checkingAccountId,
+          amount: -(index + 1) * 100,
+          currency: 'ILS',
+          date: new Date(),
+          description: `Existing transaction ${index}`,
+          rawData: { description: `Existing transaction ${index}` }
+        });
+      }
+
       scrapingEvents.emit('checking-accounts:completed', {
         strategyName: 'checking-accounts',
         bankAccountId: checkingAccountId,
         userId: testUser._id,
         result: {
           transactions: {
-            newTransactions: 25
+            newTransactions: 1
           }
         }
       });
@@ -388,7 +401,8 @@ describe('Onboarding Event Handlers', () => {
 
       const updatedUser = await User.findById(testUser._id);
       expect(updatedUser.onboarding.currentStep).toBe('credit-card-setup');
-      expect(updatedUser.onboarding.transactionImport.transactionsImported).toBe(25);
+      expect(updatedUser.onboarding.transactionImport.transactionsImported).toBe(3);
+      expect(updatedUser.onboarding.transactionImport.countVerifiedAt).toBeTruthy();
       expect(creditCardDetectionService.analyzeCreditCardUsage).not.toHaveBeenCalled();
     });
 

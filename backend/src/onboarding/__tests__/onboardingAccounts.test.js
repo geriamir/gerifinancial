@@ -466,6 +466,125 @@ describe('Onboarding Accounts API', () => {
         .toBeGreaterThan(analyzedAt.getTime());
     });
 
+    it('repairs a zero-result analysis when recognizable card payments were miscategorized', async () => {
+      const analyzedAt = new Date();
+      const expenseCategory = await Category.create({
+        name: 'Financial Services',
+        type: 'Expense',
+        userId: testUser._id
+      });
+
+      await Transaction.create({
+        identifier: 'miscategorized-card-payment',
+        userId: testUser._id,
+        accountId: new mongoose.Types.ObjectId(),
+        amount: -10009.46,
+        currency: 'ILS',
+        date: new Date(),
+        description: 'כרטיסי אשראי-י',
+        type: 'Expense',
+        category: expenseCategory._id,
+        categorizationMethod: 'ai',
+        rawData: { description: 'כרטיסי אשראי-י' }
+      });
+
+      testUser.onboarding = {
+        isComplete: false,
+        currentStep: 'credit-card-detection',
+        transactionImport: {
+          completed: true,
+          transactionsImported: 1,
+          completedAt: analyzedAt
+        },
+        creditCardDetection: {
+          analyzed: true,
+          analyzedAt,
+          transactionCount: 0,
+          recommendation: 'skip',
+          sampleTransactions: []
+        },
+        completedSteps: ['checking-account', 'transaction-import']
+      };
+      await testUser.save();
+
+      const response = await request(app)
+        .get('/api/onboarding/status')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.creditCardDetection.transactionCount).toBe(1);
+      expect(response.body.data.creditCardDetection.recommendation).toBe('connect');
+      expect(response.body.data.creditCardDetection.sampleTransactions).toEqual([
+        expect.objectContaining({
+          description: 'כרטיסי אשראי-י',
+          amount: 10009.46
+        })
+      ]);
+    });
+
+    it('repairs an incremental import count to the checking account total', async () => {
+      const accountId = new mongoose.Types.ObjectId();
+      for (let index = 0; index < 3; index += 1) {
+        await Transaction.create({
+          identifier: `imported-total-${index}`,
+          userId: testUser._id,
+          accountId,
+          amount: -(index + 1) * 100,
+          currency: 'ILS',
+          date: new Date(),
+          description: `Imported transaction ${index}`,
+          rawData: { description: `Imported transaction ${index}` }
+        });
+      }
+
+      testUser.onboarding = {
+        isComplete: false,
+        currentStep: 'credit-card-detection',
+        checkingAccount: {
+          connected: true,
+          accountId,
+          connectedAt: new Date(),
+          bankId: 'hapoalim'
+        },
+        transactionImport: {
+          completed: true,
+          transactionsImported: 1,
+          completedAt: new Date()
+        },
+        creditCardDetection: {
+          analyzed: true,
+          analyzedAt: new Date(),
+          transactionCount: 1,
+          recommendation: 'connect',
+          sampleTransactions: []
+        },
+        completedSteps: ['checking-account', 'transaction-import']
+      };
+      await testUser.save();
+
+      const countDocuments = jest.spyOn(Transaction, 'countDocuments');
+      const response = await request(app)
+        .get('/api/onboarding/status')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.transactionImport.transactionsImported).toBe(3);
+      const repairedUser = await User.findById(testUser._id);
+      expect(repairedUser.onboarding.transactionImport.transactionsImported).toBe(3);
+      expect(repairedUser.onboarding.transactionImport.countVerifiedAt).toBeTruthy();
+      expect(countDocuments).toHaveBeenCalledTimes(1);
+
+      countDocuments.mockClear();
+      const secondResponse = await request(app)
+        .get('/api/onboarding/status')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(secondResponse.status).toBe(200);
+      expect(secondResponse.body.data.transactionImport.transactionsImported).toBe(3);
+      expect(countDocuments).not.toHaveBeenCalled();
+      countDocuments.mockRestore();
+    });
+
     it('does not refresh when only an older transaction was categorized after analysis', async () => {
       const analyzedAt = new Date(Date.now() - 60 * 1000);
       const oldTransactionDate = new Date();

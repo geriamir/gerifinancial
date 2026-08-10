@@ -3,7 +3,7 @@ const router = express.Router();
 const auth = require('../../shared/middleware/auth');
 const logger = require('../../shared/utils/logger');
 const { User } = require('../../auth');
-const { bankAccountService } = require('../../banking');
+const { bankAccountService, Transaction } = require('../../banking');
 const onboardingCreditCardDetectionService = require('../services/onboardingCreditCardDetectionService');
 
 /**
@@ -290,9 +290,7 @@ router.get('/status', auth, async (req, res) => {
   try {
     const userId = req.user._id || req.user.userId;
     
-    let user = await User.findById(userId)
-      .populate('onboarding.checkingAccount.accountId')
-      .populate('onboarding.creditCardSetup.creditCardAccounts.accountId');
+    let user = await User.findById(userId);
     
     if (!user) {
       return res.status(404).json({
@@ -301,7 +299,47 @@ router.get('/status', auth, async (req, res) => {
       });
     }
 
-    if (await onboardingCreditCardDetectionService.refreshIfStale(user)) {
+    const checkingAccountId =
+      user.onboarding?.checkingAccount?.accountId?._id ||
+      user.onboarding?.checkingAccount?.accountId;
+    let importCountVerified = false;
+
+    await user.populate('onboarding.checkingAccount.accountId');
+    await user.populate('onboarding.creditCardSetup.creditCardAccounts.accountId');
+
+    if (
+      user.onboarding?.transactionImport?.completed &&
+      !user.onboarding.transactionImport.countVerifiedAt &&
+      checkingAccountId
+    ) {
+      const importedTransactions = await Transaction.countDocuments({
+        userId,
+        accountId: checkingAccountId
+      });
+      const storedTransactions = user.onboarding.transactionImport.transactionsImported || 0;
+
+      const countVerifiedAt = new Date();
+      const importUpdate = {
+        'onboarding.transactionImport.countVerifiedAt': countVerifiedAt
+      };
+
+      if (importedTransactions > storedTransactions) {
+        logger.info(
+          `Refreshing onboarding import count for user ${userId}: ` +
+          `${storedTransactions} -> ${importedTransactions}`
+        );
+        importUpdate['onboarding.transactionImport.transactionsImported'] = importedTransactions;
+      }
+
+      await User.updateOne(
+        { _id: userId },
+        { $set: importUpdate }
+      );
+      importCountVerified = true;
+    }
+
+    const detectionRefreshed = await onboardingCreditCardDetectionService.refreshIfStale(user);
+    if (importCountVerified || detectionRefreshed) {
       user = await User.findById(userId)
         .populate('onboarding.checkingAccount.accountId')
         .populate('onboarding.creditCardSetup.creditCardAccounts.accountId');
