@@ -158,6 +158,11 @@ class OnboardingEventHandlers {
 
       // Extract transaction count from result
       const newTransactions = result.transactions?.newTransactions || 0;
+      const totalTransactions = await Transaction.countDocuments({
+        userId,
+        accountId: bankAccountId
+      });
+      const importedTransactions = Math.max(newTransactions, totalTransactions);
       
       // Count categorized transactions for this user
       const categorizedCount = await Transaction.countDocuments({
@@ -170,10 +175,10 @@ class OnboardingEventHandlers {
         isActive: false,
         status: 'complete',
         progress: 100,
-        message: `Import complete! ${newTransactions} transactions imported.`,
+        message: `Import complete! ${importedTransactions} transactions imported.`,
         startedAt: bankAccount.scrapingStatus?.startedAt || new Date(),
         lastUpdatedAt: new Date(),
-        transactionsImported: newTransactions,
+        transactionsImported: importedTransactions,
         transactionsCategorized: categorizedCount
       };
 
@@ -188,12 +193,12 @@ class OnboardingEventHandlers {
           {
             $set: {
               'onboarding.transactionImport.completed': true,
-              'onboarding.transactionImport.transactionsImported': newTransactions,
+              'onboarding.transactionImport.transactionsImported': importedTransactions,
               'onboarding.transactionImport.completedAt': new Date(),
               'onboarding.transactionImport.scrapingStatus.isActive': false,
               'onboarding.transactionImport.scrapingStatus.status': 'complete',
               'onboarding.transactionImport.scrapingStatus.progress': 100,
-              'onboarding.transactionImport.scrapingStatus.message': `Import complete! ${newTransactions} transactions imported.`
+              'onboarding.transactionImport.scrapingStatus.message': `Import complete! ${importedTransactions} transactions imported.`
             },
             $addToSet: {
               'onboarding.completedSteps': 'transaction-import'
@@ -345,7 +350,7 @@ class OnboardingEventHandlers {
       await User.findByIdAndUpdate(userId, {
         $set: {
           'onboardingStatus.hasImportedTransactions': true,
-          'onboardingStatus.transactionsImported': newTransactions,
+          'onboardingStatus.transactionsImported': importedTransactions,
           'onboardingStatus.importCompletedAt': new Date(),
           'onboardingStatus.scrapingStatus.isActive': false,
           'onboardingStatus.scrapingStatus.status': 'complete',
@@ -356,7 +361,10 @@ class OnboardingEventHandlers {
         }
       });
       
-      logger.info(`✅ Onboarding: Updated scraping status for account ${bankAccountId} - ${newTransactions} transactions imported, ${categorizedCount} categorized`);
+      logger.info(
+        `✅ Onboarding: Updated scraping status for account ${bankAccountId} - ` +
+        `${importedTransactions} transactions available (${newTransactions} new), ${categorizedCount} categorized`
+      );
     } catch (error) {
       logger.error(`❌ Onboarding: Failed to update scraping status for account ${bankAccountId}:`, error.message);
       logger.error(`❌ Onboarding: Full error details:`, error);

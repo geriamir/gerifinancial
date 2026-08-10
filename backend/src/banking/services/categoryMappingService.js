@@ -4,6 +4,7 @@ const llmCategorizer = require('./llmCategorizer');
 const { enhancedKeywordMatcher } = require('./enhanced-keyword-matching');
 const { CategorizationMethod, TransactionType } = require('../constants/enums');
 const logger = require('../../shared/utils/logger');
+const { isLikelyCreditCardPayment } = require('./creditCardPaymentMatcher');
 
 /**
  * Returned instead of a result when a caller asked for the model tier to be
@@ -32,10 +33,16 @@ class CategoryMappingService {
    * list, so none of them can reach a category the others could not.
    */
   deriveCategoryTypes(transaction) {
-    if (transaction.type) return [transaction.type];
+    if (transaction.type === TransactionType.TRANSFER) {
+      return [TransactionType.TRANSFER];
+    }
+
+    const directionalType = transaction.type ||
+      (transaction.amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME);
+
     return [
       TransactionType.TRANSFER,
-      transaction.amount < 0 ? TransactionType.EXPENSE : TransactionType.INCOME
+      directionalType
     ];
   }
 
@@ -50,7 +57,7 @@ class CategoryMappingService {
       suggestion.reasoning
     );
 
-    if (!transaction.type) {
+    if (transaction.type !== suggestion.categoryType) {
       transaction.type = suggestion.categoryType;
       await transaction.save();
     }
@@ -204,7 +211,7 @@ class CategoryMappingService {
         
         // Set transaction type based on the category type
         const category = await Category.findById(manualMatch.category);
-        if (category && !transaction.type) {
+        if (category && transaction.type !== category.type) {
           transaction.type = category.type;
           await transaction.save();
         }
@@ -212,6 +219,30 @@ class CategoryMappingService {
         return await Transaction.findById(transaction._id)
           .populate('category')
           .populate('subCategory');
+      }
+
+      if (
+        categoryTypes.includes(TransactionType.TRANSFER) &&
+        isLikelyCreditCardPayment(transaction)
+      ) {
+        const creditCardCategory = await Category.findOne({
+          userId: transaction.userId,
+          name: 'Credit Card',
+          type: TransactionType.TRANSFER
+        });
+
+        if (creditCardCategory) {
+          return await this.applySuggestion(
+            transaction,
+            {
+              categoryId: creditCardCategory._id,
+              subCategoryId: null,
+              categoryType: creditCardCategory.type,
+              reasoning: 'Recognized a credit card settlement from its bank description'
+            },
+            CategorizationMethod.PREVIOUS_DATA
+          );
+        }
       }
 
       // Try keyword-based matching - gather all potential search terms
@@ -280,7 +311,7 @@ class CategoryMappingService {
         );
         
         // Set transaction type based on the category type
-        if (!transaction.type) {
+        if (transaction.type !== categoryMatch.type) {
           transaction.type = categoryMatch.type;
           await transaction.save();
         }
@@ -354,7 +385,7 @@ class CategoryMappingService {
         );
         
         // Set transaction type based on the category type
-        if (!transaction.type) {
+        if (transaction.type !== subCategoryMatch.parentCategory.type) {
           transaction.type = subCategoryMatch.parentCategory.type;
           await transaction.save();
         }
@@ -378,9 +409,7 @@ class CategoryMappingService {
 
       if (suggestion && suggestion.categoryId) {
         const category = await Category.findById(suggestion.categoryId);
-        // A correction belonging to another type would push the transaction into
-        // a category that contradicts its own sign, so drop the suggestion
-        // rather than trust the neighbours over the arithmetic.
+        // Ignore a correction outside the types this transaction is allowed to use.
         if (category && categoryTypes.includes(category.type)) {
           await transaction.categorize(
             suggestion.categoryId,
@@ -389,7 +418,7 @@ class CategoryMappingService {
             suggestion.reasoning
           );
 
-          if (!transaction.type) {
+          if (transaction.type !== category.type) {
             transaction.type = category.type;
             await transaction.save();
           }
