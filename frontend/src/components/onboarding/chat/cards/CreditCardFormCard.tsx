@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   TextField,
@@ -25,6 +25,13 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
   const [loading, setLoading] = useState(false);
   const [skipping, setSkipping] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!suggestedProvider?.bankId) return;
+    setForm((previous) =>
+      previous.bankId ? previous : { ...previous, bankId: suggestedProvider.bankId }
+    );
+  }, [suggestedProvider?.bankId]);
 
   const handleText = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;

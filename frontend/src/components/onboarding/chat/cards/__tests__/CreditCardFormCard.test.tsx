@@ -79,6 +79,48 @@ describe('CreditCardFormCard provider selection', () => {
     expect(within(group).getByRole('radio', { name: 'Isracard' })).toBeChecked();
     expect(screen.getByText(/isracard was suggested from your bank statement/i)).toBeInTheDocument();
   });
+
+  it('applies a suggestion that arrives after the form first renders', async () => {
+    const { rerender } = render(
+      <CreditCardFormCard status={{} as OnboardingStatus} handlers={handlers} />
+    );
+
+    rerender(
+      <CreditCardFormCard
+        status={{
+          creditCardDetection: {
+            suggestedProviders: [{ bankId: 'isracard', paymentCount: 3 }]
+          }
+        } as OnboardingStatus}
+        handlers={handlers}
+      />
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: 'Isracard' })).toBeChecked()
+    );
+  });
+
+  it('does not replace a provider the user already selected', async () => {
+    const { rerender } = render(
+      <CreditCardFormCard status={{} as OnboardingStatus} handlers={handlers} />
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Max' }));
+
+    rerender(
+      <CreditCardFormCard
+        status={{
+          creditCardDetection: {
+            suggestedProviders: [{ bankId: 'isracard', paymentCount: 3 }]
+          }
+        } as OnboardingStatus}
+        handlers={handlers}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Max' })).toBeChecked());
+    expect(screen.getByRole('radio', { name: 'Isracard' })).not.toBeChecked();
+  });
 });
 
 describe('CreditCardFormCard submission', () => {

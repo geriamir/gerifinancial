@@ -1,11 +1,18 @@
 import { CREDIT_CARD_PROVIDERS } from '../../../constants/banks';
 import { OnboardingStatus } from '../../../services/api/onboarding';
 
+// Keep these legacy-record fallback patterns aligned with
+// backend/src/banking/services/creditCardPaymentMatcher.js. New analyses carry
+// server-generated suggestions; this path exists for onboarding records saved
+// before that field was introduced.
 const PROVIDER_HINTS = [
   { bankId: 'isracard', pattern: /ישראכרט|\bisracard\b/i },
   { bankId: 'visaCal', pattern: /דיינרס|ויזה\s*כאל|^\s*כאל(?:\s*-\s*י)?\s*$|\bdiners(?:\s+club)?\b|\bvisa\s*cal\b|\bcal\s+monthly\s+payment\b/i },
   { bankId: 'max', pattern: /מקס\s*(?:איט\s*)?פיננסים|^\s*מקס(?:\s*-\s*י)?\s*$|\bmax\s+monthly\s+payment\b/i }
 ];
+const PROVIDER_ORDER = new Map(
+  PROVIDER_HINTS.map((provider, index) => [provider.bankId, index])
+);
 
 export interface ProviderSuggestion {
   bankId: string;
@@ -27,7 +34,10 @@ export const providerSuggestionsFor = (
         return name ? { ...suggestion, name } : null;
       })
       .filter((suggestion): suggestion is ProviderSuggestion => suggestion !== null)
-      .sort((left, right) => right.paymentCount - left.paymentCount);
+      .sort((left, right) =>
+        right.paymentCount - left.paymentCount ||
+        (PROVIDER_ORDER.get(left.bankId) || 0) - (PROVIDER_ORDER.get(right.bankId) || 0)
+      );
   }
 
   const counts = new Map<string, number>();
@@ -46,7 +56,10 @@ export const providerSuggestionsFor = (
       (suggestion): suggestion is ProviderSuggestion =>
         suggestion.name !== null && suggestion.paymentCount > 0
     )
-    .sort((left, right) => right.paymentCount - left.paymentCount);
+    .sort((left, right) =>
+      right.paymentCount - left.paymentCount ||
+      (PROVIDER_ORDER.get(left.bankId) || 0) - (PROVIDER_ORDER.get(right.bankId) || 0)
+    );
 };
 
 export const providerNames = (suggestions: ProviderSuggestion[]): string => {
