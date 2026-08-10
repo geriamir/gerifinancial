@@ -187,6 +187,7 @@ class OnboardingEventHandlers {
       // Handle onboarding checking account completion
       if (isOnboardingCheckingAccount && !isOnboardingComplete) {
         const categorizationPending = Boolean(result.transactions?.categorizationJobId);
+        const importCompletedAt = new Date();
 
         await User.findByIdAndUpdate(
           userId,
@@ -194,7 +195,8 @@ class OnboardingEventHandlers {
             $set: {
               'onboarding.transactionImport.completed': true,
               'onboarding.transactionImport.transactionsImported': importedTransactions,
-              'onboarding.transactionImport.completedAt': new Date(),
+              'onboarding.transactionImport.completedAt': importCompletedAt,
+              'onboarding.transactionImport.countVerifiedAt': importCompletedAt,
               'onboarding.transactionImport.scrapingStatus.isActive': false,
               'onboarding.transactionImport.scrapingStatus.status': 'complete',
               'onboarding.transactionImport.scrapingStatus.progress': 100,

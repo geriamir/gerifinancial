@@ -302,37 +302,44 @@ router.get('/status', auth, async (req, res) => {
     const checkingAccountId =
       user.onboarding?.checkingAccount?.accountId?._id ||
       user.onboarding?.checkingAccount?.accountId;
-    let importCountRefreshed = false;
+    let importCountVerified = false;
 
     await user.populate('onboarding.checkingAccount.accountId');
     await user.populate('onboarding.creditCardSetup.creditCardAccounts.accountId');
 
-    if (user.onboarding?.transactionImport?.completed && checkingAccountId) {
+    if (
+      user.onboarding?.transactionImport?.completed &&
+      !user.onboarding.transactionImport.countVerifiedAt &&
+      checkingAccountId
+    ) {
       const importedTransactions = await Transaction.countDocuments({
         userId,
         accountId: checkingAccountId
       });
       const storedTransactions = user.onboarding.transactionImport.transactionsImported || 0;
 
+      const countVerifiedAt = new Date();
+      const importUpdate = {
+        'onboarding.transactionImport.countVerifiedAt': countVerifiedAt
+      };
+
       if (importedTransactions > storedTransactions) {
         logger.info(
           `Refreshing onboarding import count for user ${userId}: ` +
           `${storedTransactions} -> ${importedTransactions}`
         );
-        await User.updateOne(
-          { _id: userId },
-          {
-            $set: {
-              'onboarding.transactionImport.transactionsImported': importedTransactions
-            }
-          }
-        );
-        importCountRefreshed = true;
+        importUpdate['onboarding.transactionImport.transactionsImported'] = importedTransactions;
       }
+
+      await User.updateOne(
+        { _id: userId },
+        { $set: importUpdate }
+      );
+      importCountVerified = true;
     }
 
     const detectionRefreshed = await onboardingCreditCardDetectionService.refreshIfStale(user);
-    if (importCountRefreshed || detectionRefreshed) {
+    if (importCountVerified || detectionRefreshed) {
       user = await User.findById(userId)
         .populate('onboarding.checkingAccount.accountId')
         .populate('onboarding.creditCardSetup.creditCardAccounts.accountId');

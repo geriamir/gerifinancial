@@ -402,6 +402,7 @@ describe('Onboarding Event Handlers', () => {
       const updatedUser = await User.findById(testUser._id);
       expect(updatedUser.onboarding.currentStep).toBe('credit-card-setup');
       expect(updatedUser.onboarding.transactionImport.transactionsImported).toBe(3);
+      expect(updatedUser.onboarding.transactionImport.countVerifiedAt).toBeTruthy();
       expect(creditCardDetectionService.analyzeCreditCardUsage).not.toHaveBeenCalled();
     });
 

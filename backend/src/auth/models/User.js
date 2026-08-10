@@ -109,6 +109,10 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: null
       },
+      countVerifiedAt: {
+        type: Date,
+        default: null
+      },
       scrapingStatus: {
         isActive: {
           type: Boolean,

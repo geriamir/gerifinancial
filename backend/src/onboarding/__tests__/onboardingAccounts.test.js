@@ -562,14 +562,27 @@ describe('Onboarding Accounts API', () => {
       };
       await testUser.save();
 
+      const countDocuments = jest.spyOn(Transaction, 'countDocuments');
       const response = await request(app)
         .get('/api/onboarding/status')
         .set('Authorization', `Bearer ${authToken}`);
 
       expect(response.status).toBe(200);
       expect(response.body.data.transactionImport.transactionsImported).toBe(3);
-      expect((await User.findById(testUser._id)).onboarding.transactionImport.transactionsImported)
-        .toBe(3);
+      const repairedUser = await User.findById(testUser._id);
+      expect(repairedUser.onboarding.transactionImport.transactionsImported).toBe(3);
+      expect(repairedUser.onboarding.transactionImport.countVerifiedAt).toBeTruthy();
+      expect(countDocuments).toHaveBeenCalledTimes(1);
+
+      countDocuments.mockClear();
+      const secondResponse = await request(app)
+        .get('/api/onboarding/status')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(secondResponse.status).toBe(200);
+      expect(secondResponse.body.data.transactionImport.transactionsImported).toBe(3);
+      expect(countDocuments).not.toHaveBeenCalled();
+      countDocuments.mockRestore();
     });
 
     it('does not refresh when only an older transaction was categorized after analysis', async () => {
