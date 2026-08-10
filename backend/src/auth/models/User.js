@@ -163,6 +163,17 @@ const userSchema = new mongoose.Schema({
         date: Date,
         description: String,
         amount: Number
+      }],
+      suggestedProviders: [{
+        _id: false,
+        bankId: {
+          type: String,
+          enum: ['visaCal', 'max', 'isracard']
+        },
+        paymentCount: {
+          type: Number,
+          min: 1
+        }
       }]
     },
     

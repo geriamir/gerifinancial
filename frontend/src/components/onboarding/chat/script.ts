@@ -1,5 +1,6 @@
 import { OnboardingStatus } from '../../../services/api/onboarding';
 import { CHECKING_ACCOUNT_BANKS, CREDIT_CARD_PROVIDERS } from '../../../constants/banks';
+import { providerNames, providerSuggestionsFor } from './providerSuggestions';
 import { CardId, ChatMessage, Script } from './types';
 
 /**
@@ -123,9 +124,13 @@ const describeImport = (count: number): string => {
 const describeDetection = (detection: OnboardingStatus['creditCardDetection']): string => {
   const count = detection.transactionCount || 0;
   const payments = `${count} credit card payment${count === 1 ? '' : 's'}`;
+  const suggestedProviderNames = providerNames(providerSuggestionsFor(detection));
+  const providerHint = suggestedProviderNames
+    ? ` The payment descriptions suggest ${suggestedProviderNames}.`
+    : '';
 
   if (detection.recommendation === 'connect') {
-    return `I found ${payments} in there. Those are the monthly bills - what you actually spent is only on the card statement. Connect your card provider and I can see that too.`;
+    return `I found ${payments} in there.${providerHint} Those are the monthly bills - what you actually spent is only on the card statement. Connect your card provider and I can see that too.`;
   }
   if (count > 0) {
     return `I only found ${payments}, so cards look optional for you. You can still connect one, or skip and add it later.`;

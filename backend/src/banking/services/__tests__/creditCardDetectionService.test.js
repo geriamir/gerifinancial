@@ -23,7 +23,10 @@ describe('CreditCardDetectionService', () => {
     const descriptions = [
       'כרטיסי אשראי-י',
       'ישראכרט בע"מ-י',
-      'דיינרס קלוב-י'
+      'דיינרס קלוב-י',
+      'Isracard monthly payment',
+      'CAL monthly payment',
+      'MAX monthly payment'
     ];
     await Transaction.create(descriptions.map((description, index) => ({
       identifier: `miscategorized-card-payment-${index}`,
@@ -45,11 +48,16 @@ describe('CreditCardDetectionService', () => {
       new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
     );
 
-    expect(analysis.transactionCount).toBe(3);
+    expect(analysis.transactionCount).toBe(6);
     expect(analysis.recommendation).toBe('connect');
+    expect(analysis.suggestedProviders).toEqual([
+      { bankId: 'isracard', paymentCount: 2 },
+      { bankId: 'visaCal', paymentCount: 2 },
+      { bankId: 'max', paymentCount: 1 }
+    ]);
     expect(paymentMonths).toEqual([
       expect.objectContaining({
-        transactionCount: 3,
+        transactionCount: 6,
         transactions: expect.arrayContaining(
           descriptions.map(description => expect.objectContaining({ description }))
         )

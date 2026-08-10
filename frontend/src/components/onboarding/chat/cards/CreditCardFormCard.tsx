@@ -13,9 +13,15 @@ import { CREDIT_CARD_PROVIDERS } from '../../../../constants/banks';
 import { BankPicker } from '../../../bank/BankPicker';
 import { CardShell } from '../CardShell';
 import { CardProps } from '../types';
+import { providerSuggestionsFor } from '../providerSuggestions';
 
-export const CreditCardFormCard: React.FC<CardProps> = ({ handlers }) => {
-  const [form, setForm] = useState({ bankId: '', username: '', password: '' });
+export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) => {
+  const suggestedProvider = providerSuggestionsFor(status.creditCardDetection)[0];
+  const [form, setForm] = useState({
+    bankId: suggestedProvider?.bankId || '',
+    username: '',
+    password: ''
+  });
   const [loading, setLoading] = useState(false);
   const [skipping, setSkipping] = useState(false);
   const [error, setError] = useState('');
@@ -76,7 +82,11 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ handlers }) => {
           value={form.bankId}
           onChange={handleProvider}
           label="Card provider"
-          helperText="Whoever issues the card, which is not always the bank you just connected."
+          helperText={
+            suggestedProvider
+              ? `${suggestedProvider.name} was suggested from your bank statement. Choose another if needed.`
+              : 'Whoever issues the card, which is not always the bank you just connected.'
+          }
           testId="provider-select"
         />
 

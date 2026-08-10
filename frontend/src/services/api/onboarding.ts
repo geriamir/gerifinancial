@@ -41,6 +41,10 @@ export interface OnboardingStatus {
       description: string;
       amount: number;
     }>;
+    suggestedProviders?: Array<{
+      bankId: string;
+      paymentCount: number;
+    }>;
   };
   
   creditCardSetup: {

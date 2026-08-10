@@ -41,6 +41,7 @@ class OnboardingCreditCardDetectionService {
           'onboarding.creditCardDetection.transactionCount': analysis.transactionCount,
           'onboarding.creditCardDetection.recommendation': analysis.recommendation,
           'onboarding.creditCardDetection.sampleTransactions': analysis.sampleTransactions.slice(0, 5),
+          'onboarding.creditCardDetection.suggestedProviders': analysis.suggestedProviders || [],
           'onboarding.currentStep': 'credit-card-detection'
         }
       },

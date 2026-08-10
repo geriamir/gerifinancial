@@ -150,12 +150,14 @@ describe('buildScript', () => {
           analyzedAt: '2026-01-01T00:06:00Z',
           transactionCount: 47,
           recommendation: 'connect',
-          sampleTransactions: []
+          sampleTransactions: [],
+          suggestedProviders: [{ bankId: 'isracard', paymentCount: 12 }]
         }
       })
     );
 
     expect(textOf(script)).toContain('47 credit card payments');
+    expect(textOf(script)).toContain('descriptions suggest Isracard');
     expect(cardsOf(script)).toEqual(['credit-card-choice']);
   });
 

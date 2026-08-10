@@ -210,6 +210,9 @@ describe('Onboarding Event Handlers', () => {
             description: 'Credit Card Payment',
             amount: 2500
           }
+        ],
+        suggestedProviders: [
+          { bankId: 'isracard', paymentCount: 2 }
         ]
       });
     });
@@ -245,6 +248,9 @@ describe('Onboarding Event Handlers', () => {
       expect(updatedUser.onboarding.creditCardDetection.analyzed).toBe(true);
       expect(updatedUser.onboarding.creditCardDetection.transactionCount).toBe(10);
       expect(updatedUser.onboarding.creditCardDetection.recommendation).toBe('connect');
+      expect(updatedUser.onboarding.creditCardDetection.suggestedProviders).toEqual([
+        expect.objectContaining({ bankId: 'isracard', paymentCount: 2 })
+      ]);
       
       // Verify current step - always shows detection UI first
       expect(updatedUser.onboarding.currentStep).toBe('credit-card-detection');
