@@ -13,8 +13,8 @@ const handlers: ChatHandlers = {
   completeOnboarding: jest.fn().mockResolvedValue(undefined)
 };
 
-const showCard = () => {
-  render(<CreditCardFormCard status={{} as OnboardingStatus} handlers={handlers} />);
+const showCard = (status = {} as OnboardingStatus) => {
+  render(<CreditCardFormCard status={status} handlers={handlers} />);
   return screen.getByTestId('provider-select');
 };
 
@@ -67,6 +67,59 @@ describe('CreditCardFormCard provider selection', () => {
     for (const provider of CREDIT_CARD_PROVIDERS) {
       expect(within(group).getByRole('radio', { name: provider.name })).toBeInTheDocument();
     }
+  });
+
+  it('preselects the strongest detected provider suggestion', () => {
+    const group = showCard({
+      creditCardDetection: {
+        suggestedProviders: [{ bankId: 'isracard', paymentCount: 3 }]
+      }
+    } as OnboardingStatus);
+
+    expect(within(group).getByRole('radio', { name: 'Isracard' })).toBeChecked();
+    expect(screen.getByText(/isracard was suggested from your bank statement/i)).toBeInTheDocument();
+  });
+
+  it('applies a suggestion that arrives after the form first renders', async () => {
+    const { rerender } = render(
+      <CreditCardFormCard status={{} as OnboardingStatus} handlers={handlers} />
+    );
+
+    rerender(
+      <CreditCardFormCard
+        status={{
+          creditCardDetection: {
+            suggestedProviders: [{ bankId: 'isracard', paymentCount: 3 }]
+          }
+        } as OnboardingStatus}
+        handlers={handlers}
+      />
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: 'Isracard' })).toBeChecked()
+    );
+  });
+
+  it('does not replace a provider the user already selected', async () => {
+    const { rerender } = render(
+      <CreditCardFormCard status={{} as OnboardingStatus} handlers={handlers} />
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Max' }));
+
+    rerender(
+      <CreditCardFormCard
+        status={{
+          creditCardDetection: {
+            suggestedProviders: [{ bankId: 'isracard', paymentCount: 3 }]
+          }
+        } as OnboardingStatus}
+        handlers={handlers}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Max' })).toBeChecked());
+    expect(screen.getByRole('radio', { name: 'Isracard' })).not.toBeChecked();
   });
 });
 

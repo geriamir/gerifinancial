@@ -5,6 +5,7 @@ const User = require('../../auth/models/User');
 const logger = require('../../shared/utils/logger');
 const {
   likelyPaymentTextQuery,
+  suggestCreditCardProviders,
   creditCardPaymentMatchStage
 } = require('./creditCardPaymentMatcher');
 
@@ -59,7 +60,10 @@ class CreditCardDetectionService {
               $push: {
                 date: '$date',
                 amount: '$amount',
-                description: '$description'
+                description: '$description',
+                memo: '$memo',
+                rawDescription: '$rawData.description',
+                rawMemo: '$rawData.memo'
               }
             }
           }
@@ -83,6 +87,7 @@ class CreditCardDetectionService {
         monthlyAverage: monthlyBreakdown.length > 0 ? 
           Math.round(transactionData?.count / monthlyBreakdown.length) || 0 : 0,
         recommendation: this.generateRecommendation(transactionData, monthlyBreakdown),
+        suggestedProviders: suggestCreditCardProviders(transactionData?.transactions),
         analysisDate: new Date(),
         lookbackMonths: monthsBack,
         // All transactions for user confidence (sorted by date)

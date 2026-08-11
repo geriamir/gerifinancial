@@ -3,6 +3,7 @@ import { Box, Button, Typography, Stack, Divider } from '@mui/material';
 import { CreditCard as CreditCardIcon } from '@mui/icons-material';
 import { CardShell } from '../CardShell';
 import { CardProps } from '../types';
+import { providerNames, providerSuggestionsFor } from '../providerSuggestions';
 
 /**
  * A branch in the conversation. Both options are phrased as something the user
@@ -10,7 +11,10 @@ import { CardProps } from '../types';
  */
 export const CreditCardChoiceCard: React.FC<CardProps> = ({ status, handlers }) => {
   const [busy, setBusy] = useState<'connect' | 'skip' | null>(null);
-  const samples = status.creditCardDetection?.sampleTransactions || [];
+  const detection = status.creditCardDetection;
+  const samples = detection?.sampleTransactions || [];
+  const hiddenPaymentCount = Math.max(0, (detection?.transactionCount || 0) - samples.length);
+  const providerSuggestions = providerSuggestionsFor(detection);
 
   const choose = async (choice: 'connect' | 'skip') => {
     setBusy(choice);
@@ -29,7 +33,7 @@ export const CreditCardChoiceCard: React.FC<CardProps> = ({ status, handlers }) 
             Payments I spotted
           </Typography>
           <Stack spacing={0.5} sx={{ mt: 1, mb: 2 }}>
-            {samples.slice(0, 3).map((transaction, index) => (
+            {samples.map((transaction, index) => (
               <Box key={index} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
                 <Typography variant="body2" noWrap sx={{ flex: 1 }}>
                   {transaction.description}
@@ -39,10 +43,27 @@ export const CreditCardChoiceCard: React.FC<CardProps> = ({ status, handlers }) 
                 </Typography>
               </Box>
             ))}
+            {hiddenPaymentCount > 0 && (
+              <Typography variant="caption" color="text.secondary">
+                +{hiddenPaymentCount.toLocaleString()} more
+              </Typography>
+            )}
           </Stack>
-          <Divider sx={{ mb: 2 }} />
         </>
       )}
+
+      {providerSuggestions.length > 0 && (
+        <Box sx={{ p: 1.5, mb: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+          <Typography variant="caption" color="text.secondary">
+            Suggested provider{providerSuggestions.length === 1 ? '' : 's'}
+          </Typography>
+          <Typography variant="body2" fontWeight={600}>
+            {providerNames(providerSuggestions)}
+          </Typography>
+        </Box>
+      )}
+
+      {(samples.length > 0 || providerSuggestions.length > 0) && <Divider sx={{ mb: 2 }} />}
 
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
         <Button
