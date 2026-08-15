@@ -38,6 +38,7 @@ export const bankAccountsApi = {
     credentials: {
       username?: string;
       password?: string;
+      card6Digits?: string;
       apiToken?: string;
     }
   ): Promise<{ message: string; account: BankAccount }> => {

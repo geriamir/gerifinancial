@@ -1,6 +1,7 @@
 const validCredentials = {
   username: 'testuser',
-  password: 'bankpass123'
+  password: 'bankpass123',
+  card6Digits: '123456'
 };
 
 // Static date for consistent testing
@@ -46,6 +47,18 @@ const mockTransactions = [
 module.exports = {
   validCredentials,
   createScraper: (options) => {
+    const getUsername = credentials =>
+      options.companyId === 'isracard' ? credentials?.id : credentials?.username;
+    const hasRequiredCredentials = credentials =>
+      Boolean(
+        getUsername(credentials) &&
+        credentials?.password &&
+        (options.companyId !== 'isracard' || /^\d{6}$/.test(credentials?.card6Digits))
+      );
+    const hasValidCredentials = credentials =>
+      getUsername(credentials) === validCredentials.username &&
+      credentials?.password === validCredentials.password &&
+      (options.companyId !== 'isracard' || credentials?.card6Digits === validCredentials.card6Digits);
 
     // Add special case for error testing
     if (options.companyId === 'error_bank') {
@@ -65,9 +78,8 @@ module.exports = {
         return true;
       },
       login: async (credentials) => {
-        
         // For validation and login attempts
-        if (!credentials.username || !credentials.password) {
+        if (!hasRequiredCredentials(credentials)) {
           throw new Error('Missing credentials');
         }
 
@@ -77,7 +89,7 @@ module.exports = {
         
         if (isE2E) {
           // Special case: reject explicitly invalid credentials for error testing
-          if (credentials.username === 'invalid' && credentials.password === 'invalid') {
+          if (getUsername(credentials) === 'invalid' && credentials.password === 'invalid') {
             throw new Error('Invalid bank credentials');
           }
           // Accept all other credentials in e2e mode
@@ -85,8 +97,7 @@ module.exports = {
         }
 
         // In unit test mode, verify against specific test credentials
-        if (credentials.username === validCredentials.username && 
-            credentials.password === validCredentials.password) {
+        if (hasValidCredentials(credentials)) {
           return true;
         }
 
@@ -100,7 +111,7 @@ module.exports = {
         }];
       },
       scrape: async (credentials) => {
-        if (!credentials || !credentials.username || !credentials.password) {
+        if (!hasRequiredCredentials(credentials)) {
           return {
             success: false,
             errorType: 'InvalidCredentials',
@@ -111,8 +122,7 @@ module.exports = {
         const isE2E = process.env.NODE_ENV === 'e2e';
         
         // In e2e mode, accept any credentials and return mock data
-        if (isE2E || (credentials.username === validCredentials.username && 
-            credentials.password === validCredentials.password)) {
+        if (isE2E || hasValidCredentials(credentials)) {
           return {
             success: true,
             accounts: [{

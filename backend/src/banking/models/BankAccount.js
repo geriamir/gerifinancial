@@ -3,6 +3,10 @@ const credentialEncryption = require('../../shared/services/credentialEncryption
 const { resolveStartDate, DEFAULT_LOOKBACK_MONTHS } = require('../utils/scraperDates');
 const logger = require('../../shared/utils/logger');
 const { OTP_BANKS } = require('../constants/enums');
+const {
+  ISRACARD_BANK_ID,
+  buildScraperCredentials
+} = require('../utils/scraperCredentials');
 
 const bankAccountSchema = new mongoose.Schema({
   userId: {
@@ -32,6 +36,9 @@ const bankAccountSchema = new mongoose.Schema({
     password: {
       type: String,
       required: function() { return this.bankId !== 'mercury' && this.bankId !== 'ibkr' && !OTP_BANKS.includes(this.bankId); }
+    },
+    card6Digits: {
+      type: String
     },
     apiToken: {
       type: String,
@@ -218,7 +225,7 @@ const isEncrypted = credentialEncryption.isEncrypted;
 // Pre-save middleware to encrypt credentials with this user's own key
 bankAccountSchema.pre('save', async function(next) {
   try {
-    const fields = ['password', 'apiToken', 'flexToken', 'phoneOrEmail'];
+    const fields = ['password', 'card6Digits', 'apiToken', 'flexToken', 'phoneOrEmail'];
     for (const field of fields) {
       const value = this.credentials?.[field];
       if (this.isModified(`credentials.${field}`) && value && !isEncrypted(value)) {
@@ -241,14 +248,26 @@ bankAccountSchema.methods.getDefaultStartDate = function() {
   return resolveStartDate(this.lastScraped);
 };
 
+bankAccountSchema.methods.getScraperCredentials = async function() {
+  const credentials = {
+    username: this.credentials.username,
+    password: await credentialEncryption.decryptForUser(this.userId, this.credentials.password)
+  };
+
+  if (this.bankId === ISRACARD_BANK_ID) {
+    credentials.card6Digits = this.credentials.card6Digits
+      ? await credentialEncryption.decryptForUser(this.userId, this.credentials.card6Digits)
+      : undefined;
+  }
+
+  return buildScraperCredentials(this.bankId, credentials);
+};
+
 // Method to get scraper options for a specific strategy
 bankAccountSchema.methods.getScraperOptionsForStrategy = async function(strategyName) {
   const options = {
     companyId: this.bankId,
-    credentials: {
-      username: this.credentials.username,
-      password: await credentialEncryption.decryptForUser(this.userId, this.credentials.password)
-    },
+    credentials: await this.getScraperCredentials(),
     startDate: this.getStartDateForStrategy(strategyName),
     showBrowser: false,
     verbose: false
@@ -261,10 +280,7 @@ bankAccountSchema.methods.getScraperOptionsForStrategy = async function(strategy
 bankAccountSchema.methods.getScraperOptions = async function() {
   const options = {
     companyId: this.bankId,
-    credentials: {
-      username: this.credentials.username,
-      password: await credentialEncryption.decryptForUser(this.userId, this.credentials.password)
-    },
+    credentials: await this.getScraperCredentials(),
     startDate: this.getDefaultStartDate(),
     showBrowser: false,
     verbose: false

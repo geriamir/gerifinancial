@@ -30,16 +30,19 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
   onSuccess
 }) => {
   const [password, setPassword] = useState('');
+  const [card6Digits, setCard6Digits] = useState('');
   const [apiToken, setApiToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
   const isMercury = account ? isApiBank(account.bankId) : false;
+  const isIsracard = account?.bankId === 'isracard';
 
   const handleClose = () => {
     if (!loading) {
       setPassword('');
+      setCard6Digits('');
       setApiToken('');
       setError('');
       setSuccess(false);
@@ -62,6 +65,10 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
         setError('Password is required');
         return;
       }
+      if (isIsracard && !/^\d{6}$/.test(card6Digits)) {
+        setError('Enter the last 6 digits of your Isracard');
+        return;
+      }
     }
 
     setLoading(true);
@@ -82,7 +89,8 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
         }
         await bankAccountsApi.updateCredentials(account._id, {
           username,
-          password
+          password,
+          ...(isIsracard && { card6Digits })
         });
       }
       
@@ -155,13 +163,26 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
             ) : (
               <>
                 <TextField
-                  label="Username"
+                  label={isIsracard ? 'ID Number' : 'Username'}
                   type="text"
                   fullWidth
                   value={account.credentials?.username || 'N/A'}
                   disabled
-                  helperText="Username cannot be changed. Create a new account if needed."
+                  helperText={`${isIsracard ? 'ID number' : 'Username'} cannot be changed. Create a new account if needed.`}
                 />
+
+                {isIsracard && (
+                  <TextField
+                    label="Last 6 card digits"
+                    fullWidth
+                    required
+                    value={card6Digits}
+                    onChange={(e) => setCard6Digits(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    disabled={loading || success}
+                    inputProps={{ inputMode: 'numeric', pattern: '[0-9]{6}', maxLength: 6 }}
+                    helperText="The last 6 digits of any Isracard registered to this ID"
+                  />
+                )}
 
                 <TextField
                   label="Password"
@@ -195,7 +216,11 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
           <Button
             type="submit"
             variant="contained"
-            disabled={loading || success || (isMercury ? !apiToken : !password)}
+            disabled={
+              loading ||
+              success ||
+              (isMercury ? !apiToken : !password || (isIsracard && card6Digits.length !== 6))
+            }
             startIcon={loading && <CircularProgress size={16} />}
           >
             {loading ? 'Updating...' : isMercury ? 'Update Token' : 'Update Password'}

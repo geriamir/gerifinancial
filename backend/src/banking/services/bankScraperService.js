@@ -419,7 +419,7 @@ class BankScraperService {
       _id: 'validation',
       lastScraped: null,
       getScraperOptions: () => ({ 
-        credentials: { username: credentials.username, password: credentials.password },
+        credentials,
         startDate: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) // 6 months back for validation
       })
     };

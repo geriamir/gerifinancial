@@ -76,6 +76,75 @@ describe('Bank Account Routes', () => {
       expect(response.status).toBe(400);
       expect(response.body).toHaveProperty('error', 'Missing required fields');
     });
+
+    it('should require exactly six card digits for Isracard', async () => {
+      const response = await request(app)
+        .post('/api/bank-accounts')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          bankId: 'isracard',
+          name: 'My Isracard',
+          credentials: {
+            username: validCredentials.username,
+            password: validCredentials.password,
+            card6Digits: '12345'
+          }
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Last 6 card digits must be exactly 6 digits');
+    });
+  });
+
+  describe('PUT /api/bank-accounts/:id/credentials', () => {
+    let isracardAccount;
+
+    beforeEach(async () => {
+      isracardAccount = await BankAccount.create({
+        userId: user._id,
+        bankId: 'isracard',
+        name: 'My Isracard',
+        credentials: {
+          username: validCredentials.username,
+          password: validCredentials.password
+        },
+        status: 'error'
+      });
+    });
+
+    it('should require exactly six card digits when updating Isracard', async () => {
+      const response = await request(app)
+        .put(`/api/bank-accounts/${isracardAccount._id}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          username: validCredentials.username,
+          password: validCredentials.password,
+          card6Digits: '12345'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Last 6 card digits must be exactly 6 digits');
+    });
+
+    it('should save Isracard credentials in the scraper-required shape', async () => {
+      const response = await request(app)
+        .put(`/api/bank-accounts/${isracardAccount._id}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          username: validCredentials.username,
+          password: validCredentials.password,
+          card6Digits: validCredentials.card6Digits
+        });
+
+      expect(response.status).toBe(200);
+      const updatedAccount = await BankAccount.findById(isracardAccount._id);
+      expect(updatedAccount.status).toBe('active');
+      expect((await updatedAccount.getScraperOptions()).credentials).toEqual({
+        id: validCredentials.username,
+        card6Digits: validCredentials.card6Digits,
+        password: validCredentials.password
+      });
+    });
   });
 
   describe('POST /api/bank-accounts/scrape-all', () => {
