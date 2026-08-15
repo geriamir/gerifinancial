@@ -5,6 +5,10 @@ const logger = require('../../shared/utils/logger');
 const { User } = require('../../auth');
 const { bankAccountService, Transaction } = require('../../banking');
 const onboardingCreditCardDetectionService = require('../services/onboardingCreditCardDetectionService');
+const {
+  ISRACARD_BANK_ID,
+  isValidCard6Digits
+} = require('../../banking/utils/scraperCredentials');
 
 /**
  * @route   POST /api/onboarding/checking-account
@@ -25,7 +29,6 @@ router.post('/checking-account', auth, async (req, res) => {
         error: 'Bank ID and credentials are required'
       });
     }
-    
     // Create the bank account using the existing service
     const bankAccount = await bankAccountService.create(userId, {
       bankId,
@@ -101,13 +104,26 @@ router.post('/credit-card-account', auth, async (req, res) => {
         error: 'Bank ID and credentials are required'
       });
     }
+    if (!credentials.username || !credentials.password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Username and password are required'
+      });
+    }
+    if (bankId === ISRACARD_BANK_ID && !isValidCard6Digits(credentials.card6Digits)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Last 6 card digits must be exactly 6 digits'
+      });
+    }
     
     // Create the bank account using the existing service
     const bankAccount = await bankAccountService.create(userId, {
       bankId,
       name: displayName || bankId,
       username: credentials.username,
-      password: credentials.password
+      password: credentials.password,
+      card6Digits: credentials.card6Digits
     });
     
     // Add to onboarding credit card accounts array

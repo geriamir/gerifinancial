@@ -37,7 +37,7 @@ export interface ChatHandlers {
   ) => Promise<unknown>;
   connectCreditCardAccount: (
     bankId: string,
-    credentials: { username: string; password: string },
+    credentials: { username: string; password: string; card6Digits?: string },
     displayName: string
   ) => Promise<unknown>;
   proceedToCreditCardSetup: () => Promise<void>;

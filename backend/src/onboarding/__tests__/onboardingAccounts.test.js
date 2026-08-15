@@ -80,7 +80,8 @@ describe('Onboarding Accounts API', () => {
           bankId: 'hapoalim',
           credentials: {
             username: 'user123',
-            password: 'pass123'
+            password: 'pass123',
+            card6Digits: '123456'
           },
           displayName: 'My Checking'
         });
@@ -178,7 +179,8 @@ describe('Onboarding Accounts API', () => {
           bankId: 'isracard',
           credentials: {
             username: 'user123',
-            password: 'pass123'
+            password: 'pass123',
+            card6Digits: '123456'
           },
           displayName: 'Isracard'
         });
@@ -186,6 +188,10 @@ describe('Onboarding Accounts API', () => {
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data.onboardingStep).toBe('credit-card-matching');
+      expect(bankAccountService.create).toHaveBeenCalledWith(
+        testUser._id,
+        expect.objectContaining({ card6Digits: '123456' })
+      );
 
       // Verify onboarding structure was updated
       const updatedUser = await User.findById(testUser._id);
@@ -225,7 +231,7 @@ describe('Onboarding Accounts API', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           bankId: 'isracard',
-          credentials: { username: 'user123', password: 'pass123' }
+          credentials: { username: 'user123', password: 'pass123', card6Digits: '123456' }
         });
 
       // Add second card
@@ -240,6 +246,24 @@ describe('Onboarding Accounts API', () => {
       // Verify both were added
       const updatedUser = await User.findById(testUser._id);
       expect(updatedUser.onboarding.creditCardSetup.creditCardAccounts).toHaveLength(2);
+    });
+
+    it('should reject Isracard without exactly six card digits', async () => {
+      const response = await request(app)
+        .post('/api/onboarding/credit-card-account')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          bankId: 'isracard',
+          credentials: {
+            username: 'user123',
+            password: 'pass123',
+            card6Digits: '12345'
+          }
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Last 6 card digits must be exactly 6 digits');
+      expect(bankAccountService.create).not.toHaveBeenCalled();
     });
   });
 

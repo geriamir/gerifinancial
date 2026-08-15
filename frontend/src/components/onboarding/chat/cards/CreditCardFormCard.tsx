@@ -20,7 +20,8 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
   const [form, setForm] = useState({
     bankId: suggestedProvider?.bankId || '',
     username: '',
-    password: ''
+    password: '',
+    card6Digits: ''
   });
   const [loading, setLoading] = useState(false);
   const [skipping, setSkipping] = useState(false);
@@ -35,7 +36,10 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
 
   const handleText = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
-    setForm((previous) => ({ ...previous, [name]: value }));
+    setForm((previous) => ({
+      ...previous,
+      [name]: name === 'card6Digits' ? value.replace(/\D/g, '').slice(0, 6) : value
+    }));
   };
 
   const handleProvider = (bankId: string) => {
@@ -50,13 +54,21 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
       setError('Please fill in all required fields');
       return;
     }
+    if (form.bankId === 'isracard' && !/^\d{6}$/.test(form.card6Digits)) {
+      setError('Enter the last 6 digits of your Isracard');
+      return;
+    }
 
     setLoading(true);
     try {
       const provider = CREDIT_CARD_PROVIDERS.find((candidate) => candidate.id === form.bankId);
       await handlers.connectCreditCardAccount(
         form.bankId,
-        { username: form.username, password: form.password },
+        {
+          username: form.username,
+          password: form.password,
+          ...(form.bankId === 'isracard' && { card6Digits: form.card6Digits })
+        },
         `${provider?.name || form.bankId} Credit Cards`
       );
     } catch (err) {
@@ -83,7 +95,7 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
 
   return (
     <CardShell testId="credit-card-setup">
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         <BankPicker
           banks={CREDIT_CARD_PROVIDERS}
           value={form.bankId}
@@ -101,13 +113,29 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
           fullWidth
           margin="dense"
           size="small"
-          label="Username"
+          label={form.bankId === 'isracard' ? 'ID Number' : 'Username'}
           name="username"
           value={form.username}
           onChange={handleText}
           required
           data-testid="cc-username-input"
         />
+
+        {form.bankId === 'isracard' && (
+          <TextField
+            fullWidth
+            margin="dense"
+            size="small"
+            label="Last 6 card digits"
+            name="card6Digits"
+            value={form.card6Digits}
+            onChange={handleText}
+            required
+            inputProps={{ inputMode: 'numeric', pattern: '[0-9]{6}', maxLength: 6 }}
+            helperText="The last 6 digits of any Isracard registered to this ID"
+            data-testid="cc-card6-input"
+          />
+        )}
 
         <TextField
           fullWidth

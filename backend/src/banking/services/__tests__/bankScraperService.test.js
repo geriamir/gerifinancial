@@ -89,6 +89,16 @@ describe('BankScraperService', () => {
         password: 'invalid'
       })).rejects.toThrow('Login failed: Invalid bank credentials');
     });
+
+    it('should preserve Isracard-specific credential fields', async () => {
+      const result = await bankScraperService.validateCredentials('isracard', {
+        id: 'testuser',
+        card6Digits: '123456',
+        password: 'bankpass123'
+      });
+
+      expect(result).toBe(true);
+    });
   });
 
   describe('testConnection', () => {

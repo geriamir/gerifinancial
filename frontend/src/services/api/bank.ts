@@ -38,7 +38,10 @@ export const bankAccountsApi = {
     credentials: {
       username?: string;
       password?: string;
+      card6Digits?: string;
       apiToken?: string;
+      flexToken?: string;
+      queryId?: string;
     }
   ): Promise<{ message: string; account: BankAccount }> => {
     const response = await api.put(`/bank-accounts/${id}/credentials`, credentials);

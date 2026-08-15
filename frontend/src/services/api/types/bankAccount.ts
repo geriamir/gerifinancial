@@ -42,6 +42,7 @@ export interface AddBankAccountDto {
   credentials: {
     username?: string;
     password?: string;
+    card6Digits?: string;
     apiToken?: string;
     flexToken?: string;
     queryId?: string;

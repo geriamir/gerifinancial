@@ -128,17 +128,40 @@ describe('CreditCardFormCard submission', () => {
     const group = showCard();
 
     fireEvent.click(within(group).getByRole('radio', { name: 'Isracard' }));
-    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'someone' } });
+    fireEvent.change(screen.getByLabelText(/id number/i), { target: { value: 'someone' } });
+    fireEvent.change(screen.getByLabelText(/last 6 card digits/i), { target: { value: '123456' } });
     fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret' } });
     fireEvent.click(screen.getByTestId('connect-cards-btn'));
 
     await waitFor(() =>
       expect(handlers.connectCreditCardAccount).toHaveBeenCalledWith(
         'isracard',
-        { username: 'someone', password: 'secret' },
+        { username: 'someone', password: 'secret', card6Digits: '123456' },
         'Isracard Credit Cards'
       )
     );
+  });
+
+  it('requires exactly six card digits for Isracard', async () => {
+    const group = showCard();
+
+    fireEvent.click(within(group).getByRole('radio', { name: 'Isracard' }));
+    fireEvent.change(screen.getByLabelText(/id number/i), { target: { value: 'someone' } });
+    fireEvent.change(screen.getByLabelText(/last 6 card digits/i), { target: { value: '12345' } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret' } });
+    fireEvent.click(screen.getByTestId('connect-cards-btn'));
+
+    expect(await screen.findByText(/enter the last 6 digits/i)).toBeInTheDocument();
+    expect(handlers.connectCreditCardAccount).not.toHaveBeenCalled();
+  });
+
+  it('does not ask other providers for card digits', () => {
+    const group = showCard();
+
+    fireEvent.click(within(group).getByRole('radio', { name: 'Max' }));
+
+    expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/last 6 card digits/i)).not.toBeInTheDocument();
   });
 
   // Nothing is selected on first render, so the provider is the field most

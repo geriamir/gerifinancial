@@ -102,6 +102,37 @@ describe('BankAccountService', () => {
       // Verify no event was emitted
       expect(eventListeners.accountCreated).not.toHaveBeenCalled();
     });
+
+    it('should validate and store Isracard last-six credentials', async () => {
+      bankScraperService.validateCredentials.mockResolvedValueOnce(true);
+
+      const account = await bankAccountService.create(userId, {
+        ...mockAccountData,
+        bankId: 'isracard',
+        card6Digits: validCredentials.card6Digits
+      });
+
+      expect(bankScraperService.validateCredentials).toHaveBeenCalledWith('isracard', {
+        id: validCredentials.username,
+        card6Digits: validCredentials.card6Digits,
+        password: validCredentials.password
+      });
+      expect((await account.getScraperOptions()).credentials).toEqual({
+        id: validCredentials.username,
+        card6Digits: validCredentials.card6Digits,
+        password: validCredentials.password
+      });
+    });
+
+    it('should reject Isracard credentials without exactly six card digits', async () => {
+      await expect(bankAccountService.create(userId, {
+        ...mockAccountData,
+        bankId: 'isracard',
+        card6Digits: '12345'
+      })).rejects.toThrow('Last 6 card digits must be exactly 6 digits');
+
+      expect(bankScraperService.validateCredentials).not.toHaveBeenCalled();
+    });
   });
 
   describe('delete', () => {

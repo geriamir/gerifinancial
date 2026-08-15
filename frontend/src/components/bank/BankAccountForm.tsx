@@ -40,6 +40,7 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
     name: '',
     username: '',
     password: '',
+    card6Digits: '',
     apiToken: '',
     flexToken: '',
     queryId: '',
@@ -52,7 +53,7 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: name === 'card6Digits' ? value.replace(/\D/g, '').slice(0, 6) : value
     }));
   };
 
@@ -74,6 +75,12 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
       bankName: SUPPORTED_BANKS.find(bank => bank.id === formData.bankId)?.name
     });
 
+    if (formData.bankId === 'isracard' && !/^\d{6}$/.test(formData.card6Digits)) {
+      setLoading(false);
+      setError('Enter the last 6 digits of your Isracard');
+      return;
+    }
+
     try {
       let credentials;
       if (formData.bankId === 'ibkr') {
@@ -83,7 +90,11 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
       } else if (isApiBank(formData.bankId)) {
         credentials = { apiToken: formData.apiToken };
       } else {
-        credentials = { username: formData.username, password: formData.password };
+        credentials = {
+          username: formData.username,
+          password: formData.password,
+          ...(formData.bankId === 'isracard' && { card6Digits: formData.card6Digits })
+        };
       }
 
       await bankAccountsApi.add({
@@ -121,6 +132,7 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
       name: '',
       username: '',
       password: '',
+      card6Digits: '',
       apiToken: '',
       flexToken: '',
       queryId: '',
@@ -265,12 +277,26 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
               <TextField
                 fullWidth
                 margin="normal"
-                label="Username"
+                label={formData.bankId === 'isracard' ? 'ID Number' : 'Username'}
                 name="username"
                 value={formData.username}
                 onChange={handleInputChange}
                 required
               />
+
+              {formData.bankId === 'isracard' && (
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="Last 6 card digits"
+                  name="card6Digits"
+                  value={formData.card6Digits}
+                  onChange={handleInputChange}
+                  required
+                  inputProps={{ inputMode: 'numeric', pattern: '[0-9]{6}', maxLength: 6 }}
+                  helperText="The last 6 digits of any Isracard registered to this ID"
+                />
+              )}
 
               <TextField
                 fullWidth

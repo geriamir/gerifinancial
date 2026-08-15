@@ -8,6 +8,7 @@ const queuedDataSyncService = require('../../services/queuedDataSyncService');
 const app = require('../../../app');
 const { User } = require('../../../auth');
 const { BankAccount } = require('../../models');
+const credentialEncryption = require('../../../shared/services/credentialEncryption');
 
 // Import valid credentials from mock (bankScraperService handles the mocking automatically based on NODE_ENV)
 const { validCredentials } = require('../../../test/mocks/bankScraper');
@@ -75,6 +76,107 @@ describe('Bank Account Routes', () => {
 
       expect(response.status).toBe(400);
       expect(response.body).toHaveProperty('error', 'Missing required fields');
+    });
+
+    it('should require exactly six card digits for Isracard', async () => {
+      const response = await request(app)
+        .post('/api/bank-accounts')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          bankId: 'isracard',
+          name: 'My Isracard',
+          credentials: {
+            username: validCredentials.username,
+            password: validCredentials.password,
+            card6Digits: '12345'
+          }
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Last 6 card digits must be exactly 6 digits');
+    });
+  });
+
+  describe('PUT /api/bank-accounts/:id/credentials', () => {
+    let isracardAccount;
+
+    beforeEach(async () => {
+      isracardAccount = await BankAccount.create({
+        userId: user._id,
+        bankId: 'isracard',
+        name: 'My Isracard',
+        credentials: {
+          username: validCredentials.username,
+          password: validCredentials.password
+        },
+        status: 'error'
+      });
+    });
+
+    it('should require exactly six card digits when updating Isracard', async () => {
+      const response = await request(app)
+        .put(`/api/bank-accounts/${isracardAccount._id}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          username: validCredentials.username,
+          password: validCredentials.password,
+          card6Digits: '12345'
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Last 6 card digits must be exactly 6 digits');
+    });
+
+    it('should save Isracard credentials in the scraper-required shape', async () => {
+      const response = await request(app)
+        .put(`/api/bank-accounts/${isracardAccount._id}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          username: validCredentials.username,
+          password: validCredentials.password,
+          card6Digits: validCredentials.card6Digits
+        });
+
+      expect(response.status).toBe(200);
+      const updatedAccount = await BankAccount.findById(isracardAccount._id);
+      expect(updatedAccount.status).toBe('active');
+      expect((await updatedAccount.getScraperOptions()).credentials).toEqual({
+        id: validCredentials.username,
+        card6Digits: validCredentials.card6Digits,
+        password: validCredentials.password
+      });
+    });
+
+    it('should update IBKR Flex credentials instead of treating it as Mercury', async () => {
+      const ibkrAccount = await BankAccount.create({
+        userId: user._id,
+        bankId: 'ibkr',
+        name: 'Interactive Brokers',
+        credentials: {
+          flexToken: 'old-flex-token',
+          queryId: '111'
+        },
+        status: 'error'
+      });
+
+      const response = await request(app)
+        .put(`/api/bank-accounts/${ibkrAccount._id}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          flexToken: 'new-flex-token',
+          queryId: '222'
+        });
+
+      expect(response.status).toBe(200);
+      const updatedAccount = await BankAccount.findById(ibkrAccount._id);
+      expect(updatedAccount.status).toBe('active');
+      expect(updatedAccount.credentials.queryId).toBe('222');
+      expect(
+        await credentialEncryption.decryptForUser(
+          updatedAccount.userId,
+          updatedAccount.credentials.flexToken
+        )
+      ).toBe('new-flex-token');
     });
   });
 

@@ -138,6 +138,27 @@ describe('BankAccount Model', () => {
       });
     });
 
+    it('should map and decrypt Isracard credentials for the scraper', async () => {
+      const account = await BankAccount.create({
+        ...mockAccount,
+        bankId: 'isracard',
+        credentials: {
+          username: validCredentials.username,
+          password: validCredentials.password,
+          card6Digits: validCredentials.card6Digits
+        }
+      });
+
+      const savedAccount = await BankAccount.findById(account._id);
+      expect(savedAccount.credentials.card6Digits).not.toBe(validCredentials.card6Digits);
+      expect(credentialEncryption.isEncrypted(savedAccount.credentials.card6Digits)).toBe(true);
+      expect((await savedAccount.getScraperOptions()).credentials).toEqual({
+        id: validCredentials.username,
+        card6Digits: validCredentials.card6Digits,
+        password: validCredentials.password
+      });
+    });
+
     it('should default first-time scraping to the past year', async () => {
       const before = new Date();
       before.setMonth(before.getMonth() - 12);
@@ -175,6 +196,7 @@ describe('BankAccount Model', () => {
       expect(json.credentials).toBeDefined();
       expect(json.credentials.username).toBe(mockAccount.credentials.username);
       expect(json.credentials.password).toBeUndefined();
+      expect(json.credentials.card6Digits).toBeUndefined();
       expect(json.bankId).toBe(mockAccount.bankId);
       expect(json.name).toBe(mockAccount.name);
     });

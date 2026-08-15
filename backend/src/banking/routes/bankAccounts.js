@@ -3,6 +3,10 @@ const BankAccount = require('../models/BankAccount');
 const auth = require('../../shared/middleware/auth');
 const bankAccountService = require('../services/bankAccountService.js');
 const { OTP_BANKS } = require('../constants/enums');
+const {
+  ISRACARD_BANK_ID,
+  isValidCard6Digits
+} = require('../utils/scraperCredentials');
 
 const router = express.Router();
 
@@ -37,6 +41,9 @@ router.post('/', auth, async (req, res) => {
       if (!bankId || !name || !credentials?.username || !credentials?.password) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
+      if (bankId === ISRACARD_BANK_ID && !isValidCard6Digits(credentials.card6Digits)) {
+        return res.status(400).json({ error: 'Last 6 card digits must be exactly 6 digits' });
+      }
     }
 
     const bankAccount = await bankAccountService.create(req.user._id, {
@@ -44,6 +51,7 @@ router.post('/', auth, async (req, res) => {
       name,
       username: credentials.username,
       password: credentials.password,
+      card6Digits: credentials.card6Digits,
       apiToken: credentials.apiToken,
       flexToken: credentials.flexToken,
       queryId: credentials.queryId,
@@ -71,7 +79,7 @@ router.patch('/:id', auth, async (req, res) => {
 // Update bank account credentials
 router.put('/:id/credentials', auth, async (req, res) => {
   try {
-    const { username, password, apiToken } = req.body;
+    const { username, password, card6Digits, apiToken, flexToken, queryId } = req.body;
 
     // Look up account to determine bank type
     const account = await BankAccount.findOne({ _id: req.params.id, userId: req.user._id });
@@ -83,16 +91,23 @@ router.put('/:id/credentials', auth, async (req, res) => {
       if (!apiToken) {
         return res.status(400).json({ error: 'API token is required for Mercury' });
       }
+    } else if (account.bankId === 'ibkr') {
+      if (!flexToken || !queryId) {
+        return res.status(400).json({ error: 'Flex token and Query ID are required for Interactive Brokers' });
+      }
     } else {
       if (!username || !password) {
         return res.status(400).json({ error: 'Username and password are required' });
+      }
+      if (account.bankId === ISRACARD_BANK_ID && !isValidCard6Digits(card6Digits)) {
+        return res.status(400).json({ error: 'Last 6 card digits must be exactly 6 digits' });
       }
     }
 
     const bankAccount = await bankAccountService.updateCredentials(
       req.params.id,
       req.user._id,
-      { username, password, apiToken }
+      { username, password, card6Digits, apiToken, flexToken, queryId }
     );
 
     res.json({
