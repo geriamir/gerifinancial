@@ -119,7 +119,14 @@ class BankAccountService {
     }
   }
 
-  async updateCredentials(accountId, userId, { username, password, card6Digits, apiToken }) {
+  async updateCredentials(accountId, userId, {
+    username,
+    password,
+    card6Digits,
+    apiToken,
+    flexToken,
+    queryId
+  }) {
     const bankAccount = await BankAccount.findOne({ _id: accountId, userId });
     if (!bankAccount) {
       throw new Error('Bank account not found');
@@ -128,6 +135,9 @@ class BankAccountService {
     if (bankAccount.bankId === 'mercury') {
       // Mercury uses API token — no scraper validation
       bankAccount.credentials = { apiToken };
+    } else if (bankAccount.bankId === 'ibkr') {
+      // IBKR uses Flex Web Service token + query ID
+      bankAccount.credentials = { flexToken, queryId };
     } else {
       // Israeli banks: validate new credentials before saving
       if (bankAccount.bankId === ISRACARD_BANK_ID && !isValidCard6Digits(card6Digits)) {

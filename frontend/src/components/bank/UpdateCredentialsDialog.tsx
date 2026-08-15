@@ -14,7 +14,6 @@ import {
 } from '@mui/material';
 import { BankAccount } from '../../services/api/types';
 import { bankAccountsApi } from '../../services/api/bank';
-import { isApiBank } from '../../constants/banks';
 
 interface UpdateCredentialsDialogProps {
   open: boolean;
@@ -32,11 +31,14 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
   const [password, setPassword] = useState('');
   const [card6Digits, setCard6Digits] = useState('');
   const [apiToken, setApiToken] = useState('');
+  const [flexToken, setFlexToken] = useState('');
+  const [queryId, setQueryId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const isMercury = account ? isApiBank(account.bankId) : false;
+  const isMercury = account?.bankId === 'mercury';
+  const isIbkr = account?.bankId === 'ibkr';
   const isIsracard = account?.bankId === 'isracard';
 
   const handleClose = () => {
@@ -44,6 +46,8 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
       setPassword('');
       setCard6Digits('');
       setApiToken('');
+      setFlexToken('');
+      setQueryId('');
       setError('');
       setSuccess(false);
       onClose();
@@ -58,6 +62,11 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
     if (isMercury) {
       if (!apiToken) {
         setError('API token is required');
+        return;
+      }
+    } else if (isIbkr) {
+      if (!flexToken || !queryId) {
+        setError('Flex token and Query ID are required');
         return;
       }
     } else {
@@ -79,6 +88,11 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
       if (isMercury) {
         await bankAccountsApi.updateCredentials(account._id, {
           apiToken
+        });
+      } else if (isIbkr) {
+        await bankAccountsApi.updateCredentials(account._id, {
+          flexToken,
+          queryId
         });
       } else {
         const username = account.credentials?.username || '';
@@ -160,6 +174,28 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
                 placeholder="Enter your Mercury API token"
                 helperText="Generate a new token from your Mercury dashboard"
               />
+            ) : isIbkr ? (
+              <>
+                <TextField
+                  label="Flex Web Service Token"
+                  type="password"
+                  fullWidth
+                  required
+                  value={flexToken}
+                  onChange={(e) => setFlexToken(e.target.value)}
+                  disabled={loading || success}
+                  helperText="Your token from IBKR Settings → Flex Web Service"
+                />
+                <TextField
+                  label="Flex Query ID"
+                  fullWidth
+                  required
+                  value={queryId}
+                  onChange={(e) => setQueryId(e.target.value)}
+                  disabled={loading || success}
+                  helperText="The numeric ID of your Activity Flex Query"
+                />
+              </>
             ) : (
               <>
                 <TextField
@@ -201,6 +237,8 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
             <Alert severity="info" sx={{ mt: 1 }}>
               {isMercury
                 ? 'Your API token will be encrypted and stored securely.'
+                : isIbkr
+                  ? 'Your Flex token will be encrypted and the updated connection will be synced automatically.'
                 : 'Your credentials will be validated with the bank before saving. The connection will be tested automatically.'}
             </Alert>
           </Stack>
@@ -219,11 +257,21 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
             disabled={
               loading ||
               success ||
-              (isMercury ? !apiToken : !password || (isIsracard && card6Digits.length !== 6))
+              (isMercury
+                ? !apiToken
+                : isIbkr
+                  ? !flexToken || !queryId
+                  : !password || (isIsracard && card6Digits.length !== 6))
             }
             startIcon={loading && <CircularProgress size={16} />}
           >
-            {loading ? 'Updating...' : isMercury ? 'Update Token' : 'Update Password'}
+            {loading
+              ? 'Updating...'
+              : isMercury
+                ? 'Update Token'
+                : isIbkr
+                  ? 'Update Flex Credentials'
+                  : 'Update Password'}
           </Button>
         </DialogActions>
       </form>

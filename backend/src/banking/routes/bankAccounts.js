@@ -79,7 +79,7 @@ router.patch('/:id', auth, async (req, res) => {
 // Update bank account credentials
 router.put('/:id/credentials', auth, async (req, res) => {
   try {
-    const { username, password, card6Digits, apiToken } = req.body;
+    const { username, password, card6Digits, apiToken, flexToken, queryId } = req.body;
 
     // Look up account to determine bank type
     const account = await BankAccount.findOne({ _id: req.params.id, userId: req.user._id });
@@ -90,6 +90,10 @@ router.put('/:id/credentials', auth, async (req, res) => {
     if (account.bankId === 'mercury') {
       if (!apiToken) {
         return res.status(400).json({ error: 'API token is required for Mercury' });
+      }
+    } else if (account.bankId === 'ibkr') {
+      if (!flexToken || !queryId) {
+        return res.status(400).json({ error: 'Flex token and Query ID are required for Interactive Brokers' });
       }
     } else {
       if (!username || !password) {
@@ -103,7 +107,7 @@ router.put('/:id/credentials', auth, async (req, res) => {
     const bankAccount = await bankAccountService.updateCredentials(
       req.params.id,
       req.user._id,
-      { username, password, card6Digits, apiToken }
+      { username, password, card6Digits, apiToken, flexToken, queryId }
     );
 
     res.json({

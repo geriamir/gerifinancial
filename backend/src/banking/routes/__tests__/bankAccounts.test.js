@@ -8,6 +8,7 @@ const queuedDataSyncService = require('../../services/queuedDataSyncService');
 const app = require('../../../app');
 const { User } = require('../../../auth');
 const { BankAccount } = require('../../models');
+const credentialEncryption = require('../../../shared/services/credentialEncryption');
 
 // Import valid credentials from mock (bankScraperService handles the mocking automatically based on NODE_ENV)
 const { validCredentials } = require('../../../test/mocks/bankScraper');
@@ -144,6 +145,38 @@ describe('Bank Account Routes', () => {
         card6Digits: validCredentials.card6Digits,
         password: validCredentials.password
       });
+    });
+
+    it('should update IBKR Flex credentials instead of treating it as Mercury', async () => {
+      const ibkrAccount = await BankAccount.create({
+        userId: user._id,
+        bankId: 'ibkr',
+        name: 'Interactive Brokers',
+        credentials: {
+          flexToken: 'old-flex-token',
+          queryId: '111'
+        },
+        status: 'error'
+      });
+
+      const response = await request(app)
+        .put(`/api/bank-accounts/${ibkrAccount._id}/credentials`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          flexToken: 'new-flex-token',
+          queryId: '222'
+        });
+
+      expect(response.status).toBe(200);
+      const updatedAccount = await BankAccount.findById(ibkrAccount._id);
+      expect(updatedAccount.status).toBe('active');
+      expect(updatedAccount.credentials.queryId).toBe('222');
+      expect(
+        await credentialEncryption.decryptForUser(
+          updatedAccount.userId,
+          updatedAccount.credentials.flexToken
+        )
+      ).toBe('new-flex-token');
     });
   });
 
