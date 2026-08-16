@@ -258,6 +258,33 @@ describe('buildScript', () => {
     expect(cardsOf(script)).toEqual(['matching-review']);
   });
 
+  it('does not claim unmatched payments must belong to an unconnected card', () => {
+    const script = buildScript(
+      imported({
+        currentStep: 'credit-card-matching',
+        creditCardDetection: {
+          analyzed: true,
+          analyzedAt: '2026-01-01T00:06:00Z',
+          transactionCount: 3,
+          recommendation: 'connect',
+          sampleTransactions: []
+        },
+        creditCardMatching: {
+          completed: true,
+          completedAt: '2026-01-01T00:09:00Z',
+          totalCreditCardPayments: 3,
+          coveredPayments: 0,
+          uncoveredPayments: 3,
+          coveragePercentage: 0,
+          matchedPayments: []
+        }
+      })
+    );
+
+    expect(textOf(script)).toContain("couldn't confidently reconcile the rest");
+    expect(textOf(script)).not.toContain("probably on a card you haven't connected");
+  });
+
   it('ends on the completion card', () => {
     const script = buildScript(
       imported({

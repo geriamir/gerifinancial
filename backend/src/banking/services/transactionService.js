@@ -119,6 +119,11 @@ class TransactionService {
           
           results.creditCardsCreated++;
           logger.info(`Created/found credit card: ${creditCard.displayName} for bank account ${bankAccount._id}`);
+
+          if (account.statements?.length) {
+            await creditCard.upsertStatements(account.statements);
+            logger.info(`Stored ${account.statements.length} statement totals for card ${creditCard.displayName}`);
+          }
         } catch (error) {
           logger.error(`Error creating credit card for account ${account.accountNumber}:`, error);
           results.errors.push({
