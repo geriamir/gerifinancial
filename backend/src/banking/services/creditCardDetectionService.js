@@ -6,8 +6,27 @@ const logger = require('../../shared/utils/logger');
 const {
   likelyPaymentTextQuery,
   suggestCreditCardProviders,
+  inferCreditCardProvider,
   creditCardPaymentMatchStage
 } = require('./creditCardPaymentMatcher');
+
+const israelDateFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Jerusalem',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+});
+
+const israelDateKey = value => {
+  const parts = israelDateFormatter.formatToParts(new Date(value));
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+};
+
+const monthIndex = dateKey => {
+  const [year, month] = dateKey.split('-').map(Number);
+  return year * 12 + month;
+};
 
 /**
  * Service for detecting credit card usage from transaction data
@@ -349,7 +368,7 @@ class CreditCardDetectionService {
 
   /**
    * Analyze credit card transaction coverage after connecting accounts
-   * Matches "Credit Card" categorized transactions against actual credit card spending by monthly totals
+   * Matches "Credit Card" categorized transactions against provider debit-date totals
    * @param {string} userId - User ID
    * @returns {Promise<Object>} Coverage analysis results
    */
@@ -450,11 +469,12 @@ class CreditCardDetectionService {
         };
       }
 
-      // Get monthly spending totals for each connected credit card
-      const creditCardMonthlyTotals = await this.getCreditCardMonthlyTotals(connectedCreditCards, startDate);
+      // Group imported card activity by the debit date supplied by the
+      // provider. The checking-account payment uses that same local date.
+      const creditCardDebitTotals = await this.getCreditCardDebitTotals(connectedCreditCards, startDate);
       
-      // Match credit card payments to credit card monthly spending
-      const matchingResults = await this.matchPaymentsToCards(creditCardPayments, creditCardMonthlyTotals);
+      // Match credit card payments to provider debit-date totals
+      const matchingResults = await this.matchPaymentsToCards(creditCardPayments, creditCardDebitTotals);
       
       const coverageAnalysis = {
         totalCreditCardPayments: creditCardPayments.length,
@@ -479,7 +499,7 @@ class CreditCardDetectionService {
         recommendation: matchingResults.coveragePercentage >= 80 ? 'complete' : 'connect_more',
         recommendationReason: matchingResults.coveragePercentage >= 80 
           ? `Excellent coverage! ${matchingResults.coveragePercentage}% of your credit card payments are matched to connected cards.`
-          : `${matchingResults.uncoveredCount} credit card payments couldn't be matched. Consider connecting additional credit card providers.`
+          : `${matchingResults.uncoveredCount} credit card payments couldn't be confidently reconciled with the connected providers.`
       };
 
       logger.info(`Coverage analysis completed for user ${userId}: ${matchingResults.coveragePercentage}% coverage across ${connectedCreditCards.length} cards`);
@@ -492,119 +512,154 @@ class CreditCardDetectionService {
   }
 
   /**
-   * Get monthly spending totals for each connected credit card
-   * Uses processedDate to group credit card spending for accurate payment matching
+   * Get provider totals grouped by the debit date supplied by the card scraper
    * @param {Array} connectedCreditCards - Array of connected credit card objects
    * @param {Date} startDate - Start date for analysis
-   * @returns {Promise<Array>} Monthly totals per credit card
+   * @returns {Promise<Array>} Debit-date totals per provider account
    */
-  async getCreditCardMonthlyTotals(connectedCreditCards, startDate) {
+  async getCreditCardDebitTotals(connectedCreditCards, startDate) {
     try {
-      const monthlyTotals = [];
+      const debitTotals = [];
+      const cardsByAccount = new Map();
 
       for (const creditCard of connectedCreditCards) {
-        // Get transactions for this specific credit card using processedDate for grouping
-        // Exclude Transfer transactions to get accurate spending amounts
-        const cardTransactions = await Transaction.aggregate([
+        const accountId = creditCard.bankAccountId?._id || creditCard.bankAccountId;
+        const accountKey = accountId?.toString();
+        if (!accountKey) continue;
+
+        const accountGroup = cardsByAccount.get(accountKey) || {
+          bankAccount: creditCard.bankAccountId,
+          creditCards: []
+        };
+        accountGroup.creditCards.push(creditCard);
+        cardsByAccount.set(accountKey, accountGroup);
+      }
+
+      for (const { bankAccount, creditCards } of cardsByAccount.values()) {
+        const providerTransactions = await Transaction.aggregate([
           {
             $match: {
-              creditCardId: creditCard._id,
+              creditCardId: { $in: creditCards.map(card => card._id) },
               processedDate: { $gte: startDate }
-            }
-          },
-          {
-            $lookup: {
-              from: 'categories',
-              localField: 'category',
-              foreignField: '_id',
-              as: 'categoryDetails'
-            }
-          },
-          {
-            $match: {
-              $or: [
-                { 'categoryDetails.type': { $ne: 'Transfer' } },
-                { category: null }
-              ]
             }
           },
           {
             $group: {
               _id: {
-                year: { $year: '$processedDate' },
-                month: { $month: '$processedDate' },
-                creditCardId: '$creditCardId'
+                $dateToString: {
+                  date: '$processedDate',
+                  format: '%Y-%m-%d',
+                  timezone: 'Asia/Jerusalem'
+                }
               },
+              debitDate: { $min: '$processedDate' },
               totalSpent: { $sum: { $abs: '$amount' } },
-              transactionCount: { $sum: 1 }
+              transactionCount: { $sum: 1 },
+              creditCardIds: { $addToSet: '$creditCardId' }
             }
           },
           {
-            $sort: { '_id.year': -1, '_id.month': -1 }
+            $sort: { _id: -1 }
           }
         ]);
 
-        // Add credit card info to each monthly total
-        const cardMonthlyData = cardTransactions.map(monthData => ({
-          creditCard,
-          year: monthData._id.year,
-          month: monthData._id.month,
-          monthString: `${monthData._id.year}-${String(monthData._id.month).padStart(2, '0')}`,
-          totalSpent: monthData.totalSpent,
-          transactionCount: monthData.transactionCount
+        const creditCardsById = new Map(
+          creditCards.map(card => [card._id.toString(), card])
+        );
+        const providerDebitData = providerTransactions.map(debitData => ({
+          creditCards: debitData.creditCardIds
+            .map(cardId => creditCardsById.get(cardId.toString()))
+            .filter(Boolean),
+          provider: bankAccount?.bankId || 'unknown',
+          displayName: bankAccount?.name || creditCards[0].displayName,
+          debitDate: debitData.debitDate,
+          debitDateKey: debitData._id,
+          totalSpent: debitData.totalSpent,
+          transactionCount: debitData.transactionCount
         }));
-        logger.debug(`Monthly data for card ${creditCard.displayName}:`, cardMonthlyData);
+        logger.debug(`Debit-date data for provider ${bankAccount?.bankId}:`, providerDebitData);
 
-        monthlyTotals.push(...cardMonthlyData);
+        debitTotals.push(...providerDebitData);
       }
 
-      return monthlyTotals;
+      return debitTotals;
     } catch (error) {
-      logger.error('Error getting credit card monthly totals:', error);
+      logger.error('Error getting credit card debit-date totals:', error);
       return [];
     }
   }
 
   /**
-   * Match credit card payments to credit card monthly spending totals
+   * Match checking-account payments to provider debit-date totals
    * @param {Array} creditCardPayments - "Credit Card" categorized transactions (payments)
-   * @param {Array} creditCardMonthlyTotals - Monthly spending totals per credit card
+   * @param {Array} creditCardDebitTotals - Spending totals grouped by provider and debit date
    * @returns {Promise<Object>} Matching results
    */
-  async matchPaymentsToCards(creditCardPayments, creditCardMonthlyTotals) {
+  async matchPaymentsToCards(creditCardPayments, creditCardDebitTotals) {
     try {
       const matchedPayments = [];
       const uncoveredPayments = [];
-      const tolerance = 0.05; // 5% tolerance for amount matching
+      const possibleMatches = [];
 
-      for (const payment of creditCardPayments) {
+      for (const [paymentIndex, payment] of creditCardPayments.entries()) {
         const paymentAmount = Math.abs(payment.amount);
-        const paymentDate = new Date(payment.date);
-        const paymentMonth = paymentDate.getMonth() + 1;
-        const paymentYear = paymentDate.getFullYear();
+        const paymentDateKey = israelDateKey(payment.date);
+        const paymentProvider = inferCreditCardProvider(payment);
 
-        // Look for credit card monthly totals that match this payment
-        // Check current month, previous month, and next month (billing cycles can vary)
-        const matchingCandidates = creditCardMonthlyTotals.filter(monthlyTotal => {
-          const monthDiff = Math.abs((monthlyTotal.year * 12 + monthlyTotal.month) - (paymentYear * 12 + paymentMonth));
-          return monthDiff <= 1; // Within 1 month
-        });
+        for (const [debitTotalIndex, debitTotal] of creditCardDebitTotals.entries()) {
+          if (paymentProvider && debitTotal.provider !== paymentProvider) continue;
 
-        // Find best amount match within candidates
-        let bestMatch = null;
-        let bestMatchScore = Infinity;
-
-        for (const candidate of matchingCandidates) {
-          const amountDiff = Math.abs(paymentAmount - candidate.totalSpent);
+          const exactDebitDate = paymentDateKey === debitTotal.debitDateKey;
+          const amountDiff = Math.abs(paymentAmount - debitTotal.totalSpent);
           const amountDiffPercentage = amountDiff / paymentAmount;
-          
-          if (amountDiffPercentage <= tolerance && amountDiff < bestMatchScore) {
-            bestMatch = candidate;
-            bestMatchScore = amountDiff;
-          }
+          const monthDiff = Math.abs(
+            monthIndex(debitTotal.debitDateKey) - monthIndex(paymentDateKey)
+          );
+
+          if (!exactDebitDate && (monthDiff > 1 || amountDiffPercentage > 0.05)) continue;
+
+          possibleMatches.push({
+            paymentIndex,
+            debitTotalIndex,
+            paymentProvider,
+            exactDebitDate,
+            amountDiff,
+            amountDiffPercentage
+          });
+        }
+      }
+
+      possibleMatches.sort((left, right) =>
+        Number(Boolean(right.paymentProvider)) - Number(Boolean(left.paymentProvider))
+        || Number(right.exactDebitDate) - Number(left.exactDebitDate)
+        || left.amountDiffPercentage - right.amountDiffPercentage
+        || left.amountDiff - right.amountDiff
+      );
+
+      const selectedMatches = new Map();
+      const usedDebitTotals = new Set();
+
+      for (const possibleMatch of possibleMatches) {
+        if (
+          selectedMatches.has(possibleMatch.paymentIndex)
+          || usedDebitTotals.has(possibleMatch.debitTotalIndex)
+        ) {
+          continue;
         }
 
-        if (bestMatch) {
+        selectedMatches.set(possibleMatch.paymentIndex, possibleMatch);
+        usedDebitTotals.add(possibleMatch.debitTotalIndex);
+      }
+
+      for (const [paymentIndex, payment] of creditCardPayments.entries()) {
+        const selectedMatch = selectedMatches.get(paymentIndex);
+
+        if (selectedMatch) {
+          const bestMatch = creditCardDebitTotals[selectedMatch.debitTotalIndex];
+          const matchedCard = bestMatch.creditCards.length === 1
+            ? bestMatch.creditCards[0]
+            : null;
+          const paymentAmount = Math.abs(payment.amount);
           matchedPayments.push({
             payment: {
               id: payment._id,
@@ -614,18 +669,23 @@ class CreditCardDetectionService {
               originalAmount: payment.amount
             },
             matchedCreditCard: {
-              id: bestMatch.creditCard._id.toString(),
-              displayName: bestMatch.creditCard.displayName,
-              cardNumber: bestMatch.creditCard.cardNumber,
-              lastFourDigits: bestMatch.creditCard.lastFourDigits,
-              provider: bestMatch.creditCard.bankAccountId?.bankId || 'unknown'
+              id: matchedCard?._id.toString() || null,
+              displayName: bestMatch.displayName,
+              cardNumber: matchedCard?.cardNumber || null,
+              lastFourDigits: matchedCard?.lastFourDigits || null,
+              provider: bestMatch.provider
             },
-            matchedMonth: bestMatch.monthString,
+            matchedMonth: bestMatch.debitDateKey.slice(0, 7),
             matchedAmount: bestMatch.totalSpent,
             paymentAmount,
-            amountDifference: Math.abs(paymentAmount - bestMatch.totalSpent),
-            matchType: 'amount_date_match',
-            matchConfidence: Math.max(0, 100 - Math.round((Math.abs(paymentAmount - bestMatch.totalSpent) / paymentAmount) * 100))
+            amountDifference: selectedMatch.amountDiff,
+            matchType: selectedMatch.exactDebitDate
+              ? 'debit_date_match'
+              : 'amount_month_match',
+            matchConfidence: Math.max(
+              0,
+              100 - Math.round(selectedMatch.amountDiffPercentage * 100)
+            )
           });
         } else {
           uncoveredPayments.push(payment);

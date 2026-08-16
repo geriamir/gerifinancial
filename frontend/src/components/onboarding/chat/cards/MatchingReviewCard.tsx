@@ -6,8 +6,8 @@ import { CardProps } from '../types';
 
 /**
  * Shown once the card statements have been matched against the payments in the
- * checking account. Finishing is always allowed: partial coverage usually means
- * a card the user genuinely does not have, and blocking on it would strand them.
+ * checking account. Finishing is always allowed because a provider debit can
+ * still be ambiguous when several card payments share the same date.
  */
 export const MatchingReviewCard: React.FC<CardProps> = ({ status, handlers }) => {
   const [busy, setBusy] = useState<'more' | 'finish' | null>(null);

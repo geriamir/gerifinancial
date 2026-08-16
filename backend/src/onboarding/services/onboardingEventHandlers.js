@@ -266,7 +266,9 @@ class OnboardingEventHandlers {
         const coverageAnalysis = await creditCardDetectionService.analyzeCreditCardCoverage(userId);
         
         // Mark matched transactions with their credit card
-        for (const match of coverageAnalysis.matchedPayments || []) {
+        const cardLevelMatches = (coverageAnalysis.matchedPayments || [])
+          .filter(match => match.matchedCreditCard.id);
+        for (const match of cardLevelMatches) {
           await Transaction.findByIdAndUpdate(match.payment.id, {
             $set: {
               'matchedCreditCard': {
@@ -279,7 +281,7 @@ class OnboardingEventHandlers {
           });
         }
 
-        logger.info(`✅ Onboarding: Marked ${coverageAnalysis.matchedPayments?.length || 0} transactions with matched credit cards`);
+        logger.info(`✅ Onboarding: Marked ${cardLevelMatches.length} transactions with matched credit cards`);
 
         // Only complete if 100% coverage, otherwise show matching results
         const isFullCoverage = coverageAnalysis.coveragePercentage === 100;
@@ -443,7 +445,9 @@ class OnboardingEventHandlers {
       const coverageAnalysis = await creditCardDetectionService.analyzeCreditCardCoverage(userId);
       
       // Mark matched transactions with their credit card
-      for (const match of coverageAnalysis.matchedPayments || []) {
+      const cardLevelMatches = (coverageAnalysis.matchedPayments || [])
+        .filter(match => match.matchedCreditCard.id);
+      for (const match of cardLevelMatches) {
         await Transaction.findByIdAndUpdate(match.payment.id, {
           $set: {
             'matchedCreditCard': {
@@ -456,7 +460,7 @@ class OnboardingEventHandlers {
         });
       }
 
-      logger.info(`✅ Onboarding: Marked ${coverageAnalysis.matchedPayments?.length || 0} transactions with matched credit cards`);
+      logger.info(`✅ Onboarding: Marked ${cardLevelMatches.length} transactions with matched credit cards`);
 
       // Update onboarding structure with matching results
       await User.findByIdAndUpdate(userId, {
