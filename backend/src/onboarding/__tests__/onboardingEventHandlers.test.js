@@ -474,6 +474,45 @@ describe('Onboarding Event Handlers', () => {
       expect(updatedUser.onboarding.creditCardDetection.analyzed).toBe(true);
       expect(updatedUser.onboarding.creditCardDetection.recommendation).toBe('skip');
     });
+
+    it('stores the current matching shape when a card account imports no cards', async () => {
+      testUser.onboarding.creditCardSetup = {
+        skipped: false,
+        creditCardAccounts: [{
+          accountId: creditCardAccountId,
+          connectedAt: new Date(),
+          bankId: 'isracard',
+          displayName: 'Isracard'
+        }]
+      };
+      testUser.onboarding.currentStep = 'credit-card-matching';
+      await testUser.save();
+
+      scrapingEvents.emit('checking-accounts:completed', {
+        strategyName: 'checking-accounts',
+        bankAccountId: creditCardAccountId,
+        userId: testUser._id,
+        result: {
+          transactions: {
+            newTransactions: 0
+          }
+        }
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      const updatedUser = await User.findById(testUser._id);
+      expect(updatedUser.onboarding.creditCardMatching).toEqual(expect.objectContaining({
+        completed: true,
+        totalCreditCardPayments: 0,
+        coveredPayments: 0,
+        uncoveredPayments: 0,
+        coveragePercentage: 0
+      }));
+      expect(updatedUser.onboarding.creditCardMatching.matchedPayments).toEqual([]);
+      expect(updatedUser.onboarding.currentStep).toBe('complete');
+      expect(updatedUser.onboarding.isComplete).toBe(true);
+    });
   });
 
   describe('credit-cards:completed event', () => {

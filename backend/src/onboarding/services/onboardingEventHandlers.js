@@ -247,9 +247,13 @@ class OnboardingEventHandlers {
               'onboarding.creditCardMatching': {
                 completed: true,
                 completedAt: new Date(),
-                matchedPayments: 0,
-                unmatchedPayments: 0,
-                coveragePercentage: 0
+                totalCreditCardPayments: 0,
+                coveredPayments: 0,
+                uncoveredPayments: 0,
+                coveragePercentage: 0,
+                matchedPayments: [],
+                uncoveredSampleTransactions: [],
+                connectedCreditCards: []
               },
               'onboarding.currentStep': 'complete',
               'onboarding.isComplete': true,
