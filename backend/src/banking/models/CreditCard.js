@@ -1,23 +1,5 @@
 const mongoose = require('mongoose');
 
-const statementSchema = new mongoose.Schema({
-  date: {
-    type: Date,
-    required: true
-  },
-  amount: {
-    type: Number,
-    required: true
-  },
-  currency: {
-    type: String,
-    required: true
-  },
-  transactionAmount: {
-    type: Number
-  }
-}, { _id: false });
-
 const creditCardSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -73,10 +55,6 @@ const creditCardSchema = new mongoose.Schema({
   lastFourDigits: {
     type: String,
     maxlength: 4
-  },
-  statements: {
-    type: [statementSchema],
-    default: []
   }
 }, {
   timestamps: true
@@ -117,34 +95,6 @@ creditCardSchema.statics.getUserActiveCards = async function(userId) {
 creditCardSchema.methods.updateTimingConfig = async function(gracePeriodDays, cutoffDay) {
   this.timingFlexibility.gracePeriodDays = gracePeriodDays;
   this.timingFlexibility.cutoffDay = cutoffDay;
-  await this.save();
-  return this;
-};
-
-creditCardSchema.methods.upsertStatements = async function(statements) {
-  for (const statement of statements || []) {
-    const date = new Date(statement.date);
-    if (Number.isNaN(date.getTime()) || !Number.isFinite(statement.amount) || !statement.currency) {
-      continue;
-    }
-
-    const existing = this.statements.find(item =>
-      item.date.getTime() === date.getTime() && item.currency === statement.currency
-    );
-
-    if (existing) {
-      existing.amount = statement.amount;
-      existing.transactionAmount = statement.transactionAmount;
-    } else {
-      this.statements.push({
-        date,
-        amount: statement.amount,
-        currency: statement.currency,
-        transactionAmount: statement.transactionAmount
-      });
-    }
-  }
-
   await this.save();
   return this;
 };

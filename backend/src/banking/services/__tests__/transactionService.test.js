@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const transactionService = require('../transactionService');
 const transactionCategorizationService = require('../transactionCategorizationService');
 const { User } = require('../../../auth');
-const { Transaction, CreditCard, Category, SubCategory, ManualCategorized } = require('../../models');
+const { Transaction, Category, SubCategory, ManualCategorized } = require('../../models');
 const { createTestUser } = require('../../../test/testUtils');
 const { TransactionType, CategorizationMethod } = require('../../constants/enums');
 
@@ -15,7 +15,6 @@ describe('TransactionService', () => {
       Category.deleteMany({}),
       SubCategory.deleteMany({}),
       Transaction.deleteMany({}),
-      CreditCard.deleteMany({}),
       ManualCategorized.deleteMany({})
     ]);
 
@@ -215,37 +214,6 @@ describe('TransactionService', () => {
       expect(result.mostRecentTransactionDate).toEqual(completedDate);
       expect(result.skippedPending).toBe(1);
       expect(result.newTransactions).toBe(1);
-    });
-
-    it('stores statement totals returned for a credit card account', async () => {
-      const bankAccount = {
-        _id: new mongoose.Types.ObjectId(),
-        userId: user._id,
-        bankId: 'visaCal',
-        defaultCurrency: 'ILS'
-      };
-      const accounts = [{
-        accountNumber: '1234',
-        statements: [{
-          date: '2026-08-10T00:00:00.000Z',
-          amount: -34208.45,
-          currency: '₪',
-          transactionAmount: -31131.79
-        }],
-        txns: []
-      }];
-
-      await transactionService.processScrapedTransactions(accounts, bankAccount);
-      accounts[0].statements[0].transactionAmount = -32000;
-      await transactionService.processScrapedTransactions(accounts, bankAccount);
-
-      const creditCard = await CreditCard.findOne({ bankAccountId: bankAccount._id });
-      expect(creditCard.statements).toHaveLength(1);
-      expect(creditCard.statements[0]).toEqual(expect.objectContaining({
-        amount: -34208.45,
-        currency: '₪',
-        transactionAmount: -32000
-      }));
     });
 
     // The queue is fed only by newly-saved transactions, so a backlog the AI

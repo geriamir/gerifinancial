@@ -572,7 +572,6 @@ describe('Onboarding Event Handlers', () => {
       expect(updatedUser.onboarding.creditCardMatching.coveredPayments).toBe(8);
       expect(updatedUser.onboarding.creditCardMatching.uncoveredPayments).toBe(2);
       expect(updatedUser.onboarding.creditCardMatching.coveragePercentage).toBe(80);
-      expect(updatedUser.onboarding.creditCardMatching.analysisVersion).toBe(2);
       
       // Verify onboarding is complete
       expect(updatedUser.onboarding.currentStep).toBe('complete');
@@ -587,60 +586,6 @@ describe('Onboarding Event Handlers', () => {
       expect(creditCardDetectionService.analyzeCreditCardCoverage).toHaveBeenCalled();
       const callArgs = creditCardDetectionService.analyzeCreditCardCoverage.mock.calls[0];
       expect(callArgs[0].toString()).toEqual(testUser._id.toString());
-    });
-
-    it('does not rerun matching after completed onboarding has the current analysis', async () => {
-      testUser.onboarding.isComplete = true;
-      testUser.onboarding.currentStep = 'complete';
-      testUser.onboarding.creditCardMatching.completed = true;
-      testUser.onboarding.creditCardMatching.analysisVersion = 2;
-      await testUser.save();
-
-      await BankAccount.findByIdAndUpdate(creditCardAccountId, {
-        $set: {
-          'scrapingStatus.status': 'complete',
-          'scrapingStatus.isActive': false
-        }
-      });
-
-      scrapingEvents.emit('credit-cards:completed', {
-        strategyName: 'credit-cards',
-        bankAccountId: creditCardAccountId,
-        userId: testUser._id,
-        result: { transactions: { newTransactions: 0 } }
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      expect(creditCardDetectionService.analyzeCreditCardCoverage).not.toHaveBeenCalled();
-    });
-
-    it('refreshes completed onboarding once when its matching analysis is stale', async () => {
-      testUser.onboarding.isComplete = true;
-      testUser.onboarding.currentStep = 'complete';
-      testUser.onboarding.creditCardMatching.completed = true;
-      testUser.onboarding.creditCardMatching.analysisVersion = 1;
-      await testUser.save();
-
-      await BankAccount.findByIdAndUpdate(creditCardAccountId, {
-        $set: {
-          'scrapingStatus.status': 'complete',
-          'scrapingStatus.isActive': false
-        }
-      });
-
-      scrapingEvents.emit('credit-cards:completed', {
-        strategyName: 'credit-cards',
-        bankAccountId: creditCardAccountId,
-        userId: testUser._id,
-        result: { transactions: { newTransactions: 0 } }
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      const updatedUser = await User.findById(testUser._id);
-      expect(creditCardDetectionService.analyzeCreditCardCoverage).toHaveBeenCalledTimes(1);
-      expect(updatedUser.onboarding.creditCardMatching.analysisVersion).toBe(2);
     });
 
     it('should NOT process non-onboarding credit card accounts', async () => {

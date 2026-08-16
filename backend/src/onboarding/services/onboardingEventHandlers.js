@@ -6,7 +6,6 @@ const logger = require('../../shared/utils/logger');
 const CATEGORIZATION_HANDOFF_RETRIES = 10;
 const CATEGORIZATION_HANDOFF_DELAY_MS = 100;
 const IMPORT_RELATED_STEPS = ['checking-account', 'transaction-import'];
-const CREDIT_CARD_MATCHING_ANALYSIS_VERSION = 2;
 
 /**
  * Event handlers for onboarding-specific scraping events
@@ -248,7 +247,6 @@ class OnboardingEventHandlers {
               'onboarding.creditCardMatching': {
                 completed: true,
                 completedAt: new Date(),
-                analysisVersion: CREDIT_CARD_MATCHING_ANALYSIS_VERSION,
                 matchedPayments: 0,
                 unmatchedPayments: 0,
                 coveragePercentage: 0
@@ -295,7 +293,6 @@ class OnboardingEventHandlers {
             'onboarding.creditCardMatching': {
               completed: true,
               completedAt: new Date(),
-              analysisVersion: CREDIT_CARD_MATCHING_ANALYSIS_VERSION,
               totalCreditCardPayments: coverageAnalysis.totalCreditCardPayments,
               coveredPayments: coverageAnalysis.coveredPayments,
               uncoveredPayments: coverageAnalysis.uncoveredPayments,
@@ -405,15 +402,6 @@ class OnboardingEventHandlers {
         return;
       }
 
-      const matchingAnalysisIsCurrent =
-        user.onboarding?.isComplete === true
-        && user.onboarding?.creditCardMatching?.analysisVersion >= CREDIT_CARD_MATCHING_ANALYSIS_VERSION;
-
-      if (matchingAnalysisIsCurrent) {
-        logger.info(`Onboarding matching is already current for user ${userId}, skipping scheduled refresh`);
-        return;
-      }
-
       // Check if all onboarding credit card accounts have finished scraping
       const allAccountIds = onboardingCreditCards.map(cc => cc.accountId);
       const accounts = await BankAccount.find({ _id: { $in: allAccountIds } });
@@ -476,7 +464,6 @@ class OnboardingEventHandlers {
           'onboarding.creditCardMatching': {
             completed: true,
             completedAt: new Date(),
-            analysisVersion: CREDIT_CARD_MATCHING_ANALYSIS_VERSION,
             totalCreditCardPayments: coverageAnalysis.totalCreditCardPayments,
             coveredPayments: coverageAnalysis.coveredPayments,
             uncoveredPayments: coverageAnalysis.uncoveredPayments,

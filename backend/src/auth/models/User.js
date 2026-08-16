@@ -224,10 +224,6 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: 0
       },
-      analysisVersion: {
-        type: Number,
-        default: 0
-      },
       matchedPayments: [{
         payment: {
           id: String,

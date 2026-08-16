@@ -135,10 +135,9 @@ class CreditCardService {
 
       // Get transaction statistics for the card
       const stats = await this.getCreditCardBasicStats(cardId, userId);
-      const { statements, ...publicCard } = creditCard;
 
       return {
-        ...publicCard,
+        ...creditCard,
         ...stats
       };
 

@@ -147,5 +147,5 @@ const describeMatching = (matching: OnboardingStatus['creditCardMatching']): str
   if (percentage >= 80) {
     return `Matched ${covered} of your credit card payments to a card - that covers ${percentage}% of them.`;
   }
-  return `I matched ${covered} of your credit card payments, or ${percentage}%. I couldn't confidently reconcile the rest from the available card statements.`;
+  return `I matched ${covered} of your credit card payments, or ${percentage}%. The rest are probably on a card you haven't connected yet.`;
 };
