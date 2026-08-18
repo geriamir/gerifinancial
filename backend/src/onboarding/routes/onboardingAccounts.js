@@ -141,7 +141,8 @@ router.post('/credit-card-account', auth, async (req, res) => {
         'onboarding.currentStep': 'credit-card-matching',
         'onboarding.creditCardMatching.completed': false, // Mark as not completed
         'onboarding.creditCardMatching.processingAccountId': bankAccount._id, // Track which account is being processed
-        'onboarding.creditCardMatching.completedAt': null
+        'onboarding.creditCardMatching.completedAt': null,
+        'onboarding.creditCardMatching.error': null
       }
     });
     

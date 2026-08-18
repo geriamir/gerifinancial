@@ -94,7 +94,12 @@ export const buildScript = (status: OnboardingStatus | null): Script => {
       say('matching', "Now I'm checking those cards against the payments in your checking account.");
       return pause();
     }
-    say('matched', describeMatching(matching));
+    if (matching.error) {
+      say('matching-error', matching.error);
+    }
+    if (!matching.error || matching.totalCreditCardPayments > 0) {
+      say('matched', describeMatching(matching));
+    }
     return offer('matching-review');
   }
 
@@ -145,7 +150,7 @@ const describeMatching = (matching: OnboardingStatus['creditCardMatching']): str
   const percentage = Math.round(matching.coveragePercentage || 0);
   const covered = `${matching.coveredPayments} of ${total}`;
   if (percentage >= 80) {
-    return `Matched ${covered} of your credit card payments to a card - that covers ${percentage}% of them.`;
+    return `Matched ${covered} of your credit card payments with your connected card providers - that covers ${percentage}% of them.`;
   }
   return `I matched ${covered} of your credit card payments, or ${percentage}%. I couldn't confidently reconcile the rest with the connected providers.`;
 };

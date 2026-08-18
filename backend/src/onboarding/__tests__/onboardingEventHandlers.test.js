@@ -715,4 +715,81 @@ describe('Onboarding Event Handlers', () => {
       expect(creditCardDetectionService.analyzeCreditCardCoverage).not.toHaveBeenCalled();
     });
   });
+
+  describe('checking-accounts:failed event', () => {
+    it('restores the matching review when the card currently being added fails', async () => {
+      testUser.onboarding = {
+        startedAt: new Date(),
+        currentStep: 'credit-card-matching',
+        isComplete: false,
+        checkingAccount: {
+          connected: true,
+          accountId: checkingAccountId,
+          connectedAt: new Date(),
+          bankId: 'hapoalim'
+        },
+        creditCardSetup: {
+          skipped: false,
+          creditCardAccounts: [{
+            accountId: creditCardAccountId,
+            connectedAt: new Date(),
+            bankId: 'isracard',
+            displayName: 'Isracard'
+          }]
+        },
+        creditCardMatching: {
+          completed: false,
+          completedAt: null,
+          processingAccountId: creditCardAccountId,
+          totalCreditCardPayments: 5,
+          coveredPayments: 2,
+          uncoveredPayments: 3,
+          coveragePercentage: 40,
+          matchedPayments: []
+        },
+        completedSteps: [
+          'checking-account',
+          'transaction-import',
+          'credit-card-detection',
+          'credit-card-setup',
+          'credit-card-matching'
+        ]
+      };
+      await testUser.save();
+
+      const emit = jest.spyOn(scrapingEvents, 'emit');
+
+      scrapingEvents.emit('checking-accounts:failed', {
+        strategyName: 'checking-accounts',
+        bankAccountId: creditCardAccountId,
+        userId: testUser._id,
+        error: new Error(
+          'Checking Accounts scraping failed: The bank requires a password change. Sign in to the bank website and change it'
+        )
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      const updatedUser = await User.findById(testUser._id);
+      expect(updatedUser.onboarding.creditCardMatching).toEqual(expect.objectContaining({
+        completed: true,
+        error: 'Isracard could not be imported. The bank requires a password change. Sign in to the bank website and change it',
+        totalCreditCardPayments: 5,
+        coveredPayments: 2,
+        uncoveredPayments: 3,
+        coveragePercentage: 40
+      }));
+      expect(updatedUser.onboarding.creditCardMatching.processingAccountId).toBeFalsy();
+      expect(updatedUser.onboarding.currentStep).toBe('credit-card-matching');
+      expect(updatedUser.onboarding.isComplete).toBe(false);
+      expect(emit).toHaveBeenCalledWith('credit-card-matching:completed', {
+        userId: testUser._id,
+        matchingResults: {
+          coveredCount: 2,
+          uncoveredCount: 3,
+          coveragePercentage: 40
+        }
+      });
+    });
+  });
 });

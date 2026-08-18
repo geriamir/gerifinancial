@@ -285,6 +285,36 @@ describe('buildScript', () => {
     expect(textOf(script)).not.toContain("probably on a card you haven't connected");
   });
 
+  it('returns to the matching review when a card import fails', () => {
+    const script = buildScript(
+      imported({
+        currentStep: 'credit-card-matching',
+        creditCardDetection: {
+          analyzed: true,
+          analyzedAt: '2026-01-01T00:06:00Z',
+          transactionCount: 5,
+          recommendation: 'connect',
+          sampleTransactions: []
+        },
+        creditCardMatching: {
+          completed: true,
+          completedAt: '2026-01-01T00:09:00Z',
+          error: 'Visa Cal could not be imported. The bank requires a password change.',
+          totalCreditCardPayments: 5,
+          coveredPayments: 2,
+          uncoveredPayments: 3,
+          coveragePercentage: 40,
+          matchedPayments: []
+        }
+      })
+    );
+
+    expect(textOf(script)).toContain('Visa Cal could not be imported');
+    expect(textOf(script)).toContain('2 of 5');
+    expect(cardsOf(script)).toEqual(['matching-review']);
+    expect(script.waiting).toBe(false);
+  });
+
   it('ends on the completion card', () => {
     const script = buildScript(
       imported({
