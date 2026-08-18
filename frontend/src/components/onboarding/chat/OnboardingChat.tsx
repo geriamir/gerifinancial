@@ -65,6 +65,8 @@ export const OnboardingChat: React.FC = () => {
     error,
     addCheckingAccount,
     addCreditCardAccount,
+    repairCreditCardAccount,
+    removeCreditCardAccount,
     proceedToCreditCardSetup,
     skipCreditCards,
     completeOnboarding
@@ -74,11 +76,21 @@ export const OnboardingChat: React.FC = () => {
     () => ({
       connectCheckingAccount: addCheckingAccount,
       connectCreditCardAccount: addCreditCardAccount,
+      repairCreditCardAccount,
+      removeCreditCardAccount,
       proceedToCreditCardSetup,
       skipCreditCards,
       completeOnboarding
     }),
-    [addCheckingAccount, addCreditCardAccount, proceedToCreditCardSetup, skipCreditCards, completeOnboarding]
+    [
+      addCheckingAccount,
+      addCreditCardAccount,
+      repairCreditCardAccount,
+      removeCreditCardAccount,
+      proceedToCreditCardSetup,
+      skipCreditCards,
+      completeOnboarding
+    ]
   );
 
   const script = useMemo(() => buildScript(status), [status]);

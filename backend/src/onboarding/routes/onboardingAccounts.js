@@ -3,7 +3,7 @@ const router = express.Router();
 const auth = require('../../shared/middleware/auth');
 const logger = require('../../shared/utils/logger');
 const { User } = require('../../auth');
-const { bankAccountService, Transaction } = require('../../banking');
+const { bankAccountService, Transaction, scrapingEvents } = require('../../banking');
 const onboardingCreditCardDetectionService = require('../services/onboardingCreditCardDetectionService');
 const {
   ISRACARD_BANK_ID,
@@ -142,7 +142,8 @@ router.post('/credit-card-account', auth, async (req, res) => {
         'onboarding.creditCardMatching.completed': false, // Mark as not completed
         'onboarding.creditCardMatching.processingAccountId': bankAccount._id, // Track which account is being processed
         'onboarding.creditCardMatching.completedAt': null,
-        'onboarding.creditCardMatching.error': null
+        'onboarding.creditCardMatching.error': null,
+        'onboarding.creditCardMatching.failedAccount': null
       }
     });
     
@@ -167,6 +168,190 @@ router.post('/credit-card-account', auth, async (req, res) => {
       success: false,
       error: 'Failed to add credit card account',
       message: error.message
+    });
+  }
+});
+
+/**
+ * @route   PUT /api/onboarding/credit-card-account/:accountId/credentials
+ * @desc    Repair a failed onboarding credit card account and retry its import
+ * @access  Private
+ */
+router.put('/credit-card-account/:accountId/credentials', auth, async (req, res) => {
+  const userId = req.user._id || req.user.userId;
+  const { accountId } = req.params;
+  const { username, password, card6Digits } = req.body;
+
+  try {
+    const user = await User.findById(userId);
+    const account = user?.onboarding?.creditCardSetup?.creditCardAccounts?.find(
+      candidate => candidate.accountId?.toString() === accountId
+    );
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        error: 'Credit card account not found in onboarding'
+      });
+    }
+    if (user.onboarding?.creditCardMatching?.failedAccount?.accountId?.toString() !== accountId) {
+      return res.status(409).json({
+        success: false,
+        error: 'Credit card account is not awaiting repair'
+      });
+    }
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Username and password are required'
+      });
+    }
+    if (account.bankId === ISRACARD_BANK_ID && !isValidCard6Digits(card6Digits)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Last 6 card digits must be exactly 6 digits'
+      });
+    }
+
+    await User.findByIdAndUpdate(userId, {
+      $set: {
+        'onboarding.currentStep': 'credit-card-matching',
+        'onboarding.creditCardMatching.completed': false,
+        'onboarding.creditCardMatching.completedAt': null,
+        'onboarding.creditCardMatching.error': null,
+        'onboarding.creditCardMatching.failedAccount': null,
+        'onboarding.creditCardMatching.processingAccountId': accountId
+      }
+    });
+
+    try {
+      const bankAccount = await bankAccountService.updateCredentials(
+        accountId,
+        userId,
+        { username, password, card6Digits },
+        { requireQueuedSync: true }
+      );
+
+      return res.json({
+        success: true,
+        data: {
+          accountId: bankAccount._id,
+          message: 'Credentials updated. Retrying the card import.'
+        }
+      });
+    } catch (error) {
+      const displayName = account.displayName || account.bankId || 'Credit card account';
+      const matchingError = `${displayName} still needs attention. ${error.message}`;
+
+      await User.findByIdAndUpdate(userId, {
+        $set: {
+          'onboarding.creditCardMatching.completed': true,
+          'onboarding.creditCardMatching.completedAt': new Date(),
+          'onboarding.creditCardMatching.error': matchingError,
+          'onboarding.creditCardMatching.failedAccount': {
+            accountId,
+            bankId: account.bankId,
+            displayName,
+            error: error.message
+          }
+        },
+        $unset: {
+          'onboarding.creditCardMatching.processingAccountId': ''
+        }
+      });
+
+      const queueFailed = error.code === 'SYNC_QUEUE_FAILED';
+      return res.status(queueFailed ? 503 : 400).json({
+        success: false,
+        error: queueFailed
+          ? 'Credentials updated, but the card import retry could not be started'
+          : 'Failed to update credit card credentials',
+        details: error.message
+      });
+    }
+  } catch (error) {
+    logger.error(`Failed to repair onboarding credit card account ${accountId}:`, error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to repair credit card account'
+    });
+  }
+});
+
+/**
+ * @route   DELETE /api/onboarding/credit-card-account/:accountId
+ * @desc    Remove a failed credit card account from onboarding
+ * @access  Private
+ */
+router.delete('/credit-card-account/:accountId', auth, async (req, res) => {
+  const userId = req.user._id || req.user.userId;
+  const { accountId } = req.params;
+
+  try {
+    const user = await User.findById(userId);
+    const account = user?.onboarding?.creditCardSetup?.creditCardAccounts?.find(
+      candidate => candidate.accountId?.toString() === accountId
+    );
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        error: 'Credit card account not found in onboarding'
+      });
+    }
+    if (user.onboarding?.creditCardMatching?.failedAccount?.accountId?.toString() !== accountId) {
+      return res.status(409).json({
+        success: false,
+        error: 'Credit card account is not awaiting removal'
+      });
+    }
+
+    const removed = await bankAccountService.delete(accountId, userId);
+    if (!removed) {
+      return res.status(404).json({
+        success: false,
+        error: 'Credit card account not found'
+      });
+    }
+
+    const matching = user.onboarding.creditCardMatching;
+    await User.findByIdAndUpdate(userId, {
+      $pull: {
+        'onboarding.creditCardSetup.creditCardAccounts': { accountId }
+      },
+      $set: {
+        'onboarding.currentStep': 'credit-card-matching',
+        'onboarding.creditCardMatching.completed': true,
+        'onboarding.creditCardMatching.completedAt': new Date(),
+        'onboarding.creditCardMatching.error': null,
+        'onboarding.creditCardMatching.failedAccount': null
+      },
+      $unset: {
+        'onboarding.creditCardMatching.processingAccountId': ''
+      }
+    });
+
+    scrapingEvents.emit('credit-card-matching:completed', {
+      userId,
+      matchingResults: {
+        coveredCount: matching.coveredPayments,
+        uncoveredCount: matching.uncoveredPayments,
+        coveragePercentage: matching.coveragePercentage
+      }
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        accountId,
+        message: 'Credit card account removed.'
+      }
+    });
+  } catch (error) {
+    logger.error(`Failed to remove onboarding credit card account ${accountId}:`, error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to remove credit card account'
     });
   }
 });

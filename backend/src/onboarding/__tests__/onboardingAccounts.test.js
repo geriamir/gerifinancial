@@ -13,7 +13,9 @@ jest.mock('../../banking', () => {
   return {
     ...actual,
     bankAccountService: {
-      create: jest.fn()
+      create: jest.fn(),
+      updateCredentials: jest.fn(),
+      delete: jest.fn()
     }
   };
 });
@@ -268,6 +270,136 @@ describe('Onboarding Accounts API', () => {
       expect(response.status).toBe(400);
       expect(response.body.error).toBe('Last 6 card digits must be exactly 6 digits');
       expect(bankAccountService.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('failed onboarding credit card actions', () => {
+    let failedAccountId;
+
+    beforeEach(async () => {
+      failedAccountId = new mongoose.Types.ObjectId();
+      testUser.onboarding = {
+        startedAt: new Date(),
+        currentStep: 'credit-card-matching',
+        isComplete: false,
+        creditCardSetup: {
+          skipped: false,
+          creditCardAccounts: [{
+            accountId: failedAccountId,
+            connectedAt: new Date(),
+            bankId: 'visaCal',
+            displayName: 'Visa Cal Credit Cards'
+          }]
+        },
+        creditCardMatching: {
+          completed: true,
+          completedAt: new Date(),
+          error: 'Visa Cal Credit Cards could not be imported.',
+          failedAccount: {
+            accountId: failedAccountId,
+            bankId: 'visaCal',
+            displayName: 'Visa Cal Credit Cards',
+            error: 'The bank requires a password change.'
+          },
+          totalCreditCardPayments: 5,
+          coveredPayments: 2,
+          uncoveredPayments: 3,
+          coveragePercentage: 40,
+          matchedPayments: []
+        }
+      };
+      await testUser.save();
+    });
+
+    it('updates credentials and returns the account to processing', async () => {
+      bankAccountService.updateCredentials.mockResolvedValue({
+        _id: failedAccountId
+      });
+
+      const response = await request(app)
+        .put(`/api/onboarding/credit-card-account/${failedAccountId}/credentials`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          username: 'cal-user',
+          password: 'new-password'
+        });
+
+      expect(response.status).toBe(200);
+      expect(bankAccountService.updateCredentials).toHaveBeenCalledWith(
+        failedAccountId.toString(),
+        testUser._id,
+        {
+          username: 'cal-user',
+          password: 'new-password',
+          card6Digits: undefined
+        },
+        { requireQueuedSync: true }
+      );
+
+      const updatedUser = await User.findById(testUser._id);
+      expect(updatedUser.onboarding.creditCardMatching.completed).toBe(false);
+      expect(updatedUser.onboarding.creditCardMatching.processingAccountId.toString())
+        .toBe(failedAccountId.toString());
+      expect(updatedUser.onboarding.creditCardMatching.error).toBeNull();
+      expect(updatedUser.onboarding.creditCardMatching.failedAccount).toBeNull();
+    });
+
+    it('restores the failed account when the retry cannot be queued', async () => {
+      const queueError = new Error(
+        'Credentials were updated, but the automatic import retry could not be started: Queue unavailable'
+      );
+      queueError.code = 'SYNC_QUEUE_FAILED';
+      bankAccountService.updateCredentials.mockRejectedValue(queueError);
+
+      const response = await request(app)
+        .put(`/api/onboarding/credit-card-account/${failedAccountId}/credentials`)
+        .set('Authorization', ['Bearer', authToken].join(' '))
+        .send({
+          username: 'cal-user',
+          password: 'new-password'
+        });
+
+      expect(response.status).toBe(503);
+      expect(response.body.error)
+        .toBe('Credentials updated, but the card import retry could not be started');
+
+      const updatedUser = await User.findById(testUser._id);
+      expect(updatedUser.onboarding.creditCardMatching.completed).toBe(true);
+      expect(updatedUser.onboarding.creditCardMatching.processingAccountId).toBeNull();
+      expect(updatedUser.onboarding.creditCardMatching.failedAccount).toEqual(
+        expect.objectContaining({
+          accountId: failedAccountId,
+          bankId: 'visaCal',
+          displayName: 'Visa Cal Credit Cards',
+          error: expect.stringContaining('Queue unavailable')
+        })
+      );
+    });
+
+    it('removes the failed account and preserves the previous matching result', async () => {
+      bankAccountService.delete.mockResolvedValue(true);
+
+      const response = await request(app)
+        .delete(`/api/onboarding/credit-card-account/${failedAccountId}`)
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(response.status).toBe(200);
+      expect(bankAccountService.delete).toHaveBeenCalledWith(
+        failedAccountId.toString(),
+        testUser._id
+      );
+
+      const updatedUser = await User.findById(testUser._id);
+      expect(updatedUser.onboarding.creditCardSetup.creditCardAccounts).toHaveLength(0);
+      expect(updatedUser.onboarding.creditCardMatching).toEqual(expect.objectContaining({
+        completed: true,
+        error: null,
+        totalCreditCardPayments: 5,
+        coveredPayments: 2,
+        uncoveredPayments: 3,
+        coveragePercentage: 40
+      }));
+      expect(updatedUser.onboarding.creditCardMatching.failedAccount).toBeNull();
     });
   });
 

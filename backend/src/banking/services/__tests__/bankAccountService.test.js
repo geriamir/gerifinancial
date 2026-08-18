@@ -281,6 +281,45 @@ describe('BankAccountService', () => {
     });
   });
 
+  describe('updateCredentials', () => {
+    it('surfaces a required retry queue failure without leaving the account active', async () => {
+      const account = await BankAccount.create({
+        userId,
+        bankId: mockAccountData.bankId,
+        name: mockAccountData.name,
+        credentials: {
+          username: mockAccountData.username,
+          password: mockAccountData.password
+        },
+        status: 'error'
+      });
+      bankScraperService.validateCredentials.mockResolvedValueOnce(true);
+      queuedDataSyncService.queueBankAccountSync.mockRejectedValueOnce(new Error('Queue unavailable'));
+
+      await expect(bankAccountService.updateCredentials(
+        account._id,
+        userId,
+        {
+          username: 'new-user',
+          password: 'new-password'
+        },
+        { requireQueuedSync: true }
+      )).rejects.toMatchObject({
+        code: 'SYNC_QUEUE_FAILED',
+        message: expect.stringContaining('Queue unavailable')
+      });
+
+      const updatedAccount = await BankAccount.findById(account._id);
+      expect(updatedAccount.status).toBe('error');
+      expect(updatedAccount.lastError.message)
+        .toBe('Credentials were updated, but the automatic import retry could not be started');
+      expect((await updatedAccount.getScraperOptions()).credentials).toEqual({
+        username: 'new-user',
+        password: 'new-password'
+      });
+    });
+  });
+
   describe('recoverMissingTransactions', () => {
     let account;
 

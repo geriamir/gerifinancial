@@ -66,6 +66,12 @@ export interface OnboardingStatus {
     completed: boolean;
     completedAt: string | null;
     error?: string | null;
+    failedAccount?: {
+      accountId: string;
+      bankId: string;
+      displayName: string;
+      error: string;
+    } | null;
     totalCreditCardPayments: number;
     coveredPayments: number;
     uncoveredPayments: number;
@@ -246,6 +252,22 @@ export const onboardingApi = {
       credentials,
       displayName
     });
+    return response.data.data;
+  },
+
+  repairCreditCardAccount: async (
+    accountId: string,
+    credentials: { username: string; password: string; card6Digits?: string }
+  ) => {
+    const response = await api.put(
+      `/onboarding/credit-card-account/${accountId}/credentials`,
+      credentials
+    );
+    return response.data.data;
+  },
+
+  removeCreditCardAccount: async (accountId: string) => {
+    const response = await api.delete(`/onboarding/credit-card-account/${accountId}`);
     return response.data.data;
   },
 

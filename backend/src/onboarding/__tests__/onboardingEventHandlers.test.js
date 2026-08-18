@@ -780,6 +780,12 @@ describe('Onboarding Event Handlers', () => {
         coveragePercentage: 40
       }));
       expect(updatedUser.onboarding.creditCardMatching.processingAccountId).toBeFalsy();
+      expect(updatedUser.onboarding.creditCardMatching.failedAccount).toEqual(expect.objectContaining({
+        accountId: creditCardAccountId,
+        bankId: 'isracard',
+        displayName: 'Isracard',
+        error: 'The bank requires a password change. Sign in to the bank website and change it'
+      }));
       expect(updatedUser.onboarding.currentStep).toBe('credit-card-matching');
       expect(updatedUser.onboarding.isComplete).toBe(false);
       expect(emit).toHaveBeenCalledWith('credit-card-matching:completed', {

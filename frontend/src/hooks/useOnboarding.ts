@@ -9,6 +9,11 @@ interface UseOnboardingResult {
   refetch: () => Promise<OnboardingStatus>;
   addCheckingAccount: (bankId: string, credentials: any, displayName?: string) => Promise<any>;
   addCreditCardAccount: (bankId: string, credentials: any, displayName?: string) => Promise<any>;
+  repairCreditCardAccount: (
+    accountId: string,
+    credentials: { username: string; password: string; card6Digits?: string }
+  ) => Promise<any>;
+  removeCreditCardAccount: (accountId: string) => Promise<any>;
   proceedToCreditCardSetup: () => Promise<void>;
   skipCreditCards: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -66,6 +71,42 @@ export const useOnboarding = (): UseOnboardingResult => {
         break;
     }
   }, [fetchStatus]);
+
+  const refetchAfterActionFailure = useCallback(async () => {
+    try {
+      await fetchStatus();
+    } catch (refreshError) {
+      // fetchStatus already exposes this error through the hook state.
+      console.error('[useOnboarding] Failed to refresh after an onboarding action:', refreshError);
+    }
+  }, [fetchStatus]);
+
+  const repairCreditCardAccount = useCallback(async (
+    accountId: string,
+    credentials: { username: string; password: string; card6Digits?: string }
+  ) => {
+    try {
+      setError(null);
+      const result = await onboardingApi.repairCreditCardAccount(accountId, credentials);
+      await fetchStatus();
+      return result;
+    } catch (err) {
+      await refetchAfterActionFailure();
+      throw err;
+    }
+  }, [fetchStatus, refetchAfterActionFailure]);
+
+  const removeCreditCardAccount = useCallback(async (accountId: string) => {
+    try {
+      setError(null);
+      const result = await onboardingApi.removeCreditCardAccount(accountId);
+      await fetchStatus();
+      return result;
+    } catch (err) {
+      await refetchAfterActionFailure();
+      throw err;
+    }
+  }, [fetchStatus, refetchAfterActionFailure]);
 
   // Connect to SSE for real-time updates
   useSSE(handleSSEEvent, { autoConnect: true });
@@ -169,6 +210,8 @@ export const useOnboarding = (): UseOnboardingResult => {
     refetch: fetchStatus,
     addCheckingAccount,
     addCreditCardAccount,
+    repairCreditCardAccount,
+    removeCreditCardAccount,
     proceedToCreditCardSetup,
     skipCreditCards,
     completeOnboarding

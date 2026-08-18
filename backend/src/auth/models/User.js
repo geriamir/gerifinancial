@@ -217,6 +217,19 @@ const userSchema = new mongoose.Schema({
         ref: 'BankAccount',
         default: null
       },
+      failedAccount: {
+        type: {
+          accountId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'BankAccount'
+          },
+          bankId: String,
+          displayName: String,
+          error: String
+        },
+        default: null,
+        _id: false
+      },
       totalCreditCardPayments: {
         type: Number,
         default: 0

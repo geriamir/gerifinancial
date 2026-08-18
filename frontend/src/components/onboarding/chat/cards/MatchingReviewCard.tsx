@@ -5,6 +5,7 @@ import { CardShell } from '../CardShell';
 import { CardProps } from '../types';
 import { CREDIT_CARD_PROVIDERS } from '../../../../constants/banks';
 import { formatCurrencyDisplay } from '../../../../utils/formatters';
+import { FailedCardAccountActions } from './FailedCardAccountActions';
 
 const providerName = (provider: string): string =>
   CREDIT_CARD_PROVIDERS.find((candidate) => candidate.id === provider)?.name || provider;
@@ -28,6 +29,7 @@ export const MatchingReviewCard: React.FC<CardProps> = ({ status, handlers }) =>
   const matching = status.creditCardMatching;
   const cards = matching?.connectedCreditCards || [];
   const matchedPayments = matching?.matchedPayments || [];
+  const failedAccount = matching?.failedAccount;
   const percentage = Math.round(matching?.coveragePercentage || 0);
 
   const run = async (action: 'more' | 'finish') => {
@@ -41,6 +43,10 @@ export const MatchingReviewCard: React.FC<CardProps> = ({ status, handlers }) =>
 
   return (
     <CardShell testId="matching-review">
+      {failedAccount && (
+        <FailedCardAccountActions account={failedAccount} handlers={handlers} />
+      )}
+
       {(matching?.totalCreditCardPayments ?? 0) > 0 && (
         <Box sx={{ mb: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
