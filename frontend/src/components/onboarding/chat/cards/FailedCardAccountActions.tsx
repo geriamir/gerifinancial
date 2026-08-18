@@ -8,7 +8,7 @@ import {
   TextField,
   Typography
 } from '@mui/material';
-import { AxiosError } from 'axios';
+import axios from 'axios';
 import { OnboardingStatus } from '../../../../services/api/onboarding';
 import { ChatHandlers } from '../types';
 
@@ -19,13 +19,32 @@ interface FailedCardAccountActionsProps {
 
 type Mode = 'summary' | 'repair' | 'remove';
 
+const displayableErrorValue = (value: unknown): string | null => {
+  if (typeof value === 'string') return value.trim() || null;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return null;
+};
+
 const apiErrorMessage = (error: unknown): string => {
-  if (error instanceof AxiosError) {
-    return error.response?.data?.details
-      || error.response?.data?.error
-      || 'Failed to update the card account';
+  if (axios.isAxiosError(error)) {
+    const responseData: unknown = error.response?.data;
+    const directMessage = displayableErrorValue(responseData);
+    if (directMessage) return directMessage;
+
+    if (responseData && typeof responseData === 'object') {
+      const details = 'details' in responseData
+        ? displayableErrorValue(responseData.details)
+        : null;
+      const responseError = 'error' in responseData
+        ? displayableErrorValue(responseData.error)
+        : null;
+      return details || responseError || 'Failed to update the card account';
+    }
   }
-  return error instanceof Error ? error.message : 'Failed to update the card account';
+
+  return error instanceof Error && error.message
+    ? error.message
+    : 'Failed to update the card account';
 };
 
 export const FailedCardAccountActions: React.FC<FailedCardAccountActionsProps> = ({

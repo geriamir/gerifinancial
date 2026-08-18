@@ -356,6 +356,25 @@ describe('OnboardingChat', () => {
     });
   });
 
+  it('shows details from an Axios-compatible repair error', async () => {
+    const user = userEvent.setup();
+    mockStatus = failedCard();
+    mockRepairCreditCardAccount.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        data: { details: 503 }
+      }
+    });
+    draw();
+
+    await user.click(await screen.findByTestId('fix-card-account-btn'));
+    await user.type(screen.getByTestId('repair-card-username'), 'cal-user');
+    await user.type(screen.getByTestId('repair-card-password'), 'new-password');
+    await user.click(screen.getByRole('button', { name: 'Save and retry' }));
+
+    expect(await screen.findByText('503')).toBeInTheDocument();
+  });
+
   it('confirms before removing the failed account', async () => {
     const user = userEvent.setup();
     mockStatus = failedCard();

@@ -72,6 +72,15 @@ export const useOnboarding = (): UseOnboardingResult => {
     }
   }, [fetchStatus]);
 
+  const refetchAfterActionFailure = useCallback(async () => {
+    try {
+      await fetchStatus();
+    } catch (refreshError) {
+      // fetchStatus already exposes this error through the hook state.
+      console.error('[useOnboarding] Failed to refresh after an onboarding action:', refreshError);
+    }
+  }, [fetchStatus]);
+
   const repairCreditCardAccount = useCallback(async (
     accountId: string,
     credentials: { username: string; password: string; card6Digits?: string }
@@ -82,11 +91,10 @@ export const useOnboarding = (): UseOnboardingResult => {
       await fetchStatus();
       return result;
     } catch (err) {
-      await fetchStatus();
-      setError(err as Error);
+      await refetchAfterActionFailure();
       throw err;
     }
-  }, [fetchStatus]);
+  }, [fetchStatus, refetchAfterActionFailure]);
 
   const removeCreditCardAccount = useCallback(async (accountId: string) => {
     try {
@@ -95,10 +103,10 @@ export const useOnboarding = (): UseOnboardingResult => {
       await fetchStatus();
       return result;
     } catch (err) {
-      setError(err as Error);
+      await refetchAfterActionFailure();
       throw err;
     }
-  }, [fetchStatus]);
+  }, [fetchStatus, refetchAfterActionFailure]);
 
   // Connect to SSE for real-time updates
   useSSE(handleSSEEvent, { autoConnect: true });
