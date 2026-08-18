@@ -1,6 +1,34 @@
 const logger = require('../../../shared/utils/logger');
 const BaseSyncStrategy = require('./BaseSyncStrategy');
 
+const SCRAPER_ERROR_MESSAGES = {
+  TWO_FACTOR_RETRIEVER_MISSING: 'Two-factor authentication is required for this account',
+  INVALID_PASSWORD: 'Invalid bank credentials',
+  CHANGE_PASSWORD: 'The bank requires a password change. Sign in to the bank website, change the password, then update the saved credentials',
+  TIMEOUT: 'The bank website took too long to respond',
+  ACCOUNT_BLOCKED: 'The bank account is blocked. Contact the bank before retrying',
+  GENERIC: 'The bank scraper encountered an unexpected error',
+  GENERAL_ERROR: 'The bank website returned an unexpected login error'
+};
+
+function getScraperErrorMessage(scrapingResult) {
+  const errorMessage = typeof scrapingResult.errorMessage === 'string'
+    ? scrapingResult.errorMessage.trim()
+    : '';
+
+  if (errorMessage) {
+    return errorMessage;
+  }
+
+  if (SCRAPER_ERROR_MESSAGES[scrapingResult.errorType]) {
+    return SCRAPER_ERROR_MESSAGES[scrapingResult.errorType];
+  }
+
+  return scrapingResult.errorType
+    ? `Scraper failed with error type ${scrapingResult.errorType}`
+    : 'Scraper failed without error details';
+}
+
 /**
  * Sync strategy for banks that use the israeli-bank-scrapers library.
  * Handles scraper creation, login, and the scrape→process pipeline.
@@ -62,7 +90,7 @@ class IsraeliScraperSyncStrategy extends BaseSyncStrategy {
       const scrapingResult = await scraper[this.scrapingMethod](credentials);
       
       if (!scrapingResult.success) {
-        throw new Error(`${this.displayName} scraping failed: ${scrapingResult.errorMessage || 'Unknown error'}`);
+        throw new Error(`${this.displayName} scraping failed: ${getScraperErrorMessage(scrapingResult)}`);
       }
       
       const processedResults = await this.processScrapedData(scrapingResult, bankAccount, context);
