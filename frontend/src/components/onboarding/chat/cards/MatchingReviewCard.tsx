@@ -9,13 +9,14 @@ import { formatCurrencyDisplay } from '../../../../utils/formatters';
 const providerName = (provider: string): string =>
   CREDIT_CARD_PROVIDERS.find((candidate) => candidate.id === provider)?.name || provider;
 
-const formatPaymentDate = (date: string): string =>
-  new Intl.DateTimeFormat('en-IL', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'Asia/Jerusalem'
-  }).format(new Date(date));
+const PAYMENT_DATE_FORMATTER = new Intl.DateTimeFormat('en-IL', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'Asia/Jerusalem'
+});
+
+const formatPaymentDate = (date: string): string => PAYMENT_DATE_FORMATTER.format(new Date(date));
 
 /**
  * Shown once the card statements have been matched against the payments in the
