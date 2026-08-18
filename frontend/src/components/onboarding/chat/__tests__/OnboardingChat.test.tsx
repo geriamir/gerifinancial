@@ -222,6 +222,70 @@ describe('OnboardingChat', () => {
     expect(Number(bar.getAttribute('aria-valuenow'))).toBeLessThan(100);
   });
 
+  it('separates provider-level matches from connected card endings', async () => {
+    mockStatus = {
+      ...importing(),
+      currentStep: 'credit-card-matching',
+      completedSteps: ['checking-account', 'transaction-import', 'credit-card-detection', 'credit-card-setup'],
+      transactionImport: {
+        completed: true,
+        transactionsImported: 42,
+        completedAt: '2026-01-01T00:05:00Z',
+        scrapingStatus: { isActive: false, status: 'complete', progress: 100, message: null, error: null }
+      },
+      creditCardDetection: {
+        analyzed: true,
+        analyzedAt: '2026-01-01T00:06:00Z',
+        transactionCount: 5,
+        recommendation: 'connect',
+        sampleTransactions: []
+      },
+      creditCardSetup: {
+        skipped: false,
+        skippedAt: null,
+        creditCardAccounts: []
+      },
+      creditCardMatching: {
+        completed: true,
+        completedAt: '2026-01-01T00:08:00Z',
+        totalCreditCardPayments: 5,
+        coveredPayments: 2,
+        uncoveredPayments: 3,
+        coveragePercentage: 40,
+        matchedPayments: [{
+          payment: {
+            id: 'payment-1',
+            date: '2026-08-10T00:00:00.000Z',
+            description: 'Card payment',
+            amount: 34208.45
+          },
+          matchedCreditCard: {
+            id: 'card-1',
+            displayName: 'Visa Cal Credit Cards',
+            cardNumber: '0296',
+            lastFourDigits: '0296',
+            provider: 'visaCal'
+          },
+          matchedMonth: '2026-08',
+          matchConfidence: 91
+        }],
+        connectedCreditCards: [
+          { id: 'card-1', displayName: '0296', provider: 'visaCal' },
+          { id: 'card-2', displayName: '4940', provider: 'visaCal' }
+        ]
+      }
+    };
+    draw();
+
+    expect(await screen.findByText('Matched checking-account payments')).toBeInTheDocument();
+    expect(screen.getByText(/34,208\.45/)).toBeInTheDocument();
+    expect(screen.getByText('Matched to Visa Cal')).toBeInTheDocument();
+    expect(screen.getByText('Connected cards (last 4 digits)')).toBeInTheDocument();
+    expect(screen.getByText('ending 0296')).toBeInTheDocument();
+    expect(screen.getByText('ending 4940')).toBeInTheDocument();
+    expect(screen.getByText(/cannot always be assigned to one card ending/)).toBeInTheDocument();
+  });
+
   it('shows full progress once onboarding is complete', async () => {
     mockStatus = { ...importing(), currentStep: 'complete', isComplete: true };
     draw();

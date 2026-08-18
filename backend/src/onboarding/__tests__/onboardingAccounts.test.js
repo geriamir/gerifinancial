@@ -200,6 +200,10 @@ describe('Onboarding Accounts API', () => {
         .toBe(mockAccount._id.toString());
       expect(updatedUser.onboarding.creditCardSetup.creditCardAccounts[0].bankId).toBe('isracard');
       expect(updatedUser.onboarding.currentStep).toBe('credit-card-matching');
+      expect(updatedUser.onboarding.creditCardMatching.completed).toBe(false);
+      expect(updatedUser.onboarding.creditCardMatching.processingAccountId.toString())
+        .toBe(mockAccount._id.toString());
+      expect(updatedUser.onboarding.creditCardMatching.error).toBeNull();
     });
 
     it('should allow adding multiple credit card accounts', async () => {

@@ -208,6 +208,15 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: null
       },
+      error: {
+        type: String,
+        default: null
+      },
+      processingAccountId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'BankAccount',
+        default: null
+      },
       totalCreditCardPayments: {
         type: Number,
         default: 0

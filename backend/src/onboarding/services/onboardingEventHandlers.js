@@ -585,6 +585,7 @@ class OnboardingEventHandlers {
    */
   async handleCheckingAccountsFailed(data) {
     const { strategyName, bankAccountId, userId, error } = data;
+    const errorMessage = error?.message || 'Unknown error';
     
     logger.info(`📬 Onboarding: Received checking-accounts failed event for account ${bankAccountId}`);
     
@@ -600,7 +601,7 @@ class OnboardingEventHandlers {
         isActive: false,
         status: 'error',
         progress: 0,
-        message: `Import failed: ${error.message || 'Unknown error'}`,
+        message: `Import failed: ${errorMessage}`,
         startedAt: bankAccount.scrapingStatus?.startedAt || new Date(),
         lastUpdatedAt: new Date(),
         transactionsImported: 0,
@@ -608,6 +609,51 @@ class OnboardingEventHandlers {
       };
 
       await bankAccount.save();
+
+      const user = await User.findById(userId);
+      const onboardingCreditCards = user?.onboarding?.creditCardSetup?.creditCardAccounts || [];
+      const isOnboardingCreditCard = onboardingCreditCards.some(
+        account => account.accountId?.toString() === bankAccountId.toString()
+      );
+      const matching = user?.onboarding?.creditCardMatching;
+      const processingAccountId = matching?.processingAccountId?.toString();
+      const isTrackedAccount = !processingAccountId || processingAccountId === bankAccountId.toString();
+
+      if (
+        user
+        && !user.onboarding?.isComplete
+        && user.onboarding?.currentStep === 'credit-card-matching'
+        && matching?.completed === false
+        && isOnboardingCreditCard
+        && isTrackedAccount
+      ) {
+        const providerName = bankAccount.displayName || bankAccount.name || 'Credit card account';
+        const failureReason = errorMessage.replace(/^Checking Accounts scraping failed:\s*/, '');
+        const matchingError = `${providerName} could not be imported. ${failureReason}`;
+        const completedAt = new Date();
+
+        await User.findByIdAndUpdate(userId, {
+          $set: {
+            'onboarding.creditCardMatching.completed': true,
+            'onboarding.creditCardMatching.completedAt': completedAt,
+            'onboarding.creditCardMatching.error': matchingError
+          },
+          $unset: {
+            'onboarding.creditCardMatching.processingAccountId': ''
+          }
+        });
+
+        scrapingEvents.emit('credit-card-matching:completed', {
+          userId,
+          matchingResults: {
+            coveredCount: matching.coveredPayments,
+            uncoveredCount: matching.uncoveredPayments,
+            coveragePercentage: matching.coveragePercentage
+          }
+        });
+
+        logger.info(`✅ Onboarding: Restored matching review after card import failure for account ${bankAccountId}`);
+      }
       
       logger.info(`✅ Onboarding: Updated scraping status to error for account ${bankAccountId}`);
     } catch (err) {

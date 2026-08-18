@@ -65,6 +65,7 @@ export interface OnboardingStatus {
   creditCardMatching: {
     completed: boolean;
     completedAt: string | null;
+    error?: string | null;
     totalCreditCardPayments: number;
     coveredPayments: number;
     uncoveredPayments: number;
