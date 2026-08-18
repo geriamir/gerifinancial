@@ -126,7 +126,7 @@ class BankAccountService {
     apiToken,
     flexToken,
     queryId
-  }) {
+  }, { requireQueuedSync = false } = {}) {
     const bankAccount = await BankAccount.findOne({ _id: accountId, userId });
     if (!bankAccount) {
       throw new Error('Bank account not found');
@@ -172,7 +172,20 @@ class BankAccountService {
       logger.info(`Queued scraping job for account ${bankAccount.name} after credential update`);
     } catch (error) {
       logger.error(`Failed to queue scraping after credential update for account ${bankAccount.name}:`, error);
-      // Don't throw error - credential update was successful
+      if (requireQueuedSync) {
+        bankAccount.status = 'error';
+        bankAccount.lastError = {
+          message: 'Credentials were updated, but the automatic import retry could not be started',
+          date: new Date()
+        };
+        await bankAccount.save();
+
+        const retryError = new Error(
+          `Credentials were updated, but the automatic import retry could not be started: ${error.message}`
+        );
+        retryError.code = 'SYNC_QUEUE_FAILED';
+        throw retryError;
+      }
     }
 
     return bankAccount;

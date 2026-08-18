@@ -636,7 +636,13 @@ class OnboardingEventHandlers {
           $set: {
             'onboarding.creditCardMatching.completed': true,
             'onboarding.creditCardMatching.completedAt': completedAt,
-            'onboarding.creditCardMatching.error': matchingError
+            'onboarding.creditCardMatching.error': matchingError,
+            'onboarding.creditCardMatching.failedAccount': {
+              accountId: bankAccountId,
+              bankId: bankAccount.bankId,
+              displayName: providerName,
+              error: failureReason
+            }
           },
           $unset: {
             'onboarding.creditCardMatching.processingAccountId': ''

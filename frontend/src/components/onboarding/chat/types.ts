@@ -40,6 +40,11 @@ export interface ChatHandlers {
     credentials: { username: string; password: string; card6Digits?: string },
     displayName: string
   ) => Promise<unknown>;
+  repairCreditCardAccount: (
+    accountId: string,
+    credentials: { username: string; password: string; card6Digits?: string }
+  ) => Promise<unknown>;
+  removeCreditCardAccount: (accountId: string) => Promise<unknown>;
   proceedToCreditCardSetup: () => Promise<void>;
   skipCreditCards: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
