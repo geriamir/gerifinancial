@@ -87,4 +87,30 @@ describe('IsraeliScraperSyncStrategy', () => {
       'Checking Accounts scraping failed: Scraper failed with error type NEW_SCRAPER_ERROR'
     );
   });
+
+  it('does not read inherited properties as scraper error messages', async () => {
+    bankScraperService.createScraper.mockReturnValue({
+      scrape: jest.fn().mockResolvedValue({
+        success: false,
+        errorType: '__proto__'
+      })
+    });
+
+    await expect(strategy.executeSync(bankAccount, {}, {})).rejects.toThrow(
+      'Checking Accounts scraping failed: Scraper failed with error type __proto__'
+    );
+  });
+
+  it.each([
+    ['a null result', null],
+    ['a non-string error type', { success: false, errorType: { code: 'CHANGE_PASSWORD' } }]
+  ])('handles %s without throwing a type error', async (_description, scrapingResult) => {
+    bankScraperService.createScraper.mockReturnValue({
+      scrape: jest.fn().mockResolvedValue(scrapingResult)
+    });
+
+    await expect(strategy.executeSync(bankAccount, {}, {})).rejects.toThrow(
+      'Checking Accounts scraping failed: Scraper failed without error details'
+    );
+  });
 });

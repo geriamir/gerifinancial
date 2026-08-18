@@ -12,7 +12,7 @@ const SCRAPER_ERROR_MESSAGES = {
 };
 
 function getScraperErrorMessage(scrapingResult) {
-  const errorMessage = typeof scrapingResult.errorMessage === 'string'
+  const errorMessage = typeof scrapingResult?.errorMessage === 'string'
     ? scrapingResult.errorMessage.trim()
     : '';
 
@@ -20,12 +20,16 @@ function getScraperErrorMessage(scrapingResult) {
     return errorMessage;
   }
 
-  if (SCRAPER_ERROR_MESSAGES[scrapingResult.errorType]) {
-    return SCRAPER_ERROR_MESSAGES[scrapingResult.errorType];
+  const errorType = typeof scrapingResult?.errorType === 'string'
+    ? scrapingResult.errorType.trim()
+    : '';
+
+  if (Object.prototype.hasOwnProperty.call(SCRAPER_ERROR_MESSAGES, errorType)) {
+    return SCRAPER_ERROR_MESSAGES[errorType];
   }
 
-  return scrapingResult.errorType
-    ? `Scraper failed with error type ${scrapingResult.errorType}`
+  return errorType
+    ? `Scraper failed with error type ${errorType}`
     : 'Scraper failed without error details';
 }
 
@@ -89,7 +93,7 @@ class IsraeliScraperSyncStrategy extends BaseSyncStrategy {
       
       const scrapingResult = await scraper[this.scrapingMethod](credentials);
       
-      if (!scrapingResult.success) {
+      if (!scrapingResult?.success) {
         throw new Error(`${this.displayName} scraping failed: ${getScraperErrorMessage(scrapingResult)}`);
       }
       
