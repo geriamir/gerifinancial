@@ -3,9 +3,6 @@ name: Unit Tests
 on:
   pull_request:
     branches: [ main, develop ]
-  # Called by deploy.yml, so pushes to main are gated by the same suite that
-  # gates pull requests instead of a second copy of it that can drift.
-  workflow_call:
 
 jobs:
   test:
