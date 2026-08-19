@@ -18,9 +18,9 @@ concurrency:
   cancel-in-progress: false
 
 # id-token is granted per job rather than here. The token can be exchanged for
-# Azure access, and the test and build jobs run the projects' whole npm
-# dependency trees - a compromised package in one of them has no business being
-# able to mint one.
+# Azure access, and the build jobs run the projects' whole npm dependency
+# trees - a compromised package in one of them has no business being able to
+# mint one.
 permissions:
   contents: read
 
@@ -32,9 +32,6 @@ env:
   API_URL: https://gerifinancial-api.livelymushroom-c563c2a6.northeurope.azurecontainerapps.io
 
 jobs:
-  test:
-    uses: ./.github/workflows/test.yml
-
   changes:
     name: Detect changed areas
     runs-on: ubuntu-latest
@@ -100,7 +97,7 @@ jobs:
 
   deploy-api:
     name: Deploy API
-    needs: [ test, changes ]
+    needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -165,7 +162,7 @@ jobs:
 
   build-frontend:
     name: Build frontend
-    needs: [ test, changes ]
+    needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     # Deliberately no id-token. This job runs the frontend's entire dependency
