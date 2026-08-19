@@ -98,7 +98,7 @@ jobs:
   deploy-api:
     name: Deploy API
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -163,7 +163,7 @@ jobs:
   build-frontend:
     name: Build frontend
     needs: changes
-    if: needs.changes.outputs.frontend == 'true'
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     # Deliberately no id-token. This job runs the frontend's entire dependency
     # tree through npm ci and the build, and the deploy identity can replace
@@ -202,6 +202,7 @@ jobs:
   deploy-frontend:
     name: Deploy frontend
     needs: build-frontend
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
