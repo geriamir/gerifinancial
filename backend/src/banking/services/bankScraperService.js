@@ -6,6 +6,7 @@ const { createScraper } = scraperModule;
 const logger = require('../../shared/utils/logger');
 const { BankAccount } = require('../models');
 const { resolveStartDate } = require('../utils/scraperDates');
+const { getScraperErrorMessage } = require('../utils/scraperErrors');
 
 
 class BankScraperService {
@@ -86,17 +87,19 @@ class BankScraperService {
   }
 
   async login(bankAccount, options = {}) {
-    const scraper = this.createScraper(bankAccount, options);
     const { credentials } = await bankAccount.getScraperOptions();
     let attempts = 0;
     let error = null;
 
     while (attempts < this.MAX_RETRIES) {
+      const scraper = this.createScraper(bankAccount, options);
+
       try {
+        await scraper.initialize();
         const loginResult = await scraper.login(credentials);
 
-        if (!loginResult) {
-          throw new Error('Login failed - invalid credentials');
+        if (loginResult !== true && loginResult?.success !== true) {
+          throw new Error(getScraperErrorMessage(loginResult));
         }
 
         logger.info(`Successfully logged in to bank account ${bankAccount._id}`);
@@ -104,6 +107,7 @@ class BankScraperService {
       } catch (err) {
         error = err;
         attempts++;
+        await this.terminateScraper(scraper, false);
         
         if (attempts < this.MAX_RETRIES) {
           logger.info(`Login attempt ${attempts} failed for bank account ${bankAccount._id}, retrying in ${this.RETRY_DELAY}ms...`);
@@ -113,6 +117,18 @@ class BankScraperService {
     }
 
     this.handleScraperError(error, 'Login', bankAccount._id);
+  }
+
+  async terminateScraper(scraper, success) {
+    if (typeof scraper?.terminate !== 'function') {
+      return;
+    }
+
+    try {
+      await scraper.terminate(success);
+    } catch (error) {
+      logger.warn(`Failed to close scraper after login validation: ${error.message}`);
+    }
   }
 
   // REMOVED: Old comprehensive scrapeTransactions method
@@ -424,21 +440,27 @@ class BankScraperService {
       })
     };
     
+    let scraper;
     try {
-      await this.login(tempAccount, { verbose: true });
+      scraper = await this.login(tempAccount, { verbose: true });
       return true;
-    } catch (error) {
-      throw error; // Let the caller handle the error
+    } finally {
+      if (scraper) {
+        await this.terminateScraper(scraper, true);
+      }
     }
   }
 
   async testConnection(bankAccount) {
+    let scraper;
     try {
-      await this.login(bankAccount);
+      scraper = await this.login(bankAccount);
       logger.info(`Connection test successful for bank account ${bankAccount._id}`);
       return true;
-    } catch (error) {
-      throw error; // Let the caller handle the error
+    } finally {
+      if (scraper) {
+        await this.terminateScraper(scraper, true);
+      }
     }
   }
 

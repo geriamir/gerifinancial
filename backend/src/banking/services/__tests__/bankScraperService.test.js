@@ -21,6 +21,10 @@ describe('BankScraperService', () => {
     })
   };
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   describe('login', () => {
     it('should successfully login with valid credentials', async () => {
       const scraper = await bankScraperService.login(mockBankAccount);
@@ -68,6 +72,44 @@ describe('BankScraperService', () => {
         .rejects
         .toThrow('Login failed: Invalid bank credentials');
     });
+
+    it('initializes the scraper before logging in', async () => {
+      const scraper = {
+        initialize: jest.fn().mockResolvedValue(undefined),
+        login: jest.fn().mockResolvedValue({ success: true })
+      };
+      jest.spyOn(bankScraperService, 'createScraper').mockReturnValue(scraper);
+
+      await bankScraperService.login(mockBankAccount);
+
+      expect(scraper.initialize).toHaveBeenCalledTimes(1);
+      expect(scraper.login).toHaveBeenCalledTimes(1);
+      expect(scraper.initialize.mock.invocationCallOrder[0])
+        .toBeLessThan(scraper.login.mock.invocationCallOrder[0]);
+    });
+
+    it('rejects an unsuccessful scraper login result', async () => {
+      const originalMaxRetries = bankScraperService.MAX_RETRIES;
+      const scraper = {
+        initialize: jest.fn().mockResolvedValue(undefined),
+        login: jest.fn().mockResolvedValue({
+          success: false,
+          errorType: 'CHANGE_PASSWORD'
+        }),
+        terminate: jest.fn().mockResolvedValue(undefined)
+      };
+      jest.spyOn(bankScraperService, 'createScraper').mockReturnValue(scraper);
+      bankScraperService.MAX_RETRIES = 1;
+
+      try {
+        await expect(bankScraperService.login(mockBankAccount)).rejects.toThrow(
+          'Login failed: The bank requires a password change'
+        );
+        expect(scraper.terminate).toHaveBeenCalledWith(false);
+      } finally {
+        bankScraperService.MAX_RETRIES = originalMaxRetries;
+      }
+    });
   });
 
   // REMOVED: scrapeTransactions tests
@@ -81,6 +123,22 @@ describe('BankScraperService', () => {
         password: 'bankpass123'
       });
       expect(result).toBe(true);
+    });
+
+    it('closes the temporary scraper after validation', async () => {
+      const scraper = {
+        initialize: jest.fn().mockResolvedValue(undefined),
+        login: jest.fn().mockResolvedValue({ success: true }),
+        terminate: jest.fn().mockResolvedValue(undefined)
+      };
+      jest.spyOn(bankScraperService, 'createScraper').mockReturnValue(scraper);
+
+      await bankScraperService.validateCredentials('hapoalim', {
+        username: 'testuser',
+        password: 'bankpass123'
+      });
+
+      expect(scraper.terminate).toHaveBeenCalledWith(true);
     });
 
     it('should reject invalid credentials', async () => {
