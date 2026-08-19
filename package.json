@@ -33,7 +33,7 @@
   },
   "homepage": "https://github.com/geriamir/gerifinancial#readme",
   "devDependencies": {
-    "axios": "^1.10.0",
+    "axios": "^1.19.0",
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
     "kill-port": "^2.0.1",
