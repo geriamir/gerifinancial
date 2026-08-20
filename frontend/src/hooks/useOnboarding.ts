@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { onboardingApi, OnboardingStatus } from '../services/api/onboarding';
+import { bankAccountsApi } from '../services/api/bank';
 import { useSSE } from './useSSE';
 
 interface UseOnboardingResult {
@@ -14,6 +15,7 @@ interface UseOnboardingResult {
     credentials: { username: string; password: string; card6Digits?: string }
   ) => Promise<any>;
   removeCreditCardAccount: (accountId: string) => Promise<any>;
+  renameCreditCardAccount: (accountId: string, name: string) => Promise<any>;
   proceedToCreditCardSetup: () => Promise<void>;
   skipCreditCards: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -100,6 +102,18 @@ export const useOnboarding = (): UseOnboardingResult => {
     try {
       setError(null);
       const result = await onboardingApi.removeCreditCardAccount(accountId);
+      await fetchStatus();
+      return result;
+    } catch (err) {
+      await refetchAfterActionFailure();
+      throw err;
+    }
+  }, [fetchStatus, refetchAfterActionFailure]);
+
+  const renameCreditCardAccount = useCallback(async (accountId: string, name: string) => {
+    try {
+      setError(null);
+      const result = await bankAccountsApi.update(accountId, { name });
       await fetchStatus();
       return result;
     } catch (err) {
@@ -212,6 +226,7 @@ export const useOnboarding = (): UseOnboardingResult => {
     addCreditCardAccount,
     repairCreditCardAccount,
     removeCreditCardAccount,
+    renameCreditCardAccount,
     proceedToCreditCardSetup,
     skipCreditCards,
     completeOnboarding

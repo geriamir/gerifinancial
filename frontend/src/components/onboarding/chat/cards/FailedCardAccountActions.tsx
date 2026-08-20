@@ -10,7 +10,6 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import { OnboardingStatus } from '../../../../services/api/onboarding';
-import { formatAccountLabel } from '../../../../utils/accountLabel';
 import { ChatHandlers } from '../types';
 
 interface FailedCardAccountActionsProps {
@@ -18,7 +17,7 @@ interface FailedCardAccountActionsProps {
   handlers: ChatHandlers;
 }
 
-type Mode = 'summary' | 'repair' | 'remove';
+type Mode = 'summary' | 'rename' | 'repair' | 'remove';
 
 const displayableErrorValue = (value: unknown): string | null => {
   if (typeof value === 'string') return value.trim() || null;
@@ -53,17 +52,26 @@ export const FailedCardAccountActions: React.FC<FailedCardAccountActionsProps> =
   handlers
 }) => {
   const [mode, setMode] = useState<Mode>('summary');
-  const [form, setForm] = useState({ username: '', password: '', card6Digits: '' });
+  const [form, setForm] = useState({
+    accountName: account.displayName,
+    username: '',
+    password: '',
+    card6Digits: ''
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const isIsracard = account.bankId === 'isracard';
-  const accountLabel = formatAccountLabel(account.displayName, account.loginHint);
 
   useEffect(() => {
     setMode('summary');
-    setForm({ username: '', password: '', card6Digits: '' });
+    setForm({
+      accountName: account.displayName,
+      username: '',
+      password: '',
+      card6Digits: ''
+    });
     setError('');
-  }, [account.accountId]);
+  }, [account.accountId, account.displayName]);
 
   const handleText = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -112,15 +120,41 @@ export const FailedCardAccountActions: React.FC<FailedCardAccountActionsProps> =
     }
   };
 
+  const rename = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const accountName = form.accountName.trim();
+    if (!accountName) {
+      setError('Account name is required');
+      return;
+    }
+
+    setBusy(true);
+    setError('');
+    try {
+      await handlers.renameCreditCardAccount(account.accountId, accountName);
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Box sx={{ mb: 2 }} data-testid="failed-card-account">
       <Alert severity="error">
-        <AlertTitle>{accountLabel} needs attention</AlertTitle>
+        <AlertTitle>{account.displayName} needs attention</AlertTitle>
         {account.error}
       </Alert>
 
       {mode === 'summary' && (
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setMode('rename')}
+            data-testid="rename-card-account-btn"
+          >
+            Rename
+          </Button>
           <Button
             variant="contained"
             onClick={() => setMode('repair')}
@@ -139,10 +173,40 @@ export const FailedCardAccountActions: React.FC<FailedCardAccountActionsProps> =
         </Stack>
       )}
 
+      {mode === 'rename' && (
+        <Box component="form" onSubmit={rename} sx={{ mt: 1.5 }}>
+          <TextField
+            fullWidth
+            margin="dense"
+            size="small"
+            label="Account name"
+            name="accountName"
+            value={form.accountName}
+            onChange={handleText}
+            disabled={busy}
+            required
+            inputProps={{ 'data-testid': 'rename-card-account-name' }}
+          />
+          {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+          <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={busy || form.accountName.trim() === account.displayName}
+            >
+              {busy ? 'Saving...' : 'Save name'}
+            </Button>
+            <Button onClick={() => setMode('summary')} disabled={busy}>
+              Cancel
+            </Button>
+          </Stack>
+        </Box>
+      )}
+
       {mode === 'repair' && (
         <Box component="form" onSubmit={repair} sx={{ mt: 1.5 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Enter the credentials for {accountLabel}. They will be validated before the import retries.
+            Enter the credentials for {account.displayName}. They will be validated before the import retries.
           </Typography>
           <TextField
             fullWidth

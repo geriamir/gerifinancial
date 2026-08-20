@@ -55,12 +55,10 @@ export interface OnboardingStatus {
         _id: string;
         bankId: string;
         displayName: string;
-        loginHint?: string | null;
       };
       connectedAt: string;
       bankId: string;
       displayName: string;
-      loginHint?: string | null;
     }>;
   };
   
@@ -73,7 +71,6 @@ export interface OnboardingStatus {
       bankId: string;
       displayName: string;
       error: string;
-      loginHint?: string | null;
     } | null;
     totalCreditCardPayments: number;
     coveredPayments: number;

@@ -9,7 +9,6 @@ const {
   ISRACARD_BANK_ID,
   isValidCard6Digits
 } = require('../../banking/utils/scraperCredentials');
-const { buildAccountLoginHint } = require('../../banking/utils/accountLoginHint');
 
 /**
  * @route   POST /api/onboarding/checking-account
@@ -95,14 +94,15 @@ router.post('/credit-card-account', auth, async (req, res) => {
   try {
     const userId = req.user._id || req.user.userId;
     const { bankId, credentials, displayName } = req.body;
+    const accountName = typeof displayName === 'string' ? displayName.trim() : '';
     
     logger.info(`Adding credit card account for onboarding - User: ${userId}, Bank: ${bankId}`);
     
     // Validate required fields
-    if (!bankId || !credentials) {
+    if (!bankId || !credentials || !accountName) {
       return res.status(400).json({
         success: false,
-        error: 'Bank ID and credentials are required'
+        error: 'Account name, bank ID and credentials are required'
       });
     }
     if (!credentials.username || !credentials.password) {
@@ -121,7 +121,7 @@ router.post('/credit-card-account', auth, async (req, res) => {
     // Create the bank account using the existing service
     const bankAccount = await bankAccountService.create(userId, {
       bankId,
-      name: displayName || bankId,
+      name: accountName,
       username: credentials.username,
       password: credentials.password,
       card6Digits: credentials.card6Digits
@@ -135,7 +135,7 @@ router.post('/credit-card-account', auth, async (req, res) => {
           accountId: bankAccount._id,
           connectedAt: new Date(),
           bankId: bankId,
-          displayName: displayName || bankId
+          displayName: accountName
         }
       },
       $set: {
@@ -550,25 +550,6 @@ router.get('/status', auth, async (req, res) => {
     
     // Transform old credit card matching data to new format if needed
     let onboardingData = user.onboarding.toObject ? user.onboarding.toObject() : user.onboarding;
-
-    const loginHintsByAccountId = new Map();
-    const creditCardAccounts = onboardingData.creditCardSetup?.creditCardAccounts || [];
-    for (const creditCardAccount of creditCardAccounts) {
-      const populatedAccount = creditCardAccount.accountId;
-      if (!populatedAccount?._id) continue;
-
-      const loginHint = buildAccountLoginHint(populatedAccount.credentials?.username);
-      if (!loginHint) continue;
-
-      creditCardAccount.loginHint = loginHint;
-      populatedAccount.loginHint = loginHint;
-      loginHintsByAccountId.set(populatedAccount._id.toString(), loginHint);
-    }
-
-    const failedAccount = onboardingData.creditCardMatching?.failedAccount;
-    if (failedAccount?.accountId) {
-      failedAccount.loginHint = loginHintsByAccountId.get(failedAccount.accountId.toString()) || null;
-    }
     
     // Check if we have old format data (matchedPayments is a number instead of array)
     if (onboardingData.creditCardMatching && 

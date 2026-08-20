@@ -15,10 +15,20 @@ import { CardShell } from '../CardShell';
 import { CardProps } from '../types';
 import { providerSuggestionsFor } from '../providerSuggestions';
 
+const suggestedNameFor = (status: CardProps['status'], bankId: string) => {
+  const provider = CREDIT_CARD_PROVIDERS.find((candidate) => candidate.id === bankId);
+  const existingCount = status.creditCardSetup?.creditCardAccounts
+    ?.filter((account) => account.bankId === bankId).length || 0;
+  return `${provider?.name || bankId} account ${existingCount + 1}`;
+};
+
 export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) => {
   const suggestedProvider = providerSuggestionsFor(status.creditCardDetection)[0];
   const [form, setForm] = useState({
     bankId: suggestedProvider?.bankId || '',
+    accountName: suggestedProvider?.bankId
+      ? suggestedNameFor(status, suggestedProvider.bankId)
+      : '',
     username: '',
     password: '',
     card6Digits: ''
@@ -30,9 +40,15 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
   useEffect(() => {
     if (!suggestedProvider?.bankId) return;
     setForm((previous) =>
-      previous.bankId ? previous : { ...previous, bankId: suggestedProvider.bankId }
+      previous.bankId
+        ? previous
+        : {
+            ...previous,
+            bankId: suggestedProvider.bankId,
+            accountName: suggestedNameFor(status, suggestedProvider.bankId)
+          }
     );
-  }, [suggestedProvider?.bankId]);
+  }, [suggestedProvider?.bankId, status]);
 
   const handleText = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -43,14 +59,18 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
   };
 
   const handleProvider = (bankId: string) => {
-    setForm((previous) => ({ ...previous, bankId }));
+    setForm((previous) => ({
+      ...previous,
+      bankId,
+      accountName: suggestedNameFor(status, bankId)
+    }));
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
 
-    if (!form.bankId || !form.username || !form.password) {
+    if (!form.bankId || !form.accountName.trim() || !form.username || !form.password) {
       setError('Please fill in all required fields');
       return;
     }
@@ -61,7 +81,6 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
 
     setLoading(true);
     try {
-      const provider = CREDIT_CARD_PROVIDERS.find((candidate) => candidate.id === form.bankId);
       await handlers.connectCreditCardAccount(
         form.bankId,
         {
@@ -69,7 +88,7 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
           password: form.password,
           ...(form.bankId === 'isracard' && { card6Digits: form.card6Digits })
         },
-        `${provider?.name || form.bankId} Credit Cards`
+        form.accountName.trim()
       );
     } catch (err) {
       setError(
@@ -107,6 +126,19 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
               : 'Whoever issues the card, which is not always the bank you just connected.'
           }
           testId="provider-select"
+        />
+
+        <TextField
+          fullWidth
+          margin="dense"
+          size="small"
+          label="Account name"
+          name="accountName"
+          value={form.accountName}
+          onChange={handleText}
+          required
+          helperText="Give this connection a name you will recognize. You can change it later."
+          data-testid="cc-account-name-input"
         />
 
         <TextField

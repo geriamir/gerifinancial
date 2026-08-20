@@ -10,6 +10,7 @@ const mockAddCheckingAccount = jest.fn().mockResolvedValue({});
 const mockAddCreditCardAccount = jest.fn().mockResolvedValue({});
 const mockRepairCreditCardAccount = jest.fn().mockResolvedValue({});
 const mockRemoveCreditCardAccount = jest.fn().mockResolvedValue({});
+const mockRenameCreditCardAccount = jest.fn().mockResolvedValue({});
 const mockProceedToCreditCardSetup = jest.fn().mockResolvedValue(undefined);
 const mockSkipCreditCards = jest.fn().mockResolvedValue(undefined);
 const mockCompleteOnboarding = jest.fn().mockResolvedValue(undefined);
@@ -26,6 +27,7 @@ jest.mock('../../../../hooks/useOnboarding', () => ({
     addCreditCardAccount: mockAddCreditCardAccount,
     repairCreditCardAccount: mockRepairCreditCardAccount,
     removeCreditCardAccount: mockRemoveCreditCardAccount,
+    renameCreditCardAccount: mockRenameCreditCardAccount,
     proceedToCreditCardSetup: mockProceedToCreditCardSetup,
     skipCreditCards: mockSkipCreditCards,
     completeOnboarding: mockCompleteOnboarding
@@ -117,7 +119,6 @@ const failedCard = (): OnboardingStatus => ({
       accountId: 'failed-cal',
       bankId: 'visaCal',
       displayName: 'Visa Cal Credit Cards',
-      loginHint: 'Login ending 1234',
       error: 'The bank requires a password change.'
     },
     totalCreditCardPayments: 5,
@@ -341,9 +342,7 @@ describe('OnboardingChat', () => {
     mockStatus = failedCard();
     draw();
 
-    expect(
-      await screen.findByText('Visa Cal Credit Cards (Login ending 1234) needs attention')
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Visa Cal Credit Cards needs attention')).toBeInTheDocument();
     expect(screen.getByText('The bank requires a password change.')).toBeInTheDocument();
 
     await user.click(screen.getByTestId('fix-card-account-btn'));
@@ -356,6 +355,22 @@ describe('OnboardingChat', () => {
         username: 'cal-user',
         password: 'new-password'
       });
+    });
+  });
+
+  it('lets the user rename the failed account', async () => {
+    const user = userEvent.setup();
+    mockStatus = failedCard();
+    draw();
+
+    await user.click(await screen.findByTestId('rename-card-account-btn'));
+    const name = screen.getByTestId('rename-card-account-name');
+    await user.clear(name);
+    await user.type(name, 'Family CAL');
+    await user.click(screen.getByRole('button', { name: 'Save name' }));
+
+    await waitFor(() => {
+      expect(mockRenameCreditCardAccount).toHaveBeenCalledWith('failed-cal', 'Family CAL');
     });
   });
 

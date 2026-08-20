@@ -15,6 +15,7 @@ import {
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
+  Edit as EditIcon,
   Refresh as RefreshIcon,
   Key as KeyIcon,
   ExpandMore as ExpandMoreIcon,
@@ -32,7 +33,7 @@ import { ScrapeAllAccounts } from './ScrapeAllAccounts';
 import { AccountScraping } from './AccountScraping';
 import { formatCurrency } from '../../utils/formatters';
 import { BalanceHistoryChart } from './BalanceHistoryChart';
-import { formatAccountLabel } from '../../utils/accountLabel';
+import { RenameAccountDialog } from './RenameAccountDialog';
 
 const getStatusColor = (status: BankAccount['status']) => {
   switch (status) {
@@ -62,15 +63,13 @@ const getStrategyDisplayName = (strategyKey: string): string => {
   return names[strategyKey] || strategyKey;
 };
 
-const getAccountLabel = (account: BankAccount): string =>
-  formatAccountLabel(account.name, account.loginHint);
-
 export const BankAccountsList: React.FC = () => {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showUpdateCredentials, setShowUpdateCredentials] = useState(false);
+  const [showRenameAccount, setShowRenameAccount] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [expandedAccount, setExpandedAccount] = useState<string | null>(null);
   const fetchAccounts = async () => {
@@ -134,6 +133,11 @@ export const BankAccountsList: React.FC = () => {
     setShowUpdateCredentials(true);
   };
 
+  const handleRenameAccount = (account: BankAccount) => {
+    setSelectedAccount(account);
+    setShowRenameAccount(true);
+  };
+
   if (loading) {
     return <Typography>Loading accounts...</Typography>;
   }
@@ -185,7 +189,7 @@ export const BankAccountsList: React.FC = () => {
                   <Stack direction="row" spacing={2} alignItems="flex-start">
                     <BankIcon bankId={account.bankId} size={40} sx={{ mt: 0.5, flexShrink: 0 }} />
                     <Box>
-                      <Typography variant="h6" sx={{ mb: 0.5 }}>{getAccountLabel(account)}</Typography>
+                      <Typography variant="h6" sx={{ mb: 0.5 }}>{account.name}</Typography>
                       <Typography color="textSecondary" variant="body2">
                         {getBankName(account.bankId)}
                       </Typography>
@@ -224,9 +228,17 @@ export const BankAccountsList: React.FC = () => {
                       size="small"
                     />
                     <IconButton
+                      onClick={() => handleRenameAccount(account)}
+                      title="Rename Account"
+                      aria-label={`Rename ${account.name}`}
+                      size="small"
+                    >
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton
                       onClick={() => handleUpdateCredentials(account)}
                       title="Update Credentials"
-                      aria-label={`Update credentials for ${getAccountLabel(account)}`}
+                      aria-label={`Update credentials for ${account.name}`}
                       size="small"
                       color="primary"
                     >
@@ -235,7 +247,7 @@ export const BankAccountsList: React.FC = () => {
                     <IconButton
                       onClick={() => handleTestConnection(account._id, getBankName(account.bankId))}
                       title="Test Connection"
-                      aria-label={`Test connection for ${getAccountLabel(account)}`}
+                      aria-label={`Test connection for ${account.name}`}
                       size="small"
                     >
                       <RefreshIcon />
@@ -243,7 +255,7 @@ export const BankAccountsList: React.FC = () => {
                     <IconButton
                       onClick={() => handleDelete(account._id, getBankName(account.bankId))}
                       title="Delete Account"
-                      aria-label={`Delete ${getAccountLabel(account)}`}
+                      aria-label={`Delete ${account.name}`}
                       size="small"
                       color="error"
                     >
@@ -255,7 +267,7 @@ export const BankAccountsList: React.FC = () => {
                           expandedAccount === account._id ? null : account._id
                         )}
                         title="Balance History"
-                        aria-label={`Balance history for ${getAccountLabel(account)}`}
+                        aria-label={`Balance history for ${account.name}`}
                         size="small"
                       >
                         {expandedAccount === account._id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
@@ -293,6 +305,16 @@ export const BankAccountsList: React.FC = () => {
         account={selectedAccount}
         onClose={() => {
           setShowUpdateCredentials(false);
+          setSelectedAccount(null);
+        }}
+        onSuccess={fetchAccounts}
+      />
+
+      <RenameAccountDialog
+        open={showRenameAccount}
+        account={selectedAccount}
+        onClose={() => {
+          setShowRenameAccount(false);
           setSelectedAccount(null);
         }}
         onSuccess={fetchAccounts}

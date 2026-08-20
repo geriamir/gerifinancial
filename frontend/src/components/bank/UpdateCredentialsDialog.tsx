@@ -14,7 +14,6 @@ import {
 } from '@mui/material';
 import { BankAccount } from '../../services/api/types';
 import { bankAccountsApi } from '../../services/api/bank';
-import { formatAccountLabel } from '../../utils/accountLabel';
 
 interface UpdateCredentialsDialogProps {
   open: boolean;
@@ -127,7 +126,6 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
   };
 
   if (!account) return null;
-  const accountLabel = formatAccountLabel(account.name, account.loginHint);
 
   return (
     <Dialog 
@@ -145,7 +143,7 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
           <Stack spacing={2} sx={{ mt: 1 }}>
             <Box>
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                Updating credentials for: <strong>{accountLabel}</strong>
+                Updating credentials for: <strong>{account.name}</strong>
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Bank: {account.bankId}

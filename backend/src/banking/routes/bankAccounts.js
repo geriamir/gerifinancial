@@ -1,5 +1,6 @@
 const express = require('express');
 const BankAccount = require('../models/BankAccount');
+const { User } = require('../../auth');
 const auth = require('../../shared/middleware/auth');
 const bankAccountService = require('../services/bankAccountService.js');
 const { OTP_BANKS } = require('../constants/enums');
@@ -7,7 +8,6 @@ const {
   ISRACARD_BANK_ID,
   isValidCard6Digits
 } = require('../utils/scraperCredentials');
-const { buildAccountLoginHint } = require('../utils/accountLoginHint');
 
 const router = express.Router();
 
@@ -15,13 +15,7 @@ const router = express.Router();
 router.get('/', auth, async (req, res) => {
   try {
     const accounts = await BankAccount.find({ userId: req.user._id });
-    res.json(accounts.map(account => {
-      const serializedAccount = account.toJSON();
-      return {
-        ...serializedAccount,
-        loginHint: buildAccountLoginHint(serializedAccount.credentials?.username)
-      };
-    }));
+    res.json(accounts);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -77,6 +71,35 @@ router.post('/', auth, async (req, res) => {
 router.patch('/:id', auth, async (req, res) => {
   try {
     const bankAccount = await bankAccountService.update(req.params.id, req.user._id, req.body);
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'name')) {
+      await User.updateOne(
+        {
+          _id: req.user._id,
+          'onboarding.creditCardSetup.creditCardAccounts.accountId': bankAccount._id
+        },
+        {
+          $set: {
+            'onboarding.creditCardSetup.creditCardAccounts.$[account].displayName': bankAccount.name
+          }
+        },
+        {
+          arrayFilters: [{ 'account.accountId': bankAccount._id }]
+        }
+      );
+      await User.updateOne(
+        {
+          _id: req.user._id,
+          'onboarding.creditCardMatching.failedAccount.accountId': bankAccount._id
+        },
+        {
+          $set: {
+            'onboarding.creditCardMatching.failedAccount.displayName': bankAccount.name
+          }
+        }
+      );
+    }
+
     res.json(bankAccount.toJSON());
   } catch (error) {
     res.status(400).json({ error: error.message });

@@ -180,6 +180,76 @@ describe('Bank Account Routes', () => {
     });
   });
 
+  describe('PATCH /api/bank-accounts/:id', () => {
+    it('renames the account and its onboarding references', async () => {
+      const bankAccount = await BankAccount.create({
+        userId: user._id,
+        bankId: 'visaCal',
+        name: 'Visa Cal Credit Cards',
+        credentials: {
+          username: validCredentials.username,
+          password: validCredentials.password
+        }
+      });
+      user.onboarding.creditCardSetup.creditCardAccounts = [{
+        accountId: bankAccount._id,
+        connectedAt: new Date(),
+        bankId: 'visaCal',
+        displayName: 'Visa Cal Credit Cards'
+      }];
+      user.onboarding.creditCardMatching.failedAccount = {
+        accountId: bankAccount._id,
+        bankId: 'visaCal',
+        displayName: 'Visa Cal Credit Cards',
+        error: 'Password expired'
+      };
+      await user.save();
+
+      const response = await request(app)
+        .patch(`/api/bank-accounts/${bankAccount._id}`)
+        .set('Authorization', 'Bearer ' + token)
+        .send({ name: 'Personal CAL' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.name).toBe('Personal CAL');
+
+      const updatedUser = await User.findById(user._id);
+      expect(updatedUser.onboarding.creditCardSetup.creditCardAccounts[0].displayName)
+        .toBe('Personal CAL');
+      expect(updatedUser.onboarding.creditCardMatching.failedAccount.displayName)
+        .toBe('Personal CAL');
+    });
+
+    it('rejects duplicate account names', async () => {
+      const firstAccount = await BankAccount.create({
+        userId: user._id,
+        bankId: 'visaCal',
+        name: 'Personal CAL',
+        credentials: {
+          username: validCredentials.username,
+          password: validCredentials.password
+        }
+      });
+      const secondAccount = await BankAccount.create({
+        userId: user._id,
+        bankId: 'visaCal',
+        name: 'Other CAL',
+        credentials: {
+          username: validCredentials.username + '-2',
+          password: validCredentials.password
+        }
+      });
+
+      const response = await request(app)
+        .patch(`/api/bank-accounts/${secondAccount._id}`)
+        .set('Authorization', 'Bearer ' + token)
+        .send({ name: firstAccount.name.toLowerCase() });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('An account with this name already exists');
+    });
+  });
+
   describe('POST /api/bank-accounts/scrape-all', () => {
     // Skip these tests - they require real Redis/BullMQ which isn't available in test environment
     it.skip('should queue scraping jobs for all active accounts', async () => {
@@ -375,8 +445,6 @@ describe('Bank Account Routes', () => {
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBe(1);
       expect(response.body[0].userId.toString()).toBe(user._id.toString());
-      expect(response.body[0].loginHint)
-        .toBe(`Login ending ${validCredentials.username.slice(-4)}`);
     });
 
     it('should not list accounts without authentication', async () => {
