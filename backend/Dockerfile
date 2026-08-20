@@ -14,8 +14,8 @@ FROM node:22-bookworm AS scraper-build
 ARG SCRAPER_REPO=https://github.com/geriamir/israeli-bank-scrapers.git
 # Pinned to a commit so an image rebuild is reproducible; a branch name would let
 # the dependency change underneath an otherwise identical build. Bump deliberately
-# after verifying the new scraper commit: git rev-parse origin/feature/add-foreign-currency
-ARG SCRAPER_REF=5351a5020745d411d701f1dba66e0092fcccfc80
+# after verifying the new scraper commit: git rev-parse origin/fix/amex-cloudflare-waf
+ARG SCRAPER_REF=1965a8bfffb8e481ae83ced31a2969fba27b0902
 
 WORKDIR /scraper
 
