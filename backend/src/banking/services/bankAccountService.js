@@ -57,6 +57,8 @@ class BankAccountService {
       if (bankId === ISRACARD_BANK_ID && !isValidCard6Digits(card6Digits)) {
         throw new Error('Last 6 card digits must be exactly 6 digits');
       }
+      // Onboarding card flows validate in the queued import so a slow provider
+      // login cannot outlive the HTTP request. Other callers keep this check.
       if (!deferCredentialValidation) {
         await bankScraperService.validateCredentials(
           bankId,
@@ -166,6 +168,8 @@ class BankAccountService {
       if (bankAccount.bankId === ISRACARD_BANK_ID && !isValidCard6Digits(card6Digits)) {
         throw new Error('Last 6 card digits must be exactly 6 digits');
       }
+      // Failed onboarding cards are revalidated by the queued retry, while
+      // regular credential updates still validate before replacing the secret.
       if (!deferCredentialValidation) {
         await bankScraperService.validateCredentials(
           bankAccount.bankId,
