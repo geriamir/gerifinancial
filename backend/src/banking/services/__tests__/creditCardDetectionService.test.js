@@ -201,6 +201,43 @@ describe('CreditCardDetectionService', () => {
       );
     });
 
+    it('does not match a payment to a future provider debit cycle', async () => {
+      const visaCal = bankAccount('visaCal', 'Visa Cal');
+      const visaCalCard = card(visaCal, '0296');
+      const results = await creditCardDetectionService.matchPaymentsToCards(
+        [
+          payment('כרטיסי אשראי-י', 34208.45),
+          payment('ל.מאסטרקרד(יש)', 3978.23)
+        ],
+        [{
+          creditCards: [visaCalCard],
+          provider: 'visaCal',
+          displayName: 'Visa Cal',
+          debitDate: new Date('2026-08-10T00:00:00.000Z'),
+          debitDateKey: '2026-08-10',
+          totalSpent: 31131.79,
+          transactionCount: 83
+        }, {
+          creditCards: [visaCalCard],
+          provider: 'visaCal',
+          displayName: 'Visa Cal',
+          debitDate: new Date('2026-09-10T00:00:00.000Z'),
+          debitDateKey: '2026-09-10',
+          totalSpent: 3869.73,
+          transactionCount: 10
+        }]
+      );
+
+      expect(results.coveredCount).toBe(1);
+      expect(results.matchedPayments[0].payment.amount).toBe(34208.45);
+      expect(results.uncoveredPayments).toEqual([
+        expect.objectContaining({
+          description: 'ל.מאסטרקרד(יש)',
+          amount: -3978.23
+        })
+      ]);
+    });
+
     it('does not match an explicitly named provider to another provider', async () => {
       const visaCal = bankAccount('visaCal', 'Visa Cal');
       const results = await creditCardDetectionService.matchPaymentsToCards(

@@ -610,12 +610,12 @@ class CreditCardDetectionService {
           if (paymentProvider && debitTotal.provider !== paymentProvider) continue;
 
           const exactDebitDate = paymentDateKey === debitTotal.debitDateKey;
+          const debitDateAfterPayment = debitTotal.debitDateKey > paymentDateKey;
           const amountDiff = Math.abs(paymentAmount - debitTotal.totalSpent);
           const amountDiffPercentage = amountDiff / paymentAmount;
-          const monthDiff = Math.abs(
-            monthIndex(debitTotal.debitDateKey) - monthIndex(paymentDateKey)
-          );
+          const monthDiff = monthIndex(paymentDateKey) - monthIndex(debitTotal.debitDateKey);
 
+          if (debitDateAfterPayment) continue;
           if (!exactDebitDate && (monthDiff > 1 || amountDiffPercentage > 0.05)) continue;
 
           possibleMatches.push({
