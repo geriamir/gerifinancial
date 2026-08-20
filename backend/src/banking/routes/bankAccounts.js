@@ -1,5 +1,6 @@
 const express = require('express');
 const BankAccount = require('../models/BankAccount');
+const { User } = require('../../auth');
 const auth = require('../../shared/middleware/auth');
 const bankAccountService = require('../services/bankAccountService.js');
 const { OTP_BANKS } = require('../constants/enums');
@@ -70,6 +71,35 @@ router.post('/', auth, async (req, res) => {
 router.patch('/:id', auth, async (req, res) => {
   try {
     const bankAccount = await bankAccountService.update(req.params.id, req.user._id, req.body);
+
+    if (Object.prototype.hasOwnProperty.call(req.body, 'name')) {
+      await User.updateOne(
+        {
+          _id: req.user._id,
+          'onboarding.creditCardSetup.creditCardAccounts.accountId': bankAccount._id
+        },
+        {
+          $set: {
+            'onboarding.creditCardSetup.creditCardAccounts.$[account].displayName': bankAccount.name
+          }
+        },
+        {
+          arrayFilters: [{ 'account.accountId': bankAccount._id }]
+        }
+      );
+      await User.updateOne(
+        {
+          _id: req.user._id,
+          'onboarding.creditCardMatching.failedAccount.accountId': bankAccount._id
+        },
+        {
+          $set: {
+            'onboarding.creditCardMatching.failedAccount.displayName': bankAccount.name
+          }
+        }
+      );
+    }
+
     res.json(bankAccount.toJSON());
   } catch (error) {
     res.status(400).json({ error: error.message });

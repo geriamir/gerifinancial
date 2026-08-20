@@ -10,6 +10,7 @@ const handlers: ChatHandlers = {
   connectCreditCardAccount: jest.fn().mockResolvedValue(undefined),
   repairCreditCardAccount: jest.fn().mockResolvedValue(undefined),
   removeCreditCardAccount: jest.fn().mockResolvedValue(undefined),
+  renameCreditCardAccount: jest.fn().mockResolvedValue(undefined),
   proceedToCreditCardSetup: jest.fn().mockResolvedValue(undefined),
   skipCreditCards: jest.fn().mockResolvedValue(undefined),
   completeOnboarding: jest.fn().mockResolvedValue(undefined)
@@ -126,7 +127,7 @@ describe('CreditCardFormCard provider selection', () => {
 });
 
 describe('CreditCardFormCard submission', () => {
-  it('submits the provider that was clicked, named after it', async () => {
+  it('submits the suggested account name', async () => {
     const group = showCard();
 
     fireEvent.click(within(group).getByRole('radio', { name: 'Isracard' }));
@@ -139,9 +140,53 @@ describe('CreditCardFormCard submission', () => {
       expect(handlers.connectCreditCardAccount).toHaveBeenCalledWith(
         'isracard',
         { username: 'someone', password: 'secret', card6Digits: '123456' },
-        'Isracard Credit Cards'
+        'Isracard account 1'
       )
     );
+  });
+
+  it('lets the user give the account a recognizable name', async () => {
+    const group = showCard();
+
+    fireEvent.click(within(group).getByRole('radio', { name: 'Visa Cal' }));
+    fireEvent.change(screen.getByLabelText(/account name/i), {
+      target: { value: 'Family CAL' }
+    });
+    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'someone' } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret' } });
+    fireEvent.click(screen.getByTestId('connect-cards-btn'));
+
+    await waitFor(() =>
+      expect(handlers.connectCreditCardAccount).toHaveBeenCalledWith(
+        'visaCal',
+        { username: 'someone', password: 'secret' },
+        'Family CAL'
+      )
+    );
+  });
+
+  it('suggests the next account number for the same provider', () => {
+    showCard({
+      creditCardDetection: {
+        suggestedProviders: [{ bankId: 'visaCal', paymentCount: 2 }]
+      },
+      creditCardSetup: {
+        skipped: false,
+        skippedAt: null,
+        creditCardAccounts: [{
+          accountId: {
+            _id: 'cal-1',
+            bankId: 'visaCal',
+            displayName: 'Personal CAL'
+          },
+          connectedAt: '2026-08-20T00:00:00.000Z',
+          bankId: 'visaCal',
+          displayName: 'Personal CAL'
+        }]
+      }
+    } as OnboardingStatus);
+
+    expect(screen.getByLabelText(/account name/i)).toHaveValue('Visa Cal account 2');
   });
 
   it('requires exactly six card digits for Isracard', async () => {

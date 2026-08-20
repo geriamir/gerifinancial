@@ -67,6 +67,7 @@ export const OnboardingChat: React.FC = () => {
     addCreditCardAccount,
     repairCreditCardAccount,
     removeCreditCardAccount,
+    renameCreditCardAccount,
     proceedToCreditCardSetup,
     skipCreditCards,
     completeOnboarding
@@ -78,6 +79,7 @@ export const OnboardingChat: React.FC = () => {
       connectCreditCardAccount: addCreditCardAccount,
       repairCreditCardAccount,
       removeCreditCardAccount,
+      renameCreditCardAccount,
       proceedToCreditCardSetup,
       skipCreditCards,
       completeOnboarding
@@ -87,6 +89,7 @@ export const OnboardingChat: React.FC = () => {
       addCreditCardAccount,
       repairCreditCardAccount,
       removeCreditCardAccount,
+      renameCreditCardAccount,
       proceedToCreditCardSetup,
       skipCreditCards,
       completeOnboarding

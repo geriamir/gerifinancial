@@ -10,6 +10,16 @@ const {
   isValidCard6Digits
 } = require('../../banking/utils/scraperCredentials');
 
+const serializePopulatedAccount = (account) => {
+  if (!account || typeof account !== 'object' || !account.bankId) return account;
+
+  return {
+    _id: account._id,
+    bankId: account.bankId,
+    displayName: account.name
+  };
+};
+
 /**
  * @route   POST /api/onboarding/checking-account
  * @desc    Add main checking account during onboarding
@@ -94,14 +104,15 @@ router.post('/credit-card-account', auth, async (req, res) => {
   try {
     const userId = req.user._id || req.user.userId;
     const { bankId, credentials, displayName } = req.body;
+    const accountName = typeof displayName === 'string' ? displayName.trim() : '';
     
     logger.info(`Adding credit card account for onboarding - User: ${userId}, Bank: ${bankId}`);
     
     // Validate required fields
-    if (!bankId || !credentials) {
+    if (!bankId || !credentials || !accountName) {
       return res.status(400).json({
         success: false,
-        error: 'Bank ID and credentials are required'
+        error: 'Account name, bank ID and credentials are required'
       });
     }
     if (!credentials.username || !credentials.password) {
@@ -120,7 +131,7 @@ router.post('/credit-card-account', auth, async (req, res) => {
     // Create the bank account using the existing service
     const bankAccount = await bankAccountService.create(userId, {
       bankId,
-      name: displayName || bankId,
+      name: accountName,
       username: credentials.username,
       password: credentials.password,
       card6Digits: credentials.card6Digits
@@ -134,7 +145,7 @@ router.post('/credit-card-account', auth, async (req, res) => {
           accountId: bankAccount._id,
           connectedAt: new Date(),
           bankId: bankId,
-          displayName: displayName || bankId
+          displayName: accountName
         }
       },
       $set: {
@@ -549,6 +560,15 @@ router.get('/status', auth, async (req, res) => {
     
     // Transform old credit card matching data to new format if needed
     let onboardingData = user.onboarding.toObject ? user.onboarding.toObject() : user.onboarding;
+
+    if (onboardingData.checkingAccount?.accountId) {
+      onboardingData.checkingAccount.accountId = serializePopulatedAccount(
+        onboardingData.checkingAccount.accountId
+      );
+    }
+    for (const account of onboardingData.creditCardSetup?.creditCardAccounts || []) {
+      account.accountId = serializePopulatedAccount(account.accountId);
+    }
     
     // Check if we have old format data (matchedPayments is a number instead of array)
     if (onboardingData.creditCardMatching && 

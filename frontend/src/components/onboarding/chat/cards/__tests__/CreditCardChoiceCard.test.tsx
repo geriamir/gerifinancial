@@ -9,6 +9,7 @@ const handlers: ChatHandlers = {
   connectCreditCardAccount: jest.fn().mockResolvedValue(undefined),
   repairCreditCardAccount: jest.fn().mockResolvedValue(undefined),
   removeCreditCardAccount: jest.fn().mockResolvedValue(undefined),
+  renameCreditCardAccount: jest.fn().mockResolvedValue(undefined),
   proceedToCreditCardSetup: jest.fn().mockResolvedValue(undefined),
   skipCreditCards: jest.fn().mockResolvedValue(undefined),
   completeOnboarding: jest.fn().mockResolvedValue(undefined)

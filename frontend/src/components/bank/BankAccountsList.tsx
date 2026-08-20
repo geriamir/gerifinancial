@@ -15,6 +15,7 @@ import {
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
+  Edit as EditIcon,
   Refresh as RefreshIcon,
   Key as KeyIcon,
   ExpandMore as ExpandMoreIcon,
@@ -32,6 +33,7 @@ import { ScrapeAllAccounts } from './ScrapeAllAccounts';
 import { AccountScraping } from './AccountScraping';
 import { formatCurrency } from '../../utils/formatters';
 import { BalanceHistoryChart } from './BalanceHistoryChart';
+import { RenameAccountDialog } from './RenameAccountDialog';
 
 const getStatusColor = (status: BankAccount['status']) => {
   switch (status) {
@@ -67,6 +69,7 @@ export const BankAccountsList: React.FC = () => {
   const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [showUpdateCredentials, setShowUpdateCredentials] = useState(false);
+  const [showRenameAccount, setShowRenameAccount] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
   const [expandedAccount, setExpandedAccount] = useState<string | null>(null);
   const fetchAccounts = async () => {
@@ -128,6 +131,11 @@ export const BankAccountsList: React.FC = () => {
   const handleUpdateCredentials = (account: BankAccount) => {
     setSelectedAccount(account);
     setShowUpdateCredentials(true);
+  };
+
+  const handleRenameAccount = (account: BankAccount) => {
+    setSelectedAccount(account);
+    setShowRenameAccount(true);
   };
 
   if (loading) {
@@ -220,6 +228,14 @@ export const BankAccountsList: React.FC = () => {
                       size="small"
                     />
                     <IconButton
+                      onClick={() => handleRenameAccount(account)}
+                      title="Rename Account"
+                      aria-label={`Rename ${account.name}`}
+                      size="small"
+                    >
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton
                       onClick={() => handleUpdateCredentials(account)}
                       title="Update Credentials"
                       aria-label={`Update credentials for ${account.name}`}
@@ -289,6 +305,16 @@ export const BankAccountsList: React.FC = () => {
         account={selectedAccount}
         onClose={() => {
           setShowUpdateCredentials(false);
+          setSelectedAccount(null);
+        }}
+        onSuccess={fetchAccounts}
+      />
+
+      <RenameAccountDialog
+        open={showRenameAccount}
+        account={selectedAccount}
+        onClose={() => {
+          setShowRenameAccount(false);
           setSelectedAccount(null);
         }}
         onSuccess={fetchAccounts}

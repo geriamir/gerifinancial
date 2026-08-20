@@ -11,6 +11,15 @@ const {
   isValidCard6Digits
 } = require('../utils/scraperCredentials');
 
+const normalizeAccountName = (name) => {
+  if (typeof name !== 'string' || !name.trim()) {
+    throw new Error('Account name is required');
+  }
+  return name.trim();
+};
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 class BankAccountService {
   async create(userId, {
     bankId,
@@ -23,6 +32,15 @@ class BankAccountService {
     queryId,
     phoneOrEmail
   }) {
+    name = normalizeAccountName(name);
+    const duplicateName = await BankAccount.exists({
+      userId,
+      name: { $regex: `^${escapeRegExp(name)}$`, $options: 'i' }
+    });
+    if (duplicateName) {
+      throw new Error('An account with this name already exists');
+    }
+
     let credentials;
 
     if (bankId === 'mercury') {
@@ -204,6 +222,18 @@ class BankAccountService {
     const invalidUpdates = updateKeys.filter(key => !allowedUpdates.includes(key));
     if (invalidUpdates.length > 0) {
       throw new Error(`Invalid update fields: ${invalidUpdates.join(', ')}`);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(updates, 'name')) {
+      updates.name = normalizeAccountName(updates.name);
+      const duplicateName = await BankAccount.exists({
+        _id: { $ne: bankAccount._id },
+        userId,
+        name: { $regex: `^${escapeRegExp(updates.name)}$`, $options: 'i' }
+      });
+      if (duplicateName) {
+        throw new Error('An account with this name already exists');
+      }
     }
 
     // Apply updates

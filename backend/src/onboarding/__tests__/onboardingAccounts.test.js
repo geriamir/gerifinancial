@@ -192,7 +192,10 @@ describe('Onboarding Accounts API', () => {
       expect(response.body.data.onboardingStep).toBe('credit-card-matching');
       expect(bankAccountService.create).toHaveBeenCalledWith(
         testUser._id,
-        expect.objectContaining({ card6Digits: '123456' })
+        expect.objectContaining({
+          name: 'Isracard',
+          card6Digits: '123456'
+        })
       );
 
       // Verify onboarding structure was updated
@@ -201,6 +204,7 @@ describe('Onboarding Accounts API', () => {
       expect(updatedUser.onboarding.creditCardSetup.creditCardAccounts[0].accountId.toString())
         .toBe(mockAccount._id.toString());
       expect(updatedUser.onboarding.creditCardSetup.creditCardAccounts[0].bankId).toBe('isracard');
+      expect(updatedUser.onboarding.creditCardSetup.creditCardAccounts[0].displayName).toBe('Isracard');
       expect(updatedUser.onboarding.currentStep).toBe('credit-card-matching');
       expect(updatedUser.onboarding.creditCardMatching.completed).toBe(false);
       expect(updatedUser.onboarding.creditCardMatching.processingAccountId.toString())
@@ -237,7 +241,8 @@ describe('Onboarding Accounts API', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           bankId: 'isracard',
-          credentials: { username: 'user123', password: 'pass123', card6Digits: '123456' }
+          credentials: { username: 'user123', password: 'pass123', card6Digits: '123456' },
+          displayName: 'Personal Isracard'
         });
 
       // Add second card
@@ -246,12 +251,31 @@ describe('Onboarding Accounts API', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           bankId: 'max',
-          credentials: { username: 'user456', password: 'pass456' }
+          credentials: { username: 'user456', password: 'pass456' },
+          displayName: 'Family Max'
         });
 
       // Verify both were added
       const updatedUser = await User.findById(testUser._id);
       expect(updatedUser.onboarding.creditCardSetup.creditCardAccounts).toHaveLength(2);
+    });
+
+    it('requires a name for each credit card account', async () => {
+      const response = await request(app)
+        .post('/api/onboarding/credit-card-account')
+        .set('Authorization', 'Bearer ' + authToken)
+        .send({
+          bankId: 'visaCal',
+          credentials: {
+            username: 'user123',
+            password: 'pass123'
+          },
+          displayName: '   '
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Account name, bank ID and credentials are required');
+      expect(bankAccountService.create).not.toHaveBeenCalled();
     });
 
     it('should reject Isracard without exactly six card digits', async () => {
@@ -264,7 +288,8 @@ describe('Onboarding Accounts API', () => {
             username: 'user123',
             password: 'pass123',
             card6Digits: '12345'
-          }
+          },
+          displayName: 'Personal Isracard'
         });
 
       expect(response.status).toBe(400);
@@ -548,11 +573,15 @@ describe('Onboarding Accounts API', () => {
       expect(data.isComplete).toBe(false);
       expect(data.checkingAccount.connected).toBe(true);
       expect(data.checkingAccount.accountId._id).toBe(checkingAccountId.toString());
+      expect(data.checkingAccount.accountId.displayName).toBe('My Checking');
+      expect(data.checkingAccount.accountId).not.toHaveProperty('credentials');
       expect(data.transactionImport.completed).toBe(true);
       expect(data.transactionImport.transactionsImported).toBe(150);
       expect(data.creditCardDetection.analyzed).toBe(true);
       expect(data.creditCardDetection.recommendation).toBe('connect');
       expect(data.creditCardSetup.creditCardAccounts).toHaveLength(1);
+      expect(data.creditCardSetup.creditCardAccounts[0].accountId.displayName).toBe('Isracard');
+      expect(data.creditCardSetup.creditCardAccounts[0].accountId).not.toHaveProperty('credentials');
       expect(data.completedSteps).toHaveLength(3);
     });
 
