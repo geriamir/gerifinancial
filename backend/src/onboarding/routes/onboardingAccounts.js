@@ -10,6 +10,16 @@ const {
   isValidCard6Digits
 } = require('../../banking/utils/scraperCredentials');
 
+const serializePopulatedAccount = (account) => {
+  if (!account || typeof account !== 'object' || !account.bankId) return account;
+
+  return {
+    _id: account._id,
+    bankId: account.bankId,
+    displayName: account.name
+  };
+};
+
 /**
  * @route   POST /api/onboarding/checking-account
  * @desc    Add main checking account during onboarding
@@ -550,6 +560,15 @@ router.get('/status', auth, async (req, res) => {
     
     // Transform old credit card matching data to new format if needed
     let onboardingData = user.onboarding.toObject ? user.onboarding.toObject() : user.onboarding;
+
+    if (onboardingData.checkingAccount?.accountId) {
+      onboardingData.checkingAccount.accountId = serializePopulatedAccount(
+        onboardingData.checkingAccount.accountId
+      );
+    }
+    for (const account of onboardingData.creditCardSetup?.creditCardAccounts || []) {
+      account.accountId = serializePopulatedAccount(account.accountId);
+    }
     
     // Check if we have old format data (matchedPayments is a number instead of array)
     if (onboardingData.creditCardMatching && 

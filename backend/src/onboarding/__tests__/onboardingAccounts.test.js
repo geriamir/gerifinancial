@@ -573,11 +573,15 @@ describe('Onboarding Accounts API', () => {
       expect(data.isComplete).toBe(false);
       expect(data.checkingAccount.connected).toBe(true);
       expect(data.checkingAccount.accountId._id).toBe(checkingAccountId.toString());
+      expect(data.checkingAccount.accountId.displayName).toBe('My Checking');
+      expect(data.checkingAccount.accountId).not.toHaveProperty('credentials');
       expect(data.transactionImport.completed).toBe(true);
       expect(data.transactionImport.transactionsImported).toBe(150);
       expect(data.creditCardDetection.analyzed).toBe(true);
       expect(data.creditCardDetection.recommendation).toBe('connect');
       expect(data.creditCardSetup.creditCardAccounts).toHaveLength(1);
+      expect(data.creditCardSetup.creditCardAccounts[0].accountId.displayName).toBe('Isracard');
+      expect(data.creditCardSetup.creditCardAccounts[0].accountId).not.toHaveProperty('credentials');
       expect(data.completedSteps).toHaveLength(3);
     });
 
