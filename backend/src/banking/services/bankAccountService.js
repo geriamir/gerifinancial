@@ -156,6 +156,8 @@ class BankAccountService {
     if (!bankAccount) {
       throw new Error('Bank account not found');
     }
+    // A deferred check makes the queued import the only validation path.
+    const queuedSyncRequired = requireQueuedSync || deferCredentialValidation;
 
     if (bankAccount.bankId === 'mercury') {
       // Mercury uses API token — no scraper validation
@@ -201,7 +203,7 @@ class BankAccountService {
       logger.info(`Queued scraping job for account ${bankAccount.name} after credential update`);
     } catch (error) {
       logger.error(`Failed to queue scraping after credential update for account ${bankAccount.name}:`, error);
-      if (requireQueuedSync) {
+      if (queuedSyncRequired) {
         bankAccount.status = 'error';
         bankAccount.lastError = {
           message: 'Credentials were updated, but the automatic import retry could not be started',
