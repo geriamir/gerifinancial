@@ -87,10 +87,17 @@ Add a credit card account during onboarding.
 ```json
 {
   "bankId": "isracard",
-  "credentials": { "username": "...", "password": "..." },
+  "credentials": {
+    "username": "...",
+    "password": "...",
+    "card6Digits": "123456"
+  },
   "displayName": "Isracard" // optional
 }
 ```
+
+American Express uses the same ID number, password, and last-six credential shape with
+`"bankId": "amex"`.
 
 **Response:**
 ```json

@@ -7,6 +7,7 @@ import { OnboardingStatus } from '../../../services/api/onboarding';
 // before that field was introduced.
 const PROVIDER_HINTS = [
   { bankId: 'isracard', pattern: /ישראכרט|\bisracard\b/i },
+  { bankId: 'amex', pattern: /אמריקן\s*אקספרס|אמקס|american\s+express|\bamex\b/i },
   { bankId: 'visaCal', pattern: /דיינרס|ויזה\s*כאל|^\s*כאל(?:\s*-\s*י)?\s*$|\bdiners(?:\s+club)?\b|\bvisa\s*cal\b|\bcal\s+monthly\s+payment\b/i },
   { bankId: 'max', pattern: /מקס\s*(?:איט\s*)?פיננסים|^\s*מקס(?:\s*-\s*י)?\s*$|\bmax\s+monthly\s+payment\b/i }
 ];

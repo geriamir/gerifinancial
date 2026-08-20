@@ -6,9 +6,9 @@ const bankAccountEvents = require('./bankAccountEvents');
 const ForeignCurrencyAccount = require('../../foreign-currency/models/ForeignCurrencyAccount');
 const { OTP_BANKS } = require('../constants/enums');
 const {
-  ISRACARD_BANK_ID,
   buildScraperCredentials,
-  isValidCard6Digits
+  isValidCard6Digits,
+  requiresCard6Digits
 } = require('../utils/scraperCredentials');
 
 const normalizeAccountName = (name) => {
@@ -54,7 +54,7 @@ class BankAccountService {
       credentials = { username, phoneOrEmail };
     } else {
       // Israeli banks use username/password with browser scraping
-      if (bankId === ISRACARD_BANK_ID && !isValidCard6Digits(card6Digits)) {
+      if (requiresCard6Digits(bankId) && !isValidCard6Digits(card6Digits)) {
         throw new Error('Last 6 card digits must be exactly 6 digits');
       }
       // Onboarding card flows validate in the queued import so a slow provider
@@ -68,7 +68,7 @@ class BankAccountService {
       credentials = {
         username,
         password,
-        ...(bankId === ISRACARD_BANK_ID && { card6Digits })
+        ...(requiresCard6Digits(bankId) && { card6Digits })
       };
     }
 
@@ -167,7 +167,7 @@ class BankAccountService {
       bankAccount.credentials = { flexToken, queryId };
     } else {
       // Israeli banks: validate new credentials before saving
-      if (bankAccount.bankId === ISRACARD_BANK_ID && !isValidCard6Digits(card6Digits)) {
+      if (requiresCard6Digits(bankAccount.bankId) && !isValidCard6Digits(card6Digits)) {
         throw new Error('Last 6 card digits must be exactly 6 digits');
       }
       // Failed onboarding cards are revalidated by the queued retry, while
@@ -181,7 +181,7 @@ class BankAccountService {
       bankAccount.credentials = {
         username,
         password,
-        ...(bankAccount.bankId === ISRACARD_BANK_ID && { card6Digits })
+        ...(requiresCard6Digits(bankAccount.bankId) && { card6Digits })
       };
     }
 

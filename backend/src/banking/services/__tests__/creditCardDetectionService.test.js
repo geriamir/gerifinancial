@@ -23,8 +23,10 @@ describe('CreditCardDetectionService', () => {
     const descriptions = [
       'כרטיסי אשראי-י',
       'ישראכרט בע"מ-י',
+      'אמריקן אקספרס בע"מ',
       'דיינרס קלוב-י',
       'Isracard monthly payment',
+      'Amex monthly payment',
       'CAL monthly payment',
       'MAX monthly payment'
     ];
@@ -48,16 +50,17 @@ describe('CreditCardDetectionService', () => {
       new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
     );
 
-    expect(analysis.transactionCount).toBe(6);
+    expect(analysis.transactionCount).toBe(8);
     expect(analysis.recommendation).toBe('connect');
     expect(analysis.suggestedProviders).toEqual([
       { bankId: 'isracard', paymentCount: 2 },
+      { bankId: 'amex', paymentCount: 2 },
       { bankId: 'visaCal', paymentCount: 2 },
       { bankId: 'max', paymentCount: 1 }
     ]);
     expect(paymentMonths).toEqual([
       expect.objectContaining({
-        transactionCount: 6,
+        transactionCount: 8,
         transactions: expect.arrayContaining(
           descriptions.map(description => expect.objectContaining({ description }))
         )

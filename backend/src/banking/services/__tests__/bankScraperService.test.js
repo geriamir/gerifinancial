@@ -148,8 +148,8 @@ describe('BankScraperService', () => {
       })).rejects.toThrow('Login failed: Invalid bank credentials');
     });
 
-    it('should preserve Isracard-specific credential fields', async () => {
-      const result = await bankScraperService.validateCredentials('isracard', {
+    it.each(['isracard', 'amex'])('should preserve %s-specific credential fields', async (bankId) => {
+      const result = await bankScraperService.validateCredentials(bankId, {
         id: 'testuser',
         card6Digits: '123456',
         password: 'bankpass123'

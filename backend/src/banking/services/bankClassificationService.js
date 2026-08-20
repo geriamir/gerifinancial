@@ -20,7 +20,7 @@ class BankClassificationService {
    * @returns {string[]} Array of credit card provider IDs
    */
   static getCreditCardProviders() {
-    return ['visaCal', 'max', 'isracard'];
+    return ['visaCal', 'max', 'isracard', 'amex'];
   }
   
   /**
@@ -151,7 +151,8 @@ class BankClassificationService {
     return [
       { id: 'visaCal', name: 'Visa Cal' },
       { id: 'max', name: 'Max' },
-      { id: 'isracard', name: 'Isracard' }
+      { id: 'isracard', name: 'Isracard' },
+      { id: 'amex', name: 'American Express' }
     ];
   }
   

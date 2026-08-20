@@ -4,7 +4,7 @@ const { resolveStartDate, DEFAULT_LOOKBACK_MONTHS } = require('../utils/scraperD
 const logger = require('../../shared/utils/logger');
 const { OTP_BANKS } = require('../constants/enums');
 const {
-  ISRACARD_BANK_ID,
+  requiresCard6Digits,
   buildScraperCredentials
 } = require('../utils/scraperCredentials');
 
@@ -17,7 +17,7 @@ const bankAccountSchema = new mongoose.Schema({
   bankId: {
     type: String,
     required: true,
-    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury', 'ibkr', 'phoenix', 'clal'] // Supported banks
+    enum: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'amex', 'mercury', 'ibkr', 'phoenix', 'clal'] // Supported banks
   },
   defaultCurrency: {
     type: String,
@@ -254,7 +254,7 @@ bankAccountSchema.methods.getScraperCredentials = async function() {
     password: await credentialEncryption.decryptForUser(this.userId, this.credentials.password)
   };
 
-  if (this.bankId === ISRACARD_BANK_ID) {
+  if (requiresCard6Digits(this.bankId)) {
     credentials.card6Digits = this.credentials.card6Digits
       ? await credentialEncryption.decryptForUser(this.userId, this.credentials.card6Digits)
       : undefined;

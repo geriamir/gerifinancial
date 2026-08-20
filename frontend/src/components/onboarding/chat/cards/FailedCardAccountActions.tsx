@@ -10,6 +10,10 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import { OnboardingStatus } from '../../../../services/api/onboarding';
+import {
+  card6DigitsProviderName,
+  requiresCard6Digits
+} from '../../../../constants/banks';
 import { ChatHandlers } from '../types';
 
 interface FailedCardAccountActionsProps {
@@ -60,7 +64,8 @@ export const FailedCardAccountActions: React.FC<FailedCardAccountActionsProps> =
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const isIsracard = account.bankId === 'isracard';
+  const needsCard6Digits = requiresCard6Digits(account.bankId);
+  const cardProviderName = card6DigitsProviderName(account.bankId);
 
   useEffect(() => {
     setMode('summary');
@@ -89,8 +94,8 @@ export const FailedCardAccountActions: React.FC<FailedCardAccountActionsProps> =
       setError('Please enter the username and new password');
       return;
     }
-    if (isIsracard && !/^\d{6}$/.test(form.card6Digits)) {
-      setError('Enter the last 6 digits of your Isracard');
+    if (needsCard6Digits && !/^\d{6}$/.test(form.card6Digits)) {
+      setError(`Enter the last 6 digits of your ${cardProviderName}`);
       return;
     }
 
@@ -99,7 +104,7 @@ export const FailedCardAccountActions: React.FC<FailedCardAccountActionsProps> =
       await handlers.repairCreditCardAccount(account.accountId, {
         username: form.username,
         password: form.password,
-        ...(isIsracard && { card6Digits: form.card6Digits })
+        ...(needsCard6Digits && { card6Digits: form.card6Digits })
       });
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -212,7 +217,7 @@ export const FailedCardAccountActions: React.FC<FailedCardAccountActionsProps> =
             fullWidth
             margin="dense"
             size="small"
-            label={isIsracard ? 'ID Number' : 'Username'}
+            label={needsCard6Digits ? 'ID Number' : 'Username'}
             name="username"
             value={form.username}
             onChange={handleText}
@@ -220,7 +225,7 @@ export const FailedCardAccountActions: React.FC<FailedCardAccountActionsProps> =
             required
             inputProps={{ 'data-testid': 'repair-card-username' }}
           />
-          {isIsracard && (
+          {needsCard6Digits && (
             <TextField
               fullWidth
               margin="dense"

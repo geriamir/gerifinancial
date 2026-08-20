@@ -19,7 +19,13 @@ import {
   Typography
 } from '@mui/material';
 import { bankAccountsApi } from '../../services/api/bank';
-import { SUPPORTED_BANKS, isApiBank, isOtpBank } from '../../constants/banks';
+import {
+  SUPPORTED_BANKS,
+  card6DigitsProviderName,
+  isApiBank,
+  isOtpBank,
+  requiresCard6Digits
+} from '../../constants/banks';
 import { BankIcon } from './BankIcon';
 import { track } from '../../utils/analytics';
 import { BANK_ACCOUNT_EVENTS } from '../../constants/analytics';
@@ -75,9 +81,9 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
       bankName: SUPPORTED_BANKS.find(bank => bank.id === formData.bankId)?.name
     });
 
-    if (formData.bankId === 'isracard' && !/^\d{6}$/.test(formData.card6Digits)) {
+    if (requiresCard6Digits(formData.bankId) && !/^\d{6}$/.test(formData.card6Digits)) {
       setLoading(false);
-      setError('Enter the last 6 digits of your Isracard');
+      setError(`Enter the last 6 digits of your ${card6DigitsProviderName(formData.bankId)}`);
       return;
     }
 
@@ -93,7 +99,7 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
         credentials = {
           username: formData.username,
           password: formData.password,
-          ...(formData.bankId === 'isracard' && { card6Digits: formData.card6Digits })
+          ...(requiresCard6Digits(formData.bankId) && { card6Digits: formData.card6Digits })
         };
       }
 
@@ -277,14 +283,14 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
               <TextField
                 fullWidth
                 margin="normal"
-                label={formData.bankId === 'isracard' ? 'ID Number' : 'Username'}
+                label={requiresCard6Digits(formData.bankId) ? 'ID Number' : 'Username'}
                 name="username"
                 value={formData.username}
                 onChange={handleInputChange}
                 required
               />
 
-              {formData.bankId === 'isracard' && (
+              {requiresCard6Digits(formData.bankId) && (
                 <TextField
                   fullWidth
                   margin="normal"
@@ -294,7 +300,7 @@ export const BankAccountForm: React.FC<BankAccountFormProps> = ({
                   onChange={handleInputChange}
                   required
                   inputProps={{ inputMode: 'numeric', pattern: '[0-9]{6}', maxLength: 6 }}
-                  helperText="The last 6 digits of any Isracard registered to this ID"
+                  helperText={`The last 6 digits of any ${card6DigitsProviderName(formData.bankId)} card registered to this ID`}
                 />
               )}
 

@@ -513,7 +513,7 @@ class BankScraperService {
 
   getScraperInfo() {
     return {
-      supportedBanks: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard'],
+      supportedBanks: ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'amex'],
       defaultSettings: {
         timeout: this.DEFAULT_TIMEOUT,
         maxRetries: this.MAX_RETRIES,

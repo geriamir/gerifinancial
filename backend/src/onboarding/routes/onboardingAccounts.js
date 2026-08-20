@@ -6,8 +6,8 @@ const { User } = require('../../auth');
 const { bankAccountService, Transaction, scrapingEvents } = require('../../banking');
 const onboardingCreditCardDetectionService = require('../services/onboardingCreditCardDetectionService');
 const {
-  ISRACARD_BANK_ID,
-  isValidCard6Digits
+  isValidCard6Digits,
+  requiresCard6Digits
 } = require('../../banking/utils/scraperCredentials');
 
 const serializePopulatedAccount = (account) => {
@@ -121,7 +121,7 @@ router.post('/credit-card-account', auth, async (req, res) => {
         error: 'Username and password are required'
       });
     }
-    if (bankId === ISRACARD_BANK_ID && !isValidCard6Digits(credentials.card6Digits)) {
+    if (requiresCard6Digits(bankId) && !isValidCard6Digits(credentials.card6Digits)) {
       return res.status(400).json({
         success: false,
         error: 'Last 6 card digits must be exactly 6 digits'
@@ -219,7 +219,7 @@ router.put('/credit-card-account/:accountId/credentials', auth, async (req, res)
         error: 'Username and password are required'
       });
     }
-    if (account.bankId === ISRACARD_BANK_ID && !isValidCard6Digits(card6Digits)) {
+    if (requiresCard6Digits(account.bankId) && !isValidCard6Digits(card6Digits)) {
       return res.status(400).json({
         success: false,
         error: 'Last 6 card digits must be exactly 6 digits'

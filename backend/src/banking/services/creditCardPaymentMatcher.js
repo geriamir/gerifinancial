@@ -1,8 +1,9 @@
 const CARD_PAYMENT_DESCRIPTION_PATTERN =
-  /^\s*(?:כרטיסי?\s*אשראי|ישראכרט(?:\s+בע"?מ)?|דיינרס(?:\s*קלוב)?|ויזה\s*כאל|מקס\s*(?:איט\s*)?פיננסים|כאל|מקס|credit\s*card(?:\s+payment)?|isracard(?:\s+monthly\s+payment)?|diners(?:\s+club)?(?:\s+monthly\s+payment)?|visa\s*cal(?:\s+monthly\s+payment)?|(?:cal|max)\s+monthly\s+payment)(?:\s*-\s*י)?\s*$/i;
+  /^\s*(?:כרטיסי?\s*אשראי|ישראכרט(?:\s+בע"?מ)?|אמריקן\s*אקספרס(?:\s+בע"?מ)?|אמקס|דיינרס(?:\s*קלוב)?|ויזה\s*כאל|מקס\s*(?:איט\s*)?פיננסים|כאל|מקס|credit\s*card(?:\s+payment)?|isracard(?:\s+monthly\s+payment)?|american\s+express(?:\s+monthly\s+payment)?|amex(?:\s+monthly\s+payment)?|diners(?:\s+club)?(?:\s+monthly\s+payment)?|visa\s*cal(?:\s+monthly\s+payment)?|(?:cal|max)\s+monthly\s+payment)(?:\s*-\s*י)?\s*$/i;
 
 const CREDIT_CARD_PROVIDER_HINTS = [
   { bankId: 'isracard', pattern: /ישראכרט|\bisracard\b/i },
+  { bankId: 'amex', pattern: /אמריקן\s*אקספרס|אמקס|american\s+express|\bamex\b/i },
   { bankId: 'visaCal', pattern: /דיינרס|ויזה\s*כאל|^\s*כאל(?:\s*-\s*י)?\s*$|\bdiners(?:\s+club)?\b|\bvisa\s*cal\b|\bcal\s+monthly\s+payment\b/i },
   { bankId: 'max', pattern: /מקס\s*(?:איט\s*)?פיננסים|^\s*מקס(?:\s*-\s*י)?\s*$|\bmax\s+monthly\s+payment\b/i }
 ];
