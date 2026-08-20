@@ -31,7 +31,7 @@ class BankAccountService {
     flexToken,
     queryId,
     phoneOrEmail
-  }) {
+  }, { deferCredentialValidation = false } = {}) {
     name = normalizeAccountName(name);
     const duplicateName = await BankAccount.exists({
       userId,
@@ -57,10 +57,12 @@ class BankAccountService {
       if (bankId === ISRACARD_BANK_ID && !isValidCard6Digits(card6Digits)) {
         throw new Error('Last 6 card digits must be exactly 6 digits');
       }
-      await bankScraperService.validateCredentials(
-        bankId,
-        buildScraperCredentials(bankId, { username, password, card6Digits })
-      );
+      if (!deferCredentialValidation) {
+        await bankScraperService.validateCredentials(
+          bankId,
+          buildScraperCredentials(bankId, { username, password, card6Digits })
+        );
+      }
       credentials = {
         username,
         password,
@@ -144,7 +146,10 @@ class BankAccountService {
     apiToken,
     flexToken,
     queryId
-  }, { requireQueuedSync = false } = {}) {
+  }, {
+    requireQueuedSync = false,
+    deferCredentialValidation = false
+  } = {}) {
     const bankAccount = await BankAccount.findOne({ _id: accountId, userId });
     if (!bankAccount) {
       throw new Error('Bank account not found');
@@ -161,10 +166,12 @@ class BankAccountService {
       if (bankAccount.bankId === ISRACARD_BANK_ID && !isValidCard6Digits(card6Digits)) {
         throw new Error('Last 6 card digits must be exactly 6 digits');
       }
-      await bankScraperService.validateCredentials(
-        bankAccount.bankId,
-        buildScraperCredentials(bankAccount.bankId, { username, password, card6Digits })
-      );
+      if (!deferCredentialValidation) {
+        await bankScraperService.validateCredentials(
+          bankAccount.bankId,
+          buildScraperCredentials(bankAccount.bankId, { username, password, card6Digits })
+        );
+      }
       bankAccount.credentials = {
         username,
         password,
