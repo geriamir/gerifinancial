@@ -319,6 +319,22 @@ describe('OnboardingChat', () => {
           },
           matchedMonth: '2026-08',
           matchConfidence: 91
+        }, {
+          payment: {
+            id: 'payment-2',
+            date: '2026-07-10T00:00:00.000Z',
+            description: 'Card payment',
+            amount: 3978.23
+          },
+          matchedCreditCard: {
+            id: null,
+            displayName: 'Visa Cal Credit Cards',
+            cardNumber: null,
+            lastFourDigits: null,
+            provider: 'visaCal'
+          },
+          matchedMonth: '2026-07',
+          matchConfidence: 100
         }],
         connectedCreditCards: [
           { id: 'card-1', displayName: '0296', provider: 'visaCal' },
@@ -330,6 +346,8 @@ describe('OnboardingChat', () => {
 
     expect(await screen.findByText('Matched checking-account payments')).toBeInTheDocument();
     expect(screen.getByText(/34,208\.45/)).toBeInTheDocument();
+    expect(screen.getByText(/3,978\.23/)).toBeInTheDocument();
+    expect(screen.getByText('Matched to Visa Cal · ending 0296')).toBeInTheDocument();
     expect(screen.getByText('Matched to Visa Cal')).toBeInTheDocument();
     expect(screen.getByText('Connected cards (last 4 digits)')).toBeInTheDocument();
     expect(screen.getByText('ending 0296')).toBeInTheDocument();

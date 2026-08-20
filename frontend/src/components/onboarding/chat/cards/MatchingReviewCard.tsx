@@ -19,6 +19,16 @@ const PAYMENT_DATE_FORMATTER = new Intl.DateTimeFormat('en-IL', {
 
 const formatPaymentDate = (date: string): string => PAYMENT_DATE_FORMATTER.format(new Date(date));
 
+const matchedCardEnding = (
+  matchedCard: CardProps['status']['creditCardMatching']['matchedPayments'][number]['matchedCreditCard']
+): string | null => {
+  for (const value of [matchedCard.lastFourDigits, matchedCard.cardNumber]) {
+    const ending = value?.match(/\d{4}$/)?.[0];
+    if (ending) return ending;
+  }
+  return null;
+};
+
 /**
  * Shown once the card statements have been matched against the payments in the
  * checking account. Finishing is always allowed because a provider debit can
@@ -72,16 +82,20 @@ export const MatchingReviewCard: React.FC<CardProps> = ({ status, handlers }) =>
             Matched checking-account payments
           </Typography>
           <Stack spacing={1}>
-            {matchedPayments.map((match) => (
-              <Box key={match.payment.id}>
-                <Typography variant="body2">
-                  {formatPaymentDate(match.payment.date)} · {formatCurrencyDisplay(match.payment.amount)}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Matched to {providerName(match.matchedCreditCard.provider)}
-                </Typography>
-              </Box>
-            ))}
+            {matchedPayments.map((match) => {
+              const ending = matchedCardEnding(match.matchedCreditCard);
+              return (
+                <Box key={match.payment.id}>
+                  <Typography variant="body2">
+                    {formatPaymentDate(match.payment.date)} · {formatCurrencyDisplay(match.payment.amount)}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Matched to {providerName(match.matchedCreditCard.provider)}
+                    {ending && ` · ending ${ending}`}
+                  </Typography>
+                </Box>
+              );
+            })}
           </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
             A provider debit can combine several physical cards, so it cannot always be assigned to one card ending.
