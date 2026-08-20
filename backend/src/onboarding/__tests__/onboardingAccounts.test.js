@@ -526,6 +526,12 @@ describe('Onboarding Accounts API', () => {
         },
         creditCardMatching: {
           completed: false,
+          failedAccount: {
+            accountId: creditCardAccountId,
+            bankId: 'isracard',
+            displayName: 'Isracard',
+            error: 'Password expired'
+          },
           totalCreditCardPayments: 0,
           coveredPayments: 0,
           uncoveredPayments: 0,
@@ -553,6 +559,9 @@ describe('Onboarding Accounts API', () => {
       expect(data.creditCardDetection.analyzed).toBe(true);
       expect(data.creditCardDetection.recommendation).toBe('connect');
       expect(data.creditCardSetup.creditCardAccounts).toHaveLength(1);
+      expect(data.creditCardSetup.creditCardAccounts[0].loginHint).toBe('Login ending user');
+      expect(data.creditCardSetup.creditCardAccounts[0].accountId.loginHint).toBe('Login ending user');
+      expect(data.creditCardMatching.failedAccount.loginHint).toBe('Login ending user');
       expect(data.completedSteps).toHaveLength(3);
     });
 

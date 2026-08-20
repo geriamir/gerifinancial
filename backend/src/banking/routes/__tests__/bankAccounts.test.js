@@ -375,6 +375,8 @@ describe('Bank Account Routes', () => {
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBe(1);
       expect(response.body[0].userId.toString()).toBe(user._id.toString());
+      expect(response.body[0].loginHint)
+        .toBe(`Login ending ${validCredentials.username.slice(-4)}`);
     });
 
     it('should not list accounts without authentication', async () => {

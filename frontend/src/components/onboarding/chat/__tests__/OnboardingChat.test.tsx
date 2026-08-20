@@ -117,6 +117,7 @@ const failedCard = (): OnboardingStatus => ({
       accountId: 'failed-cal',
       bankId: 'visaCal',
       displayName: 'Visa Cal Credit Cards',
+      loginHint: 'Login ending 1234',
       error: 'The bank requires a password change.'
     },
     totalCreditCardPayments: 5,
@@ -340,7 +341,9 @@ describe('OnboardingChat', () => {
     mockStatus = failedCard();
     draw();
 
-    expect(await screen.findByText('Visa Cal Credit Cards needs attention')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Visa Cal Credit Cards (Login ending 1234) needs attention')
+    ).toBeInTheDocument();
     expect(screen.getByText('The bank requires a password change.')).toBeInTheDocument();
 
     await user.click(screen.getByTestId('fix-card-account-btn'));

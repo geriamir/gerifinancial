@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import { OnboardingStatus } from '../../../../services/api/onboarding';
+import { formatAccountLabel } from '../../../../utils/accountLabel';
 import { ChatHandlers } from '../types';
 
 interface FailedCardAccountActionsProps {
@@ -56,6 +57,7 @@ export const FailedCardAccountActions: React.FC<FailedCardAccountActionsProps> =
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const isIsracard = account.bankId === 'isracard';
+  const accountLabel = formatAccountLabel(account.displayName, account.loginHint);
 
   useEffect(() => {
     setMode('summary');
@@ -113,7 +115,7 @@ export const FailedCardAccountActions: React.FC<FailedCardAccountActionsProps> =
   return (
     <Box sx={{ mb: 2 }} data-testid="failed-card-account">
       <Alert severity="error">
-        <AlertTitle>{account.displayName} needs attention</AlertTitle>
+        <AlertTitle>{accountLabel} needs attention</AlertTitle>
         {account.error}
       </Alert>
 
@@ -140,7 +142,7 @@ export const FailedCardAccountActions: React.FC<FailedCardAccountActionsProps> =
       {mode === 'repair' && (
         <Box component="form" onSubmit={repair} sx={{ mt: 1.5 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Enter the credentials for {account.displayName}. They will be validated before the import retries.
+            Enter the credentials for {accountLabel}. They will be validated before the import retries.
           </Typography>
           <TextField
             fullWidth

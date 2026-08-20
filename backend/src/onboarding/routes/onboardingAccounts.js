@@ -9,6 +9,7 @@ const {
   ISRACARD_BANK_ID,
   isValidCard6Digits
 } = require('../../banking/utils/scraperCredentials');
+const { buildAccountLoginHint } = require('../../banking/utils/accountLoginHint');
 
 /**
  * @route   POST /api/onboarding/checking-account
@@ -549,6 +550,25 @@ router.get('/status', auth, async (req, res) => {
     
     // Transform old credit card matching data to new format if needed
     let onboardingData = user.onboarding.toObject ? user.onboarding.toObject() : user.onboarding;
+
+    const loginHintsByAccountId = new Map();
+    const creditCardAccounts = onboardingData.creditCardSetup?.creditCardAccounts || [];
+    for (const creditCardAccount of creditCardAccounts) {
+      const populatedAccount = creditCardAccount.accountId;
+      if (!populatedAccount?._id) continue;
+
+      const loginHint = buildAccountLoginHint(populatedAccount.credentials?.username);
+      if (!loginHint) continue;
+
+      creditCardAccount.loginHint = loginHint;
+      populatedAccount.loginHint = loginHint;
+      loginHintsByAccountId.set(populatedAccount._id.toString(), loginHint);
+    }
+
+    const failedAccount = onboardingData.creditCardMatching?.failedAccount;
+    if (failedAccount?.accountId) {
+      failedAccount.loginHint = loginHintsByAccountId.get(failedAccount.accountId.toString()) || null;
+    }
     
     // Check if we have old format data (matchedPayments is a number instead of array)
     if (onboardingData.creditCardMatching && 

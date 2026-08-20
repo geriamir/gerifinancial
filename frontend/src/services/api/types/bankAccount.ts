@@ -2,6 +2,7 @@ export interface BankAccount {
   _id: string;
   bankId: string;
   name: string;
+  loginHint?: string | null;
   status: 'active' | 'error' | 'pending' | 'disabled';
   lastScraped: string | null;
   currentBalance?: number | null;

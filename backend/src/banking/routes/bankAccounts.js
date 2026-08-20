@@ -7,6 +7,7 @@ const {
   ISRACARD_BANK_ID,
   isValidCard6Digits
 } = require('../utils/scraperCredentials');
+const { buildAccountLoginHint } = require('../utils/accountLoginHint');
 
 const router = express.Router();
 
@@ -14,7 +15,13 @@ const router = express.Router();
 router.get('/', auth, async (req, res) => {
   try {
     const accounts = await BankAccount.find({ userId: req.user._id });
-    res.json(accounts);
+    res.json(accounts.map(account => {
+      const serializedAccount = account.toJSON();
+      return {
+        ...serializedAccount,
+        loginHint: buildAccountLoginHint(serializedAccount.credentials?.username)
+      };
+    }));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
