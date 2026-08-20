@@ -127,7 +127,7 @@ class BankScraperService {
     try {
       await scraper.terminate(success);
     } catch (error) {
-      logger.warn(`Failed to close scraper after login validation: ${error.message}`);
+      logger.warn(`Failed to terminate scraper cleanly: ${error.message}`);
     }
   }
 
