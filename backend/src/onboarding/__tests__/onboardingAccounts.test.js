@@ -213,6 +213,43 @@ describe('Onboarding Accounts API', () => {
       expect(updatedUser.onboarding.creditCardMatching.error).toBeNull();
     });
 
+    it('should add an American Express account with last-six credentials', async () => {
+      const mockAccount = {
+        _id: new mongoose.Types.ObjectId(),
+        userId: testUser._id,
+        bankId: 'amex',
+        accountType: 'creditCard',
+        displayName: 'American Express',
+        isActive: true
+      };
+      bankAccountService.create.mockResolvedValue(mockAccount);
+
+      const response = await request(app)
+        .post('/api/onboarding/credit-card-account')
+        .set('Authorization', 'Bearer ' + authToken)
+        .send({
+          bankId: 'amex',
+          credentials: {
+            username: 'user123',
+            password: 'pass123',
+            card6Digits: '654321'
+          },
+          displayName: 'American Express'
+        });
+
+      expect(response.status).toBe(200);
+      expect(bankAccountService.create).toHaveBeenCalledWith(
+        testUser._id,
+        expect.objectContaining({
+          bankId: 'amex',
+          card6Digits: '654321'
+        }),
+        { deferCredentialValidation: true }
+      );
+      const updatedUser = await User.findById(testUser._id);
+      expect(updatedUser.onboarding.creditCardSetup.creditCardAccounts[0].bankId).toBe('amex');
+    });
+
     it('should allow adding multiple credit card accounts', async () => {
       const mockAccount1 = {
         _id: new mongoose.Types.ObjectId(),
@@ -279,18 +316,21 @@ describe('Onboarding Accounts API', () => {
       expect(bankAccountService.create).not.toHaveBeenCalled();
     });
 
-    it('should reject Isracard without exactly six card digits', async () => {
+    it.each([
+      ['isracard', 'Personal Isracard'],
+      ['amex', 'Personal American Express']
+    ])('should reject %s without exactly six card digits', async (bankId, displayName) => {
       const response = await request(app)
         .post('/api/onboarding/credit-card-account')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          bankId: 'isracard',
+          bankId,
           credentials: {
             username: 'user123',
             password: 'pass123',
             card6Digits: '12345'
           },
-          displayName: 'Personal Isracard'
+          displayName
         });
 
       expect(response.status).toBe(400);

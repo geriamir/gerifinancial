@@ -117,16 +117,16 @@ describe('BankAccountService', () => {
       );
     });
 
-    it('should validate and store Isracard last-six credentials', async () => {
+    it.each(['isracard', 'amex'])('should validate and store %s last-six credentials', async (bankId) => {
       bankScraperService.validateCredentials.mockResolvedValueOnce(true);
 
       const account = await bankAccountService.create(userId, {
         ...mockAccountData,
-        bankId: 'isracard',
+        bankId,
         card6Digits: validCredentials.card6Digits
       });
 
-      expect(bankScraperService.validateCredentials).toHaveBeenCalledWith('isracard', {
+      expect(bankScraperService.validateCredentials).toHaveBeenCalledWith(bankId, {
         id: validCredentials.username,
         card6Digits: validCredentials.card6Digits,
         password: validCredentials.password
@@ -138,10 +138,10 @@ describe('BankAccountService', () => {
       });
     });
 
-    it('should reject Isracard credentials without exactly six card digits', async () => {
+    it.each(['isracard', 'amex'])('should reject %s credentials without exactly six card digits', async (bankId) => {
       await expect(bankAccountService.create(userId, {
         ...mockAccountData,
-        bankId: 'isracard',
+        bankId,
         card6Digits: '12345'
       })).rejects.toThrow('Last 6 card digits must be exactly 6 digits');
 

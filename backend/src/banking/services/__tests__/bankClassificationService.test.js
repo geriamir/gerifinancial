@@ -20,7 +20,7 @@ describe('BankClassificationService', () => {
   describe('getCreditCardProviders', () => {
     test('should return correct credit card provider IDs', () => {
       const creditProviders = BankClassificationService.getCreditCardProviders();
-      expect(creditProviders).toEqual(['visaCal', 'max', 'isracard']);
+      expect(creditProviders).toEqual(['visaCal', 'max', 'isracard', 'amex']);
     });
     
     test('should return array of strings', () => {
@@ -44,6 +44,7 @@ describe('BankClassificationService', () => {
       expect(BankClassificationService.isCheckingBank('visaCal')).toBe(false);
       expect(BankClassificationService.isCheckingBank('max')).toBe(false);
       expect(BankClassificationService.isCheckingBank('isracard')).toBe(false);
+      expect(BankClassificationService.isCheckingBank('amex')).toBe(false);
     });
     
     test('should return false for unknown bank IDs', () => {
@@ -59,6 +60,7 @@ describe('BankClassificationService', () => {
       expect(BankClassificationService.isCreditCardProvider('visaCal')).toBe(true);
       expect(BankClassificationService.isCreditCardProvider('max')).toBe(true);
       expect(BankClassificationService.isCreditCardProvider('isracard')).toBe(true);
+      expect(BankClassificationService.isCreditCardProvider('amex')).toBe(true);
     });
     
     test('should return false for checking bank IDs', () => {
@@ -79,7 +81,7 @@ describe('BankClassificationService', () => {
   describe('getAllSupportedBanks', () => {
     test('should return all supported banks (checking + credit + api + otp)', () => {
       const allBanks = BankClassificationService.getAllSupportedBanks();
-      const expectedBanks = ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'mercury', 'phoenix', 'clal'];
+      const expectedBanks = ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'amex', 'mercury', 'phoenix', 'clal'];
       expect(allBanks).toEqual(expectedBanks);
     });
     
@@ -92,7 +94,7 @@ describe('BankClassificationService', () => {
   
   describe('isSupportedBank', () => {
     test('should return true for all supported banks', () => {
-      const supportedBanks = ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard'];
+      const supportedBanks = ['hapoalim', 'leumi', 'discount', 'otsarHahayal', 'visaCal', 'max', 'isracard', 'amex'];
       supportedBanks.forEach(bank => {
         expect(BankClassificationService.isSupportedBank(bank)).toBe(true);
       });
@@ -117,6 +119,7 @@ describe('BankClassificationService', () => {
       expect(BankClassificationService.getBankType('visaCal')).toBe('credit');
       expect(BankClassificationService.getBankType('max')).toBe('credit');
       expect(BankClassificationService.getBankType('isracard')).toBe('credit');
+      expect(BankClassificationService.getBankType('amex')).toBe('credit');
     });
     
     test('should return null for unsupported banks', () => {
@@ -135,7 +138,7 @@ describe('BankClassificationService', () => {
     
     test('should return credit card providers for type "credit"', () => {
       const creditProviders = BankClassificationService.getBanksByType('credit');
-      expect(creditProviders).toEqual(['visaCal', 'max', 'isracard']);
+      expect(creditProviders).toEqual(['visaCal', 'max', 'isracard', 'amex']);
     });
     
     test('should return empty array for unknown type', () => {
@@ -174,7 +177,8 @@ describe('BankClassificationService', () => {
       const expected = [
         { id: 'visaCal', name: 'Visa Cal' },
         { id: 'max', name: 'Max' },
-        { id: 'isracard', name: 'Isracard' }
+        { id: 'isracard', name: 'Isracard' },
+        { id: 'amex', name: 'American Express' }
       ];
       expect(providerDetails).toEqual(expected);
     });

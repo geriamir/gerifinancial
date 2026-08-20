@@ -168,7 +168,7 @@ const userSchema = new mongoose.Schema({
         _id: false,
         bankId: {
           type: String,
-          enum: ['visaCal', 'max', 'isracard']
+          enum: ['visaCal', 'max', 'isracard', 'amex']
         },
         paymentCount: {
           type: Number,

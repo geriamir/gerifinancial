@@ -145,6 +145,24 @@ describe('CreditCardFormCard submission', () => {
     );
   });
 
+  it('submits American Express credentials with the required last six digits', async () => {
+    const group = showCard();
+
+    fireEvent.click(within(group).getByRole('radio', { name: 'American Express' }));
+    fireEvent.change(screen.getByLabelText(/id number/i), { target: { value: 'someone' } });
+    fireEvent.change(screen.getByLabelText(/last 6 card digits/i), { target: { value: '654321' } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret' } });
+    fireEvent.click(screen.getByTestId('connect-cards-btn'));
+
+    await waitFor(() =>
+      expect(handlers.connectCreditCardAccount).toHaveBeenCalledWith(
+        'amex',
+        { username: 'someone', password: 'secret', card6Digits: '654321' },
+        'American Express account 1'
+      )
+    );
+  });
+
   it('lets the user give the account a recognizable name', async () => {
     const group = showCard();
 

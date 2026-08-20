@@ -150,7 +150,7 @@ must not take down the first page a new user sees.
 #### `frontend/src/components/onboarding/chat/cards/CreditCardFormCard.tsx`
 **Purpose**: Step 4 - Credit card provider connection
 **Responsibilities**:
-- Show only credit card providers (Visa Cal, Max, Isracard)
+- Show only credit card providers (Visa Cal, Max, Isracard, American Express)
 - Handle credit card account setup
 - Optional step (can be skipped)
 
@@ -321,7 +321,7 @@ Response: {
 **Key Methods**:
 ```javascript
 getCheckingBanks()           // Returns ['hapoalim', 'leumi', 'discount', 'otsarHahayal']
-getCreditCardProviders()     // Returns ['visaCal', 'max', 'isracard']
+getCreditCardProviders()     // Returns ['visaCal', 'max', 'isracard', 'amex']
 isCheckingBank(bankId)       // Boolean check
 isCreditCardProvider(bankId) // Boolean check
 getBankType(bankId)          // Returns 'checking' | 'credit' | null

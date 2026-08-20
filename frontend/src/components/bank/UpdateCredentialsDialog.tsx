@@ -14,6 +14,10 @@ import {
 } from '@mui/material';
 import { BankAccount } from '../../services/api/types';
 import { bankAccountsApi } from '../../services/api/bank';
+import {
+  card6DigitsProviderName,
+  requiresCard6Digits
+} from '../../constants/banks';
 
 interface UpdateCredentialsDialogProps {
   open: boolean;
@@ -39,7 +43,8 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
 
   const isMercury = account?.bankId === 'mercury';
   const isIbkr = account?.bankId === 'ibkr';
-  const isIsracard = account?.bankId === 'isracard';
+  const needsCard6Digits = requiresCard6Digits(account?.bankId || '');
+  const cardProviderName = card6DigitsProviderName(account?.bankId || '');
 
   const handleClose = () => {
     if (!loading) {
@@ -74,8 +79,8 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
         setError('Password is required');
         return;
       }
-      if (isIsracard && !/^\d{6}$/.test(card6Digits)) {
-        setError('Enter the last 6 digits of your Isracard');
+      if (needsCard6Digits && !/^\d{6}$/.test(card6Digits)) {
+        setError(`Enter the last 6 digits of your ${cardProviderName}`);
         return;
       }
     }
@@ -104,7 +109,7 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
         await bankAccountsApi.updateCredentials(account._id, {
           username,
           password,
-          ...(isIsracard && { card6Digits })
+          ...(needsCard6Digits && { card6Digits })
         });
       }
       
@@ -199,15 +204,15 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
             ) : (
               <>
                 <TextField
-                  label={isIsracard ? 'ID Number' : 'Username'}
+                  label={needsCard6Digits ? 'ID Number' : 'Username'}
                   type="text"
                   fullWidth
                   value={account.credentials?.username || 'N/A'}
                   disabled
-                  helperText={`${isIsracard ? 'ID number' : 'Username'} cannot be changed. Create a new account if needed.`}
+                  helperText={`${needsCard6Digits ? 'ID number' : 'Username'} cannot be changed. Create a new account if needed.`}
                 />
 
-                {isIsracard && (
+                {needsCard6Digits && (
                   <TextField
                     label="Last 6 card digits"
                     fullWidth
@@ -216,7 +221,7 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
                     onChange={(e) => setCard6Digits(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     disabled={loading || success}
                     inputProps={{ inputMode: 'numeric', pattern: '[0-9]{6}', maxLength: 6 }}
-                    helperText="The last 6 digits of any Isracard registered to this ID"
+                    helperText={`The last 6 digits of any ${cardProviderName} card registered to this ID`}
                   />
                 )}
 
@@ -261,7 +266,7 @@ export const UpdateCredentialsDialog: React.FC<UpdateCredentialsDialogProps> = (
                 ? !apiToken
                 : isIbkr
                   ? !flexToken || !queryId
-                  : !password || (isIsracard && card6Digits.length !== 6))
+                  : !password || (needsCard6Digits && card6Digits.length !== 6))
             }
             startIcon={loading && <CircularProgress size={16} />}
           >

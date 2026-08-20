@@ -87,11 +87,14 @@ Adds a credit card account during onboarding and tracks it separately from regul
   "bankId": "isracard",
   "credentials": {
     "username": "user123",
-    "password": "pass123"
+    "password": "pass123",
+    "card6Digits": "123456"
   },
   "displayName": "Isracard Visa" // optional
 }
 ```
+
+American Express accounts use the same credential fields with `"bankId": "amex"`.
 
 **Response:**
 ```json

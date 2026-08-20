@@ -32,7 +32,8 @@ export const CHECKING_ACCOUNT_BANKS: SupportedBank[] = [
 export const CREDIT_CARD_PROVIDERS: SupportedBank[] = [
   { id: 'visaCal', name: 'Visa Cal', monogram: 'CAL', color: '#0057B8', logo: '/banks/visaCal.png' },
   { id: 'max', name: 'Max', monogram: 'MAX', color: '#5B2C86', logo: '/banks/max.png' },
-  { id: 'isracard', name: 'Isracard', monogram: 'ISR', color: '#E4761B', logo: '/banks/isracard.png' }
+  { id: 'isracard', name: 'Isracard', monogram: 'ISR', color: '#E4761B', logo: '/banks/isracard.png' },
+  { id: 'amex', name: 'American Express', monogram: 'AMX', color: '#006FCF' }
 ];
 
 // API-based banks (token-based REST API, no browser scraping)
@@ -87,6 +88,14 @@ export const isApiBank = (bankId: string): boolean => {
 export const isOtpBank = (bankId: string): boolean => {
   return OTP_BANKS.some(bank => bank.id === bankId);
 };
+
+const CARD6_DIGITS_PROVIDER_IDS = new Set(['isracard', 'amex']);
+
+export const requiresCard6Digits = (bankId: string): boolean =>
+  CARD6_DIGITS_PROVIDER_IDS.has(bankId);
+
+export const card6DigitsProviderName = (bankId: string): string =>
+  bankId === 'amex' ? 'American Express' : 'Isracard';
 
 export const getBankStrategies = (bankId?: string): string[] => {
   switch (bankId) {

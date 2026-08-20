@@ -78,13 +78,16 @@ describe('Bank Account Routes', () => {
       expect(response.body).toHaveProperty('error', 'Missing required fields');
     });
 
-    it('should require exactly six card digits for Isracard', async () => {
+    it.each([
+      ['isracard', 'My Isracard'],
+      ['amex', 'My American Express']
+    ])('should require exactly six card digits for %s', async (bankId, name) => {
       const response = await request(app)
         .post('/api/bank-accounts')
         .set('Authorization', `Bearer ${token}`)
         .send({
-          bankId: 'isracard',
-          name: 'My Isracard',
+          bankId,
+          name,
           credentials: {
             username: validCredentials.username,
             password: validCredentials.password,

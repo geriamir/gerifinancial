@@ -138,26 +138,29 @@ describe('BankAccount Model', () => {
       });
     });
 
-    it('should map and decrypt Isracard credentials for the scraper', async () => {
-      const account = await BankAccount.create({
-        ...mockAccount,
-        bankId: 'isracard',
-        credentials: {
-          username: validCredentials.username,
-          password: validCredentials.password,
-          card6Digits: validCredentials.card6Digits
-        }
-      });
+    it.each(['isracard', 'amex'])(
+      'should map and decrypt %s credentials for the scraper',
+      async (bankId) => {
+        const account = await BankAccount.create({
+          ...mockAccount,
+          bankId,
+          credentials: {
+            username: validCredentials.username,
+            password: validCredentials.password,
+            card6Digits: validCredentials.card6Digits
+          }
+        });
 
-      const savedAccount = await BankAccount.findById(account._id);
-      expect(savedAccount.credentials.card6Digits).not.toBe(validCredentials.card6Digits);
-      expect(credentialEncryption.isEncrypted(savedAccount.credentials.card6Digits)).toBe(true);
-      expect((await savedAccount.getScraperOptions()).credentials).toEqual({
-        id: validCredentials.username,
-        card6Digits: validCredentials.card6Digits,
-        password: validCredentials.password
-      });
-    });
+        const savedAccount = await BankAccount.findById(account._id);
+        expect(savedAccount.credentials.card6Digits).not.toBe(validCredentials.card6Digits);
+        expect(credentialEncryption.isEncrypted(savedAccount.credentials.card6Digits)).toBe(true);
+        expect((await savedAccount.getScraperOptions()).credentials).toEqual({
+          id: validCredentials.username,
+          card6Digits: validCredentials.card6Digits,
+          password: validCredentials.password
+        });
+      }
+    );
 
     it('should default first-time scraping to the past year', async () => {
       const before = new Date();

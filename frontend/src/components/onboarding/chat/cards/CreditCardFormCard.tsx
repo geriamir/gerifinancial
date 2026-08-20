@@ -9,7 +9,11 @@ import {
 } from '@mui/material';
 import { Lock as LockIcon } from '@mui/icons-material';
 import { AxiosError } from 'axios';
-import { CREDIT_CARD_PROVIDERS } from '../../../../constants/banks';
+import {
+  CREDIT_CARD_PROVIDERS,
+  card6DigitsProviderName,
+  requiresCard6Digits
+} from '../../../../constants/banks';
 import { BankPicker } from '../../../bank/BankPicker';
 import { CardShell } from '../CardShell';
 import { CardProps } from '../types';
@@ -74,8 +78,8 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
       setError('Please fill in all required fields');
       return;
     }
-    if (form.bankId === 'isracard' && !/^\d{6}$/.test(form.card6Digits)) {
-      setError('Enter the last 6 digits of your Isracard');
+    if (requiresCard6Digits(form.bankId) && !/^\d{6}$/.test(form.card6Digits)) {
+      setError(`Enter the last 6 digits of your ${card6DigitsProviderName(form.bankId)}`);
       return;
     }
 
@@ -86,7 +90,7 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
         {
           username: form.username,
           password: form.password,
-          ...(form.bankId === 'isracard' && { card6Digits: form.card6Digits })
+          ...(requiresCard6Digits(form.bankId) && { card6Digits: form.card6Digits })
         },
         form.accountName.trim()
       );
@@ -145,7 +149,7 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
           fullWidth
           margin="dense"
           size="small"
-          label={form.bankId === 'isracard' ? 'ID Number' : 'Username'}
+          label={requiresCard6Digits(form.bankId) ? 'ID Number' : 'Username'}
           name="username"
           value={form.username}
           onChange={handleText}
@@ -153,7 +157,7 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
           data-testid="cc-username-input"
         />
 
-        {form.bankId === 'isracard' && (
+        {requiresCard6Digits(form.bankId) && (
           <TextField
             fullWidth
             margin="dense"
@@ -164,7 +168,7 @@ export const CreditCardFormCard: React.FC<CardProps> = ({ status, handlers }) =>
             onChange={handleText}
             required
             inputProps={{ inputMode: 'numeric', pattern: '[0-9]{6}', maxLength: 6 }}
-            helperText="The last 6 digits of any Isracard registered to this ID"
+            helperText={`The last 6 digits of any ${card6DigitsProviderName(form.bankId)} card registered to this ID`}
             data-testid="cc-card6-input"
           />
         )}

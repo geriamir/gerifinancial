@@ -47,18 +47,19 @@ const mockTransactions = [
 module.exports = {
   validCredentials,
   createScraper: (options) => {
+    const requiresCard6Digits = ['isracard', 'amex'].includes(options.companyId);
     const getUsername = credentials =>
-      options.companyId === 'isracard' ? credentials?.id : credentials?.username;
+      requiresCard6Digits ? credentials?.id : credentials?.username;
     const hasRequiredCredentials = credentials =>
       Boolean(
         getUsername(credentials) &&
         credentials?.password &&
-        (options.companyId !== 'isracard' || /^\d{6}$/.test(credentials?.card6Digits))
+        (!requiresCard6Digits || /^\d{6}$/.test(credentials?.card6Digits))
       );
     const hasValidCredentials = credentials =>
       getUsername(credentials) === validCredentials.username &&
       credentials?.password === validCredentials.password &&
-      (options.companyId !== 'isracard' || credentials?.card6Digits === validCredentials.card6Digits);
+      (!requiresCard6Digits || credentials?.card6Digits === validCredentials.card6Digits);
 
     // Add special case for error testing
     if (options.companyId === 'error_bank') {

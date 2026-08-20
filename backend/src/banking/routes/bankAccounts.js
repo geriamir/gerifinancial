@@ -5,8 +5,8 @@ const auth = require('../../shared/middleware/auth');
 const bankAccountService = require('../services/bankAccountService.js');
 const { OTP_BANKS } = require('../constants/enums');
 const {
-  ISRACARD_BANK_ID,
-  isValidCard6Digits
+  isValidCard6Digits,
+  requiresCard6Digits
 } = require('../utils/scraperCredentials');
 
 const router = express.Router();
@@ -42,7 +42,7 @@ router.post('/', auth, async (req, res) => {
       if (!bankId || !name || !credentials?.username || !credentials?.password) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
-      if (bankId === ISRACARD_BANK_ID && !isValidCard6Digits(credentials.card6Digits)) {
+      if (requiresCard6Digits(bankId) && !isValidCard6Digits(credentials.card6Digits)) {
         return res.status(400).json({ error: 'Last 6 card digits must be exactly 6 digits' });
       }
     }
@@ -129,7 +129,7 @@ router.put('/:id/credentials', auth, async (req, res) => {
       if (!username || !password) {
         return res.status(400).json({ error: 'Username and password are required' });
       }
-      if (account.bankId === ISRACARD_BANK_ID && !isValidCard6Digits(card6Digits)) {
+      if (requiresCard6Digits(account.bankId) && !isValidCard6Digits(card6Digits)) {
         return res.status(400).json({ error: 'Last 6 card digits must be exactly 6 digits' });
       }
     }
