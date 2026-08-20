@@ -84,10 +84,10 @@ export interface OnboardingStatus {
         amount: number;
       };
       matchedCreditCard: {
-        id: string;
+        id: string | null;
         displayName: string;
-        cardNumber: string;
-        lastFourDigits: string;
+        cardNumber: string | null;
+        lastFourDigits: string | null;
         provider: string;
       };
       matchedMonth: string;
