@@ -135,6 +135,8 @@ router.post('/credit-card-account', auth, async (req, res) => {
       username: credentials.username,
       password: credentials.password,
       card6Digits: credentials.card6Digits
+    }, {
+      deferCredentialValidation: true
     });
     
     // Add to onboarding credit card accounts array
@@ -240,7 +242,10 @@ router.put('/credit-card-account/:accountId/credentials', auth, async (req, res)
         accountId,
         userId,
         { username, password, card6Digits },
-        { requireQueuedSync: true }
+        {
+          requireQueuedSync: true,
+          deferCredentialValidation: true
+        }
       );
 
       return res.json({

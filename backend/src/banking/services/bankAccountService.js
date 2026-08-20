@@ -31,7 +31,7 @@ class BankAccountService {
     flexToken,
     queryId,
     phoneOrEmail
-  }) {
+  }, { deferCredentialValidation = false } = {}) {
     name = normalizeAccountName(name);
     const duplicateName = await BankAccount.exists({
       userId,
@@ -57,10 +57,14 @@ class BankAccountService {
       if (bankId === ISRACARD_BANK_ID && !isValidCard6Digits(card6Digits)) {
         throw new Error('Last 6 card digits must be exactly 6 digits');
       }
-      await bankScraperService.validateCredentials(
-        bankId,
-        buildScraperCredentials(bankId, { username, password, card6Digits })
-      );
+      // Onboarding card flows validate in the queued import so a slow provider
+      // login cannot outlive the HTTP request. Other callers keep this check.
+      if (!deferCredentialValidation) {
+        await bankScraperService.validateCredentials(
+          bankId,
+          buildScraperCredentials(bankId, { username, password, card6Digits })
+        );
+      }
       credentials = {
         username,
         password,
@@ -144,11 +148,16 @@ class BankAccountService {
     apiToken,
     flexToken,
     queryId
-  }, { requireQueuedSync = false } = {}) {
+  }, {
+    requireQueuedSync = false,
+    deferCredentialValidation = false
+  } = {}) {
     const bankAccount = await BankAccount.findOne({ _id: accountId, userId });
     if (!bankAccount) {
       throw new Error('Bank account not found');
     }
+    // A deferred check makes the queued import the only validation path.
+    const queuedSyncRequired = requireQueuedSync || deferCredentialValidation;
 
     if (bankAccount.bankId === 'mercury') {
       // Mercury uses API token — no scraper validation
@@ -161,10 +170,14 @@ class BankAccountService {
       if (bankAccount.bankId === ISRACARD_BANK_ID && !isValidCard6Digits(card6Digits)) {
         throw new Error('Last 6 card digits must be exactly 6 digits');
       }
-      await bankScraperService.validateCredentials(
-        bankAccount.bankId,
-        buildScraperCredentials(bankAccount.bankId, { username, password, card6Digits })
-      );
+      // Failed onboarding cards are revalidated by the queued retry, while
+      // regular credential updates still validate before replacing the secret.
+      if (!deferCredentialValidation) {
+        await bankScraperService.validateCredentials(
+          bankAccount.bankId,
+          buildScraperCredentials(bankAccount.bankId, { username, password, card6Digits })
+        );
+      }
       bankAccount.credentials = {
         username,
         password,
@@ -190,7 +203,7 @@ class BankAccountService {
       logger.info(`Queued scraping job for account ${bankAccount.name} after credential update`);
     } catch (error) {
       logger.error(`Failed to queue scraping after credential update for account ${bankAccount.name}:`, error);
-      if (requireQueuedSync) {
+      if (queuedSyncRequired) {
         bankAccount.status = 'error';
         bankAccount.lastError = {
           message: 'Credentials were updated, but the automatic import retry could not be started',

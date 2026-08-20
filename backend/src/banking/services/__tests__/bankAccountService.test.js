@@ -103,6 +103,20 @@ describe('BankAccountService', () => {
       expect(eventListeners.accountCreated).not.toHaveBeenCalled();
     });
 
+    it('can defer credential validation to the initial background scrape', async () => {
+      const account = await bankAccountService.create(
+        userId,
+        mockAccountData,
+        { deferCredentialValidation: true }
+      );
+
+      expect(bankScraperService.validateCredentials).not.toHaveBeenCalled();
+      expect(account.status).toBe('active');
+      expect(eventListeners.accountCreated).toHaveBeenCalledWith(
+        expect.objectContaining({ _id: account._id })
+      );
+    });
+
     it('should validate and store Isracard last-six credentials', async () => {
       bankScraperService.validateCredentials.mockResolvedValueOnce(true);
 
@@ -282,6 +296,42 @@ describe('BankAccountService', () => {
   });
 
   describe('updateCredentials', () => {
+    it('can defer validation and queue the credential retry immediately', async () => {
+      const account = await BankAccount.create({
+        userId,
+        bankId: mockAccountData.bankId,
+        name: mockAccountData.name,
+        credentials: {
+          username: mockAccountData.username,
+          password: mockAccountData.password
+        },
+        status: 'error'
+      });
+      queuedDataSyncService.queueBankAccountSync.mockResolvedValueOnce();
+
+      const updatedAccount = await bankAccountService.updateCredentials(
+        account._id,
+        userId,
+        {
+          username: 'new-user',
+          password: 'new-password'
+        },
+        {
+          requireQueuedSync: true,
+          deferCredentialValidation: true
+        }
+      );
+
+      expect(bankScraperService.validateCredentials).not.toHaveBeenCalled();
+      expect(queuedDataSyncService.queueBankAccountSync)
+        .toHaveBeenCalledWith(account._id, { priority: 'high' });
+      expect(updatedAccount.status).toBe('active');
+      expect((await updatedAccount.getScraperOptions()).credentials).toEqual({
+        username: 'new-user',
+        password: 'new-password'
+      });
+    });
+
     it('surfaces a required retry queue failure without leaving the account active', async () => {
       const account = await BankAccount.create({
         userId,
@@ -317,6 +367,39 @@ describe('BankAccountService', () => {
         username: 'new-user',
         password: 'new-password'
       });
+    });
+
+    it('requires the queued retry whenever credential validation is deferred', async () => {
+      const account = await BankAccount.create({
+        userId,
+        bankId: mockAccountData.bankId,
+        name: mockAccountData.name,
+        credentials: {
+          username: mockAccountData.username,
+          password: mockAccountData.password
+        },
+        status: 'error'
+      });
+      queuedDataSyncService.queueBankAccountSync.mockRejectedValueOnce(new Error('Queue unavailable'));
+
+      await expect(bankAccountService.updateCredentials(
+        account._id,
+        userId,
+        {
+          username: 'new-user',
+          password: 'new-password'
+        },
+        { deferCredentialValidation: true }
+      )).rejects.toMatchObject({
+        code: 'SYNC_QUEUE_FAILED',
+        message: expect.stringContaining('Queue unavailable')
+      });
+
+      expect(bankScraperService.validateCredentials).not.toHaveBeenCalled();
+      const updatedAccount = await BankAccount.findById(account._id);
+      expect(updatedAccount.status).toBe('error');
+      expect(updatedAccount.lastError.message)
+        .toBe('Credentials were updated, but the automatic import retry could not be started');
     });
   });
 

@@ -195,7 +195,8 @@ describe('Onboarding Accounts API', () => {
         expect.objectContaining({
           name: 'Isracard',
           card6Digits: '123456'
-        })
+        }),
+        { deferCredentialValidation: true }
       );
 
       // Verify onboarding structure was updated
@@ -358,7 +359,10 @@ describe('Onboarding Accounts API', () => {
           password: 'new-password',
           card6Digits: undefined
         },
-        { requireQueuedSync: true }
+        {
+          requireQueuedSync: true,
+          deferCredentialValidation: true
+        }
       );
 
       const updatedUser = await User.findById(testUser._id);
