@@ -10,8 +10,12 @@ const {
   parseAnswer,
   parseBatchAnswers,
   asOneLine,
+  amountContext,
+  foreignCurrencyContext,
   providerCategoryContext,
-  transactionContext
+  transactionContext,
+  PROMPT,
+  BATCH_PROMPT
 } = _internals;
 
 const EXPENSE = ['Expense'];
@@ -44,6 +48,40 @@ describe('llmCategorizer', () => {
 
     it('keeps an unfamiliar provider category without inventing an interpretation', () => {
       expect(providerCategoryContext('קטגוריה חדשה')).toBe('Provider category: קטגוריה חדשה');
+    });
+
+    it('adds normalized original purchase details for foreign-currency transactions', () => {
+      expect(transactionContext({
+        description: 'HOTEL ROMA',
+        memo: null,
+        providerCategory: null,
+        originalAmount: -180,
+        originalCurrency: '€',
+        isForeignCurrency: true
+      })).toBe(
+        'HOTEL ROMA\nOriginal purchase: -180 EUR (foreign currency)'
+      );
+    });
+
+    it('keeps the foreign currency useful when the original amount is unavailable', () => {
+      expect(foreignCurrencyContext({
+        originalAmount: null,
+        originalCurrency: '$',
+        isForeignCurrency: true
+      })).toBe('Original purchase currency: USD (foreign currency)');
+    });
+
+    it('uses the charged currency for the recorded amount', () => {
+      expect(amountContext({ amount: -700, currency: '₪' })).toBe('Amount: -700 ILS');
+    });
+
+    it('treats foreign currency as travel evidence but excludes e-commerce', () => {
+      for (const prompt of [PROMPT, BATCH_PROMPT]) {
+        expect(prompt).toContain('supporting evidence for Travel');
+        expect(prompt).toContain('Do not infer Travel from foreign currency for e-commerce');
+        expect(prompt).toContain('software');
+        expect(prompt).toContain('subscriptions');
+      }
     });
   });
 
@@ -188,6 +226,27 @@ describe('llmCategorizer', () => {
         '<untrusted source="transaction-description">\nמיקה מודיעין\n' +
         'Provider category: אנרגיה (vehicle fuel and gas stations, not household utilities)'
       );
+    });
+
+    it('sends original foreign-currency details with the merchant context', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      answering({ category: 'Food', subCategory: 'Restaurants', confidence: 0.9 });
+
+      await ask(catalogue, {
+        description: 'TRATTORIA ROMA',
+        amount: -700,
+        currency: '₪',
+        originalAmount: -180,
+        originalCurrency: '€',
+        isForeignCurrency: true
+      });
+
+      const request = llmService.chat.mock.calls[0][0];
+      expect(request.messages[0].content).toContain(
+        'Original purchase: -180 EUR (foreign currency)'
+      );
+      expect(request.messages[0].content).toContain('Amount: -700 ILS');
     });
 
     // The choices are shown as "Category > Subcategory" lines, so a model asked to
@@ -369,6 +428,25 @@ describe('llmCategorizer', () => {
 
       await ask(catalogue, { description: 'Local Shop', providerCategory: 'מסעדות' });
       await ask(catalogue, { description: 'Local Shop', providerCategory: 'אנרגיה' });
+
+      expect(llmService.chat).toHaveBeenCalledTimes(2);
+    });
+
+    it('asks again when the same merchant has foreign-currency evidence', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      answering({ category: 'Food', subCategory: 'Restaurants', confidence: 0.9 });
+
+      await ask(catalogue, {
+        description: 'Restaurant',
+        originalCurrency: 'ILS',
+        isForeignCurrency: false
+      });
+      await ask(catalogue, {
+        description: 'Restaurant',
+        originalCurrency: 'EUR',
+        isForeignCurrency: true
+      });
 
       expect(llmService.chat).toHaveBeenCalledTimes(2);
     });
@@ -705,6 +783,27 @@ describe('llmCategorizer', () => {
         'מיקה מודיעין Provider category: אנרגיה ' +
         '(vehicle fuel and gas stations, not household utilities)'
       );
+    });
+
+    it('includes foreign-currency evidence in batched transaction context', async () => {
+      await seedCategories();
+      const catalogue = await llmCategorizer.forUser(userId);
+      batchAnswering([]);
+
+      await llmCategorizer.prefetch(catalogue, [
+        req('HOTEL ROMA', {
+          amount: -700,
+          currency: 'ILS',
+          originalAmount: -180,
+          originalCurrency: '€',
+          isForeignCurrency: true
+        })
+      ]);
+
+      expect(lastRequest()).toContain(
+        'HOTEL ROMA Original purchase: -180 EUR (foreign currency)'
+      );
+      expect(lastRequest()).toContain('Amount: -700 ILS');
     });
 
     it('applies the same confidence floor to a batched answer as to a single one', async () => {

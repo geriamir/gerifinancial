@@ -1,7 +1,24 @@
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  '₪': 'ILS',
+  '$': 'USD',
+  '€': 'EUR',
+  '£': 'GBP',
+  '¥': 'JPY',
+};
+
+export const normalizeCurrency = (
+  currency?: string | null,
+  fallback: string = 'ILS'
+): string => {
+  const raw = String(currency ?? '').trim();
+  return raw ? (CURRENCY_SYMBOLS[raw] || raw.toUpperCase()) : fallback;
+};
+
 export const formatCurrency = (amount: number, currency: string = 'ILS'): string => {
+  const normalizedCurrency = normalizeCurrency(currency);
   return new Intl.NumberFormat('he-IL', {
     style: 'currency',
-    currency,
+    currency: normalizedCurrency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(amount);
@@ -16,7 +33,8 @@ export const formatCurrencyDisplay = (amount: number, currency: string = 'ILS'):
     maximumFractionDigits: 2
   }).format(absAmount);
   
-  const currencySymbol = currency === 'ILS' ? '₪' : currency;
+  const normalizedCurrency = normalizeCurrency(currency);
+  const currencySymbol = normalizedCurrency === 'ILS' ? '₪' : normalizedCurrency;
   
   return `${isNegative ? '-' : ''}${formattedNumber} ${currencySymbol}`;
 };
@@ -35,6 +53,7 @@ export const formatNumber = (num: number): string => {
 const formatters = {
   formatCurrency,
   formatCurrencyDisplay,
+  normalizeCurrency,
   formatPercentage,
   formatNumber
 };

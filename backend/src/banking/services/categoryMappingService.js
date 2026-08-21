@@ -6,6 +6,7 @@ const { CategorizationMethod, TransactionType } = require('../constants/enums');
 const { CURRENT_CATEGORIZATION_VERSION } = require('../constants/categorization');
 const logger = require('../../shared/utils/logger');
 const { isLikelyCreditCardPayment } = require('./creditCardPaymentMatcher');
+const { transactionCurrencyDetails } = require('../utils/currency');
 
 /**
  * Returned instead of a result when a caller asked for the model tier to be
@@ -118,17 +119,28 @@ class CategoryMappingService {
   /**
    * The exact question the model tier is asked about a transaction. Prefetching
    * a batch and later reading the answer back must build this identically: the
-   * answer cache is keyed on the category types, description and memo, so a
-   * request assembled even slightly differently in one of the two places files
-   * the answer under a key the lookup will never find, and every transaction
-   * quietly falls back to a request of its own.
+   * answer cache includes the category types, merchant evidence, and original
+   * purchase currency, so a request assembled even slightly differently in one
+   * of the two places files the answer under a key the lookup will never find,
+   * and every transaction quietly falls back to a request of its own.
    */
   toModelRequest(transaction) {
+    const {
+      chargedCurrency,
+      originalCurrency,
+      originalAmount,
+      isForeignCurrency
+    } = transactionCurrencyDetails(transaction);
+
     return {
       description: transaction.description,
       memo: transaction.memo || transaction.rawData?.memo || null,
       providerCategory: transaction.rawData?.category || null,
       amount: transaction.amount,
+      currency: chargedCurrency,
+      originalAmount,
+      originalCurrency,
+      isForeignCurrency,
       categoryTypes: this.deriveCategoryTypes(transaction)
     };
   }

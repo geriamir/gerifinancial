@@ -7,6 +7,10 @@ const { llmService } = require('../../shared/services/ai');
 const { AiBudgetExceededError } = require('../../shared/services/ai/aiBudget');
 const config = require('../../shared/config');
 const logger = require('../../shared/utils/logger');
+const {
+  originalCurrencyOf,
+  toIsoCurrency
+} = require('../../banking/utils/currency');
 
 /**
  * Finds the transactions that belong to a project the user is running.
@@ -104,25 +108,6 @@ const clampConfidence = (value) => {
   if (number > 1) return 1;
   return number;
 };
-
-// Scrapers report the currency a charge was made in as a symbol about as often
-// as an ISO code, and the two forms have to compare equal before a currency can
-// be evidence of anything.
-const SYMBOL_TO_ISO = { '₪': 'ILS', $: 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY' };
-
-const toIsoCurrency = (value) => {
-  const raw = String(value || '').trim();
-  if (!raw) return null;
-  return SYMBOL_TO_ISO[raw] || raw.toUpperCase();
-};
-
-/**
- * The currency a transaction was actually charged in, which is not always the
- * one it is recorded under: a hotel in Rome arrives as a shekel debit carrying
- * the euro it was really paid in.
- */
-const originalCurrencyOf = (transaction) =>
-  toIsoCurrency(transaction.rawData?.originalCurrency) || toIsoCurrency(transaction.currency);
 
 class ProjectTransactionMatcher {
   isEnabled() {
