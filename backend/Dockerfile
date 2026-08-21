@@ -15,7 +15,7 @@ ARG SCRAPER_REPO=https://github.com/geriamir/israeli-bank-scrapers.git
 # Pinned to a commit so an image rebuild is reproducible; a branch name would let
 # the dependency change underneath an otherwise identical build. Bump deliberately
 # after verifying the new scraper commit: git rev-parse origin/fix/amex-cloudflare-waf
-ARG SCRAPER_REF=1965a8bfffb8e481ae83ced31a2969fba27b0902
+ARG SCRAPER_REF=c48b42d989e9b95976bfb9f47f7355a7033f7ef9
 
 WORKDIR /scraper
 
