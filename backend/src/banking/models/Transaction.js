@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { CategorizationMethod, TransactionType, TransactionStatus } = require('../constants/enums');
+const { CURRENT_CATEGORIZATION_VERSION } = require('../constants/categorization');
 const Tag = require('./Tag');
 
 const transactionSchema = new mongoose.Schema({
@@ -130,6 +131,12 @@ const transactionSchema = new mongoose.Schema({
   awaitingModelCategorization: {
     type: Boolean,
     default: false
+  },
+  // Lets a categorizer improvement reconsider unresolved rows once without
+  // repeatedly paying for the same model refusal on every scrape.
+  categorizationVersion: {
+    type: Number,
+    default: CURRENT_CATEGORIZATION_VERSION
   },
   status: {
     type: String,

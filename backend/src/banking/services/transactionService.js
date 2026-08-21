@@ -239,7 +239,7 @@ class TransactionService {
     // at one day's allowance rather than finishing over a few days.
     const resuming = await transactionCategorizationService.outstanding(bankAccount.userId);
     if (resuming.length) {
-      console.log(`Resuming categorization for ${resuming.length} transaction(s) the model has not seen`);
+      console.log(`Resuming categorization for ${resuming.length} transaction(s) awaiting reconsideration`);
     }
 
     if (pendingCategorization.length || resuming.length) {
