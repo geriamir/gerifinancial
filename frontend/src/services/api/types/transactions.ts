@@ -1,5 +1,14 @@
 import type { Category, SubCategory } from '../types';
 
+export interface TransactionRawData extends Record<string, any> {
+  originalAmount?: number | string;
+  originalCurrency?: string;
+  chargedAmount?: number | string;
+  chargedCurrency?: string;
+  memo?: string;
+  category?: string;
+}
+
 export interface Transaction {
   _id: string;
   identifier: string;
@@ -14,7 +23,7 @@ export interface Transaction {
   subCategory?: SubCategory;
   categorizationMethod: 'manual' | 'previous_data' | 'ai';
   categorizationReasoning?: string;
-  rawData: Record<string, any>;
+  rawData: TransactionRawData;
   createdAt: string;
   updatedAt: string;
   userId: string;

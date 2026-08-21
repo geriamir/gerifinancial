@@ -635,6 +635,50 @@ describe('CategoryMappingService', () => {
           expect(llmService.chat).not.toHaveBeenCalled();
         });
 
+        it('passes normalized foreign-currency evidence through prefetch and lookup', async () => {
+          const transaction = await uncategorisable({
+            amount: -700,
+            rawData: {
+              description: 'HOTEL ROMA',
+              chargedAmount: -700,
+              chargedCurrency: '₪',
+              originalAmount: -180,
+              originalCurrency: '€'
+            }
+          });
+          const request = categoryMappingService.toModelRequest(transaction);
+          expect(request).toMatchObject({
+            amount: -700,
+            currency: 'ILS',
+            originalAmount: -180,
+            originalCurrency: 'EUR',
+            isForeignCurrency: true
+          });
+
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          await categoryMappingService.attemptAutoCategorization(
+            transaction,
+            { catalogue, deferModel: true }
+          );
+          llmService.__setChatResponse({
+            content: JSON.stringify({
+              answers: [{
+                id: 1,
+                category: 'Test Expense Category',
+                subCategory: 'Test Expense SubCategory',
+                confidence: 0.9
+              }]
+            })
+          });
+          await llmCategorizer.prefetch(catalogue, [request]);
+          llmService.chat.mockClear();
+
+          const updated = await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          expect(updated.category._id).toEqual(testExpenseCategory._id);
+          expect(llmService.chat).not.toHaveBeenCalled();
+        });
+
         // A transaction can also be deleted while the model is answering, and
         // saving the held document would either resurrect it or throw.
         it('skips a deferred transaction that was deleted while the model answered', async () => {

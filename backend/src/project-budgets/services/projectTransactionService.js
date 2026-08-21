@@ -2,6 +2,11 @@ const { ProjectBudget } = require('../models');
 const { Tag, Transaction, Category, SubCategory } = require('../../banking');
 const { CategorizationMethod } = require('../../banking/constants/enums');
 const transactionClassifier = require('../../banking/services/transactionClassifier');
+const {
+  currencyVariants,
+  toCurrencySymbol,
+  toIsoCurrency
+} = require('../../banking/utils/currency');
 const { ObjectId } = require('mongodb');
 const logger = require('../../shared/utils/logger');
 
@@ -579,23 +584,8 @@ class ProjectTransactionService {
       throw new Error('Project not found');
     }
 
-    // ILS identifiers: the currency field uses ISO 'ILS', rawData uses symbol '₪' or 'ILS'
-    const ilsIdentifiers = ['ILS', '₪'];
-
-    // Symbol-to-ISO mapping for normalization
-    const symbolToISO = { '₪': 'ILS', '$': 'USD', '€': 'EUR', '£': 'GBP' };
-    const isoToSymbol = { 'ILS': '₪', 'USD': '$', 'EUR': '€', 'GBP': '£' };
-
-    // Expand user-selected currencies to match both symbol and ISO forms
-    const expandCurrencies = (codes) => {
-      const expanded = new Set();
-      for (const c of codes) {
-        expanded.add(c);
-        if (symbolToISO[c]) expanded.add(symbolToISO[c]);
-        if (isoToSymbol[c]) expanded.add(isoToSymbol[c]);
-      }
-      return [...expanded];
-    };
+    // The top-level field uses ISO codes while scraper data can use symbols.
+    const ilsIdentifiers = currencyVariants(['ILS']);
 
     // Build query: user's transactions within project date range
     const query = {
@@ -611,7 +601,7 @@ class ProjectTransactionService {
     // Currency filter — check rawData.originalCurrency (the actual transaction currency)
     // Falls back to the top-level currency field for transactions without rawData
     if (currencies && currencies.length > 0) {
-      const expanded = expandCurrencies(currencies);
+      const expanded = currencyVariants(currencies);
       query.$or = [
         { 'rawData.originalCurrency': { $in: expanded } },
         { currency: { $in: expanded } }
@@ -658,8 +648,8 @@ class ProjectTransactionService {
     // Normalize to ISO codes and deduplicate, keeping both symbol and ISO for display
     const currencyMap = new Map(); // ISO -> { code, symbol, label }
     for (const raw of rawCurrencies) {
-      const iso = symbolToISO[raw] || raw;
-      const symbol = isoToSymbol[iso] || raw;
+      const iso = toIsoCurrency(raw);
+      const symbol = toCurrencySymbol(iso, raw);
       if (!currencyMap.has(iso)) {
         const label = symbol !== iso ? `${symbol} (${iso})` : iso;
         currencyMap.set(iso, { code: iso, symbol, label });

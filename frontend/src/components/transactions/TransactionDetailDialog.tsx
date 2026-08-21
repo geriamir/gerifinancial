@@ -24,7 +24,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import type { Transaction, Tag } from '../../services/api/types/transactions';
-import { formatCurrencyDisplay } from '../../utils/formatters';
+import { formatCurrencyDisplay, normalizeCurrency } from '../../utils/formatters';
 import { EnhancedCategorizationDialog } from './EnhancedCategorizationDialog';
 import { transactionsApi } from '../../services/api/transactions';
 import { useCategories } from '../../hooks/useCategories';
@@ -232,6 +232,22 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
     return format(new Date(dateString), 'EEEE, MMMM d, yyyy \'at\' h:mm a');
   };
 
+  const chargedCurrency = normalizeCurrency(
+    transaction.rawData?.chargedCurrency || transaction.currency
+  );
+  const originalCurrency = normalizeCurrency(
+    transaction.rawData?.originalCurrency || chargedCurrency
+  );
+  const parsedOriginalAmount = Number(transaction.rawData?.originalAmount);
+  const originalAmount =
+    transaction.rawData?.originalAmount !== null &&
+    transaction.rawData?.originalAmount !== undefined &&
+    transaction.rawData?.originalAmount !== '' &&
+    Number.isFinite(parsedOriginalAmount)
+      ? parsedOriginalAmount
+      : null;
+  const hasConvertedForeignAmount = originalCurrency !== chargedCurrency;
+
   return (
     <>
       <Dialog
@@ -270,11 +286,11 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                 <MoneyIcon color="primary" />
                 <Box>
                   <Typography variant="caption" color="text.secondary" display="block">
-                    Amount
+                    {hasConvertedForeignAmount ? 'Charged amount' : 'Amount'}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="h5" component="div" sx={{ fontFamily: 'monospace' }}>
-                      {formatCurrencyDisplay(transaction.amount, transaction.currency)}
+                      {formatCurrencyDisplay(transaction.amount, chargedCurrency)}
                     </Typography>
                     {transaction.type && (
                       <Chip 
@@ -284,6 +300,18 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
                       />
                     )}
                   </Box>
+                  {hasConvertedForeignAmount && (
+                    <Box sx={{ mt: 0.75 }}>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        Original purchase
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontFamily: 'monospace' }}>
+                        {originalAmount === null
+                          ? originalCurrency
+                          : formatCurrencyDisplay(originalAmount, originalCurrency)}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </Box>
               

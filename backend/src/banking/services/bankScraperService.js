@@ -7,6 +7,7 @@ const logger = require('../../shared/utils/logger');
 const { BankAccount } = require('../models');
 const { resolveStartDate } = require('../utils/scraperDates');
 const { getScraperErrorMessage } = require('../utils/scraperErrors');
+const { toIsoCurrency } = require('../utils/currency');
 
 
 class BankScraperService {
@@ -34,23 +35,7 @@ class BankScraperService {
 
   // Helper method to normalize currency symbols to ISO codes
   normalizeCurrency(currency) {
-    if (!currency) return 'ILS'; // Default to ILS if no currency provided
-    
-    const currencyMap = {
-      '₪': 'ILS',
-      'ils': 'ILS',
-      '$': 'USD',
-      'usd': 'USD',
-      '€': 'EUR',
-      'eur': 'EUR',
-      '£': 'GBP',
-      'gbp': 'GBP',
-      '¥': 'JPY',
-      'jpy': 'JPY'
-    };
-    
-    const normalizedKey = currency.toLowerCase();
-    return currencyMap[currency] || currencyMap[normalizedKey] || currency.toUpperCase();
+    return toIsoCurrency(currency, 'ILS');
   }
 
   createScraper(bankAccount, options = {}) {
