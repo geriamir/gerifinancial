@@ -8,6 +8,7 @@ const sseService = require('../../shared/services/sseService');
 const aiCostMeter = require('../../shared/services/ai/aiCostMeter');
 const config = require('../../shared/config');
 const logger = require('../../shared/utils/logger');
+const { CURRENT_CATEGORIZATION_VERSION } = require('../constants/categorization');
 
 const JOB_TYPE = 'categorize-transactions';
 
@@ -49,13 +50,12 @@ class TransactionCategorizationService {
   }
 
   /**
-   * The transactions the model never saw because the budget ran out on an
-   * earlier run, newest first.
+   * The transactions still owed a model decision, newest first.
    *
-   * This is what keeps a budget ceiling from being a cliff. Nothing else ever
-   * revisits an uncategorised transaction - the queue is fed only by
-   * newly-saved ones - so without this, everything past the day's allowance
-   * stays uncategorised for good.
+   * This includes work deferred by the daily budget and unresolved rows last
+   * evaluated by an older categorizer version. The version condition lets an
+   * evidence improvement revisit historical declines once without paying for
+   * the same refusal after every scrape.
    *
    * `category: null` is checked as well as the flag because the user may have
    * categorised it themselves in the meantime, and paying the model to have an
@@ -67,8 +67,12 @@ class TransactionCategorizationService {
     try {
       const rows = await Transaction.find({
         userId,
-        awaitingModelCategorization: true,
-        category: null
+        category: null,
+        $or: [
+          { awaitingModelCategorization: true },
+          { categorizationVersion: { $exists: false } },
+          { categorizationVersion: { $lt: CURRENT_CATEGORIZATION_VERSION } }
+        ]
       })
         .select('_id')
         .sort({ date: -1 })

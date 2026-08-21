@@ -3,6 +3,7 @@ const transactionClassifier = require('./transactionClassifier');
 const llmCategorizer = require('./llmCategorizer');
 const { enhancedKeywordMatcher } = require('./enhanced-keyword-matching');
 const { CategorizationMethod, TransactionType } = require('../constants/enums');
+const { CURRENT_CATEGORIZATION_VERSION } = require('../constants/categorization');
 const logger = require('../../shared/utils/logger');
 const { isLikelyCreditCardPayment } = require('./creditCardPaymentMatcher');
 
@@ -98,6 +99,19 @@ class CategoryMappingService {
       changed = true;
     }
 
+    const versionWasDefaulted = transaction.$isDefault?.('categorizationVersion') === true;
+    if (
+      !stillOwed &&
+      (
+        versionWasDefaulted ||
+        transaction.categorizationVersion !== CURRENT_CATEGORIZATION_VERSION
+      )
+    ) {
+      transaction.categorizationVersion = CURRENT_CATEGORIZATION_VERSION;
+      if (versionWasDefaulted) transaction.markModified('categorizationVersion');
+      changed = true;
+    }
+
     if (changed) await transaction.save();
   }
 
@@ -113,6 +127,7 @@ class CategoryMappingService {
     return {
       description: transaction.description,
       memo: transaction.memo || transaction.rawData?.memo || null,
+      providerCategory: transaction.rawData?.category || null,
       amount: transaction.amount,
       categoryTypes: this.deriveCategoryTypes(transaction)
     };

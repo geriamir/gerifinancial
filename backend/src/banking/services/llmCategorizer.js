@@ -47,8 +47,31 @@ const RULES = [
 const HEADER = [
   'You categorise bank transactions for a personal finance app used in Israel.',
   'Descriptions are usually Hebrew and are often abbreviated or truncated merchant names.',
+  'When present, the provider category comes from the bank or card issuer. Treat it as useful',
+  'evidence about the merchant type, while remembering that it can be broad or imperfect.',
   ''
 ];
+
+const PROVIDER_CATEGORY_HINTS = new Map([
+  ['אנרגיה', 'vehicle fuel and gas stations, not household utilities'],
+  ['מסעדות', 'restaurants, cafes, and prepared food'],
+  ['ריהוט ובית', 'home goods, furnishings, decorations, and household supplies'],
+  ['תקשורת ומחשבים', 'communications, computers, software, and electronics'],
+  ['רפואה ובריאות', 'medical care, health services, and pharmacies'],
+  ['ציוד ומשרד', 'office supplies and office equipment'],
+  ['טיפוח ויופי', 'grooming, beauty, and personal care'],
+  ['תעשיה ומכירות', 'general retail or industrial goods'],
+  ['תיירות', 'travel and tourism'],
+  ['מלונאות ואירוח', 'hotels and lodging'],
+  ['מזון ומשקאות', 'food, groceries, and beverages'],
+  ['רכב ותחבורה', 'vehicles and transportation'],
+  ['ילדים', 'children and kids'],
+  ['מקצועות חופשיים', 'professional services'],
+  ['פנאי בילוי', 'entertainment and leisure'],
+  ['ביטוח ופיננסים', 'insurance and financial services'],
+  ['אופנה', 'apparel and accessories'],
+  ['מוסדות', 'institutions and organizations']
+]);
 
 const PROMPT = [
   ...HEADER,
@@ -74,8 +97,23 @@ const BATCH_PROMPT = [
 
 // A correction only helps if the same merchant reaches the same key, so
 // descriptions are compared with their spacing and casing flattened.
-const cacheKey = (categoryTypes, description, memo) =>
-  `${[...categoryTypes].sort().join('|')}::${[description, memo].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim().toLowerCase()}`;
+const cacheKey = (categoryTypes, description, memo, providerCategory) =>
+  `${[...categoryTypes].sort().join('|')}::${[description, memo, providerCategory].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim().toLowerCase()}`;
+
+const providerCategoryContext = (providerCategory) => {
+  const normalized = String(providerCategory ?? '').trim();
+  if (!normalized) return null;
+  const hint = PROVIDER_CATEGORY_HINTS.get(normalized);
+  return `Provider category: ${normalized}${hint ? ` (${hint})` : ''}`;
+};
+
+const transactionContext = ({ description, memo, providerCategory }) => {
+  const merchantText = [description, memo].filter(Boolean).join(' ').trim();
+  return [
+    merchantText,
+    providerCategoryContext(providerCategory)
+  ].filter(Boolean).join('\n');
+};
 
 /**
  * Models are prone to wrapping JSON in a markdown fence even when asked not to,
@@ -283,9 +321,9 @@ class LlmCategorizer {
    * every day. The two are otherwise indistinguishable, because both leave the
    * transaction without a category.
    */
-  hasAnswerFor(catalogue, { description, memo, categoryTypes }) {
+  hasAnswerFor(catalogue, { description, memo, providerCategory, categoryTypes }) {
     if (!catalogue) return false;
-    return catalogue.answers.has(cacheKey(categoryTypes, description, memo));
+    return catalogue.answers.has(cacheKey(categoryTypes, description, memo, providerCategory));
   }
 
   /**
@@ -295,13 +333,14 @@ class LlmCategorizer {
    * every other tier: the user can act on an empty category and cannot act on a
    * wrong one they never noticed.
    */
-  async suggestFrom(catalogue, { description, memo, amount, categoryTypes }) {
+  async suggestFrom(catalogue, { description, memo, providerCategory, amount, categoryTypes }) {
     if (!catalogue || !this.isEnabled()) return null;
 
-    const text = [description, memo].filter(Boolean).join(' ').trim();
-    if (!text) return null;
+    const merchantText = [description, memo].filter(Boolean).join(' ').trim();
+    const context = transactionContext({ description, memo, providerCategory });
+    if (!context) return null;
 
-    const key = cacheKey(categoryTypes, description, memo);
+    const key = cacheKey(categoryTypes, description, memo, providerCategory);
     // A scrape is full of the same shops. Asking about each of them once is the
     // difference between a handful of requests and one per transaction. After a
     // prefetch this is also where the batched answers are collected from, so the
@@ -324,7 +363,7 @@ class LlmCategorizer {
       ...choices,
       '',
       'Transaction:',
-      llmService.asUntrustedData(text, 'transaction-description'),
+      llmService.asUntrustedData(context, 'transaction-description'),
       typeof amount === 'number' ? `Amount: ${amount} ILS` : null
     ].filter(Boolean).join('\n');
 
@@ -339,12 +378,12 @@ class LlmCategorizer {
         purpose: 'categorisation-fallback'
       });
     } catch (error) {
-      if (this.handleRequestError(catalogue, error, `"${text}"`)) return null;
+      if (this.handleRequestError(catalogue, error, `"${merchantText || providerCategory}"`)) return null;
       return null;
     }
 
     const suggestion = this.toSuggestion(
-      catalogue, categoryTypes, parseAnswer(response.content), text
+      catalogue, categoryTypes, parseAnswer(response.content), merchantText || providerCategory
     );
 
     // A refusal is worth caching too: the same unrecognisable merchant appearing
@@ -380,10 +419,16 @@ class LlmCategorizer {
     // transactions that would see different menus cannot share a request.
     const groups = new Map();
     for (const request of requests || []) {
-      const text = [request.description, request.memo].filter(Boolean).join(' ').trim();
-      if (!text) continue;
+      const merchantText = [request.description, request.memo].filter(Boolean).join(' ').trim();
+      const context = transactionContext(request);
+      if (!context) continue;
 
-      const key = cacheKey(request.categoryTypes, request.description, request.memo);
+      const key = cacheKey(
+        request.categoryTypes,
+        request.description,
+        request.memo,
+        request.providerCategory
+      );
       if (catalogue.answers.has(key)) continue;
 
       const groupKey = [...request.categoryTypes].sort().join('|');
@@ -392,7 +437,12 @@ class LlmCategorizer {
       }
       // Keyed by cache key, so the same shop appearing twenty times in one
       // scrape is one line in one request rather than twenty.
-      groups.get(groupKey).items.set(key, { key, text, amount: request.amount });
+      groups.get(groupKey).items.set(key, {
+        key,
+        context,
+        merchantText: merchantText || request.providerCategory,
+        amount: request.amount
+      });
     }
 
     for (const group of groups.values()) {
@@ -421,7 +471,7 @@ class LlmCategorizer {
         // Flattened onto one line so the numbering cannot be forged from inside
         // a description; the delimiters still come from asUntrustedData.
         const fenced = llmService
-          .asUntrustedData(asOneLine(item.text), 'transaction-description')
+          .asUntrustedData(asOneLine(item.context), 'transaction-description')
           .replace(/\n/g, ' ');
         return `${index + 1}. ${fenced}${amount}`;
       })
@@ -464,7 +514,10 @@ class LlmCategorizer {
       claimed.add(id);
 
       const item = items[id - 1];
-      catalogue.answers.set(item.key, this.toSuggestion(catalogue, categoryTypes, answer, item.text));
+      catalogue.answers.set(
+        item.key,
+        this.toSuggestion(catalogue, categoryTypes, answer, item.merchantText)
+      );
     }
 
     if (claimed.size < items.length) {
@@ -497,4 +550,13 @@ class LlmCategorizer {
 
 module.exports = new LlmCategorizer();
 module.exports.UserCatalogue = UserCatalogue;
-module.exports._internals = { parseAnswer, parseBatchAnswers, asOneLine, cacheKey, PROMPT, BATCH_PROMPT };
+module.exports._internals = {
+  parseAnswer,
+  parseBatchAnswers,
+  asOneLine,
+  cacheKey,
+  providerCategoryContext,
+  transactionContext,
+  PROMPT,
+  BATCH_PROMPT
+};

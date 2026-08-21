@@ -15,6 +15,7 @@ const config = require('../../../shared/config');
 const logger = require('../../../shared/utils/logger');
 const { createTestUser } = require('../../../test/testUtils');
 const { TransactionStatus, TransactionType, CategorizationMethod } = require('../../constants/enums');
+const { CURRENT_CATEGORIZATION_VERSION } = require('../../constants/categorization');
 
 describe('transactionCategorizationService', () => {
   let user;
@@ -688,6 +689,38 @@ describe('transactionCategorizationService', () => {
       // already filed themselves is pure waste.
       it('leaves out one the user has categorised in the meantime', async () => {
         await owed('Some Shop', { category: category._id });
+
+        expect(await transactionCategorizationService.outstanding(user._id)).toEqual([]);
+      });
+
+      it('revisits an unresolved row from an older categorizer version', async () => {
+        const transaction = await makeTransaction('Old refusal');
+        await Transaction.updateOne(
+          { _id: transaction._id },
+          { $unset: { categorizationVersion: 1 } }
+        );
+
+        const ids = await transactionCategorizationService.outstanding(user._id);
+
+        expect(ids.map(String)).toEqual([String(transaction._id)]);
+      });
+
+      it('revisits an unresolved row with an explicit older version', async () => {
+        const transaction = await makeTransaction('Versioned old refusal');
+        await Transaction.updateOne(
+          { _id: transaction._id },
+          { $set: { categorizationVersion: CURRENT_CATEGORIZATION_VERSION - 1 } }
+        );
+
+        const ids = await transactionCategorizationService.outstanding(user._id);
+
+        expect(ids.map(String)).toEqual([String(transaction._id)]);
+      });
+
+      it('does not revisit a refusal from the current categorizer version', async () => {
+        const transaction = await makeTransaction('Current refusal');
+        transaction.categorizationVersion = CURRENT_CATEGORIZATION_VERSION;
+        await transaction.save();
 
         expect(await transactionCategorizationService.outstanding(user._id)).toEqual([]);
       });

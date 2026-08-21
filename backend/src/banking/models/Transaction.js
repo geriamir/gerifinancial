@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { CategorizationMethod, TransactionType, TransactionStatus } = require('../constants/enums');
+const { CURRENT_CATEGORIZATION_VERSION } = require('../constants/categorization');
 const Tag = require('./Tag');
 
 const transactionSchema = new mongoose.Schema({
@@ -131,6 +132,12 @@ const transactionSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Lets a categorizer improvement reconsider unresolved rows once without
+  // repeatedly paying for the same model refusal on every scrape.
+  categorizationVersion: {
+    type: Number,
+    default: CURRENT_CATEGORIZATION_VERSION
+  },
   status: {
     type: String,
     enum: Object.values(TransactionStatus),
@@ -231,6 +238,16 @@ transactionSchema.index(
   { userId: 1, date: -1 },
   { partialFilterExpression: { awaitingModelCategorization: true } }
 );
+
+// Supports one-time reconsideration of unresolved rows after the categorizer
+// version changes. The existing partial index above remains optimal for the
+// daily-budget branch of the same outstanding query.
+transactionSchema.index({
+  userId: 1,
+  category: 1,
+  categorizationVersion: 1,
+  date: -1
+});
 
 // Helper method to categorize a transaction
 transactionSchema.methods.categorize = async function(categoryId, subCategoryId, method = CategorizationMethod.MANUAL, reasoning = null) {

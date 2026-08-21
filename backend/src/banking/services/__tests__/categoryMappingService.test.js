@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const categoryMappingService = require('../categoryMappingService');
 const { Category, SubCategory, Transaction, ManualCategorized } = require('../../models');
 const { CategorizationMethod, TransactionType } = require('../../constants/enums');
+const { CURRENT_CATEGORIZATION_VERSION } = require('../../constants/categorization');
 const llmCategorizer = require('../llmCategorizer');
 const llmService = require('../../../shared/services/ai/llmService');
 const { AiBudgetExceededError } = require('../../../shared/services/ai/aiBudget');
@@ -603,6 +604,37 @@ describe('CategoryMappingService', () => {
           expect(llmService.chat).not.toHaveBeenCalled();
         });
 
+        it('passes the provider category through the same prefetch and lookup request', async () => {
+          const transaction = await uncategorisable({
+            description: 'מיקה מודיעין',
+            rawData: {
+              description: 'מיקה מודיעין',
+              category: 'אנרגיה',
+              chargedAmount: -250
+            }
+          });
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          await categoryMappingService.attemptAutoCategorization(transaction, { catalogue, deferModel: true });
+
+          llmService.__setChatResponse({
+            content: JSON.stringify({
+              answers: [{
+                id: 1,
+                category: 'Test Expense Category',
+                subCategory: 'Test Expense SubCategory',
+                confidence: 0.9
+              }]
+            })
+          });
+          await llmCategorizer.prefetch(catalogue, [categoryMappingService.toModelRequest(transaction)]);
+          llmService.chat.mockClear();
+
+          const updated = await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          expect(updated.category._id).toEqual(testExpenseCategory._id);
+          expect(llmService.chat).not.toHaveBeenCalled();
+        });
+
         // A transaction can also be deleted while the model is answering, and
         // saving the held document would either resurrect it or throw.
         it('skips a deferred transaction that was deleted while the model answered', async () => {
@@ -626,6 +658,38 @@ describe('CategoryMappingService', () => {
 
           expect((await Transaction.findById(transaction._id)).type).toBe(TransactionType.EXPENSE);
         });
+
+        it('records the current categorizer version after reconsidering a historical refusal', async () => {
+          const created = await uncategorisable();
+          await Transaction.updateOne(
+            { _id: created._id },
+            { $unset: { categorizationVersion: 1 } }
+          );
+          const transaction = await Transaction.findById(created._id);
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          llmService.__setChatResponse({ content: JSON.stringify({ category: null, confidence: 0 }) });
+
+          await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          expect(await Transaction.exists({
+            _id: transaction._id,
+            categorizationVersion: CURRENT_CATEGORIZATION_VERSION
+          })).toBeTruthy();
+        });
+
+        it('does not save a current-version refusal when no field changed', async () => {
+          const transaction = await uncategorisable({
+            type: TransactionType.EXPENSE,
+            categorizationVersion: CURRENT_CATEGORIZATION_VERSION
+          });
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          llmService.__setChatResponse({ content: JSON.stringify({ category: null, confidence: 0 }) });
+          const save = jest.spyOn(Transaction.prototype, 'save');
+
+          await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          expect(save).not.toHaveBeenCalled();
+        });
       });
 
       // Nothing else ever revisits an uncategorised transaction - the queue is
@@ -638,7 +702,12 @@ describe('CategoryMappingService', () => {
           llmService.__setChatError(new AiBudgetExceededError(testUserId, 200000, 200000));
 
         it('marks a transaction the budget stopped the model from ever seeing', async () => {
-          const transaction = await uncategorisable();
+          const created = await uncategorisable();
+          await Transaction.updateOne(
+            { _id: created._id },
+            { $unset: { categorizationVersion: 1 } }
+          );
+          const transaction = await Transaction.findById(created._id);
           const catalogue = await llmCategorizer.forUser(testUserId);
           spendTheBudget();
 
