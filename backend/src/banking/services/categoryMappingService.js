@@ -99,8 +99,16 @@ class CategoryMappingService {
       changed = true;
     }
 
-    if (!stillOwed) {
+    const versionWasDefaulted = transaction.$isDefault?.('categorizationVersion') === true;
+    if (
+      !stillOwed &&
+      (
+        versionWasDefaulted ||
+        transaction.categorizationVersion !== CURRENT_CATEGORIZATION_VERSION
+      )
+    ) {
       transaction.categorizationVersion = CURRENT_CATEGORIZATION_VERSION;
+      if (versionWasDefaulted) transaction.markModified('categorizationVersion');
       changed = true;
     }
 

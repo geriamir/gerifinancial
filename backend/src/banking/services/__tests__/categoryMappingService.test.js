@@ -676,6 +676,20 @@ describe('CategoryMappingService', () => {
             categorizationVersion: CURRENT_CATEGORIZATION_VERSION
           })).toBeTruthy();
         });
+
+        it('does not save a current-version refusal when no field changed', async () => {
+          const transaction = await uncategorisable({
+            type: TransactionType.EXPENSE,
+            categorizationVersion: CURRENT_CATEGORIZATION_VERSION
+          });
+          const catalogue = await llmCategorizer.forUser(testUserId);
+          llmService.__setChatResponse({ content: JSON.stringify({ category: null, confidence: 0 }) });
+          const save = jest.spyOn(Transaction.prototype, 'save');
+
+          await categoryMappingService.finishDeferred(transaction, catalogue);
+
+          expect(save).not.toHaveBeenCalled();
+        });
       });
 
       // Nothing else ever revisits an uncategorised transaction - the queue is
