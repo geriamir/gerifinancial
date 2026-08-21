@@ -83,3 +83,42 @@ it('does not repeat original purchase details for a local charge', async () => {
   expect(screen.queryByText('Original purchase')).not.toBeInTheDocument();
   await waitFor(() => expect(getTags).toHaveBeenCalled());
 });
+
+it('falls back to the account currency when scraper currency is blank', async () => {
+  render(
+    <TransactionDetailDialog
+      open
+      transaction={{
+        ...transaction({
+          chargedCurrency: '   ',
+          originalCurrency: 'EUR'
+        }),
+        currency: 'EUR'
+      }}
+      onClose={jest.fn()}
+    />
+  );
+
+  expect(screen.getByText('-700.00 EUR')).toBeInTheDocument();
+  expect(screen.queryByText('Original purchase')).not.toBeInTheDocument();
+  await waitFor(() => expect(getTags).toHaveBeenCalled());
+});
+
+it('treats a whitespace-only original amount as unavailable', async () => {
+  render(
+    <TransactionDetailDialog
+      open
+      transaction={transaction({
+        chargedCurrency: 'ILS',
+        originalAmount: '   ',
+        originalCurrency: 'USD'
+      })}
+      onClose={jest.fn()}
+    />
+  );
+
+  expect(screen.getByText('Original purchase')).toBeInTheDocument();
+  expect(screen.getByText('USD')).toBeInTheDocument();
+  expect(screen.queryByText('0.00 USD')).not.toBeInTheDocument();
+  await waitFor(() => expect(getTags).toHaveBeenCalled());
+});

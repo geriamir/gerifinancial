@@ -232,18 +232,23 @@ const TransactionDetailDialog: React.FC<TransactionDetailDialogProps> = ({
     return format(new Date(dateString), 'EEEE, MMMM d, yyyy \'at\' h:mm a');
   };
 
+  const accountCurrency = normalizeCurrency(transaction.currency);
   const chargedCurrency = normalizeCurrency(
-    transaction.rawData?.chargedCurrency || transaction.currency
+    transaction.rawData?.chargedCurrency,
+    accountCurrency
   );
   const originalCurrency = normalizeCurrency(
-    transaction.rawData?.originalCurrency || chargedCurrency
+    transaction.rawData?.originalCurrency,
+    chargedCurrency
   );
-  const parsedOriginalAmount = Number(transaction.rawData?.originalAmount);
+  const rawOriginalAmount = transaction.rawData?.originalAmount;
+  const hasOriginalAmount =
+    rawOriginalAmount !== null &&
+    rawOriginalAmount !== undefined &&
+    (typeof rawOriginalAmount !== 'string' || rawOriginalAmount.trim() !== '');
+  const parsedOriginalAmount = hasOriginalAmount ? Number(rawOriginalAmount) : NaN;
   const originalAmount =
-    transaction.rawData?.originalAmount !== null &&
-    transaction.rawData?.originalAmount !== undefined &&
-    transaction.rawData?.originalAmount !== '' &&
-    Number.isFinite(parsedOriginalAmount)
+    hasOriginalAmount && Number.isFinite(parsedOriginalAmount)
       ? parsedOriginalAmount
       : null;
   const hasConvertedForeignAmount = originalCurrency !== chargedCurrency;

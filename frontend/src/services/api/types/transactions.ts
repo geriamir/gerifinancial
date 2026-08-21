@@ -1,12 +1,12 @@
 import type { Category, SubCategory } from '../types';
 
 export interface TransactionRawData extends Record<string, any> {
-  originalAmount?: number | string;
-  originalCurrency?: string;
-  chargedAmount?: number | string;
-  chargedCurrency?: string;
-  memo?: string;
-  category?: string;
+  originalAmount?: number | string | null;
+  originalCurrency?: string | null;
+  chargedAmount?: number | string | null;
+  chargedCurrency?: string | null;
+  memo?: string | null;
+  category?: string | null;
 }
 
 export interface Transaction {
